@@ -82,6 +82,20 @@ export class CustomerService {
 
   async createCustomer(tenantId: string, data: Partial<CustomerDTO>): Promise<CustomerDTO> {
     const id = data.id || crypto.randomUUID();
+    const cleanPhone = data.phone ? data.phone.trim() : null;
+
+    if (cleanPhone) {
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('tenant_id', tenantId)
+        .eq('phone', cleanPhone)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`A customer with phone number "${cleanPhone}" already exists (${existing.name}).`);
+      }
+    }
     
     const { data: created, error } = await supabase
       .from('customers')
@@ -89,7 +103,7 @@ export class CustomerService {
         id,
         tenant_id: tenantId,
         name: data.name,
-        phone: data.phone,
+        phone: cleanPhone,
         address: data.address,
         balance: data.balance || 0,
         email: data.email
@@ -103,11 +117,27 @@ export class CustomerService {
   }
 
   async updateCustomer(tenantId: string, customerId: string, data: Partial<CustomerDTO>): Promise<CustomerDTO> {
+    const cleanPhone = data.phone !== undefined ? (data.phone ? data.phone.trim() : null) : undefined;
+
+    if (cleanPhone) {
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('tenant_id', tenantId)
+        .eq('phone', cleanPhone)
+        .neq('id', customerId)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`A customer with phone number "${cleanPhone}" already exists (${existing.name}).`);
+      }
+    }
+
     const { data: updated, error } = await supabase
       .from('customers')
       .update({
         name: data.name,
-        phone: data.phone,
+        phone: cleanPhone,
         address: data.address,
         email: data.email
       })

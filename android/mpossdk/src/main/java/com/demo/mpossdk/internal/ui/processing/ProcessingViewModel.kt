@@ -70,6 +70,7 @@ internal class ProcessingViewModel(
 
     fun startTransaction(paymentRequest: PaymentRequest) = coroutineScope.launch {
         currentPaymentRequest = paymentRequest
+        persistGeoFromRequest(paymentRequest)
         LcdApi.LedLightOn_Api(Led.LED_BLUE)
         SystemApi.Beep_Api(0)
 
@@ -77,9 +78,25 @@ internal class ProcessingViewModel(
 
         emvDetailResult = emvDetailResult.copy(terminalId = paymentRequest.terminalId)
 
+        val emvAmount = emvKernelAmount(paymentRequest)
+        val cashbackIso = if (paymentRequest.cashbackAmount > 0) {
+            ((paymentRequest.cashbackAmount * 100.0).toLong()).toString().padStart(12, '0')
+        } else {
+            null
+        }
+        emvDetailResult = emvDetailResult.copy(
+            amountAuthorisedNumeric = ((emvAmount * 100.0).toLong()).toString().padStart(12, '0'),
+            amountOtherNumeric = cashbackIso,
+            transactionType = paymentRequest.transactionType,
+        )
+
+        val title = when {
+            normalizeTx(paymentRequest.transactionType).contains("BALANCE") -> "Balance Inquiry"
+            else -> "Transaction Amount:"
+        }
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(0, 0, "Transaction Amount:", 0x08)
-        LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(paymentRequest.amount.toString())}", 0x08)
+        LcdApi.ScrDisp_Api(0, 0, title, 0x08)
+        LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(emvAmount.toString())}", 0x08)
         LcdApi.ScrDisp_Api(2, 0, "Swipe/Insert/Tap card", 0x08)
         LcdApi.ScrDrLogoxy_Api(162, 96, 90, 100, Constants.clLogo)
 
@@ -113,11 +130,11 @@ internal class ProcessingViewModel(
                 if (result == 0) {
                     LogUtil.d("Contactless Api Closed")
                 }
-                processIccTransaction(paymentRequest.amount)
+                processIccTransaction(emvAmount)
             }
 
             CardType.CONTACTLESS -> {
-                processContactlessTransaction(paymentRequest.amount)
+                processContactlessTransaction(emvAmount)
             }
 
             CardType.MAG -> {
@@ -125,7 +142,7 @@ internal class ProcessingViewModel(
                 if (result == 0) {
                     LogUtil.d("Contactless Api Closed")
                 }
-                processMagTransaction(paymentRequest.amount)
+                processMagTransaction(emvAmount)
             }
 
             CardType.UNKNOWN -> Unit
@@ -232,7 +249,13 @@ internal class ProcessingViewModel(
 
         IcApi.IccInit_Api(0, 3, ByteArray(256), ShortArray(4))
         val isoAmount = AmountUtils.toIsoAmount(amount, "566")
-        EmvApi.EMV_SetTradeAmt_Api(CommonConvert.ascStringToBCD(isoAmount), ByteArray(6))
+        val otherAmount = currentPaymentRequest?.cashbackAmount?.takeIf { it > 0 }?.let {
+            ((it * 100.0).toLong()).toString().padStart(12, '0')
+        } ?: "000000000000"
+        EmvApi.EMV_SetTradeAmt_Api(
+            CommonConvert.ascStringToBCD(isoAmount),
+            CommonConvert.ascStringToBCD(otherAmount),
+        )
 
         emvDetailResult = emvDetailResult.copy(amountAuthorisedNumeric = isoAmount)
 
@@ -491,8 +514,27 @@ internal class ProcessingViewModel(
             rrn = response.getString(37),
             stan = response.getString(11),
             statusCode = responseCode,
-            transactionType = "PURCHASE",
+            transactionType = currentPaymentRequest?.transactionType ?: "PURCHASE",
         )
+    }
+
+    private fun normalizeTx(raw: String?): String =
+        raw.orEmpty().uppercase().replace(" ", "").replace("-", "").replace("_", "")
+
+    private fun emvKernelAmount(request: PaymentRequest): Double {
+        val type = normalizeTx(request.transactionType)
+        return when {
+            type.contains("BALANCE") -> 2.0
+            type.contains("PURCHASEWITHCB") || type.contains("CASHBACK") ->
+                request.amount + request.cashbackAmount
+            request.amount < 0.01 -> 1.0
+            else -> request.amount
+        }
+    }
+
+    private fun persistGeoFromRequest(request: PaymentRequest) {
+        request.latitude?.let { sessionManager.saveLatitude(it.toString()) }
+        request.longitude?.let { sessionManager.saveLongitude(it.toString()) }
     }
 
 

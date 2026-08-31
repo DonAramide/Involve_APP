@@ -1020,19 +1020,104 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showChangePassword(BuildContext context) {
-    final controller = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscurePassword = true;
+    bool obscureConfirm = true;
+    String? errorMessage;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set New Password'),
-        content: TextField(controller: controller, obscureText: true, decoration: const InputDecoration(labelText: 'New Password')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          TextButton(onPressed: () {
-            context.read<SettingsBloc>().add(SetSystemPassword(controller.text));
-            Navigator.pop(ctx);
-          }, child: const Text('SET')),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.deepPurple),
+              SizedBox(width: 8),
+              Text('Set New Password'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter a new unlock password for this device and confirm it below.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmController,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    prefixIcon: const Icon(Icons.lock_clock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pwd = passwordController.text.trim();
+                final confirm = confirmController.text.trim();
+                if (pwd.isEmpty) {
+                  setDialogState(() => errorMessage = 'Password cannot be empty');
+                  return;
+                }
+                if (pwd.length < 4) {
+                  setDialogState(() => errorMessage = 'Password must be at least 4 characters');
+                  return;
+                }
+                if (pwd != confirm) {
+                  setDialogState(() => errorMessage = 'Passwords do not match');
+                  return;
+                }
+                context.read<SettingsBloc>().add(SetSystemPassword(pwd));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('System password updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('SET PASSWORD'),
+            ),
+          ],
+        ),
       ),
     );
   }

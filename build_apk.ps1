@@ -1,8 +1,8 @@
-# Build obfuscated APK with debug info split
-Write-Host "🚀 Starting Obfuscated Build..." -ForegroundColor Cyan
-flutter build apk --obfuscate --split-debug-info=./debug-info --split-per-abi
+# Build release APK with dart defines from .env.apk-defines.json
+Write-Host "🚀 Starting Build with .env.apk-defines.json..." -ForegroundColor Cyan
+flutter build apk --release --dart-define-from-file=.env.apk-defines.json
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ Build Complete! APKs are in build/app/outputs/flutter-apk/" -ForegroundColor Green
+    Write-Host "✅ Build Complete! APK is in build/app/outputs/flutter-apk/app-release.apk" -ForegroundColor Green
 } else {
     Write-Host "❌ Build Failed!" -ForegroundColor Red
 }

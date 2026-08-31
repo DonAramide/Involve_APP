@@ -15,7 +15,7 @@ class _AdminLoginDialogState extends State<AdminLoginDialog> {
     final mm = now.month.toString().padLeft(2, '0');
     final dd = now.day.toString().padLeft(2, '0');
     final yy = now.year.toString().substring(2);
-    return '$mm$dd${yy}iips@wendy';
+    return '$mm$dd${yy}iips@invify';
   }
 
   @override

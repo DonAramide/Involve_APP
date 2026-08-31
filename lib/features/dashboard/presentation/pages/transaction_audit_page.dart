@@ -8,6 +8,9 @@ import 'package:involve_app/features/invoicing/domain/repositories/invoice_repos
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 import 'package:involve_app/features/school_finance/data/models/finance_models.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/features/services/domain/entities/service_job.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/presentation/templates/service_pdf_generator.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 class TransactionAuditPage extends StatefulWidget {
@@ -20,8 +23,9 @@ class TransactionAuditPage extends StatefulWidget {
 class _TxRow {
   final TransactionAuditModel audit;
   final Invoice? invoice;
+  final ServiceJob? serviceJob;
 
-  const _TxRow({required this.audit, this.invoice});
+  const _TxRow({required this.audit, this.invoice, this.serviceJob});
 }
 
 class _TransactionAuditPageState extends State<TransactionAuditPage> {
@@ -227,6 +231,57 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         // Local invoices are enough when remote audit is unavailable.
       }
 
+      // Load Service Jobs and Payments
+      try {
+        final servicesRepo = context.read<IServicesRepository>();
+        final serviceJobs = await servicesRepo.getJobs();
+        for (final job in serviceJobs) {
+          final payments = await servicesRepo.getJobPayments(job.id);
+          if (payments.isNotEmpty) {
+            for (final pmt in payments) {
+              final ref = pmt.reference?.isNotEmpty == true ? pmt.reference! : job.jobId;
+              final key = 'srv_pmt:${pmt.id}';
+              byKey[key] = _TxRow(
+                serviceJob: job,
+                audit: TransactionAuditModel(
+                  id: pmt.id,
+                  type: 'SERVICE',
+                  paymentMethod: _normalizeMethod(pmt.method),
+                  amount: pmt.amount,
+                  status: 'Paid',
+                  staffName: 'Staff',
+                  date: pmt.createdAt,
+                  items: job.items.isNotEmpty
+                      ? job.items.map((i) => {'name': i.name, 'quantity': i.quantity.toInt()}).toList()
+                      : [{'name': job.title, 'quantity': 1}],
+                  customerName: job.customerName ?? 'Client',
+                  reference: ref,
+                ),
+              );
+            }
+          } else if (job.amountPaid > 0) {
+            final key = 'srv_job:${job.id}';
+            byKey[key] = _TxRow(
+              serviceJob: job,
+              audit: TransactionAuditModel(
+                id: job.id,
+                type: 'SERVICE',
+                paymentMethod: 'Cash',
+                amount: job.amountPaid,
+                status: 'Paid',
+                staffName: 'Staff',
+                date: job.createdAt,
+                items: job.items.isNotEmpty
+                    ? job.items.map((i) => {'name': i.name, 'quantity': i.quantity.toInt()}).toList()
+                    : [{'name': job.title, 'quantity': 1}],
+                customerName: job.customerName ?? 'Client',
+                reference: job.jobId,
+              ),
+            );
+          }
+        }
+      } catch (_) {}
+
       final merged = byKey.values.toList()
         ..sort((a, b) => b.audit.date.compareTo(a.audit.date));
 
@@ -283,6 +338,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   void _showDetails(_TxRow row) {
     final tx = row.audit;
     final invoice = row.invoice;
+    final serviceJob = row.serviceJob;
     final theme = Theme.of(context);
 
     showModalBottomSheet(
@@ -356,6 +412,21 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                       'Balance',
                       CurrencyFormatter.format(invoice.balanceAmount),
                     ),
+                ] else if (serviceJob != null) ...[
+                  _detailLine(
+                    'Job total',
+                    CurrencyFormatter.format(serviceJob.totalAmount),
+                  ),
+                  if (serviceJob.amountPaid > 0)
+                    _detailLine(
+                      'Amount paid',
+                      CurrencyFormatter.format(serviceJob.amountPaid),
+                    ),
+                  if (serviceJob.balance != 0)
+                    _detailLine(
+                      'Remaining balance',
+                      CurrencyFormatter.format(serviceJob.balance),
+                    ),
                 ],
                 if (tx.items.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -377,7 +448,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    if (invoice != null)
+                    if (invoice != null) ...[
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
@@ -393,7 +464,26 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                           label: const Text('Receipt'),
                         ),
                       ),
-                    if (invoice != null) const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ] else if (serviceJob != null) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            final settings = context.read<SettingsBloc>().state.settings;
+                            final payments = await context.read<IServicesRepository>().getJobPayments(serviceJob.id);
+                            await ServiceJobPdfGenerator.generateAndShow(
+                              job: serviceJob,
+                              payments: payments,
+                              settings: settings,
+                            );
+                          },
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('Receipt'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(ctx),

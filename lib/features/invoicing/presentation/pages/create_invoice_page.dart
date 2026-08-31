@@ -1455,6 +1455,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
   final addrController = TextEditingController(text: currentAddress);
   final invoiceBloc = context.read<InvoiceBloc>();
   String? selectedCustomerId = invoiceBloc.state.customerId;
+  String? existingCustomerName;
 
   showDialog(
     context: context,
@@ -1476,9 +1477,17 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                       children: [
                         const Icon(Icons.check_circle, color: Colors.green, size: 16),
                         const SizedBox(width: 8),
-                        const Expanded(child: Text('Linked to Customer Profile', style: TextStyle(color: Colors.green, fontSize: 12))),
+                        Expanded(
+                          child: Text(
+                            existingCustomerName != null ? 'Linked: $existingCustomerName' : 'Linked to Customer Profile',
+                            style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
                         InkWell(
-                          onTap: () => setState(() => selectedCustomerId = null),
+                          onTap: () => setState(() {
+                            selectedCustomerId = null;
+                            existingCustomerName = null;
+                          }),
                           child: const Icon(Icons.close, color: Colors.grey, size: 16),
                         ),
                       ],
@@ -1491,6 +1500,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                       if (customer != null) {
                         setState(() {
                           selectedCustomerId = customer.id;
+                          existingCustomerName = customer.name;
                           nameController.text = customer.name;
                           phoneController.text = customer.phone ?? '';
                           addrController.text = customer.address ?? '';
@@ -1503,68 +1513,109 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: nameController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerNameLabel ?? 'Customer Name', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.person),
+                  decoration: InputDecoration(
+                    labelText: settings?.customerNameLabel ?? 'Customer Name', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                  autofocus: true,
+                  validator: (val) {
+                    final label = settings?.customerLabel.toLowerCase() ?? 'customer';
+                    return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
+                  },
                 ),
-                autofocus: true,
-                validator: (val) {
-                  final label = settings?.customerLabel.toLowerCase() ?? 'customer';
-                  return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: phoneController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.phone),
-                  hintText: 'e.g. 08012345678',
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.phone),
+                    hintText: 'e.g. 08012345678',
+                  ),
+                  keyboardType: TextInputType.phone,
+                  onChanged: (val) async {
+                    final phone = val.trim();
+                    if (phone.length >= 10 && selectedCustomerId == null) {
+                      final repo = context.read<IServicesRepository>();
+                      final existing = await repo.getCustomerByPhone(phone);
+                      if (existing != null) {
+                        setState(() {
+                          selectedCustomerId = existing.id;
+                          existingCustomerName = existing.name;
+                          if (nameController.text.trim().isEmpty) {
+                            nameController.text = existing.name;
+                          }
+                          if (addrController.text.trim().isEmpty && existing.address != null) {
+                            addrController.text = existing.address!;
+                          }
+                        });
+                      }
+                    }
+                  },
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'Phone number required';
+                    final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
+                    if (digitsOnly.length < 11 || digitsOnly.length > 15) {
+                      return 'Phone must be 11 to 15 digits';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.phone,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Phone number required';
-                  final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                    return 'Phone must be 11 to 15 digits';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: addrController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerAddressLabel ?? 'Customer Address', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.location_on),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: addrController,
+                  decoration: InputDecoration(
+                    labelText: settings?.customerAddressLabel ?? 'Customer Address', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.location_on),
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final phone = phoneController.text.trim();
+                final name = nameController.text.trim();
+                final addr = addrController.text.trim();
+
+                String? finalCustId = selectedCustomerId;
+                final repo = context.read<IServicesRepository>();
+                if (finalCustId == null && phone.isNotEmpty) {
+                  final existing = await repo.getCustomerByPhone(phone);
+                  if (existing != null) {
+                    finalCustId = existing.id;
+                  } else {
+                    try {
+                      final created = await repo.createCustomer(
+                        name: name,
+                        phone: phone,
+                        address: addr.isEmpty ? null : addr,
+                      );
+                      finalCustId = created.id;
+                    } catch (_) {}
+                  }
+                }
+
+                invoiceBloc.add(UpdateCustomerInfo(
+                  name: name,
+                  phone: phone,
+                  address: addr.isEmpty ? null : addr,
+                  customerId: finalCustId,
+                ));
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-        ElevatedButton(
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              invoiceBloc.add(UpdateCustomerInfo(
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                address: addrController.text.isEmpty ? null : addrController.text.trim(),
-                customerId: selectedCustomerId,
-              ));
-              Navigator.pop(ctx);
-            }
-          },
-          child: const Text('SAVE'),
-        ),
-      ],
-    ),
     ),
   );
 }

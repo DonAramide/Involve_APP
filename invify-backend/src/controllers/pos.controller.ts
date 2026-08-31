@@ -5,7 +5,7 @@ import { supabase } from '../db/supabase';
 export class PosController {
   static async processTransaction(req: Request, res: Response) {
     try {
-      const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse, tenantProfile, deviceInfo } = req.body;
+      const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse, tenantProfile, deviceInfo, latitude, longitude, field120, geofencing } = req.body;
       const { resolveTenantScope } = require('../utils/resolve-tenant-scope');
       const tenantId =
         resolveTenantScope(req) ||
@@ -29,7 +29,11 @@ export class PosController {
           deviceStatus,
           transactionResponse,
           tenantProfile,
-          deviceInfo
+          deviceInfo,
+          latitude,
+          longitude,
+          field120,
+          geofencing,
         });
         return res.status(200).json(response);
       }
@@ -40,7 +44,11 @@ export class PosController {
         amount,
         emvData,
         staffName,
-        items
+        items,
+        latitude,
+        longitude,
+        field120,
+        geofencing,
       });
 
       res.status(200).json(response);

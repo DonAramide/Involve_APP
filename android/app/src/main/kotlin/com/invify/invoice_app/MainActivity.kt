@@ -243,15 +243,27 @@ class MainActivity: FlutterActivity() {
                             com.demo.mpossdk.open.ActiveHost.MEDUSA
                         }
                         val processOnDevice = call.argument<Boolean>("processOnDevice") ?: false
+                        val transactionType = call.argument<String>("transactionType") ?: "PURCHASE"
+                        val cashbackAmount = call.argument<Double>("cashbackAmount") ?: 0.0
+                        val originalRrn = call.argument<String>("originalRrn")
+                        val originalStan = call.argument<String>("originalStan")
+                        val latitude = call.argument<Double>("latitude")
+                        val longitude = call.argument<Double>("longitude")
 
                         pendingPaymentResult = result
                         resultReplied = false
 
                         val paymentRequest = PaymentRequest(
-                            amount = amount, 
-                            terminalId = terminalId, 
+                            amount = amount,
+                            terminalId = terminalId,
                             activeHost = activeHost,
-                            processOnDevice = processOnDevice
+                            processOnDevice = processOnDevice,
+                            transactionType = transactionType,
+                            cashbackAmount = cashbackAmount,
+                            originalRrn = originalRrn,
+                            originalStan = originalStan,
+                            latitude = latitude,
+                            longitude = longitude,
                         )
 
                         MposSdk.initiatePayment(this, paymentRequest) { listener ->
@@ -393,6 +405,41 @@ class MainActivity: FlutterActivity() {
                                 }
                             }
                         }
+                    )
+                }
+                "saveGeoCoordinates" -> {
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    if (latitude == null || longitude == null) {
+                        result.error("invalid_geo", "latitude and longitude are required", null)
+                    } else {
+                        MposSdk.saveGeoCoordinates(latitude, longitude)
+                        result.success(
+                            mapOf(
+                                "status" to "success",
+                                "latitude" to latitude,
+                                "longitude" to longitude,
+                                "field120" to (MposSdk.geoField120() ?: ""),
+                            )
+                        )
+                    }
+                }
+                "initGeofencing" -> {
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    if (latitude != null && longitude != null) {
+                        MposSdk.saveGeoCoordinates(latitude, longitude)
+                    }
+                    MposSdk.captureLocation()
+                    val saved = MposSdk.savedGeoCoordinates()
+                    result.success(
+                        mapOf(
+                            "status" to "success",
+                            "message" to "Geofencing coordinates stored for NIBSS Field 120",
+                            "latitude" to saved["latitude"],
+                            "longitude" to saved["longitude"],
+                            "field120" to saved["field120"],
+                        )
                     )
                 }
                 else -> {

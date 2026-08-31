@@ -13,6 +13,21 @@ class ManageJobTitlesPage extends StatefulWidget {
 
 class _ManageJobTitlesPageState extends State<ManageJobTitlesPage> {
   final _titleController = TextEditingController();
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  static const List<String> _commonSuggestions = [
+    'Consultation',
+    'General Inspection',
+    'Diagnostics',
+    'Maintenance & Servicing',
+    'Standard Repair',
+    'Installation & Setup',
+    'Custom Order / Tailoring',
+    'Deep Cleaning',
+    'Emergency Callout',
+    'Routine Checkup',
+  ];
 
   @override
   void initState() {
@@ -23,12 +38,14 @@ class _ManageJobTitlesPageState extends State<ManageJobTitlesPage> {
   @override
   void dispose() {
     _titleController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  void _addTitle() {
-    if (_titleController.text.isNotEmpty) {
-      context.read<ServicesBloc>().add(AddServicePreset(_titleController.text));
+  void _addTitle([String? text]) {
+    final title = (text ?? _titleController.text).trim();
+    if (title.isNotEmpty) {
+      context.read<ServicesBloc>().add(AddServicePreset(title));
       _titleController.clear();
       FocusScope.of(context).unfocus();
     }
@@ -38,55 +55,167 @@ class _ManageJobTitlesPageState extends State<ManageJobTitlesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Job Types'),
+        title: const Text('Service Offerings & Presets'),
       ),
-      body: BlocBuilder<ServicesBloc, ServicesState>(
+      body: BlocConsumer<ServicesBloc, ServicesState>(
+        listener: (context, state) {
+          if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.errorMessage!), backgroundColor: Colors.red),
+            );
+          }
+          if (state.successMessage != null && state.successMessage!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green),
+            );
+          }
+        },
         builder: (context, state) {
-          final presets = state.presets;
+          final allPresets = state.presets;
+          final filteredPresets = allPresets.where((p) {
+            if (_searchQuery.isEmpty) return true;
+            return p.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
 
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
+              // Add Input Card
+              Container(
                 padding: const EdgeInsets.all(16.0),
-                child: Row(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'New Job Type (e.g. Repairs, Consultation)',
-                          border: OutlineInputBorder(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _titleController,
+                            decoration: const InputDecoration(
+                              labelText: 'New Service Offering / Job Type',
+                              hintText: 'e.g. Consultation, Repair, Maintenance',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.design_services_outlined),
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                            onSubmitted: (_) => _addTitle(),
+                          ),
                         ),
-                        onSubmitted: (_) => _addTitle(),
-                      ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () => _addTitle(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                          ),
+                          child: const Text('ADD'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _addTitle,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                    const SizedBox(height: 12),
+                    // Suggestion Chips
+                    const Text(
+                      'Popular Service Suggestions:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 6),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _commonSuggestions
+                            .where((s) => !allPresets.contains(s))
+                            .take(6)
+                            .map((s) => Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ActionChip(
+                                    avatar: const Icon(Icons.add, size: 14),
+                                    label: Text(s, style: const TextStyle(fontSize: 12)),
+                                    onPressed: () => _addTitle(s),
+                                  ),
+                                ))
+                            .toList(),
                       ),
-                      child: const Text('ADD'),
                     ),
                   ],
                 ),
               ),
-              const Divider(),
+
+              if (allPresets.length > 5)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search service presets...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                  ),
+                ),
+
               Expanded(
-                child: presets.isEmpty
-                    ? const Center(child: Text('No custom titles added yet.'))
-                    : ListView.builder(
-                        itemCount: presets.length,
+                child: allPresets.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.miscellaneous_services_outlined, size: 64, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'No service offerings added yet',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Add common jobs or services so they can be picked with 1-click when creating new customer orders.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: _commonSuggestions.take(4).map((s) => ElevatedButton.icon(
+                                  onPressed: () => _addTitle(s),
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: Text(s),
+                                )).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredPresets.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
                         itemBuilder: (context, index) {
-                          final title = presets[index];
-                          return ListTile(
-                            leading: const Icon(Icons.style),
-                            title: Text(title),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _confirmDelete(context, title),
+                          final title = filteredPresets[index];
+                          return Card(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                child: Icon(Icons.build_circle_outlined, color: Theme.of(context).primaryColor, size: 20),
+                              ),
+                              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                tooltip: 'Delete Preset',
+                                onPressed: () => _confirmDelete(context, title),
+                              ),
                             ),
                           );
                         },
@@ -103,8 +232,8 @@ class _ManageJobTitlesPageState extends State<ManageJobTitlesPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Title?'),
-        content: Text('Are you sure you want to delete "$title"?'),
+        title: const Text('Delete Service Offering?'),
+        content: Text('Are you sure you want to remove "$title" from presets?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
           TextButton(

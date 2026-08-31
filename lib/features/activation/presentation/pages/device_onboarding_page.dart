@@ -55,6 +55,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   bool _isLoading = false;
   int _currentStep = 0;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool? _isServerReachable;
 
   final List<Map<String, String>> _stepsInfo = [
@@ -429,18 +430,33 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           const SizedBox(height: 20),
           _buildTextField(_emailController, 'Email Address', Icons.email, isEmail: true),
           const SizedBox(height: 20),
-          _buildTextField(_passwordController, 'Portal Password', Icons.lock, isPassword: true),
+          _buildTextField(
+            _passwordController, 
+            'Create Web Password', 
+            Icons.lock, 
+            isPassword: true,
+            isObscured: _obscurePassword,
+            onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+            helperText: 'Used to sign in to the Invify Web Management Portal',
+            customValidator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Required';
+              if (value.length < 6) return 'Password must be at least 6 characters';
+              return null;
+            },
+          ),
           const SizedBox(height: 20),
           _buildTextField(
             _confirmPasswordController, 
-            'Confirm Portal Password', 
+            'Confirm Web Password', 
             Icons.lock_outline, 
             isPassword: true,
+            isObscured: _obscureConfirmPassword,
+            onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             customValidator: (value) {
               if (value == null || value.isEmpty) return 'Required';
               if (value != _passwordController.text) return 'Passwords do not match';
               return null;
-            }
+            },
           ),
           const SizedBox(height: 20),
           _buildTextField(_businessNameController, 'Business / Tenant Name', Icons.business),
@@ -508,23 +524,38 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isEmail = false, bool isPhone = false, bool isPassword = false, bool isRequired = true, String? Function(String?)? customValidator}) {
+  Widget _buildTextField(
+    TextEditingController controller, 
+    String label, 
+    IconData icon, {
+    bool isEmail = false, 
+    bool isPhone = false, 
+    bool isPassword = false, 
+    bool isRequired = true, 
+    String? Function(String?)? customValidator,
+    String? helperText,
+    bool? isObscured,
+    VoidCallback? onToggleObscure,
+  }) {
+    final obscure = isPassword ? (isObscured ?? _obscurePassword) : false;
     return TextFormField(
       controller: controller,
       style: const TextStyle(color: Colors.white),
-      obscureText: isPassword ? _obscurePassword : false,
+      obscureText: obscure,
       keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
+        helperText: helperText,
+        helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
         prefixIcon: Icon(icon, color: const Color(0xFF818CF8)),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  obscure ? Icons.visibility_off : Icons.visibility,
                   color: const Color(0xFF818CF8),
                 ),
-                onPressed: () {
+                onPressed: onToggleObscure ?? () {
                   setState(() {
                     _obscurePassword = !_obscurePassword;
                   });

@@ -8,6 +8,9 @@ import com.demo.mpossdk.internal.iso8583.enums.ISOProcCode
 import com.demo.mpossdk.internal.iso8583.utils.ISOUtils
 import com.demo.mpossdk.internal.iso8583.utils.PosPackager
 import com.demo.mpossdk.internal.utils.Constants
+import com.demo.mpossdk.internal.utils.PosGeoCoordinates
+import com.demo.mpossdk.open.MposSdk
+import com.demo.mpossdk.open.PaymentRequest
 import org.jpos.iso.ISODate
 import org.jpos.iso.ISOMsg
 import org.jpos.iso.ISOUtil
@@ -56,12 +59,14 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         emvDetailResult: EmvDetailResult
     ): ISOMsg {
         val terminalParameters = sessionManager.getTerminalParameters()
+        val paymentRequest = MposSdk.paymentRequest
+        val txType = normalizeTransactionType(paymentRequest?.transactionType)
         val purchaseRequest = ISOMsg()
         purchaseRequest.packager = transactionPackager
-        purchaseRequest.mti = ISOMessageType._0200.value
+        purchaseRequest.mti = mtiFor(txType)
         purchaseRequest.set(2, emvDetailResult.cardNo)
-        purchaseRequest.set(3, ISOProcCode.PURCHASE_ISO_PROC_CODE.value)
-        purchaseRequest.set(4, emvDetailResult.amountAuthorisedNumeric)
+        purchaseRequest.set(3, processingCodeFor(txType))
+        purchaseRequest.set(4, field4Amount(txType, emvDetailResult, paymentRequest))
         purchaseRequest.set(7, transactionDateTime)
         purchaseRequest.set(11, ISOUtils.getStan())
         purchaseRequest.set(12, transactionTime)
@@ -74,7 +79,15 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         purchaseRequest.set(28, "D00000000")
         purchaseRequest.set(32, emvDetailResult.acquirerInstitutionId)
         purchaseRequest.set(35, normalizeTrack2(emvDetailResult.track2Data))
-        purchaseRequest.set(37, ISOUtils.generateRetrievalReferenceNumber(transactionDateTime, purchaseRequest.getString(11)))
+        val generatedRrn = ISOUtils.generateRetrievalReferenceNumber(
+            transactionDateTime,
+            purchaseRequest.getString(11),
+        )
+        val originalRrn = paymentRequest?.originalRrn?.trim().orEmpty()
+        purchaseRequest.set(
+            37,
+            if (usesOriginalRrn(txType) && originalRrn.length >= 12) originalRrn else generatedRrn,
+        )
         purchaseRequest.set(40, emvDetailResult.serviceCode)
         purchaseRequest.set(55, emvDetailResult.iccData)
         purchaseRequest.set(123, Constants.POS_DATA_CODE)
@@ -112,9 +125,13 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         )
         val rrn = purchaseRequest.getString(37) ?: ""
 
+        applyTransactionSpecificFields(purchaseRequest, txType, paymentRequest, emvDetailResult)
+        applyGeoTag(purchaseRequest, isNibssFamily, paymentRequest)
+
         // Accelerex GA (196.6.103.18:4001) peer-disconnects on default Flutter fields.
         // Match working morefunsdk applyGaNibssPurchaseOverrides before MAC.
-        if (isAccelerexGaHost(terminalParameters)) {
+        // Only for PURCHASE — cert types (balance/reversal/pre-auth) must keep their proc codes.
+        if (isAccelerexGaHost(terminalParameters) && txType == "PURCHASE") {
             applyAccelerexGaPurchaseOverrides(
                 purchaseRequest,
                 terminalId,
@@ -163,10 +180,120 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
                 "tskLen=${hashKey.length} tskFp=$tskFp macLen=${mac.size} wireMacAscii=${mac.size * 2} " +
                 "f35=${purchaseRequest.getString(35)} f59=${purchaseRequest.getString(59)} " +
                 "f52=${purchaseRequest.hasField(52)} f55len=${f55.length} $f55Tags " +
-                "tid=${purchaseRequest.getString(41)} " +
-                "BUILD_MARKER=2026-08-09-ONLINEPIN"
+                "tid=${purchaseRequest.getString(41)} mti=${purchaseRequest.mti} " +
+                "f3=${purchaseRequest.getString(3)} f120=${purchaseRequest.getString(120)} " +
+                "txType=$txType BUILD_MARKER=2026-08-30-NIBSS-GEO"
         )
         return purchaseRequest
+    }
+
+    private fun normalizeTransactionType(raw: String?): String {
+        val compact = raw.orEmpty().uppercase().replace(" ", "").replace("-", "").replace("_", "")
+        return when {
+            compact.isEmpty() || compact == "PURCHASE" || compact == "00" -> "PURCHASE"
+            compact == "BALANCE" || compact == "CARDBALANCE" || compact == "31" -> "BALANCE"
+            compact == "REVERSAL" || compact == "20" && raw.equals("REVERSAL", true) -> "REVERSAL"
+            compact == "CASHADVANCE" || compact == "01" -> "CASHADVANCE"
+            compact.contains("PURCHASEWITHCB") || compact.contains("CASHBACK") || compact == "09" -> "PURCHASEWITHCB"
+            compact == "REFUND" -> "REFUND"
+            compact == "PREAUTH" || compact == "60" -> "PREAUTH"
+            compact.contains("PREAUTHCOMPLETE") || compact.contains("PREAUTHCOMPLETION") || compact == "61" ->
+                "PREAUTHCOMPLETE"
+            else -> compact
+        }
+    }
+
+    private fun mtiFor(txType: String): String = when (txType) {
+        "BALANCE", "PREAUTH" -> ISOMessageType._0100.value
+        "PREAUTHCOMPLETE" -> ISOMessageType._0220.value
+        "REVERSAL" -> ISOMessageType._0420.value
+        else -> ISOMessageType._0200.value
+    }
+
+    private fun processingCodeFor(txType: String): String = when (txType) {
+        "PURCHASEWITHCB" -> ISOProcCode.PURCHASE_WITH_CASHBACK_ISO_PROC_CODE.value
+        "BALANCE" -> ISOProcCode.BALANCE_ISO_PROC_CODE.value
+        "CASHADVANCE" -> ISOProcCode.CASH_ADVANCE_ISO_PROC_CODE.value
+        "REFUND" -> ISOProcCode.REFUND_ISO_PROC_CODE.value
+        "PREAUTH" -> ISOProcCode.PRE_AUTH_ISO_PROC_CODE.value
+        "PREAUTHCOMPLETE" -> ISOProcCode.PRE_AUTH_COMPLETION_ISO_PROC_CODE.value
+        "REVERSAL" -> ISOProcCode.PURCHASE_ISO_PROC_CODE.value
+        else -> ISOProcCode.PURCHASE_ISO_PROC_CODE.value
+    }
+
+    private fun usesOriginalRrn(txType: String): Boolean =
+        txType == "REVERSAL" || txType == "PREAUTHCOMPLETE"
+
+    private fun field4Amount(
+        txType: String,
+        emvDetailResult: EmvDetailResult,
+        paymentRequest: PaymentRequest?,
+    ): String {
+        if (txType == "BALANCE") return "000000000000"
+        val authorised = emvDetailResult.amountAuthorisedNumeric?.trim().orEmpty()
+        if (authorised.isNotEmpty()) return authorised
+        val amount = paymentRequest?.amount ?: 0.0
+        val cashback = if (txType == "PURCHASEWITHCB") paymentRequest?.cashbackAmount ?: 0.0 else 0.0
+        val kobo = ((amount + cashback) * 100.0).toLong().coerceAtLeast(0L)
+        return kobo.toString().padStart(12, '0')
+    }
+
+    private fun applyTransactionSpecificFields(
+        request: ISOMsg,
+        txType: String,
+        paymentRequest: PaymentRequest?,
+        emvDetailResult: EmvDetailResult,
+    ) {
+        if (txType == "PURCHASEWITHCB") {
+            val currency = request.getString(49)?.takeIf { it.isNotBlank() } ?: "566"
+            val cashbackIso = cashbackIsoAmount(paymentRequest, emvDetailResult)
+            if (cashbackIso.isNotEmpty()) {
+                request.set(54, "0040${currency}D$cashbackIso")
+            }
+        }
+        if (txType == "REVERSAL" || txType == "PREAUTHCOMPLETE") {
+            val originalStan = paymentRequest?.originalStan?.trim().orEmpty()
+            if (originalStan.length >= 6) {
+                val originalMti = if (txType == "PREAUTHCOMPLETE") "0100" else "0200"
+                val datetime = request.getString(7) ?: transactionDateTime
+                val acquirer = (request.getString(32) ?: "").padStart(11, '0')
+                val forwarding = (request.getString(33) ?: "00000000000").padStart(11, '0')
+                request.set(
+                    90,
+                    originalMti + originalStan.take(6).padStart(6, '0') + datetime + acquirer + forwarding,
+                )
+            }
+        }
+    }
+
+    private fun cashbackIsoAmount(
+        paymentRequest: PaymentRequest?,
+        emvDetailResult: EmvDetailResult,
+    ): String {
+        val fromEmv = emvDetailResult.amountOtherNumeric?.trim().orEmpty()
+        if (fromEmv.isNotEmpty()) return fromEmv.padStart(12, '0')
+        val cashback = paymentRequest?.cashbackAmount ?: 0.0
+        if (cashback <= 0.0) return ""
+        return ((cashback * 100.0).toLong().coerceAtLeast(0L)).toString().padStart(12, '0')
+    }
+
+    private fun applyGeoTag(
+        request: ISOMsg,
+        isNibssFamily: Boolean,
+        paymentRequest: PaymentRequest?,
+    ) {
+        if (!isNibssFamily) return
+        val latitude = paymentRequest?.latitude
+            ?: sessionManager.getLatitude()?.toDoubleOrNull()
+        val longitude = paymentRequest?.longitude
+            ?: sessionManager.getLongitude()?.toDoubleOrNull()
+        if (latitude == null || longitude == null) {
+            android.util.Log.w(TAG, "Field 120 omitted: GPS coordinates not available")
+            return
+        }
+        val field120 = PosGeoCoordinates.toField120(latitude, longitude)
+        request.set(120, field120)
+        android.util.Log.i(TAG, "ISO field 120=$field120")
     }
 
     /**

@@ -731,6 +731,7 @@ app.post('/api/admin/apk/deploy', authenticate, ApkController.deployApk);
 app.post('/api/admin/apk/uninstall', authenticate, ApkController.uninstallApk);
 app.delete('/api/admin/apk/:id', authenticate, ApkController.removeApk);
 app.patch('/api/admin/apk/:id/url', authenticate, ApkController.updateApkUrl);
+app.get('/api/apk/:id/download', ApkController.downloadApk);
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);

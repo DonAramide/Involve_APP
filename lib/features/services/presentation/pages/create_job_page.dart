@@ -192,16 +192,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
                           controller: controller,
                           focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: 'Job Type / Title',
-                            hintText: 'e.g. Traditional Dress Sewing',
+                            labelText: 'Service Offering / Job Type',
+                            hintText: 'e.g. Repair, Consultation, Maintenance',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            prefixIcon: const Icon(Icons.work_outline),
+                            prefixIcon: const Icon(Icons.design_services_outlined),
                             suffixIcon: IconButton(
                               icon: const Icon(Icons.arrow_drop_down),
                               onPressed: () {
                                 if (_jobTitlePresets.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('No presets found. Add them in dashboard settings.'))
+                                    const SnackBar(content: Text('No service presets found. Add them in Services Setup.')),
                                   );
                                 }
                                 if (!focusNode.hasFocus) focusNode.requestFocus();
@@ -717,10 +717,11 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
     final phoneCtrl = TextEditingController();
     final addressCtrl = TextEditingController();
     Uint8List? customerImage;
+    String? phoneError;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add New Customer'),
           content: SingleChildScrollView(
@@ -744,27 +745,88 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
+                  textCapitalization: TextCapitalization.words,
+                ),
                 const SizedBox(height: 12),
-                TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder())),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.phone),
+                    errorText: phoneError,
+                  ),
+                  onChanged: (_) {
+                    if (phoneError != null) {
+                      setDialogState(() => phoneError = null);
+                    }
+                  },
+                ),
                 const SizedBox(height: 12),
-                TextField(controller: addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Home/Office Address', border: OutlineInputBorder())),
+                TextField(
+                  controller: addressCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Home/Office Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on)),
+                ),
               ],
             ),
           ),
           actions: [
-            NoLabelButton(onPressed: () => Navigator.pop(context), text: 'Cancel'),
+            NoLabelButton(onPressed: () => Navigator.pop(dialogCtx), text: 'Cancel'),
             ElevatedButton(
               onPressed: () {
-                if (nameCtrl.text.isNotEmpty) {
-                  context.read<ServicesBloc>().add(CreateServiceCustomer(
-                    name: nameCtrl.text,
-                    phone: phoneCtrl.text,
-                    address: addressCtrl.text,
-                    image: customerImage,
-                  ));
-                  Navigator.pop(context);
+                final name = nameCtrl.text.trim();
+                final phone = phoneCtrl.text.trim();
+
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Customer name is required')),
+                  );
+                  return;
                 }
+
+                if (phone.isNotEmpty) {
+                  final existingList = context.read<ServicesBloc>().state.customers;
+                  final digits = phone.replaceAll(RegExp(r'\D'), '');
+                  final match = existingList.where((c) {
+                    final p = (c.phone ?? '').trim();
+                    if (p.isEmpty) return false;
+                    if (p == phone) return true;
+                    final cd = p.replaceAll(RegExp(r'\D'), '');
+                    if (cd.isNotEmpty && digits.isNotEmpty) {
+                      if (cd == digits) return true;
+                      if (cd.length >= 10 && digits.length >= 10) {
+                        return cd.substring(cd.length - 10) == digits.substring(digits.length - 10);
+                      }
+                    }
+                    return false;
+                  }).firstOrNull;
+
+                  if (match != null) {
+                    setDialogState(() {
+                      phoneError = 'Phone already used by ${match.name}';
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('A customer with phone number "$phone" already exists (${match.name}).'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                }
+
+                context.read<ServicesBloc>().add(CreateServiceCustomer(
+                  name: name,
+                  phone: phone.isEmpty ? null : phone,
+                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                  image: customerImage,
+                ));
+                Navigator.pop(dialogCtx);
               },
               child: const Text('Save Customer'),
             ),

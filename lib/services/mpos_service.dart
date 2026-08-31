@@ -78,8 +78,8 @@ class MposService {
   }
 
   /// Initiates a payment on the POS device.
-  /// 
-  /// [amount] The amount to charge (must be >= 1.00).
+  ///
+  /// [amount] The amount to charge (must be >= 1.00 except balance/reversal/refund).
   /// [terminalId] The terminal ID for the transaction.
   Future<MposTransactionResponse> initiatePayment({
     required double amount,
@@ -87,6 +87,12 @@ class MposService {
     String activeHost = 'MEDUSA',
     bool processOnDevice = false,
     String? deviceType,
+    String transactionType = 'PURCHASE',
+    double cashbackAmount = 0,
+    String? originalRrn,
+    String? originalStan,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
@@ -97,6 +103,12 @@ class MposService {
           'activeHost': activeHost,
           'processOnDevice': processOnDevice,
           'deviceType': _deviceTypeArg(deviceType),
+          'transactionType': transactionType,
+          'cashbackAmount': cashbackAmount,
+          if (originalRrn != null) 'originalRrn': originalRrn,
+          if (originalStan != null) 'originalStan': originalStan,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
         },
       );
       
@@ -141,6 +153,48 @@ class MposService {
     } on PlatformException catch (e) {
       debugPrint('Failed to get MPOS serial number: ${e.message}');
       return null;
+    }
+  }
+
+  /// Persists NIBSS Field 120 coordinates on the VM30 session.
+  Future<Map<String, dynamic>> saveGeoCoordinates({
+    required double latitude,
+    required double longitude,
+    String? deviceType,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'saveGeoCoordinates',
+        {
+          'latitude': latitude,
+          'longitude': longitude,
+          'deviceType': _deviceTypeArg(deviceType),
+        },
+      );
+      return Map<String, dynamic>.from(result ?? {});
+    } on PlatformException catch (e) {
+      return {'status': 'failure', 'message': e.message};
+    }
+  }
+
+  /// Requests location (if provided) and stores coordinates for ISO Field 120.
+  Future<Map<String, dynamic>> initGeofencing({
+    double? latitude,
+    double? longitude,
+    String? deviceType,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'initGeofencing',
+        {
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          'deviceType': _deviceTypeArg(deviceType),
+        },
+      );
+      return Map<String, dynamic>.from(result ?? {});
+    } on PlatformException catch (e) {
+      return {'status': 'failure', 'message': e.message};
     }
   }
 

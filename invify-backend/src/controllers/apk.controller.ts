@@ -1,12 +1,18 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
+import { resolveApkObjectKey } from '../utils/apk-object-key';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 export const apkUploadMiddleware = upload.single('file');
 
-const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+const APK_TRANSFER_TIMEOUT_MS = 15 * 60 * 1000;
+
+function publicApkDownloadUrl(apkId: string): string {
+  const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || '').replace(/\/+$/, '');
+  return base ? `${base}/api/apk/${apkId}/download` : `/api/apk/${apkId}/download`;
+}
 
 const s3Client = new S3Client({
   endpoint: process.env.CONTABO_ENDPOINT || '',
@@ -33,8 +39,8 @@ export class ApkController {
   }
 
   static async uploadApk(req: Request, res: Response) {
-    req.setTimeout(APK_UPLOAD_TIMEOUT_MS);
-    res.setTimeout(APK_UPLOAD_TIMEOUT_MS);
+    req.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    res.setTimeout(APK_TRANSFER_TIMEOUT_MS);
     try {
       const file = req.file;
       const { name, packageName, version, targetSlotId } = req.body;
@@ -59,30 +65,42 @@ export class ApkController {
         ACL: process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true' ? 'public-read' : 'private'
       }));
 
-      // Construct public URL. Contabo URL is usually https://<endpoint>/<bucket>/<key>
+      // Construct public URL with Contabo tenant ID format: https://<endpoint>/<tenantId>:<bucket>/<key>
       let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
       let s3Url = '';
       if (baseUrl) {
-          if (!baseUrl.endsWith('/')) baseUrl += '/';
-          s3Url = `${baseUrl}${objectKey}`;
+        if (!baseUrl.endsWith('/')) baseUrl += '/';
+        s3Url = `${baseUrl}${objectKey}`;
       } else {
-          let endpointUrl = process.env.CONTABO_ENDPOINT || '';
-          if (!endpointUrl.endsWith('/')) endpointUrl += '/';
-          s3Url = `${endpointUrl}${bucket}/${objectKey}`;
+        let endpointUrl = (process.env.CONTABO_ENDPOINT || '').trim();
+        if (!endpointUrl.endsWith('/')) endpointUrl += '/';
+        const tenantId = (process.env.CONTABO_TENANT_ID || process.env.CONTABO_CUSTOMER_ID || '0d205683f3b543beb7298e9b68e26b0f').trim();
+        const bucketPath = tenantId && !bucket?.includes(':') ? `${tenantId}:${bucket}` : bucket;
+        s3Url = `${endpointUrl}${bucketPath}/${objectKey}`;
       }
 
       const apkData = {
         name,
         packageName,
         version,
-        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        size: file.size,
+        sizeFormatted: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
         s3Url
       };
 
       let result;
       const operatorEmail = (req as any).user?.email || 'system_operator';
-      if (targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined') {
-        result = await ApkVaultService.updateApkSlot(targetSlotId, apkData, operatorEmail);
+      const vault = await ApkVaultService.getVault();
+      const existingForPackage = vault.find(
+        (a: any) => String(a.packageName || '').toLowerCase() === String(packageName).toLowerCase(),
+      );
+      const slotId =
+        targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined'
+          ? targetSlotId
+          : existingForPackage?.id;
+
+      if (slotId) {
+        result = await ApkVaultService.updateApkSlot(slotId, apkData, operatorEmail);
       } else {
         result = await ApkVaultService.addApk(apkData, operatorEmail);
       }
@@ -90,7 +108,86 @@ export class ApkController {
       return res.status(200).json(result);
     } catch (error: any) {
       console.error('[ApkController] upload error:', error);
-      return res.status(500).json({ error: error.message });
+      const isDuplicate = error?.code === '23505' || /already exists|already in the vault/i.test(String(error?.message || ''));
+      return res.status(isDuplicate ? 409 : 500).json({
+        error: isDuplicate
+          ? `${req.body?.packageName || 'This package'} is already in the vault. Use Upload New Version on that slot.`
+          : (error.message || 'APK upload failed'),
+      });
+    }
+  }
+
+  static async downloadApk(req: Request, res: Response) {
+    req.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    res.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    try {
+      const apk = await ApkVaultService.getApkById(String(req.params.id || ''));
+      if (!apk?.s3Url) {
+        return res.status(404).json({ error: 'APK not found' });
+      }
+
+      const objectKey = resolveApkObjectKey(apk.s3Url);
+      if (!objectKey) {
+        if (apk.s3Url.startsWith('http')) {
+          return res.redirect(302, apk.s3Url);
+        }
+        return res.status(404).json({ error: 'APK storage key is missing' });
+      }
+
+      const bucket = process.env.CONTABO_BUCKET || 'iips.stargazer.bucket';
+      
+      try {
+        const object = await s3Client.send(new GetObjectCommand({
+          Bucket: bucket,
+          Key: objectKey,
+        }));
+        if (!object.Body) {
+          if (apk.s3Url.startsWith('http')) {
+            return res.redirect(302, apk.s3Url);
+          }
+          return res.status(404).json({ error: 'APK file is empty' });
+        }
+
+        const filename = `${apk.packageName || 'app'}_v${apk.version || '0'}.apk`
+          .replace(/[^\w.\-]+/g, '_');
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        if (object.ContentLength) {
+          res.setHeader('Content-Length', String(object.ContentLength));
+        }
+        res.setHeader('Cache-Control', 'public, max-age=300');
+
+        const body = object.Body as { pipe?: Function; transformToByteArray?: () => Promise<Uint8Array> };
+        if (typeof body.pipe === 'function') {
+          body.pipe(res);
+          (body as any).on?.('error', (err: Error) => {
+            console.error('[ApkController] download stream error:', err);
+            if (!res.headersSent) {
+              res.redirect(302, apk.s3Url);
+            } else {
+              res.end();
+            }
+          });
+          return;
+        }
+
+        const bytes = await body.transformToByteArray?.();
+        if (!bytes) {
+          return res.redirect(302, apk.s3Url);
+        }
+        return res.send(Buffer.from(bytes));
+      } catch (s3Error: any) {
+        console.warn('[ApkController] S3 stream failed, falling back to Contabo S3 public URL redirect:', s3Error?.message);
+        if (apk.s3Url && apk.s3Url.startsWith('http')) {
+          return res.redirect(302, apk.s3Url);
+        }
+        throw s3Error;
+      }
+    } catch (error: any) {
+      console.error('[ApkController] download error:', error);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: error.message || 'Download failed' });
+      }
     }
   }
 
@@ -127,6 +224,8 @@ export class ApkController {
         return res.status(404).json({ error: 'APK not found' });
       }
 
+      const installUrl = publicApkDownloadUrl(apk.id);
+
       // Broadcast OTA push to targeted devices
       if (targetDevices && targetDevices.length > 0) {
         targetDevices.forEach((deviceId: string) => {
@@ -135,7 +234,7 @@ export class ApkController {
             apkId: apk.id,
             packageName: apk.packageName,
             version: targetVersion,
-            url: apk.s3Url,
+            url: installUrl,
             targetDevices: targetDevices
           });
         });
@@ -146,7 +245,7 @@ export class ApkController {
           apkId: apk.id,
           packageName: apk.packageName,
           version: targetVersion,
-          url: apk.s3Url,
+          url: installUrl,
           targetDevices: targetDevices
         });
       }

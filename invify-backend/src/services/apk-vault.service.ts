@@ -1,6 +1,55 @@
 // src/services/apk-vault.service.ts
 import { supabaseAdmin as supabase } from '../db/supabase';
 
+// Helper functions to safely convert between human-readable size string and integer bytes for PostgreSQL INTEGER column
+function parseSizeToBytes(size: any): number {
+  if (typeof size === 'number') {
+    return Math.round(size);
+  }
+  if (typeof size === 'string') {
+    const mbMatch = size.match(/([\d.]+)\s*MB/i);
+    if (mbMatch) {
+      return Math.round(parseFloat(mbMatch[1]) * 1024 * 1024);
+    }
+    const kbMatch = size.match(/([\d.]+)\s*KB/i);
+    if (kbMatch) {
+      return Math.round(parseFloat(kbMatch[1]) * 1024);
+    }
+    const gbMatch = size.match(/([\d.]+)\s*GB/i);
+    if (gbMatch) {
+      return Math.round(parseFloat(gbMatch[1]) * 1024 * 1024 * 1024);
+    }
+    const digits = size.replace(/[^\d]/g, '');
+    return digits ? parseInt(digits, 10) : 0;
+  }
+  return 0;
+}
+
+function formatBytesToHuman(bytes: any): string {
+  if (bytes === null || bytes === undefined || bytes === '') return '—';
+  if (typeof bytes === 'string') {
+    if (bytes.includes('MB') || bytes.includes('KB') || bytes.includes('GB') || bytes.includes('B')) {
+      return bytes;
+    }
+    const num = parseFloat(bytes);
+    if (isNaN(num)) return bytes;
+    bytes = num;
+  }
+  if (typeof bytes === 'number') {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  }
+  return '—';
+}
+
 export class ApkVaultService {
   static async getVault() {
     const { data, error } = await supabase
@@ -19,19 +68,25 @@ export class ApkVaultService {
       name: a.name,
       packageName: a.package_name,
       version: a.version,
-      size: a.size,
+      size: formatBytesToHuman(a.size),
       status: a.status,
-      uploadProgress: a.upload_progress,
+      uploadProgress: Number(a.upload_progress) || 0,
       installCount: a.install_count,
       uninstallCount: a.uninstall_count,
       versionDistribution: a.version_distribution,
       selectedDeployVersion: a.selected_deploy_version,
       s3Url: a.s3_url,
+      downloadUrl: `/api/apk/${a.id}/download`,
       createdBy: a.created_by,
       updatedBy: a.updated_by,
       createdAt: a.created_at,
       updatedAt: a.updated_at
     }));
+  }
+
+  static async getApkById(id: string) {
+    const vault = await this.getVault();
+    return vault.find((a: any) => String(a.id) === String(id)) || null;
   }
 
   static async getLogs() {
@@ -70,7 +125,7 @@ export class ApkVaultService {
       name: apkData.name,
       package_name: apkData.packageName,
       version: apkData.version,
-      size: apkData.size,
+      size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
       status: 'READY',
       upload_progress: 100,
       install_count: 0,
@@ -91,6 +146,11 @@ export class ApkVaultService {
       .single();
 
     if (error) {
+      if (error.code === '23505') {
+        throw new Error(
+          `${apkData.packageName} is already in the vault. Use Upload New Version on that slot.`,
+        );
+      }
       throw error;
     }
 
@@ -99,7 +159,7 @@ export class ApkVaultService {
       name: data.name,
       packageName: data.package_name,
       version: data.version,
-      size: data.size,
+      size: formatBytesToHuman(data.size),
       status: data.status,
       uploadProgress: data.upload_progress,
       installCount: data.install_count,
@@ -135,7 +195,7 @@ export class ApkVaultService {
       .from('apk_vault')
       .update({
         version: apkData.version,
-        size: apkData.size,
+        size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
         s3_url: apkData.s3Url,
         version_distribution: dist,
         selected_deploy_version: apkData.version,
@@ -155,7 +215,7 @@ export class ApkVaultService {
       name: data.name,
       packageName: data.package_name,
       version: data.version,
-      size: data.size,
+      size: formatBytesToHuman(data.size),
       status: data.status,
       uploadProgress: data.upload_progress,
       installCount: data.install_count,
@@ -191,7 +251,7 @@ export class ApkVaultService {
       name: data.name,
       packageName: data.package_name,
       version: data.version,
-      size: data.size,
+      size: formatBytesToHuman(data.size),
       status: data.status,
       uploadProgress: data.upload_progress,
       installCount: data.install_count,
@@ -231,7 +291,7 @@ export class ApkVaultService {
       name: existing.name,
       packageName: existing.package_name,
       version: existing.version,
-      size: existing.size,
+      size: formatBytesToHuman(existing.size),
       status: existing.status,
       uploadProgress: existing.upload_progress,
       installCount: existing.install_count,

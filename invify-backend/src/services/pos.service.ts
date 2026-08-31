@@ -1017,6 +1017,10 @@ export class PosService {
     emvData: MposEmvData;
     staffName?: string;
     items?: any[];
+    latitude?: number;
+    longitude?: number;
+    field120?: string;
+    geofencing?: Record<string, unknown>;
   }): Promise<PosTransactionResult> {
 
     const pan: string = params.emvData?.pan ?? params.emvData?.cardNo ?? '';
@@ -1071,6 +1075,10 @@ export class PosService {
         rrn: pendingRrn,
         stan: pendingStan,
         source: 'switchboard',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
       }),
       rawResponse: '',
     };
@@ -1098,6 +1106,10 @@ export class PosService {
         rrn: pendingRrn,
         stan: pendingStan,
         source: 'switchboard',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
       },
       is_device_processed: false,
     });
@@ -1159,6 +1171,10 @@ export class PosService {
     transactionResponse?: any;
     tenantProfile?: any;
     deviceInfo?: any;
+    latitude?: number;
+    longitude?: number;
+    field120?: string;
+    geofencing?: Record<string, unknown>;
   }) {
     const isApproved = params.deviceStatus === 'payment_success';
     const txId = this.newTxId();
@@ -1179,7 +1195,15 @@ export class PosService {
       items:       params.items || [],
       isDeviceProcessed: true,
       processedBy: 'MPOS_DEVICE',
-      rawRequest:  JSON.stringify({ source: 'device', terminalId: params.terminalId, amount: params.amount }),
+      rawRequest:  JSON.stringify({
+        source: 'device',
+        terminalId: params.terminalId,
+        amount: params.amount,
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
+      }),
       rawResponse: JSON.stringify(params.transactionResponse || {}),
     };
     
@@ -1200,7 +1224,13 @@ export class PosService {
       auth_code: entry.authCode,
       staff_name: entry.staffName,
       items_jsonb: entry.items,
-      raw_request: { source: 'device' },
+      raw_request: {
+        source: 'device',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
+      },
       raw_response: params.transactionResponse || {},
       is_device_processed: true,
     });

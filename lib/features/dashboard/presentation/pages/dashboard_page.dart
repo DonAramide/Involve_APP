@@ -737,6 +737,13 @@ class _DashboardPageState extends State<DashboardPage> {
         secondaryIndicatorColor: (_terminalConfig?.posSerialNumber?.isNotEmpty == true) ? Colors.blue : Colors.grey,
         secondaryIndicatorTooltip: (_terminalConfig?.posSerialNumber?.isNotEmpty == true) ? 'POS Device: Configured' : 'POS Device: Not Configured',
       ),
+      _DashboardMenuItem(
+        id: 'nibss_cert',
+        title: 'NIBSS CERT',
+        icon: Icons.verified_user_outlined,
+        color: Colors.teal,
+        onTap: () => Navigator.pushNamed(context, '/nibss_cert'),
+      ),
       if (!isSchool) ...[
         _DashboardMenuItem(
           id: 'stock',

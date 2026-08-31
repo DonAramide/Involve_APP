@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:involve_app/core/utils/app_config.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:involve_app/core/utils/device_info_service.dart';

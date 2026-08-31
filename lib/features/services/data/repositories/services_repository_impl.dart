@@ -170,6 +170,36 @@ class ServicesRepositoryImpl implements IServicesRepository {
   }
 
   @override
+  Future<ServiceCustomer?> getCustomerByPhone(String phone) async {
+    final clean = phone.trim();
+    if (clean.isEmpty) return null;
+    final digits = clean.replaceAll(RegExp(r'\D'), '');
+
+    final all = await (db.select(db.customers)..where((t) => t.phone.isNotNull())).get();
+    for (final row in all) {
+      final rowPhone = (row.phone ?? '').trim();
+      if (rowPhone.isEmpty) continue;
+      if (rowPhone.toLowerCase() == clean.toLowerCase()) {
+        return _mapCustomer(row);
+      }
+      final rowDigits = rowPhone.replaceAll(RegExp(r'\D'), '');
+      if (rowDigits.isNotEmpty && digits.isNotEmpty) {
+        if (rowDigits == digits) {
+          return _mapCustomer(row);
+        }
+        if (rowDigits.length >= 10 && digits.length >= 10) {
+          final rowSuffix = rowDigits.substring(rowDigits.length - 10);
+          final digitsSuffix = digits.substring(digits.length - 10);
+          if (rowSuffix == digitsSuffix) {
+            return _mapCustomer(row);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<ServiceCustomer?> getCustomerByVirtualAccount(String accountNumber) async {
     final va = accountNumber.trim();
     if (va.isEmpty) return null;
@@ -294,13 +324,21 @@ class ServicesRepositoryImpl implements IServicesRepository {
     String? address,
     Uint8List? image,
   }) async {
+    final trimmedPhone = phone?.trim();
+    if (trimmedPhone != null && trimmedPhone.isNotEmpty) {
+      final existing = await getCustomerByPhone(trimmedPhone);
+      if (existing != null) {
+        throw Exception('A customer with phone number "$trimmedPhone" already exists (${existing.name}).');
+      }
+    }
+
     final id = const Uuid().v4();
     await db.into(db.customers).insert(CustomersCompanion.insert(
       id: id,
-      name: name,
-      phone: Value(phone),
-      email: Value(email),
-      address: Value(address),
+      name: name.trim(),
+      phone: Value(trimmedPhone),
+      email: Value(email?.trim()),
+      address: Value(address?.trim()),
       image: Value(image),
       createdAt: Value(DateTime.now()),
     ));
@@ -329,12 +367,20 @@ class ServicesRepositoryImpl implements IServicesRepository {
     String? email,
     String? address,
   }) async {
+    final trimmedPhone = phone?.trim();
+    if (trimmedPhone != null && trimmedPhone.isNotEmpty) {
+      final existing = await getCustomerByPhone(trimmedPhone);
+      if (existing != null && existing.id != id) {
+        throw Exception('A customer with phone number "$trimmedPhone" already exists (${existing.name}).');
+      }
+    }
+
     await (db.update(db.customers)..where((t) => t.id.equals(id))).write(
       CustomersCompanion(
-        name: name != null ? Value(name) : const Value.absent(),
-        phone: phone != null ? Value(phone) : const Value.absent(),
-        email: email != null ? Value(email) : const Value.absent(),
-        address: address != null ? Value(address) : const Value.absent(),
+        name: name != null ? Value(name.trim()) : const Value.absent(),
+        phone: trimmedPhone != null ? Value(trimmedPhone) : const Value.absent(),
+        email: email != null ? Value(email?.trim()) : const Value.absent(),
+        address: address != null ? Value(address?.trim()) : const Value.absent(),
         syncStatus: const Value('pending'),
       ),
     );

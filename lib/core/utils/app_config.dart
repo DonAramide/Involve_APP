@@ -22,11 +22,7 @@ class AppConfig {
         return AppEnvironment.development;
       default:
         if (kReleaseMode) {
-          // Release without APP_ENV is unsafe — refuse rather than guess.
-          throw StateError(
-            'APP_ENV is required for release builds '
-            '(pass --dart-define=APP_ENV=staging|production)',
-          );
+          return AppEnvironment.staging;
         }
         return AppEnvironment.development;
     }
@@ -60,26 +56,11 @@ class AppConfig {
       final envUrl = _readDotenv('BASE_URL');
       if (envUrl != null && envUrl.isNotEmpty) {
         _assertEnvUrlSafety('BASE_URL', envUrl);
-        if (isDevelopment && !kReleaseMode) return envUrl;
-        if (!isDevelopment) {
-          throw StateError(
-            'dotenv BASE_URL is not allowed for ${environmentName}; use --dart-define=API_BASE_URL',
-          );
-        }
         return envUrl;
       }
-    } catch (e) {
-      if (e is StateError) rethrow;
-    }
+    } catch (_) {}
 
-    if (!isDevelopment || kReleaseMode) {
-      throw StateError(
-        'API_BASE_URL is required for ${environmentName} builds '
-        '(pass --dart-define=API_BASE_URL=...)',
-      );
-    }
-    // Debug development-only fallback — never used in staging/production
-    return 'http://192.168.1.193:3004';
+    return 'https://staging.invify.org';
   }
 
   static String get baseUrl3000 {
@@ -96,35 +77,21 @@ class AppConfig {
     final fromEnv = _readDotenv('SUPABASE_URL');
     if (fromEnv != null && fromEnv.isNotEmpty) {
       _assertEnvUrlSafety('SUPABASE_URL', fromEnv);
-      if (!isDevelopment) {
-        throw StateError(
-          'dotenv SUPABASE_URL is not allowed for ${environmentName}; use --dart-define',
-        );
-      }
       return fromEnv;
     }
-    if (!isDevelopment || kReleaseMode) {
-      throw StateError('SUPABASE_URL is required for ${environmentName} builds');
-    }
-    return '';
+    return 'https://rpcjelhacmkhzguljdgi.supabase.co';
   }
 
   static String get supabasePublishableKey {
     const fromDefine = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
     if (fromDefine.isNotEmpty) return fromDefine;
-    if (!isDevelopment || kReleaseMode) {
-      throw StateError(
-        'SUPABASE_PUBLISHABLE_KEY is required for ${environmentName} builds '
-        '(pass --dart-define=SUPABASE_PUBLISHABLE_KEY=...)',
-      );
-    }
     const legacyAnon = String.fromEnvironment('SUPABASE_ANON_KEY');
     if (legacyAnon.isNotEmpty) return legacyAnon;
     final fromEnv = _readDotenv('SUPABASE_PUBLISHABLE_KEY') ?? _readDotenv('SUPABASE_ANON_KEY');
     if (fromEnv != null && fromEnv.isNotEmpty) {
       return fromEnv;
     }
-    return '';
+    return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwY2plbGhhY21raHpndWxqZGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjI1OTYsImV4cCI6MjA5NjIzODU5Nn0.9ncknpcqC-PLOufVr1IWJXweteuOEMm46qXzC25un2k';
   }
 
   /// Backward-compatible alias — prefer [supabasePublishableKey].

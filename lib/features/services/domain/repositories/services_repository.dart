@@ -31,6 +31,7 @@ abstract class IServicesRepository {
   // Customers
   Future<List<ServiceCustomer>> getCustomers({String? query});
   Future<ServiceCustomer?> getCustomerById(String id);
+  Future<ServiceCustomer?> getCustomerByPhone(String phone);
   Future<ServiceCustomer?> getCustomerByVirtualAccount(String accountNumber);
   /// Credits wallet from a VA deposit. Auto-debits against owing first, then
   /// any remainder becomes customer credit (negative balance).

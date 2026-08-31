@@ -118,6 +118,7 @@ import 'package:involve_app/features/stock/presentation/pages/inventory_report_p
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
 import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
+import 'package:involve_app/features/printer/presentation/pages/nibss_cert_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/calculator_page.dart';
@@ -155,20 +156,22 @@ void main() async {
     // Release / CI builds rely on --dart-define instead
   }
 
-  final supabaseUrl = AppConfig.supabaseUrl;
-  final supabaseAnonKey = AppConfig.supabaseAnonKey;
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    if (kReleaseMode) {
-      throw StateError('Missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY for release build');
+  try {
+    final supabaseUrl = AppConfig.supabaseUrl;
+    final supabaseAnonKey = AppConfig.supabaseAnonKey;
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      AppConfig.supabaseInitialized = false;
+      debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
+    } else {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+      );
+      AppConfig.supabaseInitialized = true;
     }
+  } catch (e) {
     AppConfig.supabaseInitialized = false;
-    debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
-  } else {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-    );
-    AppConfig.supabaseInitialized = true;
+    debugPrint('Supabase initialization warning: $e');
   }
   
   // Set up global BLoC observer
@@ -818,6 +821,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/customer_lookup': (_) => const CustomerLookupPage(),
               '/create_invoice': (_) => const CreateInvoicePage(),
               '/printer_settings': (_) => const PrinterSettingsPage(),
+              NibssCertPage.routeName: (_) => const NibssCertPage(),
               '/stock_management': (_) => const StockManagementPage(),
               '/invoice_history': (_) => const InvoiceHistoryPage(),
               '/calculator': (_) => const CalculatorPage(),

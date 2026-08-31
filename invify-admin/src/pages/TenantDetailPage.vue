@@ -10,54 +10,69 @@
         </q-breadcrumbs>
       </div>
 
-      <div class="row items-center q-mb-xl">
-        <q-avatar size="72px" font-size="36px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2" />
-        <div class="col">
-          <div class="row items-center q-gutter-sm">
-            <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
-            <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="md">
-              {{ tenant.status?.toUpperCase() }}
-            </q-chip>
+      <div class="row items-center justify-between q-col-gutter-md q-mb-lg">
+        <!-- Tenant Identity -->
+        <div class="col-12 col-xl-auto row items-center no-wrap">
+          <q-avatar size="64px" font-size="32px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2 flex-shrink-0" />
+          <div>
+            <div class="row items-center q-gutter-sm no-wrap">
+              <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
+              <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="sm" class="text-weight-bold">
+                {{ tenant.status?.toUpperCase() }}
+              </q-chip>
+            </div>
+            <div class="text-grey-5 text-caption q-mt-xs row items-center q-gutter-xs no-wrap">
+              <span>{{ tenant.type?.toUpperCase() }}</span>
+              <span>•</span>
+              <span>Plan: <span class="text-weight-bold text-grey-3">{{ tenant.plan?.toUpperCase() }}</span></span>
+              <span>•</span>
+              <span class="font-mono">ID: {{ tenant.id }}</span>
+            </div>
           </div>
-          <div class="text-grey-5">{{ tenant.type?.toUpperCase() }} • Plan: {{ tenant.plan?.toUpperCase() }} • ID: {{ tenant.id }}</div>
         </div>
-        <div class="col-auto">
+
+        <!-- Action Buttons -->
+        <div class="col-12 col-xl-auto row items-center q-gutter-sm">
           <q-btn 
-          color="amber-8" 
-          text-color="black"
-          icon="vpn_key" 
-          label="Generate Activation Code" 
-          @click="openActivationShortcut" 
-          class="q-mr-sm text-weight-bold animate-pulse-amber" 
-        >
-          <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
-        </q-btn>
-        <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" class="q-mr-sm" />
-        <q-btn 
-          outline 
-          :color="tenant.status === 'active' ? 'orange-8' : 'green-6'" 
-          :icon="tenant.status === 'active' ? 'block' : 'check_circle'" 
-          :label="tenant.status === 'active' ? 'Suspend' : 'Activate'" 
-          @click="toggleStatus" 
-          class="q-mr-sm text-weight-bold" 
-        />
-        <q-btn outline color="red-5" icon="lock_reset" label="Generate System Password" @click="resetPassword" class="q-mr-sm text-weight-bold">
-          <q-tooltip>Generate a recovery password for device System Access when the local password is forgotten</q-tooltip>
-        </q-btn>
-        <q-btn 
-          color="red-10" 
-          icon="lock" 
-          label="Emergency Lock" 
-          @click="triggerEmergencyLock" 
-          class="q-mr-sm text-weight-bold animate-pulse-amber" 
-        />
-        <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
-        <div v-if="tenant?.is_emergency_locked" class="q-ml-sm q-px-sm q-py-xs bg-red-1 text-red-10 rounded-borders text-caption text-weight-bold row items-center">
-          <q-icon name="lock" size="xs" class="q-mr-xs" />
-          CODE: {{ tenant.emergency_lock_code }}
+            color="amber-8" 
+            text-color="black"
+            icon="vpn_key" 
+            label="Generate Activation Code" 
+            @click="openActivationShortcut" 
+            class="text-weight-bold animate-pulse-amber" 
+            unelevated
+          >
+            <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
+          </q-btn>
+          <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" />
+          <q-btn 
+            outline 
+            :color="tenant.status === 'active' ? 'orange-8' : 'green-6'" 
+            :icon="tenant.status === 'active' ? 'block' : 'check_circle'" 
+            :label="tenant.status === 'active' ? 'Suspend' : 'Activate'" 
+            @click="toggleStatus" 
+            class="text-weight-bold" 
+          />
+          <q-btn outline color="red-5" icon="lock_reset" label="Generate System Password" @click="resetPassword" class="text-weight-bold">
+            <q-tooltip>Generate a recovery password for device System Access when the local password is forgotten</q-tooltip>
+          </q-btn>
+          <q-btn 
+            color="red-10" 
+            icon="lock" 
+            label="Emergency Lock" 
+            @click="triggerEmergencyLock" 
+            class="text-weight-bold animate-pulse-amber" 
+            unelevated
+          />
+          <q-btn flat round color="grey-6" icon="refresh" @click="fetchDetails">
+            <q-tooltip>Refresh Details</q-tooltip>
+          </q-btn>
+          <div v-if="tenant?.is_emergency_locked" class="q-px-sm q-py-xs bg-red-1 text-red-10 rounded-borders text-caption text-weight-bold row items-center">
+            <q-icon name="lock" size="xs" class="q-mr-xs" />
+            CODE: {{ tenant.emergency_lock_code }}
+          </div>
         </div>
       </div>
-    </div>
 
     <!-- Tabbed Content -->
     <q-card class="bg-blue-grey-10 shadow-2 overflow-hidden">

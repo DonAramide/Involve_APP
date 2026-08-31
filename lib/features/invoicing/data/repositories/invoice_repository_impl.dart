@@ -344,16 +344,25 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<List<Invoice>> getAllInvoices() async {
-    return _getInvoicesWithItems(db.select(db.invoices)
+    final regularInvoices = await _getInvoicesWithItems(db.select(db.invoices)
       ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
+    final serviceInvoices = await _getServiceJobsAsInvoices();
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
   }
 
   @override
   Future<Invoice?> getInvoiceById(int id) async {
     final query = db.select(db.invoices)..where((t) => t.id.equals(id));
     final results = await _getInvoicesWithItems(query);
-    if (results.isEmpty) return null;
-    return results.first;
+    if (results.isNotEmpty) return results.first;
+
+    final serviceInvoices = await _getServiceJobsAsInvoices();
+    final match = serviceInvoices.where((inv) => inv.id == id);
+    if (match.isNotEmpty) return match.first;
+
+    return null;
   }
 
   @override
@@ -366,10 +375,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end) async {
-    final query = db.select(db.invoices)
+    final regularInvoices = await _getInvoicesWithItems(db.select(db.invoices)
       ..where((t) => t.dateCreated.isBetweenValues(start, end))
-      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
-    return _getInvoicesWithItems(query);
+      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
+    final serviceInvoices = await _getServiceJobsAsInvoices(start: start, end: end);
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
   }
 
   @override
@@ -380,11 +392,19 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       ..where(db.invoices.isDeleted.equals(false));
     
     final rows = await query.get();
-    return rows
+    final names = rows
         .map((r) => r.read(db.invoices.customerName)!)
         .where((name) => name.trim().isNotEmpty)
-        .toList()
-      ..sort();
+        .toSet();
+
+    try {
+      final customers = await db.select(db.customers).get();
+      for (final c in customers) {
+        if (c.name.trim().isNotEmpty) names.add(c.name.trim());
+      }
+    } catch (_) {}
+
+    return names.toList()..sort();
   }
 
   @override
@@ -398,7 +418,123 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     
     query.orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
     
-    return _getInvoicesWithItems(query);
+    final regularInvoices = await _getInvoicesWithItems(query);
+    final serviceInvoices = await _getServiceJobsAsInvoices(start: start, end: end, customerName: customerName);
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
+  }
+
+  Future<List<Invoice>> _getServiceJobsAsInvoices({
+    DateTime? start,
+    DateTime? end,
+    String? customerName,
+  }) async {
+    try {
+      final query = db.select(db.serviceJobs);
+      if (start != null && end != null) {
+        query.where((t) => t.createdAt.isBetweenValues(start, end));
+      }
+      final jobs = await (query..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)])).get();
+
+      if (jobs.isEmpty) return [];
+
+      final customers = await db.select(db.customers).get();
+      final customerMap = {for (var c in customers) c.id: c.name};
+
+      final List<Invoice> result = [];
+
+      for (final job in jobs) {
+        final cName = customerMap[job.customerId] ?? 'Client';
+        if (customerName != null &&
+            customerName.trim().isNotEmpty &&
+            !cName.toLowerCase().contains(customerName.trim().toLowerCase())) {
+          continue;
+        }
+
+        final jobItems = await (db.select(db.serviceJobItems)..where((t) => t.jobId.equals(job.id))).get();
+        final payments = await (db.select(db.servicePayments)
+              ..where((t) => t.jobId.equals(job.id))
+              ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
+            .get();
+        final latestMethod = payments.isNotEmpty ? payments.first.method : (job.amountPaid > 0 ? 'Cash' : null);
+
+        final items = <InvoiceItem>[];
+        if (job.laborAmount > 0) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: 0,
+              name: 'Workmanship / Labor',
+              category: ItemCategory.service,
+              price: job.laborAmount,
+              stockQty: 1,
+              type: 'service',
+            ),
+            quantity: 1,
+            unitPrice: job.laborAmount,
+            type: 'service',
+          ));
+        }
+        for (final it in jobItems) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: it.id,
+              name: it.name,
+              category: ItemCategory.service,
+              price: it.price,
+              stockQty: it.quantity.toInt() > 0 ? it.quantity.toInt() : 1,
+              type: 'service',
+              serviceCategory: it.category,
+            ),
+            quantity: it.quantity.toInt() > 0 ? it.quantity.toInt() : 1,
+            unitPrice: it.price,
+            type: 'service',
+          ));
+        }
+        if (items.isEmpty) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: 0,
+              name: job.title.isNotEmpty ? job.title : 'Service Job',
+              category: ItemCategory.service,
+              price: job.totalAmount,
+              stockQty: 1,
+              type: 'service',
+            ),
+            quantity: 1,
+            unitPrice: job.totalAmount,
+            type: 'service',
+          ));
+        }
+
+        final isPaid = job.balance <= 0;
+        final paymentStatus = isPaid ? 'Paid' : (job.amountPaid > 0 ? 'Partial' : 'Unpaid');
+
+        result.add(Invoice(
+          id: job.id.hashCode.abs(),
+          invoiceNumber: job.jobId,
+          dateCreated: job.createdAt,
+          items: items,
+          subtotal: job.totalAmount,
+          taxAmount: 0.0,
+          discountAmount: 0.0,
+          discountType: DiscountType.amount,
+          totalAmount: job.totalAmount,
+          paymentStatus: paymentStatus,
+          amountPaid: job.amountPaid,
+          balanceAmount: job.balance,
+          customerName: cName,
+          customerId: job.customerId,
+          paymentMethod: latestMethod,
+          businessMode: 'services',
+          warrantyDuration: job.warrantyDuration,
+        ));
+      }
+
+      return result;
+    } catch (_) {
+      return [];
+    }
   }
 
   @override

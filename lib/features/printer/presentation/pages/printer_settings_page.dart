@@ -539,7 +539,6 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
 
                             final disablePairing = isMissingMapping;
                             final disableDownload = hasMismatch || isMissingMapping || isInvalidDevice;
-                            final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
                             final disableBalance = disableDownload || _isCheckingBalance;
 
                             return Column(
@@ -578,6 +577,21 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                                 const SizedBox(height: 12),
                                 SizedBox(
                                   width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        Navigator.pushNamed(context, '/nibss_cert'),
+                                    icon: const Icon(Icons.verified_user_outlined, size: 18),
+                                    label: const Text('NIBSS CERT'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.teal.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
                                   child: OutlinedButton.icon(
                                     onPressed: disableBalance ? null : _checkCardBalance,
                                     icon: _isCheckingBalance
@@ -586,9 +600,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                                     label: Text(
                                       _isCheckingBalance
                                           ? 'Checking balance...'
-                                          : (isMoreFun
-                                              ? 'Check Card Balance'
-                                              : 'Check Card Balance (MoreFun/MP63)'),
+                                          : 'Check Card Balance',
                                     ),
                                   ),
                                 ),
@@ -907,16 +919,6 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       );
       return;
     }
-    if (!MposDeviceType.isMoreFun(_terminalConfig?.terminalType)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Check balance is available on MoreFun/MP63 devices. Map an MP63 in admin to use it.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
     setState(() => _isCheckingBalance = true);
     showDialog(
       context: context,
@@ -944,14 +946,26 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
 
     try {
       final terminalId = _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId;
-      final result = await _mposService.checkBalance(
-        terminalId: terminalId,
-        deviceType: _mposDeviceType,
-      );
+      final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
+      final result = isMoreFun
+          ? await _mposService.checkBalance(
+              terminalId: terminalId,
+              deviceType: _mposDeviceType,
+            )
+          : await _mposService.initiatePayment(
+              amount: 2,
+              terminalId: terminalId,
+              activeHost: (_terminalConfig?.activeHost ?? 'NIBSS').toUpperCase(),
+              processOnDevice: true,
+              deviceType: _mposDeviceType,
+              transactionType: 'BALANCE',
+            );
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
 
-      final ok = result.status == 'balance_success';
+      final ok = result.status == 'balance_success' ||
+          result.status == 'payment_success' ||
+          result.transaction?.statusCode == '00';
       final balance = result.transaction?.balance?.isNotEmpty == true
           ? result.transaction!.balance
           : result.transaction?.amount;

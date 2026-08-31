@@ -114,7 +114,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           successMessage: 'Customer registered successfully!',
         ));
       } catch (e) {
-        emit(state.copyWith(errorMessage: e.toString()));
+        final cleanMsg = e.toString().replaceAll('Exception: ', '').trim();
+        emit(state.copyWith(errorMessage: cleanMsg));
       }
     });
 
@@ -163,7 +164,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<AddServicePreset>((event, emit) async {
       try {
         await getJobs.repository.addJobPreset(event.name);
-        add(const LoadServicePresets());
+        final presets = await getJobs.repository.getJobPresets();
+        emit(state.copyWith(presets: presets, successMessage: 'Service offering added!'));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -172,7 +174,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<DeleteServicePreset>((event, emit) async {
       try {
         await getJobs.repository.deleteJobPreset(event.name);
-        add(const LoadServicePresets());
+        final presets = await getJobs.repository.getJobPresets();
+        emit(state.copyWith(presets: presets, successMessage: 'Service offering removed.'));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -181,9 +184,16 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<LoadServiceMaterials>((event, emit) async {
       try {
         final materials = await getJobs.repository.getMaterials(category: event.category);
-        final categories = materials.map((m) => m.category).toSet().toList();
-        final finalMaterials = materials.isNotEmpty ? materials : const <ServiceMaterial>[];
-        emit(state.copyWith(materials: finalMaterials, categories: categories));
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -192,7 +202,18 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<AddServiceMaterial>((event, emit) async {
       try {
         await getJobs.repository.addMaterial(name: event.name, category: event.category, price: event.price);
-        add(LoadServiceMaterials(category: event.category));
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material added successfully!',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -201,7 +222,18 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<DeleteServiceMaterial>((event, emit) async {
       try {
         await getJobs.repository.deleteMaterial(event.id);
-        add(const LoadServiceMaterials());
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material deleted.',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -215,7 +247,18 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           category: event.category,
           price: event.price,
         );
-        add(LoadServiceMaterials(category: event.category));
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material updated successfully!',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }

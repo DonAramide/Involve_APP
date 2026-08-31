@@ -29,6 +29,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/offline/offline_webhook_service.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/core/pos/nibss_geo.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
@@ -674,6 +675,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                 ? true
                 : processOnDevice;
 
+        final geo = await NibssGeo.capture();
+        if (geo != null) {
+          await MposService().saveGeoCoordinates(
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+            deviceType: deviceType,
+          );
+        }
+        final geoFields = geo == null
+            ? <String, dynamic>{}
+            : {
+                'latitude': geo.latitude,
+                'longitude': geo.longitude,
+                'field120': geo.field120,
+                'geofencing': geo.toJson(),
+              };
+
         late MposTransactionResponse result;
         try {
           result = await ProgressDialogUtils.showUpdatableProgress(
@@ -686,6 +704,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                 activeHost: activeHost,
                 processOnDevice: effectiveProcessOnDevice,
                 deviceType: deviceType,
+                latitude: geo?.latitude,
+                longitude: geo?.longitude,
               );
 
               if (payment.status != 'payment_success' &&
@@ -703,6 +723,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     activeHost: secondaryHostName,
                     processOnDevice: effectiveProcessOnDevice,
                     deviceType: deviceType,
+                    latitude: geo?.latitude,
+                    longitude: geo?.longitude,
                   );
                 }
               }
@@ -726,6 +748,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               'name': i.item.name,
                             })
                         .toList(),
+                    ...geoFields,
                   },
                 );
                 final body = posRes.data is Map
@@ -873,6 +896,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
               },
               'emvData': result.emvData?.toJson(),
               'transactionResponse': result.transaction?.toJson(),
+              ...geoFields,
             },
             shouldPrint: false,
           ).catchError((Object e) {

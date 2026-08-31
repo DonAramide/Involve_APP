@@ -22,6 +22,7 @@ import 'result_preview_page.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/core/pos/nibss_geo.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
@@ -2243,6 +2244,15 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ? true
             : processOnDevice;
 
+    final geo = await NibssGeo.capture();
+    if (geo != null) {
+      await MposService().saveGeoCoordinates(
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        deviceType: deviceType,
+      );
+    }
+
     return ProgressDialogUtils.showUpdatableProgress(
       pageContext,
       (setMessage) async {
@@ -2253,6 +2263,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           activeHost: activeHost,
           processOnDevice: effectiveProcessOnDevice,
           deviceType: deviceType,
+          latitude: geo?.latitude,
+          longitude: geo?.longitude,
         );
 
         if (payment.status != 'payment_success' &&
@@ -2269,6 +2281,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               activeHost: secondaryHostName,
               processOnDevice: effectiveProcessOnDevice,
               deviceType: deviceType,
+              latitude: geo?.latitude,
+              longitude: geo?.longitude,
             );
           }
         }
@@ -2299,6 +2313,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 'studentId': student.id,
                 'admissionNumber': student.admissionNumber,
               },
+              if (geo != null) 'latitude': geo.latitude,
+              if (geo != null) 'longitude': geo.longitude,
+              if (geo != null) 'field120': geo.field120,
+              if (geo != null) 'geofencing': geo.toJson(),
             },
           );
           final body = posRes.data is Map

@@ -18,10 +18,34 @@
         <q-btn
           dense size="sm" color="cyan-4" text-color="black"
           icon="upload_file" label="Upload New APK"
-          :disable="apkVault.length >= 3"
+          :disable="apkVault.length >= 3 || isUploading"
+          :loading="isUploading"
           @click="openUploadDialog()"
           class="text-weight-bold q-px-sm"
         />
+      </div>
+    </div>
+
+    <!-- Live Contabo Upload Banner -->
+    <div v-if="isUploading" class="bg-panel border-cyan rounded-borders q-pa-sm row items-center justify-between no-wrap op-gap-16 shadow-2">
+      <div class="row items-center op-gap-12 no-wrap">
+        <q-spinner-orbit color="cyan-3" size="md" />
+        <div>
+          <div class="text-cyan-3 text-weight-bold row items-center op-gap-6" style="font-size: 13px;">
+            <span>Uploading APK to Contabo Object Storage</span>
+            <q-chip dense size="xs" color="cyan-10" text-color="cyan-3" class="text-metric-mono">{{ uploadProgress }}%</q-chip>
+          </div>
+          <div class="text-muted text-metric-mono q-mt-xs" style="font-size: 11px;">
+            {{ uploadStatusText }}
+          </div>
+        </div>
+      </div>
+      <div class="column op-gap-4" style="min-width: 220px;">
+        <div class="row items-center justify-between text-metric-mono text-cyan-3" style="font-size: 10px;">
+          <span>S3_STREAM_TRANSFER</span>
+          <span>{{ uploadProgress }}%</span>
+        </div>
+        <q-linear-progress :value="uploadProgress / 100" color="cyan-4" track-color="grey-9" size="sm" rounded stripe />
       </div>
     </div>
 
@@ -44,124 +68,147 @@
             <div
               v-for="slot in 3" :key="slot"
               class="rounded-borders border-muted q-pa-sm"
-              :class="apkVault[slot - 1] ? 'bg-panel-darker' : 'bg-empty-slot'"
+              :class="apkVault[slot - 1] ? (apkVault[slot - 1].status === 'UPLOADING' ? 'bg-panel-darker border-cyan' : 'bg-panel-darker') : 'bg-empty-slot'"
             >
               <!-- Filled slot -->
               <template v-if="apkVault[slot - 1]">
-                <div class="row items-center justify-between no-wrap">
-                  <div class="row items-center op-gap-8 no-wrap overflow-hidden">
-                    <q-icon name="android" color="green-4" size="xs" />
-                    <div class="overflow-hidden">
-                      <div class="text-main text-weight-bold ellipsis" style="font-size: 12px;">{{ apkVault[slot - 1].name }}</div>
-                      <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ apkVault[slot - 1].packageName }}</div>
-                    </div>
-                  </div>
-                  <div class="row items-center">
-                    <q-btn flat dense size="sm" icon="upgrade" color="amber-4" @click="openUpdateDialog(slot - 1)">
-                      <q-tooltip class="bg-amber-10 text-amber-2 text-caption">Upload New Version</q-tooltip>
-                    </q-btn>
-                    <q-btn
-                      flat dense size="sm"
-                      icon="content_copy"
-                      color="cyan-3"
-                      :disable="!apkVault[slot - 1].s3Url || apkVault[slot - 1].status === 'UPLOADING'"
-                      @click="copyDownloadLink(apkVault[slot - 1])"
-                    >
-                      <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Copy download link</q-tooltip>
-                    </q-btn>
-                    <q-btn flat dense size="sm" class="q-mx-md" icon="edit_link" color="cyan-4" @click="promptEditUrl(slot - 1)">
-                      <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Edit Download URL</q-tooltip>
-                    </q-btn>
-                    <q-btn flat dense size="sm" icon="delete_outline" color="red-4" @click="removeApk(slot - 1)">
-                      <q-tooltip class="bg-red-10 text-red-2 text-caption">Remove from Vault</q-tooltip>
-                    </q-btn>
-                  </div>
-                </div>
-                <div class="row items-center justify-between q-mt-xs text-caption text-muted" style="font-size: 10px;">
-                  <span>v{{ apkVault[slot - 1].version }} · {{ apkVault[slot - 1].size }}</span>
-                  <q-chip dense size="xs" :color="apkVault[slot-1].status === 'READY' ? 'green-10' : 'amber-10'" :text-color="apkVault[slot-1].status === 'READY' ? 'green-3' : 'amber-3'" class="text-weight-bold">
-                    {{ apkVault[slot - 1].status }}
-                  </q-chip>
-                </div>
-
-                <!-- Install / Uninstall counters -->
-                <div class="row items-center op-gap-12 q-mt-xs q-px-xs q-py-xs bg-panel rounded-borders border-muted">
-                  <div class="column items-center" style="gap: 1px; flex: 1;">
-                    <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 14px;">{{ apkVault[slot - 1].installCount }}</span>
-                    <span class="text-muted" style="font-size: 9px;">INSTALLS</span>
-                  </div>
-                  <div class="bg-subpanel" style="width: 1px; height: 28px;"></div>
-                  <div class="column items-center" style="gap: 1px; flex: 1;">
-                    <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 14px;">{{ apkVault[slot - 1].uninstallCount }}</span>
-                    <span class="text-muted" style="font-size: 9px;">UNINSTALLS</span>
-                  </div>
-                  <div class="bg-subpanel" style="width: 1px; height: 28px;"></div>
-                  <div class="column items-center" style="gap: 1px; flex: 1;">
-                    <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 14px;">{{ Math.max(0, apkVault[slot - 1].installCount - apkVault[slot - 1].uninstallCount) }}</span>
-                    <span class="text-muted" style="font-size: 9px;">NET ACTIVE</span>
-                  </div>
-                </div>
-                <q-linear-progress
-                  v-if="apkVault[slot-1].uploadProgress < 100"
-                  :value="apkVault[slot-1].uploadProgress / 100"
-                  color="cyan-4" track-color="grey-9" size="xs" class="q-mt-xs"
-                />
-                <!-- Version Distribution Breakdown -->
-                <div class="column op-gap-4 q-mt-xs">
-                  <div class="row items-center justify-between">
-                    <span class="text-metric-mono text-muted" style="font-size: 9px;">VERSION DISTRIBUTION ACROSS FLEET:</span>
-                    <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ totalDevicesForApk(apkVault[slot - 1]) }} DEVICES TOTAL</span>
-                  </div>
-                  <div
-                    v-for="vd in apkVault[slot - 1].versionDistribution"
-                    :key="vd.version"
-                    class="column op-gap-1"
-                  >
-                    <div class="row items-center justify-between" style="font-size: 10px;">
-                      <div class="row items-center op-gap-4">
-                        <span class="text-metric-mono" :class="vd.version === apkVault[slot-1].version ? 'text-cyan-3' : 'text-muted'">v{{ vd.version }}</span>
-                        <q-chip v-if="vd.version === apkVault[slot-1].version" dense size="xs" color="cyan-10" text-color="cyan-3" style="font-size: 9px; padding: 0 4px;">LATEST</q-chip>
-                        <q-chip v-else dense size="xs" color="grey-9" text-color="grey-5" style="font-size: 9px; padding: 0 4px;">LEGACY</q-chip>
+                <!-- UPLOADING IN-FLIGHT STATE -->
+                <div v-if="apkVault[slot - 1].status === 'UPLOADING'" class="column op-gap-6 q-pa-xs">
+                  <div class="row items-center justify-between no-wrap">
+                    <div class="row items-center op-gap-8 no-wrap overflow-hidden">
+                      <q-spinner-orbit color="cyan-3" size="xs" />
+                      <div class="overflow-hidden">
+                        <div class="text-main text-weight-bold ellipsis" style="font-size: 12px;">{{ apkVault[slot - 1].name }}</div>
+                        <div class="text-metric-mono text-cyan-3" style="font-size: 10px;">{{ apkVault[slot - 1].packageName }}</div>
                       </div>
-                      <span class="text-main text-weight-bold">{{ vd.deviceCount }} <span class="text-muted text-weight-regular">devices</span></span>
                     </div>
-                    <q-linear-progress
-                      :value="totalDevicesForApk(apkVault[slot-1]) > 0 ? vd.deviceCount / totalDevicesForApk(apkVault[slot-1]) : 0"
-                      :color="vd.version === apkVault[slot-1].version ? 'cyan-4' : 'grey-7'"
-                      track-color="grey-9"
-                      size="xs"
-                    />
-                    <div class="text-muted text-right" style="font-size: 9px;">
-                      {{ totalDevicesForApk(apkVault[slot-1]) > 0 ? Math.round(vd.deviceCount / totalDevicesForApk(apkVault[slot-1]) * 100) : 0 }}% of fleet
-                    </div>
+                    <q-chip dense size="xs" color="cyan-10" text-color="cyan-3" class="text-weight-bold">
+                      UPLOADING {{ apkVault[slot - 1].uploadProgress }}%
+                    </q-chip>
+                  </div>
+                  <q-linear-progress
+                    :value="(apkVault[slot - 1].uploadProgress || 0) / 100"
+                    color="cyan-4" track-color="grey-9" size="sm" rounded stripe class="q-mt-xs"
+                  />
+                  <div class="row items-center justify-between text-muted text-metric-mono" style="font-size: 10px;">
+                    <span>v{{ apkVault[slot - 1].version }} · {{ formatApkSize(apkVault[slot - 1].size) }}</span>
+                    <span class="text-cyan-3">{{ apkVault[slot - 1].uploadProgress < 100 ? 'Streaming to Contabo S3...' : 'Registering in Vault...' }}</span>
                   </div>
                 </div>
 
-                <div class="row items-center justify-end op-gap-8 q-mt-md border-top q-pt-sm">
-                  <div class="row items-center op-gap-4 bg-panel-darker rounded-borders q-px-xs">
-                    <span class="text-muted text-metric-mono" style="font-size: 9px;">DEPLOY VER:</span>
-                    <q-select
-                      v-model="apkVault[slot-1].selectedDeployVersion"
-                      :options="apkVault[slot-1].versionDistribution.map(v => v.version)"
-                      dense borderless options-dense hide-bottom-space
-                      class="text-caption text-weight-bold"
-                      style="min-width: 70px;"
+                <!-- READY / STABLE SLOT -->
+                <div v-else>
+                  <div class="row items-center justify-between no-wrap">
+                    <div class="row items-center op-gap-8 no-wrap overflow-hidden">
+                      <q-icon name="android" color="green-4" size="xs" />
+                      <div class="overflow-hidden">
+                        <div class="text-main text-weight-bold ellipsis" style="font-size: 12px;">{{ apkVault[slot - 1].name }}</div>
+                        <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ apkVault[slot - 1].packageName }}</div>
+                      </div>
+                    </div>
+                    <div class="row items-center">
+                      <q-btn flat dense size="sm" icon="upgrade" color="amber-4" :disable="isUploading" @click="openUpdateDialog(slot - 1)">
+                        <q-tooltip class="bg-amber-10 text-amber-2 text-caption">Upload New Version</q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        flat dense size="sm"
+                        icon="content_copy"
+                        color="cyan-3"
+                        :disable="!apkVault[slot - 1].s3Url || isUploading"
+                        @click="copyDownloadLink(apkVault[slot - 1])"
+                      >
+                        <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Copy phone download link</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense size="sm" class="q-mx-md" icon="edit_link" color="cyan-4" :disable="isUploading" @click="promptEditUrl(slot - 1)">
+                        <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Edit Download URL</q-tooltip>
+                      </q-btn>
+                      <q-btn flat dense size="sm" icon="delete_outline" color="red-4" :disable="isUploading" @click="removeApk(slot - 1)">
+                        <q-tooltip class="bg-red-10 text-red-2 text-caption">Remove from Vault</q-tooltip>
+                      </q-btn>
+                    </div>
+                  </div>
+                  <div class="row items-center justify-between q-mt-xs text-caption text-muted" style="font-size: 10px;">
+                    <span>v{{ apkVault[slot - 1].version }} · {{ formatApkSize(apkVault[slot - 1].size) }}</span>
+                    <q-chip dense size="xs" :color="apkVault[slot-1].status === 'READY' ? 'green-10' : 'amber-10'" :text-color="apkVault[slot-1].status === 'READY' ? 'green-3' : 'amber-3'" class="text-weight-bold">
+                      {{ apkVault[slot - 1].status }}
+                    </q-chip>
+                  </div>
+
+                  <!-- Install / Uninstall counters -->
+                  <div class="row items-center op-gap-12 q-mt-xs q-px-xs q-py-xs bg-panel rounded-borders border-muted">
+                    <div class="column items-center" style="gap: 1px; flex: 1;">
+                      <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 14px;">{{ apkVault[slot - 1].installCount }}</span>
+                      <span class="text-muted" style="font-size: 9px;">INSTALLS</span>
+                    </div>
+                    <div class="bg-subpanel" style="width: 1px; height: 28px;"></div>
+                    <div class="column items-center" style="gap: 1px; flex: 1;">
+                      <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 14px;">{{ apkVault[slot - 1].uninstallCount }}</span>
+                      <span class="text-muted" style="font-size: 9px;">UNINSTALLS</span>
+                    </div>
+                    <div class="bg-subpanel" style="width: 1px; height: 28px;"></div>
+                    <div class="column items-center" style="gap: 1px; flex: 1;">
+                      <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 14px;">{{ Math.max(0, apkVault[slot - 1].installCount - apkVault[slot - 1].uninstallCount) }}</span>
+                      <span class="text-muted" style="font-size: 9px;">NET ACTIVE</span>
+                    </div>
+                  </div>
+
+                  <!-- Version Distribution Breakdown -->
+                  <div class="column op-gap-4 q-mt-xs">
+                    <div class="row items-center justify-between">
+                      <span class="text-metric-mono text-muted" style="font-size: 9px;">VERSION DISTRIBUTION ACROSS FLEET:</span>
+                      <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ totalDevicesForApk(apkVault[slot - 1]) }} DEVICES TOTAL</span>
+                    </div>
+                    <div
+                      v-for="vd in apkVault[slot - 1].versionDistribution"
+                      :key="vd.version"
+                      class="column op-gap-1"
+                    >
+                      <div class="row items-center justify-between" style="font-size: 10px;">
+                        <div class="row items-center op-gap-4">
+                          <span class="text-metric-mono" :class="vd.version === apkVault[slot-1].version ? 'text-cyan-3' : 'text-muted'">v{{ vd.version }}</span>
+                          <q-chip v-if="vd.version === apkVault[slot-1].version" dense size="xs" color="cyan-10" text-color="cyan-3" style="font-size: 9px; padding: 0 4px;">LATEST</q-chip>
+                          <q-chip v-else dense size="xs" color="grey-9" text-color="grey-5" style="font-size: 9px; padding: 0 4px;">LEGACY</q-chip>
+                        </div>
+                        <span class="text-main text-weight-bold">{{ vd.deviceCount }} <span class="text-muted text-weight-regular">devices</span></span>
+                      </div>
+                      <q-linear-progress
+                        :value="totalDevicesForApk(apkVault[slot-1]) > 0 ? vd.deviceCount / totalDevicesForApk(apkVault[slot-1]) : 0"
+                        :color="vd.version === apkVault[slot-1].version ? 'cyan-4' : 'grey-7'"
+                        track-color="grey-9"
+                        size="xs"
+                      />
+                      <div class="text-muted text-right" style="font-size: 9px;">
+                        {{ totalDevicesForApk(apkVault[slot-1]) > 0 ? Math.round(vd.deviceCount / totalDevicesForApk(apkVault[slot-1]) * 100) : 0 }}% of fleet
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="row items-center justify-end op-gap-8 q-mt-md border-top q-pt-sm">
+                    <div class="row items-center op-gap-4 bg-panel-darker rounded-borders q-px-xs">
+                      <span class="text-muted text-metric-mono" style="font-size: 9px;">DEPLOY VER:</span>
+                      <q-select
+                        v-model="apkVault[slot-1].selectedDeployVersion"
+                        :options="apkVault[slot-1].versionDistribution.map(v => v.version)"
+                        dense borderless options-dense hide-bottom-space
+                        class="text-caption text-weight-bold"
+                        style="min-width: 70px;"
+                      />
+                    </div>
+                    <q-btn
+                      unelevated size="sm" color="cyan-10" text-color="cyan-3" icon="send"
+                      :label="`DEPLOY TO ${selectedDevices.length || 0} DEVICES`"
+                      :disable="selectedDevices.length === 0 || apkVault[slot-1].status !== 'READY' || isUploading"
+                      @click="deployApk(apkVault[slot - 1])"
+                      class="text-weight-bold"
+                    />
+                    <q-btn
+                      unelevated size="sm" color="red-10" text-color="red-3" icon="delete_sweep"
+                      label="UNINSTALL"
+                      :disable="selectedDevices.length === 0 || isUploading"
+                      @click="uninstallApk(apkVault[slot - 1])"
+                      class="text-weight-bold"
                     />
                   </div>
-                  <q-btn
-                    unelevated size="sm" color="cyan-10" text-color="cyan-3" icon="send"
-                    :label="`DEPLOY TO ${selectedDevices.length || 0} DEVICES`"
-                    :disable="selectedDevices.length === 0 || apkVault[slot-1].status !== 'READY'"
-                    @click="deployApk(apkVault[slot - 1])"
-                    class="text-weight-bold"
-                  />
-                  <q-btn
-                    unelevated size="sm" color="red-10" text-color="red-3" icon="delete_sweep"
-                    label="UNINSTALL"
-                    :disable="selectedDevices.length === 0"
-                    @click="uninstallApk(apkVault[slot - 1])"
-                    class="text-weight-bold"
-                  />
                 </div>
               </template>
 
@@ -322,8 +369,8 @@
     </div>
 
     <!-- Upload APK Dialog -->
-    <q-dialog v-model="uploadDialogOpen" persistent>
-      <q-card class="bg-panel text-main border-muted" style="min-width: 420px;">
+    <q-dialog v-model="uploadDialogOpen" :persistent="isUploading">
+      <q-card class="bg-panel text-main border-muted" style="min-width: 440px;">
         <q-card-section class="bg-subpanel border-bottom row items-center op-gap-8">
           <q-icon name="upload_file" color="cyan-4" size="sm" />
           <div>
@@ -333,15 +380,16 @@
         </q-card-section>
 
         <q-card-section class="column op-gap-12 q-pt-md">
-          <q-input v-model="newApk.name" dense filled stack-label :loading="isDetecting" label="Application Name *" class="bg-subpanel" :dark="true" />
-          <q-input v-model="newApk.packageName" dense filled stack-label :loading="isDetecting" label="Package Name (e.g. com.example.app) *" class="bg-subpanel" :dark="true" />
-          <q-input v-model="newApk.version" dense filled stack-label :loading="isDetecting" label="Version (e.g. 2.1.0) *" class="bg-subpanel" :dark="true" />
+          <q-input v-model="newApk.name" dense filled stack-label :loading="isDetecting" :disable="isUploading" label="Application Name *" class="bg-subpanel" :dark="true" />
+          <q-input v-model="newApk.packageName" dense filled stack-label :loading="isDetecting" :disable="isUploading" label="Package Name (e.g. com.example.app) *" class="bg-subpanel" :dark="true" />
+          <q-input v-model="newApk.version" dense filled stack-label :loading="isDetecting" :disable="isUploading" label="Version (e.g. 2.1.0) *" class="bg-subpanel" :dark="true" />
 
           <!-- File Drop Zone -->
           <div
             class="border-muted rounded-borders q-pa-md column items-center justify-center cursor-pointer hover-bg"
+            :class="{ 'disabled-cursor': isUploading }"
             style="border-style: dashed; min-height: 100px;"
-            @click="triggerFileInput"
+            @click="!isUploading && triggerFileInput()"
           >
             <q-icon name="cloud_upload" size="md" color="cyan-4" />
             <div class="text-main text-weight-medium q-mt-xs" style="font-size: 12px;">
@@ -351,16 +399,33 @@
             <input ref="fileInputRef" type="file" accept=".apk" style="display:none;" @change="onFileSelected" />
           </div>
 
-          <div v-if="!newApk.name || !newApk.packageName || !newApk.version || !newApk.fileName" class="text-amber-4 text-caption" style="font-size: 10px;">
+          <!-- Live In-Dialog Progress -->
+          <div v-if="isUploading" class="bg-subpanel q-pa-sm rounded-borders border-cyan column op-gap-6">
+            <div class="row items-center justify-between text-metric-mono" style="font-size: 11px;">
+              <div class="row items-center op-gap-6 text-cyan-3 text-weight-bold">
+                <q-spinner-orbit color="cyan-3" size="xs" />
+                <span>Uploading to Contabo Storage...</span>
+              </div>
+              <span class="text-cyan-3 text-weight-bold">{{ uploadProgress }}%</span>
+            </div>
+            <q-linear-progress :value="uploadProgress / 100" color="cyan-4" track-color="grey-9" size="sm" rounded stripe />
+            <div class="text-muted text-metric-mono" style="font-size: 10px;">
+              {{ uploadStatusText }}
+            </div>
+          </div>
+
+          <div v-if="!isUploading && (!newApk.name || !newApk.packageName || !newApk.version || !newApk.fileName)" class="text-amber-4 text-caption" style="font-size: 10px;">
             ⚠ All fields and a valid APK file are required to proceed.
           </div>
         </q-card-section>
 
         <q-card-actions align="right" class="bg-subpanel border-top q-pa-sm">
-          <q-btn flat dense size="sm" color="grey-5" label="Cancel" v-close-popup @click="resetNewApk" />
+          <q-btn flat dense size="sm" color="grey-5" label="Cancel" :disable="isUploading" v-close-popup @click="resetNewApk" />
           <q-btn
-            dense size="sm" color="cyan-4" text-color="black" label="Commit APK to Vault"
-            :disable="!newApk.name || !newApk.packageName || !newApk.version || !newApk.fileName"
+            dense size="sm" color="cyan-4" text-color="black"
+            :label="isUploading ? `Uploading... (${uploadProgress}%)` : 'Commit APK to Vault'"
+            :loading="isUploading"
+            :disable="isUploading || !newApk.name || !newApk.packageName || !newApk.version || !newApk.fileName"
             @click="commitApkToVault"
             class="q-px-sm text-weight-bold"
           />
@@ -375,10 +440,26 @@
 import { ref, computed, onMounted } from 'vue'
 import { Notify, useQuasar, copyToClipboard } from 'quasar'
 import api from 'src/api'
+import { publicApiOrigin } from 'src/config/env'
 
 const $q = useQuasar()
 // ── APK Vault (max 3) ──────────────────────────────────────────────────────────
 const apkVault = ref([])
+
+// Upload & Loading States
+const isUploading = ref(false)
+const uploadProgress = ref(0)
+const uploadStatusText = ref('')
+
+const formatApkSize = (size) => {
+  if (!size) return '—'
+  if (typeof size === 'number') {
+    if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
+    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${size} B`
+  }
+  return size.toString()
+}
 
 onMounted(async () => {
   try {
@@ -428,14 +509,17 @@ const openUpdateDialog = (index) => {
 const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
 
 const copyDownloadLink = async (apk) => {
-  const url = String(apk?.s3Url || '').trim()
+  const origin = publicApiOrigin()
+  const url = apk?.id
+    ? `${origin}/api/apk/${apk.id}/download`
+    : String(apk?.s3Url || '').trim()
   if (!url) {
     Notify.create({ type: 'warning', message: 'No download URL yet. Wait for the upload to finish.', position: 'bottom-right' })
     return
   }
   try {
     await copyToClipboard(url)
-    Notify.create({ type: 'positive', message: 'APK download link copied', position: 'bottom-right' })
+    Notify.create({ type: 'positive', message: 'APK download link copied — open it in the phone browser', position: 'bottom-right' })
   } catch {
     Notify.create({ type: 'negative', message: 'Could not copy the download link', position: 'bottom-right' })
   }
@@ -521,7 +605,20 @@ const commitApkToVault = async () => {
   
   if (targetSlotIndex.value !== null) {
     formData.append('targetSlotId', apkVault.value[targetSlotIndex.value].id)
+  } else {
+    const pkg = String(newApk.value.packageName || '').trim().toLowerCase()
+    const existingIndex = apkVault.value.findIndex(
+      (apk) => String(apk.packageName || '').toLowerCase() === pkg,
+    )
+    if (existingIndex >= 0) {
+      targetSlotIndex.value = existingIndex
+      formData.append('targetSlotId', apkVault.value[existingIndex].id)
+    }
   }
+
+  isUploading.value = true
+  uploadProgress.value = 0
+  uploadStatusText.value = 'Preparing APK binary stream...'
 
   // Create a placeholder entry for optimistic UI
   const optimisticEntry = {
@@ -547,8 +644,6 @@ const commitApkToVault = async () => {
     apkVault.value.push(optimisticEntry)
   }
 
-  uploadDialogOpen.value = false
-
   try {
     const { data } = await api.post('/api/admin/apk/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -556,14 +651,24 @@ const commitApkToVault = async () => {
       onUploadProgress: (progressEvent) => {
         const total = progressEvent.total || newApk.value.fileRef?.size || 0
         const percentCompleted = total ? Math.round((progressEvent.loaded * 100) / total) : 0
+        const cappedPercent = Math.min(99, percentCompleted)
+        uploadProgress.value = cappedPercent
+        const loadedMb = (progressEvent.loaded / 1024 / 1024).toFixed(1)
+        const totalMb = total ? (total / 1024 / 1024).toFixed(1) : '?'
+        uploadStatusText.value = cappedPercent < 99
+          ? `Streaming APK binary to Contabo Object Storage... (${loadedMb} MB / ${totalMb} MB · ${cappedPercent}%)`
+          : 'Upload stream completed. Committing metadata to APK Vault registry...'
         if (apkVault.value[finalIndex]) {
-          apkVault.value[finalIndex].uploadProgress = Math.min(99, percentCompleted)
+          apkVault.value[finalIndex].uploadProgress = cappedPercent
         }
       }
     })
     
     // Replace optimistic entry with real data
+    uploadProgress.value = 100
+    uploadStatusText.value = 'APK committed to Contabo Vault successfully!'
     apkVault.value[finalIndex] = data
+    uploadDialogOpen.value = false
     Notify.create({ type: 'positive', message: `APK [${data.name}] committed to vault successfully`, position: 'bottom-right' })
   } catch (error) {
     Notify.create({ type: 'negative', message: `Upload failed: ${error.response?.data?.error || error.message}`, position: 'bottom-right' })
@@ -578,9 +683,10 @@ const commitApkToVault = async () => {
         apkVault.value[finalIndex].status = 'ERROR'
       }
     }
+  } finally {
+    isUploading.value = false
+    resetNewApk()
   }
-
-  resetNewApk()
 }
 
 const removeApk = async (index) => {
@@ -689,6 +795,8 @@ const totalDevicesForApk = (apk) => {
 .border-bottom-light { border-bottom: 1px solid #1a2024; }
 .border-top { border-top: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
+.border-cyan { border: 1px solid rgba(0, 229, 255, 0.4) !important; }
+.disabled-cursor { pointer-events: none; opacity: 0.6; }
 .bg-empty-slot { background: rgba(255,255,255,0.02); border-style: dashed !important; }
 .row-selected { background-color: #0d2233 !important; }
 .sticky-header { position: sticky; top: 0; z-index: 2; }
