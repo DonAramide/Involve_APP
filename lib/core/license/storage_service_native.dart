@@ -14,6 +14,7 @@ class StorageService {
   static const _modeLockedKey = 'is_mode_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
+  static const _serverPlanKey = 'server_activated_plan';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
   static const _licenseFileName = 'license.dat';
@@ -211,6 +212,46 @@ class StorageService {
       if (await file.exists()) {
         await file.delete();
       }
+    }
+  }
+
+  /// Plan applied from POST /devices/validate (admin activation QR), not HMAC license.
+  static Future<void> saveServerActivatedPlan({
+    required String planType,
+    required DateTime expiryDate,
+  }) async {
+    final payload = jsonEncode({
+      'planType': planType,
+      'expiry': expiryDate.toIso8601String(),
+    });
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _serverPlanKey, value: payload);
+    } else {
+      final file = await _getDesktopFile('server_plan.dat');
+      await file.writeAsString(payload);
+    }
+  }
+
+  static Future<({String planType, DateTime expiryDate})?> getServerActivatedPlan() async {
+    String? raw;
+    if (Platform.isAndroid || Platform.isIOS) {
+      raw = await _secureStorage.read(key: _serverPlanKey);
+    } else {
+      final file = await _getDesktopFile('server_plan.dat');
+      if (await file.exists()) {
+        raw = await file.readAsString();
+      }
+    }
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map) return null;
+      final planType = map['planType']?.toString();
+      final expiry = DateTime.tryParse(map['expiry']?.toString() ?? '');
+      if (planType == null || planType.isEmpty || expiry == null) return null;
+      return (planType: planType, expiryDate: expiry);
+    } catch (_) {
+      return null;
     }
   }
 

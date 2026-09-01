@@ -128,10 +128,15 @@ export class TerminalSyncService {
       // Missing inventory must not allow cross-tenant takeover via sync.
       const inventoryAgrees =
         inventoryTenantId != null && inventoryTenantId === tenantId;
-      if (inventoryAgrees) {
+      let fleetAgrees = false;
+      try {
+        const fleet = await this.fetchOneByDeviceId('devices', deviceId, 'tenant_id', tenantId);
+        fleetAgrees = !!fleet?.tenant_id && fleet.tenant_id === tenantId;
+      } catch (_) {}
+      if (inventoryAgrees || fleetAgrees) {
         console.warn(
           `[TerminalSync] Rebinding device ${deviceId} tenant ${staleTenantId} → ${tenantId} ` +
-            `(JWT tenant; inventory=${inventoryTenantId})`,
+            `(JWT tenant; inventory=${inventoryTenantId} fleetAgrees=${fleetAgrees})`,
         );
         deviceRecord = { ...deviceRecord, tenant_id: tenantId };
         // Point all registration/device rows for this hardware at the active tenant
@@ -185,7 +190,7 @@ export class TerminalSyncService {
 
     // Step 2: support config
     let supportPhone = '+234 800 INVIFY';
-    let supportEmail = 'support@iips.app';
+    let supportEmail = 'support@invify.org';
     let supportWhatsapp = '+2348023552282';
     let broadcastMessage = '';
 

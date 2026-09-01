@@ -343,6 +343,16 @@ export class OnboardingController {
         return;
       }
 
+      const cleanPhone = (phone || '').replace(/\D/g, '');
+      if (cleanPhone.length > 14) {
+        res.status(400).json({ success: false, error: 'Phone number cannot exceed 14 digits' });
+        return;
+      }
+      if (/^(.)\1+$/.test(cleanPhone) || ['0123456789', '1234567890', '9876543210'].some(p => p.includes(cleanPhone) && cleanPhone.length >= 6)) {
+        res.status(400).json({ success: false, error: 'Invalid phone number pattern' });
+        return;
+      }
+
       const {
         emailVerificationRequired,
         whatsappVerificationRequired,
@@ -535,8 +545,23 @@ export class OnboardingController {
           owner_email: email,
           owner_name: `${firstName} ${lastName}`,
           status: 'active',
-        }).then(({ error: devErr }) => {
-          if (devErr) console.warn('[OnboardingController] device_registrations insert failed (non-fatal):', devErr.message);
+        }).then(async ({ error: devErr }) => {
+          if (!devErr) return;
+          console.warn('[OnboardingController] device_registrations insert failed, rebinding existing row:', devErr.message);
+          const { error: updErr } = await supabaseAdmin
+            .from('device_registrations')
+            .update({
+              tenant_id: finalTenantId,
+              agent_code: effectiveAgentCode,
+              location: effectiveLocation || null,
+              owner_email: email,
+              owner_name: `${firstName} ${lastName}`,
+              status: 'active',
+            })
+            .eq('device_id', effectiveDeviceId);
+          if (updErr) {
+            console.warn('[OnboardingController] device_registrations rebind failed (non-fatal):', updErr.message);
+          }
         });
 
         await supabaseAdmin.from('devices').upsert({
@@ -575,6 +600,7 @@ export class OnboardingController {
           email: email,
           role: 'owner',
           tenantId: finalTenantId,
+          deviceId: effectiveDeviceId,
         },
         process.env.JWT_SECRET,
         { expiresIn: '30d' }

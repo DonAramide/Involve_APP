@@ -16,6 +16,11 @@ class StorageService {
   static Future<void> saveProExpiryDate(DateTime date) async {}
   static Future<DateTime?> getProExpiryDate() async => null;
   static Future<void> clearProExpiryDate() async {}
+  static Future<void> saveServerActivatedPlan({
+    required String planType,
+    required DateTime expiryDate,
+  }) async {}
+  static Future<({String planType, DateTime expiryDate})?> getServerActivatedPlan() async => null;
   static Future<void> setDeviceAccessGranted(bool granted) async {}
   static Future<bool> isDeviceAccessGranted() async => false;
   static Future<void> setOnboardingCompleted(bool completed) async {}

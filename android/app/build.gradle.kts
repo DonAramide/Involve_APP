@@ -122,6 +122,28 @@ flutter {
     source = "../.."
 }
 
+fun ensureAssetManifest(variantName: String) {
+    val src = file("${layout.buildDirectory.get()}/intermediates/flutter/$variantName/flutter_assets/AssetManifest.bin")
+    val dest = file("${layout.buildDirectory.get()}/intermediates/assets/$variantName/merge${variantName.replaceFirstChar { it.uppercase() }}Assets/flutter_assets/AssetManifest.bin")
+    if (src.exists()) {
+        dest.parentFile.mkdirs()
+        src.copyTo(dest, overwrite = true)
+        println("[Invify] Copied AssetManifest.bin into merge${variantName.replaceFirstChar { it.uppercase() }}Assets")
+    }
+}
+
+afterEvaluate {
+    listOf("debug", "release", "profile").forEach { variant ->
+        val cap = variant.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name == "compress${cap}Assets" }.configureEach {
+            doFirst { ensureAssetManifest(variant) }
+        }
+        tasks.matching { it.name == "merge${cap}Assets" }.configureEach {
+            doLast { ensureAssetManifest(variant) }
+        }
+    }
+}
+
 dependencies {
     implementation(project(":mpossdk"))
     implementation(project(":morefunsdk"))

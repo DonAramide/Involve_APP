@@ -123,7 +123,7 @@ export class DeviceController {
 
       const { io } = require('../app');
       const sockets = await io.fetchSockets();
-      const byDevice = new Map<string, { deviceId: string; tenantId: string | null; socketId: string }>();
+      const byDevice = new Map<string, { deviceId: string; tenantId: string | null; socketId: string; ip: string }>();
 
       for (const sock of sockets) {
         const tenantId = sock.data?.tenantId || sock.handshake?.auth?.tenantId || null;
@@ -136,10 +136,19 @@ export class DeviceController {
         ).trim();
         if (!deviceId) continue;
         if (!byDevice.has(deviceId)) {
+          const hdr = sock.handshake?.headers?.['x-forwarded-for'];
+          const forwarded = (typeof hdr === 'string' ? hdr : Array.isArray(hdr) ? hdr[0] : '')
+            ?.split(',')[0]
+            ?.trim();
+          const real = String(sock.handshake?.headers?.['x-real-ip'] || '').trim();
+          let ip = String(sock.data?.ip || forwarded || real || sock.handshake?.address || 'unknown');
+          ip = ip.replace(/^::ffff:/, '');
+          if (ip === '::1') ip = '127.0.0.1';
           byDevice.set(deviceId, {
             deviceId,
             tenantId,
             socketId: sock.id,
+            ip,
           });
         }
       }
@@ -344,53 +353,62 @@ export class DeviceController {
         return res.status(400).json({ error: 'Invalid activation code' });
       }
 
-      if (activation.is_used || activation.status === 'used') {
-        return res.status(400).json({ error: 'Activation code has already been used' });
-      }
-
-      if (new Date(activation.expires_at) <= new Date() || activation.status === 'expired') {
-        return res.status(400).json({ error: 'Activation code has expired' });
-      }
-
-      // Enforce ownership integrity: user must belong to the same tenant as the activation (except super_admin)
-      const user = (req as any).user;
-      if (user && user.role !== 'super_admin' && activation.tenant_id !== user.tenantId) {
-        return res.status(403).json({ error: 'Forbidden: Activation code belongs to a different tenant' });
-      }
-
-      // 2. Perform conditional atomic update (expires_at > NOW() verified in query)
       let updatedActivation: any = null;
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('device_activations')
-          .update({
-            is_used: true,
-            status: 'used',
-            device_id: deviceId,
-            used_at: new Date().toISOString()
-          })
-          .eq('activation_code', code)
-          .eq('is_used', false)
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString()) // Expiration verification inside the atomic lock operation
-          .select()
-          .maybeSingle();
+      const alreadyRedeemedHere =
+        (activation.is_used || activation.status === 'used') &&
+        activation.device_id &&
+        activation.device_id === deviceId;
 
-        if (error) throw error;
-        updatedActivation = data;
-      } catch (updateErr: any) {
-        if (isNetworkTimeout(updateErr)) {
-          return res.status(503).json({
-            error: 'Database unavailable',
-            retryable: true,
-            retryAfterMs: 2000
-          });
+      if (activation.is_used || activation.status === 'used') {
+        if (!alreadyRedeemedHere) {
+          return res.status(400).json({ error: 'Activation code has already been used' });
         }
-        throw updateErr;
+        updatedActivation = activation;
       }
 
       if (!updatedActivation) {
-        return res.status(400).json({ error: 'Activation code is invalid, expired, or has already been used' });
+        if (new Date(activation.expires_at) <= new Date() || activation.status === 'expired') {
+          return res.status(400).json({ error: 'Activation code has expired' });
+        }
+
+        // Enforce ownership integrity: user must belong to the same tenant as the activation (except super_admin)
+        const user = (req as any).user;
+        if (user && user.role !== 'super_admin' && activation.tenant_id !== user.tenantId) {
+          return res.status(403).json({ error: 'Forbidden: Activation code belongs to a different tenant' });
+        }
+
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('device_activations')
+            .update({
+              is_used: true,
+              status: 'used',
+              device_id: deviceId,
+              used_at: new Date().toISOString()
+            })
+            .eq('activation_code', code)
+            .eq('is_used', false)
+            .eq('status', 'pending')
+            .gt('expires_at', new Date().toISOString())
+            .select()
+            .maybeSingle();
+
+          if (error) throw error;
+          updatedActivation = data;
+        } catch (updateErr: any) {
+          if (isNetworkTimeout(updateErr)) {
+            return res.status(503).json({
+              error: 'Database unavailable',
+              retryable: true,
+              retryAfterMs: 2000
+            });
+          }
+          throw updateErr;
+        }
+
+        if (!updatedActivation) {
+          return res.status(400).json({ error: 'Activation code is invalid, expired, or has already been used' });
+        }
       }
 
       // 3. Resolve device role dynamically
@@ -462,6 +480,15 @@ export class DeviceController {
 
         if (upsertError) throw upsertError;
 
+        try {
+          await supabaseAdmin
+            .from('device_registrations')
+            .update({ tenant_id: updatedActivation.tenant_id, status: 'active' })
+            .eq('device_id', deviceId);
+        } catch (regErr: any) {
+          console.warn('[DeviceController] device_registrations rebind failed (non-fatal):', regErr?.message || regErr);
+        }
+
         let tenantData = null;
         try {
           const { data: tenant } = await supabaseAdmin
@@ -474,10 +501,14 @@ export class DeviceController {
           console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
         }
 
+        const planIndex = Number(updatedActivation.plan_index || 0);
+        const planName = ['basic', 'standard', 'premium', 'enterprise'][planIndex] || 'basic';
         return res.status(200).json({
           valid: true,
           activation_code: updatedActivation.activation_code,
           duration_days: updatedActivation.duration_days,
+          plan_index: planIndex,
+          plan: planName,
           tenant_id: updatedActivation.tenant_id,
           tenant: tenantData,
           device_id: deviceId,

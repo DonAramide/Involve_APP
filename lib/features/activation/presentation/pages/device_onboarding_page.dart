@@ -1,5 +1,6 @@
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 
 import 'dart:convert';
@@ -43,6 +44,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _agentCodeController = TextEditingController();
+  WestAfricanCountry _selectedCountryCode = westAfricanCountries.first;
   
   // Address Fields
   final _streetController = TextEditingController();
@@ -109,7 +111,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       if (response.statusCode < 500) {
         success = true;
       } else {
-        errorReason = 'HTTP ${response.statusCode}';
+        errorReason = 'The Invify server is temporarily unavailable. Please try again.';
       }
     } catch (e) {
       try {
@@ -118,10 +120,14 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         if ((res.statusCode ?? 500) < 500) {
           success = true;
         } else {
-          errorReason = 'HTTP ${res.statusCode}';
+          errorReason = 'Could not reach the Invify server. Please try again.';
         }
       } catch (e2) {
-        errorReason = e.toString();
+        errorReason = friendlyApiError(
+          e2,
+          fallback:
+              'Could not reach the Invify server. Connect this tablet to the same Wi-Fi as the office computer, then tap the cloud icon to retry.',
+        );
       }
     }
 
@@ -136,8 +142,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           SnackBar(
             content: Text(
               success
-                  ? '✓ Cloud server connected: $targetUrl'
-                  : '✗ Server unreachable ($targetUrl). Please verify tablet Wi-Fi/Internet.\nError: ${errorReason ?? "Connection timed out"}',
+                  ? 'Connected to the Invify server.'
+                  : (errorReason ??
+                      'Could not reach the Invify server. Connect this tablet to the same Wi-Fi as the office computer, then try again.'),
             ),
             backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
             duration: const Duration(seconds: 5),
@@ -214,13 +221,20 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         debugPrint('Geolocator timeout or error: $e');
       }
 
+      // Format phone number with country dial code
+      String nationalPhone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (nationalPhone.startsWith('0')) {
+        nationalPhone = nationalPhone.replaceFirst(RegExp(r'^0+'), '');
+      }
+      final formattedFullPhone = '${_selectedCountryCode.dialCode}$nationalPhone';
+
       // Keep buttons locked until OTP is sent and the verify page opens.
       final payload = {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
         'password': _passwordController.text,
-        'phone': _phoneController.text.trim(),
+        'phone': formattedFullPhone,
         'businessName': _businessNameController.text.trim(),
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
@@ -294,10 +308,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                 child: Center(
                   child: Opacity(
                     opacity: 0.15,
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 500,
-                      height: 500,
+                    child: InvifyBrandLogo(
+                      size: 500,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -364,8 +376,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                               _pingServer(showFeedback: true);
                                             },
                                             tooltip: _isServerReachable!
-                                                ? 'API reachable over HTTP (${AppConfig.baseUrl})\nThis is not the live dashboard socket'
-                                                : 'API unreachable (${AppConfig.baseUrl}). Tap to retry',
+                                                ? 'Connected to the Invify server'
+                                                : 'Cannot reach the Invify server. Tap to retry',
                                           )
                                         else
                                           const Padding(
@@ -483,11 +495,16 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
             helperText: 'Used to sign in to the Invify Web Management Portal',
             customValidator: (value) {
-              if (value == null || value.trim().isEmpty) return 'Required';
-              if (value.length < 6) return 'Password must be at least 6 characters';
+              if (value == null || value.trim().isEmpty) return 'Password is required';
+              if (value.length < 9) return 'Password must be at least 9 characters';
+              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Password must contain at least one capital letter (A-Z)';
+              if (!RegExp(r'[a-z]').hasMatch(value)) return 'Password must contain at least one lowercase letter (a-z)';
+              if (!RegExp(r'[0-9]').hasMatch(value)) return 'Password must contain at least one number (0-9)';
+              if (!RegExp(r'[^A-Za-z0-9]').hasMatch(value)) return 'Password must contain at least one symbol (e.g. !@#\$)';
               return null;
             },
           ),
+          _buildPasswordRequirements(),
           const SizedBox(height: 20),
           _buildTextField(
             _confirmPasswordController, 
@@ -505,7 +522,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           const SizedBox(height: 20),
           _buildTextField(_businessNameController, 'Business / Tenant Name', Icons.business),
           const SizedBox(height: 20),
-          _buildTextField(_phoneController, 'WhatsApp Contact', Icons.phone, isPhone: true),
+          _buildPhoneFieldWithCountrySelector(),
           const SizedBox(height: 20),
           _buildTextField(_agentCodeController, 'Agent Code (Optional)', Icons.badge, isRequired: false),
           const SizedBox(height: 24),
@@ -618,6 +635,287 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ),
       ),
       validator: customValidator ?? (isRequired ? (value) => value == null || value.trim().isEmpty ? 'Required' : null : null),
+    );
+  }
+
+  Widget _buildPasswordRequirements() {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _passwordController,
+      builder: (context, value, _) {
+        final text = value.text;
+        final hasMinLength = text.length >= 9;
+        final hasUppercase = RegExp(r'[A-Z]').hasMatch(text);
+        final hasNumber = RegExp(r'[0-9]').hasMatch(text);
+        final hasSymbol = RegExp(r'[^A-Za-z0-9]').hasMatch(text);
+
+        Widget buildChip(String label, bool isValid) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isValid ? const Color(0x2210B981) : const Color(0x1A6B7280),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isValid ? const Color(0xFF10B981) : Colors.white.withOpacity(0.08),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isValid ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  size: 12,
+                  color: isValid ? const Color(0xFF10B981) : Colors.grey[500],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isValid ? const Color(0xFF10B981) : Colors.grey[400],
+                    fontSize: 10.5,
+                    fontWeight: isValid ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(top: 8, bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Password Security Requirements:',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  buildChip('9+ Characters', hasMinLength),
+                  buildChip('1+ Capital (A-Z)', hasUppercase),
+                  buildChip('1+ Number (0-9)', hasNumber),
+                  buildChip('1+ Symbol (!@#\$)', hasSymbol),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhoneFieldWithCountrySelector() {
+    return TextFormField(
+      controller: _phoneController,
+      style: const TextStyle(color: Colors.white),
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        labelText: 'WhatsApp Contact',
+        labelStyle: const TextStyle(color: Color(0xFF818CF8)),
+        helperText: 'Max 14 digits (West Africa regional code included)',
+        helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+        prefixIcon: InkWell(
+          onTap: _showCountryPickerBottomSheet,
+          borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _selectedCountryCode.flag,
+                  style: const TextStyle(fontSize: 18),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _selectedCountryCode.dialCode,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down, color: Color(0xFF818CF8), size: 18),
+              ],
+            ),
+          ),
+        ),
+        filled: true,
+        fillColor: const Color(0xFF101625),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF6366F1)),
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) return 'WhatsApp contact is required';
+        final clean = value.trim().replaceAll(RegExp(r'\D'), '');
+        
+        // 1. Length check: must not exceed 14 digits
+        final fullDigits = '${_selectedCountryCode.dialCode.replaceAll('+', '')}$clean';
+        if (clean.length > 14 || fullDigits.length > 14) {
+          return 'Phone number cannot exceed 14 digits';
+        }
+        if (clean.length < _selectedCountryCode.minLength) {
+          return 'Enter a valid ${_selectedCountryCode.name} number (min ${_selectedCountryCode.minLength} digits)';
+        }
+
+        // 2. Dummy / repetitive digits check (00000000000, 1111111111, etc.)
+        if (RegExp(r'^(.)\1+$').hasMatch(clean)) {
+          return 'Invalid phone number (cannot be repetitive digits like 000000... or 111111...)';
+        }
+
+        // 3. Sequential digits check (123456789, 987654321, 0123456789)
+        const sequential = ['0123456789', '1234567890', '9876543210', '0987654321'];
+        for (final seq in sequential) {
+          if (seq.contains(clean) && clean.length >= 6) {
+            return 'Invalid phone number (cannot be sequential digits)';
+          }
+        }
+
+        // 4. Nigerian specific format check
+        if (_selectedCountryCode.code == 'NG') {
+          String normalized = clean.startsWith('0') ? clean.substring(1) : clean;
+          if (normalized.length == 10 && !RegExp(r'^[789]').hasMatch(normalized)) {
+            return 'Nigerian mobile numbers must start with 7, 8, or 9';
+          }
+        }
+
+        return null;
+      },
+    );
+  }
+
+  void _showCountryPickerBottomSheet() {
+    final searchCtrl = TextEditingController();
+    List<WestAfricanCountry> filtered = List.from(westAfricanCountries);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Container(
+            height: MediaQuery.of(ctx).size.height * 0.65,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Select West African Country Code',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: searchCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search country or dial code (+234)...',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF818CF8), size: 18),
+                    filled: true,
+                    fillColor: const Color(0xFF1E293B),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (query) {
+                    final q = query.toLowerCase().trim();
+                    setModalState(() {
+                      filtered = westAfricanCountries.where((c) {
+                        return c.name.toLowerCase().contains(q) ||
+                            c.dialCode.contains(q) ||
+                            c.code.toLowerCase().contains(q);
+                      }).toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                    itemBuilder: (context, index) {
+                      final country = filtered[index];
+                      final isSelected = country.code == _selectedCountryCode.code;
+
+                      return ListTile(
+                        onTap: () {
+                          setState(() {
+                            _selectedCountryCode = country;
+                            _selectedCountry = country.name;
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        leading: Text(country.flag, style: const TextStyle(fontSize: 24)),
+                        title: Text(
+                          country.name,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF818CF8) : Colors.white,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                        trailing: Text(
+                          country.dialCode,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF818CF8) : Colors.grey[400],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

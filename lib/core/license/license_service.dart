@@ -51,6 +51,48 @@ class LicenseService {
     }
   }
 
+  static String normalizePlanName(String? raw, {int? planIndex}) {
+    if (planIndex != null) {
+      const names = ['basic', 'standard', 'premium', 'enterprise'];
+      if (planIndex >= 0 && planIndex < names.length) return names[planIndex];
+    }
+    final n = (raw ?? 'basic').toLowerCase().trim();
+    if (n.contains('enterprise')) return 'enterprise';
+    if (n.contains('premium')) return 'premium';
+    if (n.contains('standard') || n == 'pro') return 'standard';
+    if (n.contains('trial')) return 'basic';
+    return n.contains('basic') ? 'basic' : (n.isEmpty ? 'basic' : n);
+  }
+
+  /// Persists a server-redeemed activation (admin QR) so the dashboard
+  /// leaves free trial even when the code is not an HMAC license blob.
+  static Future<LicenseModel> applyServerActivation({
+    required String businessName,
+    required String activationCode,
+    required String planType,
+    required DateTime expiryDate,
+  }) async {
+    final normalized = normalizePlanName(planType);
+    final planEnum = PlanType.values.firstWhere(
+      (p) => p.name == normalized,
+      orElse: () => PlanType.basic,
+    );
+    final license = LicenseModel(
+      businessName: businessName,
+      expiryDate: expiryDate,
+      planType: planEnum,
+      licenseId: 0,
+    );
+    await StorageService.saveServerActivatedPlan(
+      planType: normalized,
+      expiryDate: expiryDate,
+    );
+    await StorageService.saveLastOpenedDate(DateTime.now());
+    await StorageService.setBusinessNameLocked(true);
+    await saveLicenseRecord(license, activationCode, isActivated: true);
+    return license;
+  }
+
   static Future<LicenseModel?> getActiveLicense(String? businessName) async {
     final code = await StorageService.getLicense();
     if (code == null || businessName == null) return null;

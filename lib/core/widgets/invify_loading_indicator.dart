@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 class InvifyLoadingIndicator extends StatefulWidget {
   final String? message;
@@ -105,10 +106,7 @@ class _InvifyLoadingIndicatorState extends State<InvifyLoadingIndicator> with Si
       child: ClipOval(
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/logo.png',
-            fit: BoxFit.contain,
-          ),
+          child: InvifyBrandLogo(size: 49, fit: BoxFit.contain),
         ),
       ),
     );

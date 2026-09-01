@@ -225,6 +225,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       );
     }
 
+    // 3b. Server-redeemed admin activation (Basic QR is not an HMAC license)
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      return UserPlan(
+        planType: serverPlan.planType,
+        expiryDate: serverPlan.expiryDate,
+      );
+    }
+
     // 4. Check for Trial validity
     final isTrialValid = await LicenseService.isTrialValid();
     if (isTrialValid) {

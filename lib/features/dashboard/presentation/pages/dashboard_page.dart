@@ -150,7 +150,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (settingsState.userPlan?.isValid == true && !settingsState.userPlan!.isBasic) ...[
+                      if (settingsState.userPlan?.isValid == true &&
+                          !settingsState.userPlan!.isFreeTrial) ...[
                         const SizedBox(width: 6),
                         _buildPlanBadge(settingsState.userPlan!),
                       ],

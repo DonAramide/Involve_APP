@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class StorageService {
@@ -10,6 +11,7 @@ class StorageService {
   static const _modeLockedKey = 'is_mode_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
+  static const _serverPlanKey = 'server_activated_plan';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
@@ -78,6 +80,34 @@ class StorageService {
 
   static Future<void> clearProExpiryDate() async {
     await _secureStorage.delete(key: _proExpiryKey);
+  }
+
+  static Future<void> saveServerActivatedPlan({
+    required String planType,
+    required DateTime expiryDate,
+  }) async {
+    await _secureStorage.write(
+      key: _serverPlanKey,
+      value: jsonEncode({
+        'planType': planType,
+        'expiry': expiryDate.toIso8601String(),
+      }),
+    );
+  }
+
+  static Future<({String planType, DateTime expiryDate})?> getServerActivatedPlan() async {
+    final raw = await _secureStorage.read(key: _serverPlanKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map) return null;
+      final planType = map['planType']?.toString();
+      final expiry = DateTime.tryParse(map['expiry']?.toString() ?? '');
+      if (planType == null || planType.isEmpty || expiry == null) return null;
+      return (planType: planType, expiryDate: expiry);
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> setDeviceAccessGranted(bool granted) async {
