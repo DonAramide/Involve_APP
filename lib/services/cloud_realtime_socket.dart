@@ -86,7 +86,7 @@ class EngineIoPollingClient implements CloudRealtimeSocket {
   final String serverUrl;
   final String path;
 
-  final http.Client _http = http.Client();
+  http.Client _http = http.Client();
   final Map<String, List<void Function(dynamic)>> _events = {};
   void Function(dynamic)? _onConnect;
   void Function(dynamic)? _onConnectError;
@@ -144,8 +144,15 @@ class EngineIoPollingClient implements CloudRealtimeSocket {
 
   @override
   void connect() {
-    if (_connecting || (_connected && !_stopped)) return;
+    if (_connecting) return;
     unawaited(_connect());
+  }
+
+  void _resetClient() {
+    try {
+      _http.close();
+    } catch (_) {}
+    _http = http.Client();
   }
 
   @override
@@ -181,6 +188,9 @@ class EngineIoPollingClient implements CloudRealtimeSocket {
   }
 
   Future<void> _connect() async {
+    _stopped = true;
+    await Future<void>.delayed(Duration.zero);
+    _resetClient();
     _stopped = false;
     _connecting = true;
     _connected = false;

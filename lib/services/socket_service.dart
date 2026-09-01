@@ -2,7 +2,6 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:involve_app/services/cloud_realtime_socket.dart';
-import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
@@ -88,14 +87,8 @@ class SocketService {
     _lastBusinessName = businessName;
     _lastToken = token;
 
-    final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
-    if (!isSyncEnabled) {
-      debugPrint('[SocketService] Online sync is disabled. Skipping connection.');
-      isConnected.value = false;
-      _disposeSocketInstance();
-      return;
-    }
-
+    // Live presence stays up on every plan (emergency lock, broadcasts).
+    // isOnlineSyncEnabled only gates data/outbox sync, not this socket.
     _ensureConnectivityListener();
 
     // Reuse the existing manager. Recreating IO.io() + checkConnectivity()
@@ -419,12 +412,6 @@ class SocketService {
     if (_reconnectInFlight) return;
     if (isConnected.value && _socket?.connected == true) return;
 
-    final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
-    if (!isSyncEnabled) {
-      debugPrint('[SocketService] Online sync disabled — skipping reconnect.');
-      return;
-    }
-
     debugPrint('[SocketService] Reconnecting (attempt ${_reconnectAttempts + 1})...');
     _reconnectAttempts++;
     _reconnectInFlight = true;
@@ -467,6 +454,7 @@ class SocketService {
       const Duration(seconds: _heartbeatIntervalSeconds),
       (_) {
         if (_socket == null || _intentionalDisconnect || _reconnectInFlight) return;
+        if (_reconnectTimer != null) return;
         if (_socket!.connected) {
           _socket!.emit('ping_heartbeat', {'timestamp': DateTime.now().toIso8601String()});
         } else if (!isConnected.value) {

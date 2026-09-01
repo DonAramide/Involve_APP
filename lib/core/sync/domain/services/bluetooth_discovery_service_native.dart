@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/peer_device.dart';
 import 'bluetooth_discovery_service.dart';
@@ -40,7 +41,20 @@ class BluetoothDiscoveryServiceNative implements BluetoothDiscoveryService {
       }
     });
 
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+    final adapterState = await FlutterBluePlus.adapterState.first.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => BluetoothAdapterState.unknown,
+    );
+    if (adapterState != BluetoothAdapterState.on) {
+      debugPrint('[BLE] Adapter is $adapterState — skip peer scan');
+      return;
+    }
+
+    try {
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+    } catch (e) {
+      debugPrint('[BLE] startScan failed: $e');
+    }
   }
 
   @override

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
@@ -217,119 +216,36 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               const SizedBox(width: 4),
               if (settings?.showNetworkIndicator == true)
-                FutureBuilder<bool>(
-                  future: StorageService.isOnlineSyncEnabled(),
-                  builder: (context, syncEnabledSnap) {
-                    final syncEnabled = syncEnabledSnap.data ?? true;
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: SocketService().isConnected,
-                      builder: (context, isConnected, child) {
-                        return ValueListenableBuilder<String?>(
-                          valueListenable: SocketService().lastError,
-                          builder: (context, lastErr, _) {
-                        IconData icon;
-                        Color color;
-                        String tooltip;
-
-                        if (!syncEnabled) {
-                          icon = Icons.cloud_off;
-                          color = Colors.white.withOpacity(0.4);
-                          tooltip = 'Sync Disabled';
-                        } else {
-                          icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
-                          color = isConnected ? Colors.greenAccent : Colors.redAccent;
-                          tooltip = isConnected
-                              ? 'Live socket connected (${AppConfig.baseUrl})'
-                              : (lastErr == null || lastErr.isEmpty)
-                                  ? 'Live socket offline (${AppConfig.baseUrl})\nHTTP can still work — this icon is Socket.IO, not /livez'
-                                  : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr';
-                        }
+                ValueListenableBuilder<bool>(
+                  valueListenable: SocketService().isConnected,
+                  builder: (context, isConnected, child) {
+                    return ValueListenableBuilder<String?>(
+                      valueListenable: SocketService().lastError,
+                      builder: (context, lastErr, _) {
+                        final icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
+                        final color = isConnected ? Colors.greenAccent : Colors.redAccent;
+                        final tooltip = isConnected
+                            ? 'Live socket connected (${AppConfig.baseUrl})'
+                            : (lastErr == null || lastErr.isEmpty)
+                                ? 'Live socket offline (${AppConfig.baseUrl})\nTap to reconnect'
+                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nTap to reconnect';
 
                         return IconButton(
                           icon: Icon(icon, size: 20, color: color),
                           tooltip: tooltip,
                           onPressed: () async {
-                            final isBasic = settingsState.userPlan == null || settingsState.userPlan!.isBasic;
-                            if (isBasic) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Cloud synchronization is a Pro/Standard Version feature.'),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // Show the gorgeous sync configuration dialog
-                            bool currentSync = await StorageService.isOnlineSyncEnabled();
-                            bool currentInvoice = await StorageService.isOnlineInvoiceUpdateEnabled();
-
+                            await SocketService().reconnect();
                             if (!context.mounted) return;
-
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                return StatefulBuilder(
-                                  builder: (context, setDialogState) {
-                                    return AlertDialog(
-                                      title: const Row(
-                                        children: [
-                                          Icon(Icons.cloud_sync_rounded, color: Colors.blue),
-                                          SizedBox(width: 10),
-                                          Text('Sync Configuration'),
-                                        ],
-                                      ),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SwitchListTile(
-                                            title: const Text('Online Sync'),
-                                            subtitle: const Text('Synchronize data with the backend server in real-time'),
-                                            value: currentSync,
-                                            activeColor: Colors.blue,
-                                            onChanged: (val) async {
-                                              await StorageService.setOnlineSyncEnabled(val);
-                                              if (val) {
-                                                SocketService().reconnect();
-                                              } else {
-                                                SocketService().disconnect();
-                                              }
-                                              setDialogState(() {
-                                                currentSync = val;
-                                              });
-                                              // Trigger rebuild of the DashboardPage to update the AppBar icon immediately
-                                              setState(() {});
-                                            },
-                                          ),
-                                          const Divider(),
-                                          SwitchListTile(
-                                            title: const Text('Online Invoice Update'),
-                                            subtitle: const Text('Automatically upload created invoices to the cloud'),
-                                            value: currentInvoice,
-                                            activeColor: Colors.blue,
-                                            onChanged: (val) async {
-                                              await StorageService.setOnlineInvoiceUpdateEnabled(val);
-                                              setDialogState(() {
-                                                currentInvoice = val;
-                                              });
-                                              setState(() {});
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text('CLOSE'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  SocketService().isConnected.value
+                                      ? 'Live socket connected'
+                                      : 'Reconnecting live socket…',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
                             );
-                          },
-                        );
                           },
                         );
                       },
@@ -516,9 +432,9 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
-          ? const SizedBox.shrink()
-          : FutureBuilder<int>(
+      bottomNavigationBar: (settingsState.userPlan?.isFreeTrial == true ||
+              !(settingsState.userPlan?.isValid ?? false))
+          ? FutureBuilder<int>(
               future: LicenseService.getTrialDaysRemaining(),
               builder: (context, trialSnapshot) {
                 if (!trialSnapshot.hasData || trialSnapshot.data == 0) return const SizedBox.shrink();
@@ -569,7 +485,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 );
               },
-            ),
+            )
+          : const SizedBox.shrink(),
         );
       },
     );
@@ -705,7 +622,6 @@ class _DashboardPageState extends State<DashboardPage> {
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
     final isSchool = settings?.businessMode == 'school';
     final isServices = settings?.businessMode == 'services';
-    final isBasicTier = userPlan == null || userPlan.isBasic;
     final lockTrialBasic = _isTrialOrBasicPlan(userPlan);
     
     final allItems = <_DashboardMenuItem>[
@@ -800,7 +716,7 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.deepOrange,
         onTap: () => _verifyAndNavigateToAdminHub(context),
       ),
-      if (!isBasicTier) ...[
+      if (!lockTrialBasic) ...[
         _DashboardMenuItem(
           id: 'cloud_metrics',
           title: 'CLOUD METRICS',

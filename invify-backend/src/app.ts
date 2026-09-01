@@ -1057,14 +1057,15 @@ export const io = new SocketIOServer(server, {
     credentials: true
   },
   // Honor X-Forwarded-For from nginx so device IP is the tablet, not 127.0.0.1.
-  proxy: true,
+  // Engine.IO supports this; @types/socket.io omits it.
+  proxy: true as unknown as undefined,
   transports: ['polling', 'websocket'],
   allowUpgrades: false,
   allowEIO3: true,
   pingInterval: 25000,
   pingTimeout: 60000,
   connectTimeout: 45000,
-});
+} as ConstructorParameters<typeof SocketIOServer>[1]);
 
 io.use(async (socket, next) => {
   try {
