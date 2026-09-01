@@ -95,6 +95,18 @@ export function persistAuthenticatedSession(tokenData = {}) {
   if (user.role) localStorage.setItem('operator_role', String(user.role).toUpperCase());
   if (user.tenantId) localStorage.setItem('tenant_id', user.tenantId);
   localStorage.setItem('mfa_status_verified', 'true');
+  clearMfaChallengeState();
+}
+
+export function clearMfaChallengeState() {
+  if (typeof sessionStorage === 'undefined') return;
+  for (const key of SESSION_STORAGE_TRANSIENT_KEYS) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function clearAuthenticatedSession() {

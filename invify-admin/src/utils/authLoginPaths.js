@@ -10,23 +10,54 @@ export function isTenantSurfacePath(pathname = '') {
   )
 }
 
+const PLATFORM_STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'STAFF',
+  'ADMIN_FINANCE',
+  'ADMIN_TREASURY',
+  'ADMIN_RISK',
+  'ADMIN_OPS',
+  'ADMIN_EXECUTIVE',
+  'ADMIN_DEPLOY'
+]
+
+const GUEST_OR_PUBLIC_PATHS = new Set([
+  '/',
+  '/login',
+  '/admin/login',
+  '/tenant/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/mfa/challenge'
+])
+
+export function hasPlatformStaffRole(roleStr) {
+  const roles = String(roleStr || '')
+    .split(',')
+    .map((r) => r.trim().toUpperCase().replace(/-/g, '_'))
+    .filter(Boolean)
+  return roles.some((r) => PLATFORM_STAFF_ROLES.includes(r))
+}
+
+export function homePathForRole(roleStr) {
+  return hasPlatformStaffRole(roleStr) ? '/fleet/overview' : '/tenant/dashboard'
+}
+
+export function resolvePostAuthRedirect(roleStr, redirect) {
+  const home = homePathForRole(roleStr)
+  if (!redirect || typeof redirect !== 'string') return home
+  const path = redirect.split('?')[0]
+  if (GUEST_OR_PUBLIC_PATHS.has(path) || path.startsWith('/mfa/')) return home
+  return redirect
+}
+
 export function loginPathForContext({ pathname, role } = {}) {
   const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '')
   if (isTenantSurfacePath(path)) return '/tenant/login'
 
   const roleStr = String(role || (typeof localStorage !== 'undefined' ? localStorage.getItem('operator_role') : '') || '')
-  const roles = roleStr.split(',').map((r) => r.trim().toUpperCase()).filter(Boolean)
-  const platformStaff = [
-    'SUPER_ADMIN',
-    'STAFF',
-    'ADMIN_FINANCE',
-    'ADMIN_TREASURY',
-    'ADMIN_RISK',
-    'ADMIN_OPS',
-    'ADMIN_EXECUTIVE',
-    'ADMIN_DEPLOY'
-  ]
-  if (roles.length && !roles.some((r) => platformStaff.includes(r))) {
+  if (roleStr && !hasPlatformStaffRole(roleStr)) {
     return '/tenant/login'
   }
   return '/admin/login'

@@ -253,7 +253,7 @@
                 placeholder="Enter new password"
                 autocomplete="new-password"
                 class="sac__custom-input"
-                :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
+                :rules="[val => !!val || 'Password required', val => evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).ok || evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).errors[0]]"
               >
                 <template v-slot:prepend>
                   <q-icon name="lock_outline" size="18px" class="sac__input-icon" />
@@ -267,6 +267,11 @@
                   />
                 </template>
               </q-input>
+              <PasswordStrengthHints
+                :password="resetForm.newPassword"
+                :email="form.email"
+                :current-password="form.password"
+              />
             </div>
 
             <div class="sac__form-group">
@@ -359,7 +364,7 @@
                   placeholder="Enter new password"
                   autocomplete="new-password"
                   class="sac__custom-input"
-                  :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
+                  :rules="[val => !!val || 'Password required', val => evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).ok || evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).errors[0]]"
                 >
                   <template v-slot:prepend>
                     <q-icon name="lock_outline" size="18px" class="sac__input-icon" />
@@ -373,6 +378,10 @@
                     />
                   </template>
                 </q-input>
+                <PasswordStrengthHints
+                  :password="otpForm.newPassword"
+                  :email="otpForm.email || form.email"
+                />
               </div>
               <div class="sac__form-group">
                 <label class="sac__input-label">Confirm Password</label>
@@ -605,6 +614,10 @@ import { joinApiUrl } from '../../config/env'
 import { useQuasar, copyToClipboard } from 'quasar'
 import logoImg from '../../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { persistAuthenticatedSession } from '../../auth/session'
+import { resolvePostAuthRedirect } from '../../utils/authLoginPaths'
+import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
+import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -1119,9 +1132,13 @@ async function executeOtpResetPassword() {
   }
   if (otpForm.value.newPassword !== otpForm.value.confirmPassword) {
     errorMessage.value = 'Passwords do not match.'
+    return
   }
-  if (!otpForm.value.newPassword || otpForm.value.newPassword.length < 6) {
-    errorMessage.value = 'Password must be at least 6 characters.'
+  const otpPolicy = evaluatePasswordPolicy(otpForm.value.newPassword, {
+    email: otpForm.value.email || form.value.email,
+  })
+  if (!otpPolicy.ok) {
+    errorMessage.value = otpPolicy.errors[0]
     return
   }
   loading.value = true
@@ -1257,14 +1274,17 @@ async function executeMfaVerification() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: activeUserId.value,
-      tokenCode: form.value.totpCode,
-      challengeToken: challengeToken.value,
-      role: activeUserRole.value
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: activeUserId.value,
+        tokenCode: form.value.totpCode,
+        challengeToken: challengeToken.value || sessionStorage.getItem('mfa_challenge_token') || '',
+        role: activeUserRole.value
+      },
+      { withCredentials: true },
+    )
     if (res.data?.token) {
-      localStorage.setItem('mfa_status_verified', 'true')
       finalizeAuthenticatedSession(res.data)
     } else {
       errorMessage.value = 'Your session could not be established. Please try again.'
@@ -1277,6 +1297,18 @@ async function executeMfaVerification() {
 }
 
 async function executeResetPassword() {
+  if (resetForm.value.newPassword !== resetForm.value.confirmPassword) {
+    errorMessage.value = 'Passwords do not match.'
+    return
+  }
+  const policy = evaluatePasswordPolicy(resetForm.value.newPassword, {
+    email: form.value.email,
+    currentPassword: form.value.password,
+  })
+  if (!policy.ok) {
+    errorMessage.value = policy.errors[0]
+    return
+  }
   loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -1302,14 +1334,17 @@ function cancelChallengeState() {
 }
 
 function finalizeAuthenticatedSession(tokenData) {
-  localStorage.setItem('invify_token', tokenData.token)
-  if (tokenData.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenData.refreshToken)
-  }
-  const cleanRole = (tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
+  persistAuthenticatedSession({
+    ...tokenData,
+    user: {
+      ...(tokenData.user || {}),
+      role: tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN',
+      email: tokenData.user?.email || form.value.email,
+    },
+  })
+  const cleanRole = (localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
   localStorage.setItem('operator_email', form.value.email || tokenData.user?.email || '')
-  localStorage.setItem('mfa_status_verified', 'true')
 
   const fullName = tokenData.user?.name || tokenData.user?.full_name || ''
   if (fullName) {
@@ -1318,14 +1353,12 @@ function finalizeAuthenticatedSession(tokenData) {
     localStorage.setItem('operator_last_name', parts.slice(1).join(' ') || '')
   }
 
-  const tenantId = tokenData.user?.tenantId || tokenData.tenantId
-  if (tenantId) localStorage.setItem('tenant_id', tenantId)
-
+  pendingChallengeState.value = false
   successMessage.value = 'Signed in successfully. Opening your dashboard…'
-  setTimeout(() => {
-    const dest = route.query?.redirect || '/'
-    router.push(dest).catch(() => {})
-  }, 400)
+  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
+  router.replace(dest).catch(() => {
+    router.replace('/fleet/overview').catch(() => {})
+  })
 }
 
 onMounted(() => {

@@ -149,7 +149,8 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
-import { loginPathForContext } from '../../utils/authLoginPaths'
+import { persistAuthenticatedSession } from '../../auth/session'
+import { loginPathForContext, resolvePostAuthRedirect, homePathForRole } from '../../utils/authLoginPaths'
 import { joinApiUrl } from '../../config/env'
 
 const router = useRouter()
@@ -264,26 +265,18 @@ const executeStandardVerification = async () => {
 }
 
 const finalizeValidatedToken = (tokenObj) => {
-  localStorage.setItem('invify_token', tokenObj.token)
-  if (tokenObj.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenObj.refreshToken)
+  persistAuthenticatedSession(tokenObj)
+  const cleanRole = (tokenObj.user?.role || localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
+  localStorage.setItem('operator_role', cleanRole)
+  if (tokenObj.user?.email) {
+    localStorage.setItem('operator_email', tokenObj.user.email)
   }
-  
-  // Set explicit verified multi-factor security clearance flags
-  localStorage.setItem('mfa_status_verified', 'true')
-  
-  // Clear pending setup session hooks
-  sessionStorage.removeItem('mfa_setup_token')
-  sessionStorage.removeItem('mfa_setup_userId')
-  sessionStorage.removeItem('mfa_challenge_token')
-  sessionStorage.removeItem('mfa_challenge_userId')
 
-  successMessage.value = 'Multi-factor gateway attested securely. Unlocking platform controls...'
-
-  setTimeout(() => {
-    const dest = route.query?.redirect || '/'
-    router.push(dest).catch(() => {})
-  }, 600)
+  successMessage.value = 'Signed in successfully. Opening your dashboard…'
+  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
+  router.replace(dest).catch(() => {
+    router.replace(homePathForRole(cleanRole)).catch(() => {})
+  })
 }
 
 const returnToRootAuth = () => {

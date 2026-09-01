@@ -28,7 +28,7 @@ export class EmailService {
       
       // 2. Fallback to .env if missing in Vault
       if (!smtpPass) smtpPass = process.env.SMTP_PASSWORD || '';
-      if (!smtpUser) smtpUser = process.env.SMTP_USER || 'support@iips.app';
+      if (!smtpUser) smtpUser = process.env.SMTP_USER || 'support@invify.org';
 
       this.transporter = nodemailer.createTransport({
         host: 'smtp.zoho.com',
@@ -62,7 +62,7 @@ export class EmailService {
         return true;
       }
       
-      const user = (transporter.options as any).auth?.user || 'support@iips.app';
+      const user = (transporter.options as any).auth?.user || 'support@invify.org';
 
       const fs = require('fs');
       const path = require('path');
@@ -93,7 +93,11 @@ export class EmailService {
         html,
         attachments
       });
-      console.log(`[EmailService] Successfully sent email to ${to}`);
+      const attachedNames = attachments.map((item: any) => item.filename).filter(Boolean);
+      console.log(
+        `[EmailService] Successfully sent email to ${to}` +
+          (attachedNames.length ? ` attachments=${attachedNames.join(',')}` : ' attachments=none'),
+      );
       return true;
     } catch (error: any) {
       console.error(`[EmailService] Failed to send email to ${to}:`, error.message);
@@ -113,7 +117,7 @@ export class EmailService {
       <br />
       <p>Thank you,</p>
       <p>Invify Support</p>
-      <p>support@iips.app</p>
+      <p>support@invify.org</p>
     `;
     return this.sendMail(to, subject, body);
   }
@@ -126,6 +130,57 @@ export class EmailService {
       <p>This code expires in 10 minutes.</p>
     `;
     return this.sendMail(to, subject, body);
+  }
+
+  private resolveUserManualPdf(): string | null {
+    const fs = require('fs');
+    const path = require('path');
+    const envPath = String(process.env.INVIFY_USER_MANUAL_PDF || '').trim();
+    const candidates = [
+      envPath,
+      path.join(process.cwd(), 'dist', 'assets', 'Invify_User_Manual.pdf'),
+      path.join(process.cwd(), 'assets', 'Invify_User_Manual.pdf'),
+      path.resolve(__dirname, '../assets/Invify_User_Manual.pdf'),
+      path.resolve(__dirname, '../../assets/Invify_User_Manual.pdf'),
+      path.resolve(__dirname, '../../../assets/docs/Invify_User_Manual.pdf'),
+      path.resolve(__dirname, '../../../invify-admin/src/assets/Invify_User_Manual.pdf'),
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      try {
+        if (candidate && fs.existsSync(candidate)) return candidate;
+      } catch {
+        /* ignore unreadable path */
+      }
+    }
+    console.warn('[EmailService] Invify_User_Manual.pdf not found; sending without the user-manual attachment');
+    return null;
+  }
+
+  private userManualAttachment(pdfPath: string | null): any[] {
+    if (!pdfPath) return [];
+    return [{ filename: 'Invify_User_Manual.pdf', path: pdfPath }];
+  }
+
+  private userManualHtml(hasAttachment: boolean): string {
+    if (hasAttachment) {
+      return `
+        <div style="background-color: #fdfbf7; border-left: 4px solid #ff9800; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
+          <h4 style="margin: 0 0 6px 0; color: #e65100; font-size: 14px;">📘 Attached: Official User Manual</h4>
+          <p style="margin: 0; font-size: 13px; color: #666;">
+            We have attached the complete <strong>Invify Master Operations &amp; User Guide (PDF)</strong> to this email. It covers getting started, system configurations, multi-till synchronization, point-of-sale workflows, and daily standard operating procedures.
+          </p>
+        </div>
+      `;
+    }
+    return `
+      <div style="background-color: #f7f9fc; border-left: 4px solid #3949ab; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
+        <h4 style="margin: 0 0 6px 0; color: #1a237e; font-size: 14px;">User Guide</h4>
+        <p style="margin: 0; font-size: 13px; color: #666;">
+          Need help getting started? Email <a href="mailto:support@invify.org" style="color: #3949ab;">support@invify.org</a> and we will send the Invify Master Operations &amp; User Guide.
+        </p>
+      </div>
+    `;
   }
 
   public async sendWelcomeEmail(
@@ -145,6 +200,7 @@ export class EmailService {
     const role = options?.role ? options.role.replace(/_/g, ' ').toUpperCase() : 'STAFF';
     const defaultPassword = options?.defaultPassword;
     const loginUrl = options?.loginUrl || 'https://staging.invify.org/admin/login';
+    const pdfPath = this.resolveUserManualPdf();
 
     let credentialsBlock = '';
     if (defaultPassword) {
@@ -191,40 +247,21 @@ export class EmailService {
 
         ${credentialsBlock}
 
-        <div style="background-color: #fdfbf7; border-left: 4px solid #ff9800; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
-          <h4 style="margin: 0 0 6px 0; color: #e65100; font-size: 14px;">📘 Attached: Official User Manual</h4>
-          <p style="margin: 0; font-size: 13px; color: #666;">
-            We have attached the complete <strong>Invify Master Operations & User Guide (PDF)</strong> to this email. It covers getting started, system configurations, multi-till synchronization, point-of-sale workflows, and daily standard operating procedures.
-          </p>
-        </div>
+        ${this.userManualHtml(!!pdfPath)}
 
         <p style="font-size: 14px; color: #666; margin-top: 30px;">
-          If you have any questions or need technical support, reach out to your system administrator or email <a href="mailto:support@iips.app" style="color: #3949ab;">support@iips.app</a>.
+          If you have any questions or need technical support, reach out to your system administrator or email <a href="mailto:support@invify.org" style="color: #3949ab;">support@invify.org</a>.
         </p>
 
         <p style="font-size: 14px; color: #333; margin-top: 20px;">
           Best regards,<br>
           <strong>Invify Operations & Engineering Team</strong><br>
-          <span style="color: #888; font-size: 12px;">support@iips.app</span>
+          <span style="color: #888; font-size: 12px;">support@invify.org</span>
         </p>
       </div>
     `;
 
-    const fs = require('fs');
-    const path = require('path');
-    const adminPdfPath = path.resolve(__dirname, '../../../invify-admin/src/assets/Invify_User_Manual.pdf');
-    const docsPdfPath = path.resolve(__dirname, '../../../assets/docs/Invify_User_Manual.pdf');
-    const resolvedPdfPath = fs.existsSync(adminPdfPath) ? adminPdfPath : (fs.existsSync(docsPdfPath) ? docsPdfPath : null);
-
-    const extraAttachments: any[] = [];
-    if (resolvedPdfPath) {
-      extraAttachments.push({
-        filename: 'Invify_User_Manual.pdf',
-        path: resolvedPdfPath
-      });
-    }
-
-    return this.sendMail(to, subject, body, extraAttachments);
+    return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath));
   }
 
   public async sendProfileUpdateEmail(
@@ -244,6 +281,7 @@ export class EmailService {
     const loginUrl = options?.loginUrl || 'https://staging.invify.org/admin/login';
     const statusText = options?.isActive !== false ? 'ACTIVE' : 'SUSPENDED';
     const defaultPassword = options?.defaultPassword;
+    const pdfPath = this.resolveUserManualPdf();
 
     let passwordRow = '';
     let passwordNotice = '';
@@ -302,40 +340,21 @@ export class EmailService {
           </a>
         </div>
 
-        <div style="background-color: #fdfbf7; border-left: 4px solid #ff9800; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
-          <h4 style="margin: 0 0 6px 0; color: #e65100; font-size: 14px;">📘 Attached: Official User Manual</h4>
-          <p style="margin: 0; font-size: 13px; color: #666;">
-            We have re-attached the complete <strong>Invify Master Operations & User Guide (PDF)</strong> for your reference regarding platform modules, permissions, and best practices.
-          </p>
-        </div>
+        ${this.userManualHtml(!!pdfPath)}
 
         <p style="font-size: 13px; color: #777; margin-top: 25px;">
-          🔒 <em>Security Notice: If you did not expect this profile update or believe this change was made in error, please contact your organization administrator immediately or email <a href="mailto:support@iips.app" style="color: #3949ab;">support@iips.app</a>.</em>
+          🔒 <em>Security Notice: If you did not expect this profile update or believe this change was made in error, please contact your organization administrator immediately or email <a href="mailto:support@invify.org" style="color: #3949ab;">support@invify.org</a>.</em>
         </p>
 
         <p style="font-size: 14px; color: #333; margin-top: 20px;">
           Best regards,<br>
           <strong>Invify Operations & Engineering Team</strong><br>
-          <span style="color: #888; font-size: 12px;">support@iips.app</span>
+          <span style="color: #888; font-size: 12px;">support@invify.org</span>
         </p>
       </div>
     `;
 
-    const fs = require('fs');
-    const path = require('path');
-    const adminPdfPath = path.resolve(__dirname, '../../../invify-admin/src/assets/Invify_User_Manual.pdf');
-    const docsPdfPath = path.resolve(__dirname, '../../../assets/docs/Invify_User_Manual.pdf');
-    const resolvedPdfPath = fs.existsSync(adminPdfPath) ? adminPdfPath : (fs.existsSync(docsPdfPath) ? docsPdfPath : null);
-
-    const extraAttachments: any[] = [];
-    if (resolvedPdfPath) {
-      extraAttachments.push({
-        filename: 'Invify_User_Manual.pdf',
-        path: resolvedPdfPath
-      });
-    }
-
-    return this.sendMail(to, subject, body, extraAttachments);
+    return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath));
   }
 
   public async sendLoginAlertEmail(
@@ -410,7 +429,7 @@ export class EmailService {
 
         <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 18px 0; border-radius: 0 6px 6px 0;">
           <p style="margin: 0; font-size: 13.5px; color: #991b1b;">
-            🚨 <strong>Didn't recognize this activity?</strong> If you did NOT initiate this login, please immediately change your password, revoke active sessions, and contact our security team at <a href="mailto:support@iips.app" style="color: #dc2626; font-weight: bold;">support@iips.app</a>.
+            🚨 <strong>Didn't recognize this activity?</strong> If you did NOT initiate this login, please immediately change your password, revoke active sessions, and contact our security team at <a href="mailto:support@invify.org" style="color: #dc2626; font-weight: bold;">support@invify.org</a>.
           </p>
         </div>
 

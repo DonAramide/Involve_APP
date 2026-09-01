@@ -46,7 +46,7 @@
           :type="showNewPassword ? 'text' : 'password'"
           outlined 
           lazy-rules
-          :rules="[val => !!val || 'Password is required', val => val.length >= 6 || 'At least 6 characters']"
+          :rules="[val => !!val || 'Password is required', val => evaluatePasswordPolicy(val, { email: email }).ok || evaluatePasswordPolicy(val, { email: email }).errors[0]]"
         >
           <template v-slot:append>
             <q-icon
@@ -56,6 +56,7 @@
             />
           </template>
         </q-input>
+        <PasswordStrengthHints :password="newPassword" :email="email" />
 
         <q-input 
           v-model="confirmPassword" 
@@ -97,6 +98,8 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
+import { evaluatePasswordPolicy } from '../../utils/passwordPolicy';
+import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue';
 
 const code = ref('');
 const newPassword = ref('');
@@ -159,6 +162,11 @@ async function onReset() {
   }
   if (newPassword.value !== confirmPassword.value) {
     errorMsg.value = 'Passwords do not match.';
+    return;
+  }
+  const policy = evaluatePasswordPolicy(newPassword.value, { email: email.value });
+  if (!policy.ok) {
+    errorMsg.value = policy.errors[0];
     return;
   }
 

@@ -6,6 +6,7 @@ import { supabase } from '../../db/supabase';
 import { BuildVariantService } from '../../config/build-variant';
 
 import { agentRepository } from './repositories/agent.repository';
+import { evaluatePasswordPolicy } from '../../utils/password-policy';
 
 const s3Client = new S3Client({
   endpoint: process.env.CONTABO_ENDPOINT || '',
@@ -406,6 +407,21 @@ export class AgentController {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: existing.email, password: oldPassword });
       if (authError || !authData.session) {
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      if (oldPassword === newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'New password cannot be the same as your current password.',
+        });
+      }
+
+      const policy = evaluatePasswordPolicy(String(newPassword || ''), {
+        email: existing.email,
+        currentPassword: oldPassword,
+      });
+      if (!policy.ok) {
+        return res.status(400).json({ success: false, message: policy.errors[0] });
       }
 
       // Update password

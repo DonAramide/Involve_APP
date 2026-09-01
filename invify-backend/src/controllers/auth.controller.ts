@@ -18,6 +18,7 @@ import {
   peekTokenSubject,
   revokeProviderSession,
 } from '../services/auth-session.service';
+import { evaluatePasswordPolicy } from '../utils/password-policy';
 
 /** Love School (device / JWT from live tablet sessions). */
 const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
@@ -404,7 +405,7 @@ export class AuthController {
 
       if (is_maintenance_locked) {
         const emailLower = (email || '').toLowerCase();
-        const isSuperAdmin = emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('iips');
+        const isSuperAdmin = emailLower === 'sysadmin@invify.org' || emailLower === 'superadmin@invify.org' || emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('invify') || emailLower.includes('iips');
         
         if (!isSuperAdmin) {
           return res.status(403).json({
@@ -754,6 +755,15 @@ export class AuthController {
         return res.status(400).json({ error: 'Password must be at least 6 characters.' });
       }
 
+      const policy = evaluatePasswordPolicy(String(newPassword), { email });
+      if (!policy.ok) {
+        return res.status(400).json({
+          error: policy.errors[0],
+          code: 'PASSWORD_POLICY',
+          checks: policy.checks,
+        });
+      }
+
       let targetUserId: string | null = userId || null;
 
       // OTP recovery path: verify email OTP then resolve user by email
@@ -825,6 +835,40 @@ export class AuthController {
 
       if (!targetUserId) {
         return res.status(400).json({ error: 'Missing userId or email for password reset.' });
+      }
+
+      const { data: currentProfile } = await supabaseAdmin
+        .from('users')
+        .select('email')
+        .eq('id', targetUserId)
+        .maybeSingle();
+      const accountEmail = String(currentProfile?.email || email || '').trim().toLowerCase();
+      const reusePolicy = evaluatePasswordPolicy(String(newPassword), { email: accountEmail });
+      if (!reusePolicy.ok) {
+        return res.status(400).json({
+          error: reusePolicy.errors[0],
+          code: 'PASSWORD_POLICY',
+          checks: reusePolicy.checks,
+        });
+      }
+
+      if (accountEmail) {
+        const { data: reuseSession } = await supabase.auth.signInWithPassword({
+          email: accountEmail,
+          password: String(newPassword),
+        });
+        if (reuseSession?.session) {
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            /* ignore */
+          }
+          return res.status(400).json({
+            error:
+              'New password cannot be the same as your current or default password. Please choose a different password.',
+            code: 'SAME_AS_PREVIOUS_PASSWORD',
+          });
+        }
       }
 
       // 1. Update password in Supabase Auth (service_role required for admin API)

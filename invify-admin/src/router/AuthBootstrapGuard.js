@@ -1,6 +1,6 @@
 // invify-admin/src/router/AuthBootstrapGuard.js
 
-import { loginPathForContext } from '../utils/authLoginPaths'
+import { loginPathForContext, homePathForRole, hasPlatformStaffRole } from '../utils/authLoginPaths'
 
 /**
  * Enterprise Production-Grade Authentication Gate & Session Rehydration Interceptor.
@@ -14,34 +14,12 @@ import { loginPathForContext } from '../utils/authLoginPaths'
  *    exclusively after token verification and RBAC assertion pipelines complete cleanly.
  */
 export function registerAuthBootstrapGuard(router) {
-  // Helper to parse multiple roles
   const getRolesArray = (roleStr) => {
     if (!roleStr) return []
     return roleStr.split(',').map(r => r.trim())
   }
 
-  // Helper to determine role-based home landing path
-  const hasPlatformStaffRole = (roleStr) => {
-    const roles = getRolesArray(roleStr)
-    const staffRoles = [
-      'SUPER_ADMIN',
-      'STAFF',
-      'ADMIN_FINANCE',
-      'ADMIN_TREASURY',
-      'ADMIN_RISK',
-      'ADMIN_OPS',
-      'ADMIN_EXECUTIVE',
-      'ADMIN_DEPLOY'
-    ]
-    return roles.some(r => staffRoles.includes(r))
-  }
-
-  const getHomePath = (roleStr) => {
-    if (hasPlatformStaffRole(roleStr)) {
-      return '/fleet/overview'
-    }
-    return '/tenant/dashboard'
-  }
+  const getHomePath = (roleStr) => homePathForRole(roleStr)
 
   const getLoginPath = (toPath) =>
     loginPathForContext({ pathname: toPath, role: localStorage.getItem('operator_role') })
@@ -71,7 +49,7 @@ export function registerAuthBootstrapGuard(router) {
     // 3. Guest route rules (e.g., /login, /admin/login, /tenant/login)
     if (to.meta?.isGuest) {
       if (isVerifiedSession) {
-        console.warn(`[DEV OVERRIDE] Allowed authenticated user to view guest route: ${to.path}`);
+        return next(getHomePath(operatorRole))
       }
       return next()
     }

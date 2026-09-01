@@ -118,7 +118,7 @@
               placeholder="••••••••••••"
               class="bg-subpanel text-main rounded-borders"
               lazy-rules
-              :rules="[val => !!val || 'Please specify a new passphrase', val => val.length >= 6 || 'Passphrase must be at least 6 characters']"
+              :rules="[val => !!val || 'Please specify a new passphrase', val => evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).ok || evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).errors[0]]"
             >
               <template v-slot:prepend>
                 <q-icon name="lock_open" size="xs" color="grey-6" />
@@ -132,6 +132,11 @@
                 />
               </template>
             </q-input>
+            <PasswordStrengthHints
+              :password="resetForm.newPassword"
+              :email="form.email"
+              :current-password="form.password"
+            />
           </div>
           <div>
             <div class="text-caption text-muted q-mb-xs">Confirm New Passphrase *</div>
@@ -206,7 +211,7 @@
               filled
               dense
               type="email"
-              placeholder="operator@IIPS.app"
+              placeholder="operator@invify.org"
               class="bg-subpanel text-main rounded-borders"
               lazy-rules
               :rules="[val => !!val || 'Specify email address']"
@@ -265,7 +270,7 @@
                 class="bg-subpanel text-main rounded-borders"
                 autofocus
                 lazy-rules
-                :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
+                :rules="[val => !!val || 'Password required', val => evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).ok || evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).errors[0]]"
               >
                 <template v-slot:append>
                   <q-icon
@@ -278,6 +283,10 @@
                   </q-icon>
                 </template>
               </q-input>
+              <PasswordStrengthHints
+                :password="otpForm.newPassword"
+                :email="otpForm.email || form.email"
+              />
             </div>
 
             <div>
@@ -344,7 +353,7 @@
               :dark="prefs.isDarkMode"
               filled
               dense
-              :placeholder="isAdminPortal ? 'e.g. ops@IIPS.app' : 'e.g. admin@yourschool.com'"
+              :placeholder="isAdminPortal ? 'e.g. ops@invify.org' : 'e.g. admin@yourschool.com'"
               class="bg-subpanel text-main rounded-borders"
               autofocus
               lazy-rules
@@ -392,8 +401,8 @@
           <div v-if="isAdminPortal" class="column op-gap-4 q-pt-xs">
             <span class="text-metric-mono text-muted" style="font-size: 9px;">PRESETS FOR ISOLATED ENVIRONMENT TESTING:</span>
             <div class="row op-gap-4">
-              <q-btn dense flat size="xs" color="blue-5" label="[Tier: Super Admin]" @click="fillPreset('superadmin@IIPS.app', 'AdminPass123!', 'SUPER_ADMIN')" class="bg-subpanel q-px-xs text-metric-sm" />
-              <q-btn dense flat size="xs" color="amber-5" label="[Tier: Staff Tier]" @click="fillPreset('staff@IIPS.app', 'StaffPass123!', 'STAFF')" class="bg-subpanel q-px-xs text-metric-sm" />
+              <q-btn dense flat size="xs" color="blue-5" label="[Tier: Super Admin]" @click="fillPreset('superadmin@invify.org', 'AdminPass123!', 'SUPER_ADMIN')" class="bg-subpanel q-px-xs text-metric-sm" />
+              <q-btn dense flat size="xs" color="amber-5" label="[Tier: Staff Tier]" @click="fillPreset('staff@invify.org', 'StaffPass123!', 'STAFF')" class="bg-subpanel q-px-xs text-metric-sm" />
             </div>
           </div>
 
@@ -574,6 +583,10 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { joinApiUrl } from '../../config/env'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { persistAuthenticatedSession } from '../../auth/session'
+import { resolvePostAuthRedirect, homePathForRole } from '../../utils/authLoginPaths'
+import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
+import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 import { useQuasar, copyToClipboard } from 'quasar'
 
 const router = useRouter()
@@ -909,8 +922,11 @@ const executeOtpResetPassword = async () => {
     errorMessage.value = 'Passphrase entries do not match.'
     return
   }
-  if (!otpForm.value.newPassword || otpForm.value.newPassword.length < 6) {
-    errorMessage.value = 'Password must be at least 6 characters.'
+  const otpPolicy = evaluatePasswordPolicy(otpForm.value.newPassword, {
+    email: otpForm.value.email || form.value.email,
+  })
+  if (!otpPolicy.ok) {
+    errorMessage.value = otpPolicy.errors[0]
     return
   }
 
@@ -1058,16 +1074,21 @@ const executeMfaVerification = async () => {
   errorMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: activeUserId.value,
-      tokenCode: form.value.totpCode,
-      challengeToken: challengeToken.value,
-      role: activeUserRole.value
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: activeUserId.value,
+        tokenCode: form.value.totpCode,
+        challengeToken: challengeToken.value || sessionStorage.getItem('mfa_challenge_token') || '',
+        role: activeUserRole.value
+      },
+      { withCredentials: true },
+    )
 
     if (res.data?.token) {
-      localStorage.setItem('mfa_status_verified', 'true')
       finalizeAuthenticatedSession(res.data)
+    } else {
+      errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
     errorMessage.value = err.response?.data?.message || 'Invalid single-use envelope signature.'
@@ -1077,6 +1098,18 @@ const executeMfaVerification = async () => {
 }
 
 const executeResetPassword = async () => {
+  if (resetForm.value.newPassword !== resetForm.value.confirmPassword) {
+    errorMessage.value = 'Passwords do not match.'
+    return
+  }
+  const policy = evaluatePasswordPolicy(resetForm.value.newPassword, {
+    email: form.value.email,
+    currentPassword: form.value.password,
+  })
+  if (!policy.ok) {
+    errorMessage.value = policy.errors[0]
+    return
+  }
   loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -1105,46 +1138,38 @@ const cancelChallengeState = () => {
 }
 
 const finalizeAuthenticatedSession = (tokenData) => {
-  localStorage.setItem('invify_token', tokenData.token)
-  if (tokenData.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenData.refreshToken)
-  }
-  
-  // Set explicit attribution storage values
-  const cleanRole = (tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
+  persistAuthenticatedSession({
+    ...tokenData,
+    user: {
+      ...(tokenData.user || {}),
+      role: tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN',
+      email: tokenData.user?.email || form.value.email,
+    },
+  })
+  const cleanRole = (localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
-  localStorage.setItem('operator_email', form.value.email || 'federated@IIPS.app')
-  localStorage.setItem('mfa_status_verified', 'true')
-  
-  // Seed operator name from backend response if provided
+  localStorage.setItem('operator_email', form.value.email || tokenData.user?.email || '')
+
   const fullName = tokenData.user?.name || tokenData.user?.full_name || ''
   if (fullName) {
     const parts = fullName.trim().split(' ')
     localStorage.setItem('operator_first_name', parts[0] || '')
     localStorage.setItem('operator_last_name', parts.slice(1).join(' ') || '')
   } else if (!localStorage.getItem('operator_first_name')) {
-    // Fallback: derive from email prefix only if never set before
     const emailPrefix = (form.value.email || '').split('@')[0]
     localStorage.setItem('operator_first_name', emailPrefix)
   }
 
-  // Record join/session timestamp for profile display
   if (!localStorage.getItem('operator_joined')) {
     localStorage.setItem('operator_joined', String(Date.now()))
   }
-  
-  const tenantId = tokenData.user?.tenantId || tokenData.tenantId
-  if (tenantId) {
-    localStorage.setItem('tenant_id', tenantId)
-  }
-  
-  successMessage.value = 'Identity verified successfully. Traversing authorized RBAC operational matrix...'
-  
-  setTimeout(() => {
-    // Route perfectly via our enterprise AuthBootstrapGuard pipeline to determine correct landing
-    const dest = route.query?.redirect || '/'
-    router.push(dest).catch(() => {})
-  }, 600)
+
+  pendingChallengeState.value = false
+  successMessage.value = 'Signed in successfully. Opening your dashboard…'
+  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
+  router.replace(dest).catch(() => {
+    router.replace(homePathForRole(cleanRole)).catch(() => {})
+  })
 }
 </script>
 

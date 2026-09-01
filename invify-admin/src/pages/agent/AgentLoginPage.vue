@@ -80,6 +80,10 @@
             />
           </template>
         </q-input>
+        <PasswordStrengthHints
+          :password="newPassword"
+          :current-password="password"
+        />
         <q-input
           v-model="confirmPassword"
           dark filled dense
@@ -218,6 +222,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
+import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
+import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -374,8 +380,13 @@ const handleChangePassword = async () => {
     $q.notify({ type: 'warning', message: 'Passwords do not match', position: 'top-right' })
     return
   }
-  if (newPassword.value.length < 6) {
-    $q.notify({ type: 'warning', message: 'Password must be at least 6 characters', position: 'top-right' })
+  if (newPassword.value === password.value) {
+    $q.notify({ type: 'warning', message: 'New password cannot be the same as your current password.', position: 'top-right' })
+    return
+  }
+  const policy = evaluatePasswordPolicy(newPassword.value, { currentPassword: password.value })
+  if (!policy.ok) {
+    $q.notify({ type: 'warning', message: policy.errors[0], position: 'top-right' })
     return
   }
 
