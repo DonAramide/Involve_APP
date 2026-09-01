@@ -3,8 +3,13 @@ import 'package:flutter/foundation.dart';
 /// Explicit mobile environment: development | staging | production
 enum AppEnvironment { development, staging, production }
 
-/// Single place to point a **debug** laptop/tablet build at the local Node API.
-/// Change this when your PC LAN IP changes. Ignored for release / staging / production.
+/// Build-time API destination: local PC or hosted staging.
+/// Prefer `--dart-define-from-file=config/app_targets/{local,staging}.json`
+/// or `--dart-define=API_TARGET=local|staging`.
+enum ApiTarget { local, staging, production }
+
+/// Fallback LAN URL used only when API_TARGET=local and API_BASE_URL was omitted.
+/// Prefer generating `config/app_targets/local.json` via `scripts/select-app-target.ps1`.
 const String kDebugLaptopApiBaseUrl = 'http://192.168.1.193:3004';
 
 const String kStagingApiBaseUrl = 'https://staging.invify.org';
@@ -49,8 +54,44 @@ class AppConfig {
   static bool get isStaging => environment == AppEnvironment.staging;
   static bool get isDevelopment => environment == AppEnvironment.development;
 
+  /// Compile-time API destination. Independent of debug vs release.
+  /// Pass: --dart-define=API_TARGET=local|staging
+  static ApiTarget get apiTarget {
+    const raw = String.fromEnvironment('API_TARGET', defaultValue: '');
+    switch (raw.trim().toLowerCase()) {
+      case 'local':
+      case 'lan':
+      case 'dev':
+      case 'development':
+        return ApiTarget.local;
+      case 'production':
+      case 'prod':
+        return ApiTarget.production;
+      case 'staging':
+      case 'stage':
+        return ApiTarget.staging;
+      default:
+        if (isProduction) return ApiTarget.production;
+        if (isStaging) return ApiTarget.staging;
+        return ApiTarget.local;
+    }
+  }
+
+  static String get apiTargetName {
+    switch (apiTarget) {
+      case ApiTarget.production:
+        return 'production';
+      case ApiTarget.staging:
+        return 'staging';
+      case ApiTarget.local:
+        return 'local';
+    }
+  }
+
+  static bool get allowsLanApi => apiTarget == ApiTarget.local;
+
   /// Compile-time / runtime configuration. Never embed LAN/localhost defaults
-  /// into release / staging / production builds.
+  /// into staging / production targets.
   static String get baseUrl {
     const fromDefine = String.fromEnvironment('API_BASE_URL');
     if (fromDefine.isNotEmpty) {
@@ -66,8 +107,7 @@ class AppConfig {
       }
     } catch (_) {}
 
-    // Debug development: talk to the laptop API over HTTP (no TLS cert).
-    if (isDevelopment && !kReleaseMode) {
+    if (allowsLanApi) {
       return kDebugLaptopApiBaseUrl;
     }
 
@@ -120,10 +160,10 @@ class AppConfig {
   }
 
   static void _assertEnvUrlSafety(String label, String url) {
-    if (isDevelopment && !kReleaseMode) return;
+    if (allowsLanApi) return;
     if (_isLoopbackOrLan(url) || url.toLowerCase().contains('ngrok')) {
       throw StateError(
-        '$label must not point at localhost/LAN/ngrok for ${environmentName}',
+        '$label must not point at localhost/LAN/ngrok for ${environmentName} / $apiTargetName',
       );
     }
     // Staging must never silently use a production host pattern without APP_ENV=production

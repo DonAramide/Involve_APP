@@ -53,6 +53,9 @@ android/upload-keystore.jks
 *.jks
 *.keystore
 
+# Machine-local Flutter API target (LAN IP). Example file is committed.
+config/app_targets/local.json
+
 # Secret files
 .env
 .env.*

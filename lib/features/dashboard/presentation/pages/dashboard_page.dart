@@ -121,26 +121,26 @@ class _DashboardPageState extends State<DashboardPage> {
         return Scaffold(
           appBar: AppBar(
             title: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Logo on the left
-                if (settings?.logo != null)
-                  Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        settings!.logo!,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.store, size: 40);
-                        },
-                      ),
+                if (settings?.logo != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      settings!.logo!,
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.store, size: 32);
+                      },
                     ),
                   ),
-                // Organization name
-                Expanded(
+                  const SizedBox(width: 8),
+                ],
+                // Organization name & Plan Badge
+                Flexible(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -152,7 +152,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                       ),
                       if (settingsState.userPlan?.isValid == true && !settingsState.userPlan!.isBasic) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         _buildPlanBadge(settingsState.userPlan!),
                       ],
                     ],
@@ -224,6 +224,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     return ValueListenableBuilder<bool>(
                       valueListenable: SocketService().isConnected,
                       builder: (context, isConnected, child) {
+                        return ValueListenableBuilder<String?>(
+                          valueListenable: SocketService().lastError,
+                          builder: (context, lastErr, _) {
                         IconData icon;
                         Color color;
                         String tooltip;
@@ -235,7 +238,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else {
                           icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
                           color = isConnected ? Colors.greenAccent : Colors.redAccent;
-                          tooltip = isConnected ? 'Server Connected' : 'Server Offline';
+                          tooltip = isConnected
+                              ? 'Live socket connected (${AppConfig.baseUrl})'
+                              : (lastErr == null || lastErr.isEmpty)
+                                  ? 'Live socket offline (${AppConfig.baseUrl})\nHTTP can still work — this icon is Socket.IO, not /livez'
+                                  : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr';
                         }
 
                         return IconButton(
@@ -321,6 +328,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                 );
                               },
                             );
+                          },
+                        );
                           },
                         );
                       },
@@ -1107,7 +1116,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final isLifetime = plan.isLifetime;
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isLifetime 
@@ -1116,7 +1125,7 @@ class _DashboardPageState extends State<DashboardPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
             color: (isLifetime ? Colors.orange : Colors.grey).withOpacity(0.3),
@@ -1130,17 +1139,17 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Icon(
             isLifetime ? Icons.stars : Icons.verified,
-            size: 10,
+            size: 9,
             color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
             plan.planType.toUpperCase(),
             style: TextStyle(
               color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
+              letterSpacing: 0.3,
             ),
           ),
         ],

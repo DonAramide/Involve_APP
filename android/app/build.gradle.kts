@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.text.SimpleDateFormat
+import java.util.Date
 
 plugins {
     id("com.android.application")
@@ -69,6 +71,37 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        val formattedDate = SimpleDateFormat("yyyy-MM-dd").format(Date())
+        val vName = variant.versionName ?: "1.0.0"
+        
+        variant.outputs.all {
+            val outputImpl = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val newApkName = "invify-v${vName}-${variant.name}-${formattedDate}.apk"
+            outputImpl?.outputFileName = newApkName
+        }
+        
+        variant.assembleProvider.configure {
+            doLast {
+                val apkDir = layout.buildDirectory.dir("outputs/apk/${variant.name}").get().asFile
+                val flutterApkDir = file("$rootDir/../build/app/outputs/flutter-apk")
+                
+                val versionedApkName = "invify-v${vName}-${formattedDate}.apk"
+                val releaseApkName = "invify-v${vName}-${variant.name}-${formattedDate}.apk"
+                
+                if (flutterApkDir.exists()) {
+                    val srcApk = file("$apkDir/$releaseApkName")
+                    if (srcApk.exists()) {
+                        srcApk.copyTo(file("$flutterApkDir/$versionedApkName"), overwrite = true)
+                        srcApk.copyTo(file("$flutterApkDir/$releaseApkName"), overwrite = true)
+                        println("[Invify Build] Generated versioned APK: ${flutterApkDir.path}/$versionedApkName")
+                    }
+                }
+            }
         }
     }
 

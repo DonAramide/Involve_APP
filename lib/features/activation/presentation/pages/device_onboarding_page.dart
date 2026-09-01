@@ -7,6 +7,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
@@ -95,13 +96,54 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
-  Future<void> _pingServer() async {
+  String? _serverPingError;
+
+  Future<void> _pingServer({bool showFeedback = false}) async {
+    String? errorReason;
+    bool success = false;
+    final targetUrl = AppConfig.baseUrl;
+
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 3)));
-      await dio.get('${AppConfig.baseUrl}/settings/onboarding');
-      if (mounted) setState(() => _isServerReachable = true);
-    } catch (_) {
-      if (mounted) setState(() => _isServerReachable = false);
+      final response = await http.get(Uri.parse('$targetUrl/livez'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode < 500) {
+        success = true;
+      } else {
+        errorReason = 'HTTP ${response.statusCode}';
+      }
+    } catch (e) {
+      try {
+        final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 5)));
+        final res = await dio.get('$targetUrl/settings/onboarding');
+        if ((res.statusCode ?? 500) < 500) {
+          success = true;
+        } else {
+          errorReason = 'HTTP ${res.statusCode}';
+        }
+      } catch (e2) {
+        errorReason = e.toString();
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isServerReachable = success;
+        _serverPingError = success ? null : errorReason;
+      });
+
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? '✓ Cloud server connected: $targetUrl'
+                  : '✗ Server unreachable ($targetUrl). Please verify tablet Wi-Fi/Internet.\nError: ${errorReason ?? "Connection timed out"}',
+            ),
+            backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -319,9 +361,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                             ),
                                             onPressed: () {
                                               setState(() => _isServerReachable = null);
-                                              _pingServer();
+                                              _pingServer(showFeedback: true);
                                             },
-                                            tooltip: _isServerReachable! ? 'Connected to Server' : 'Server Unreachable (Tap to retry)',
+                                            tooltip: _isServerReachable!
+                                                ? 'API reachable over HTTP (${AppConfig.baseUrl})\nThis is not the live dashboard socket'
+                                                : 'API unreachable (${AppConfig.baseUrl}). Tap to retry',
                                           )
                                         else
                                           const Padding(

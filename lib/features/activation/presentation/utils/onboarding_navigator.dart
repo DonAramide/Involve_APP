@@ -6,11 +6,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../pages/verify_email_page.dart';
 import '../pages/verify_whatsapp_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
-import '../pages/activation_page.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/services/socket_service.dart';
 
 class OnboardingNavigator {
   static Future<void> proceed(BuildContext context, Map<String, dynamic> payload, List<String> requiredChannels, {bool isMounted = true}) async {
@@ -102,7 +102,16 @@ class OnboardingNavigator {
           });
           
           if (response.data != null && response.data['offlineToken'] != null) {
-            await SecurityService().setOfflineToken(response.data['offlineToken']);
+            final token = response.data['offlineToken'].toString();
+            await SecurityService().setOfflineToken(token);
+            // App start connected the socket before this JWT existed (red cloud).
+            await SocketService().initializeSocket(
+              AppConfig.baseUrl,
+              tenantId: response.data['tenantId']?.toString(),
+              deviceId: payload['deviceId']?.toString(),
+              businessName: payload['businessName']?.toString(),
+              token: token,
+            );
           }
           
           signupSuccess = true;
@@ -124,11 +133,10 @@ class OnboardingNavigator {
         );
       }
 
-      // Mark device as onboarded locally
+      // Mark device as onboarded locally and start/refresh the local trial window
+      // so LandingPage does not send them to the activation-key screen.
       await StorageService.setOnboardingCompleted(true);
-      if (payload['isTrial'] == true) {
-        await StorageService.saveTrialStartDate(DateTime.now());
-      }
+      await StorageService.saveTrialStartDate(DateTime.now());
 
       if (isMounted) {
         // Sync the business name globally
@@ -147,9 +155,10 @@ class OnboardingNavigator {
           debugPrint('Error syncing business name: $e');
         }
 
-        final isTrial = payload['isTrial'] == true;
+        // Self-register already created the tenant and device JWT. Do not send
+        // them to the activation-key screen (that POST /devices/validate 400).
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => isTrial ? const DashboardPage() : const ActivationPage(isExpired: false)),
+          MaterialPageRoute(builder: (_) => const DashboardPage()),
           (route) => false,
         );
       }

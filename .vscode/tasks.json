@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Resolve Flutter target: local",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/select-app-target.ps1 -Target local",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Resolve Flutter target: usb",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/adb-reverse-api.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File scripts/select-app-target.ps1 -Target usb",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build APK (local Wi-Fi)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File build-apk.ps1 -Target local -BuildMode debug",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build APK (USB)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File build-apk.ps1 -Target usb -BuildMode debug",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build APK (staging)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File build-apk.ps1 -Target staging -BuildMode release",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

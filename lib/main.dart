@@ -164,7 +164,7 @@ void main() async {
       AppConfig.supabaseInitialized = false;
       debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
     } else {
-      debugPrint('[AppConfig] API baseUrl=${AppConfig.baseUrl} env=${AppConfig.environmentName}');
+      debugPrint('[AppConfig] API target=${AppConfig.apiTargetName} baseUrl=${AppConfig.baseUrl} env=${AppConfig.environmentName}');
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseAnonKey,

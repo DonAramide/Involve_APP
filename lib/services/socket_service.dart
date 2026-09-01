@@ -1,5 +1,7 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:involve_app/services/cloud_realtime_socket.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
@@ -19,11 +21,12 @@ class SocketService {
   factory SocketService() => _instance;
   SocketService._internal();
 
-  IO.Socket? _socket;
+  CloudRealtimeSocket? _socket;
   GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   GlobalKey<NavigatorState>? navigatorKey;
   
   final ValueNotifier<bool> isConnected = ValueNotifier<bool>(false);
+  final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
   // Cached parameters to allow delayed initialization on toggles
   String? _lastServerUrl;
@@ -99,31 +102,60 @@ class SocketService {
     // on every retry made Android fire "Network restored" in a tight loop.
     if (_socket != null && _boundServerUrl == serverUrl) {
       _applyAuth(token, tenantId);
-      _startHeartbeat();
-      if (!_socket!.connected && !_reconnectInFlight) {
-        _reconnectInFlight = true;
-        _socket!.connect();
-      }
+      if (deviceId != null) _lastDeviceId = deviceId;
+      if (businessName != null) _lastBusinessName = businessName;
+      if (plan != null) _lastPlan = plan;
+      if (type != null) _lastType = type;
+      if (_socket!.connected) _startHeartbeat();
+      if (_socket!.connected || _reconnectInFlight) return;
+      _reconnectInFlight = true;
+      _socket!.connect();
       return;
     }
 
     _disposeSocketInstance();
     _boundServerUrl = serverUrl;
 
-    _socket = IO.io(serverUrl, IO.OptionBuilder()
-      .setTransports(['websocket'])
-      .disableAutoConnect()
-      .enableForceNew()
-      .setAuth(_authPayload(token, tenantId))
-      .setExtraHeaders({'ngrok-skip-browser-warning': 'true'})
-      .build()
-    );
+    final tokenKind = token == null || token.isEmpty
+        ? 'none'
+        : token == 'mock-super-admin'
+            ? 'mock'
+            : 'jwt';
+
+    // Android can HTTP to this PC (/livez, TerminalSync) but ws://:3004 times out.
+    // socket_io_client on VM has no real polling transport — use ours for http://.
+    if (!kIsWeb && serverUrl.toLowerCase().startsWith('http://')) {
+      debugPrint('[SocketService] Connecting $serverUrl via HTTP polling auth=$tokenKind');
+      final polling = EngineIoPollingClient(serverUrl);
+      polling.auth = _authPayload(token, tenantId);
+      _socket = polling;
+    } else {
+      final transports = kIsWeb
+          ? <String>['polling', 'websocket']
+          : <String>['websocket'];
+      debugPrint('[SocketService] Connecting $serverUrl via ${transports.join(",")} auth=$tokenKind');
+      final io = IO.io(serverUrl, IO.OptionBuilder()
+        .setTransports(transports)
+        .setUpgrade(false)
+        .disableReconnection()
+        .setPath('/socket.io')
+        .setTimeout(20000)
+        .disableAutoConnect()
+        .enableForceNew()
+        .setAuth(_authPayload(token, tenantId))
+        .setExtraHeaders({'ngrok-skip-browser-warning': 'true'})
+        .build()
+      );
+      _socket = SocketIoRealtimeSocket(io);
+    }
 
     _socket!.onConnect((_) {
       isConnected.value = true;
+      lastError.value = null;
       _reconnectAttempts = 0;        // reset backoff counter on success
       _intentionalDisconnect = false;
       _reconnectInFlight = false;
+      _startHeartbeat();
       debugPrint('[SocketService] Socket successfully connected to server!');
       debugPrint('[SocketService] Emitting join_room with: tenantId=$tenantId, plan=$plan, type=$type, deviceId=$deviceId, businessName=$businessName');
       
@@ -163,6 +195,7 @@ class SocketService {
     _socket!.onConnectError((err) {
       _reconnectInFlight = false;
       isConnected.value = false;
+      lastError.value = err?.toString();
       debugPrint('[SocketService] Connect Error: $err');
       if (!_intentionalDisconnect) {
         _scheduleReconnect();
@@ -338,8 +371,6 @@ class SocketService {
       }
     });
 
-    // Start heartbeat to detect silently dead connections
-    _startHeartbeat();
     _reconnectInFlight = true;
     _socket!.connect();
   }

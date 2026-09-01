@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Invify (local Wi-Fi)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "preLaunchTask": "Resolve Flutter target: local",
+      "toolArgs": [
+        "--dart-define-from-file=config/app_targets/local.json"
+      ]
+    },
+    {
+      "name": "Invify (USB)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "preLaunchTask": "Resolve Flutter target: usb",
+      "toolArgs": [
+        "--dart-define-from-file=config/app_targets/usb.json"
+      ]
+    },
+    {
+      "name": "Invify (staging)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=config/app_targets/staging.json"
+      ]
+    }
+  ]
+}

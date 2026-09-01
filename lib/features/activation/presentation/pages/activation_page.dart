@@ -135,11 +135,17 @@ class _ActivationPageState extends State<ActivationPage> {
 
   Future<void> _pingServer() async {
     try {
-      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/settings/onboarding'))
-        .timeout(const Duration(seconds: 3));
-      if (mounted) setState(() => _isServerReachable = true);
+      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/livez'))
+        .timeout(const Duration(seconds: 4));
+      if (mounted) setState(() => _isServerReachable = response.statusCode < 500);
     } catch (_) {
-      if (mounted) setState(() => _isServerReachable = false);
+      try {
+        final response = await http.get(Uri.parse('${AppConfig.baseUrl}/settings/onboarding'))
+          .timeout(const Duration(seconds: 4));
+        if (mounted) setState(() => _isServerReachable = response.statusCode < 500);
+      } catch (_) {
+        if (mounted) setState(() => _isServerReachable = false);
+      }
     }
   }
 
@@ -596,7 +602,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                         context,
                                         icon: Icons.email,
                                         label: 'Email Support',
-                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'support@iips.app'}'),
+                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'support@invify.org'}'),
                                       ),
                                     ],
                                   ),
