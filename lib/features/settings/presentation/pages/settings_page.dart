@@ -31,6 +31,7 @@ import '../bloc/staff_bloc.dart';
 import '../bloc/staff_state.dart';
 import '../../domain/entities/staff.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
+import '../widgets/sync_configuration_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import '../widgets/business_mode_selector.dart';
 import 'package:involve_app/core/services/service_locator.dart';
@@ -230,7 +231,7 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: state.isExporting ? const Text('Exporting...', style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold)) : const Icon(Icons.backup),
             onTap: () => _showBackupOptions(context, state),
           ),
-        if (_matches('Sync'))
+        if (_matches('Sync', ['online', 'invoice', 'cloud']))
           ListTile(
             title: Row(
               children: [
@@ -246,6 +247,13 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               _showSyncSelector(context, state);
             },
+          ),
+        if (_matches('Sync Configuration', ['online sync', 'invoice update', 'cloud']))
+          ListTile(
+            title: const Text('Sync Configuration'),
+            subtitle: const Text('Online Sync and automatic invoice upload'),
+            trailing: const Icon(Icons.cloud_sync_rounded),
+            onTap: () => showSyncConfigurationDialog(context),
           ),
         if (_matches('Show Date & Time'))
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
@@ -522,6 +530,15 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () async {
               Navigator.pop(ctx);
               _triggerWebCloudSync();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.toggle_on, color: Colors.blue),
+            title: const Text('Sync Configuration'),
+            subtitle: const Text('Online Sync and automatic invoice upload'),
+            onTap: () {
+              Navigator.pop(ctx);
+              showSyncConfigurationDialog(context);
             },
           ),
           const SizedBox(height: 20),

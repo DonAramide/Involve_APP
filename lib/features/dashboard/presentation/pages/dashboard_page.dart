@@ -6,6 +6,7 @@ import 'package:involve_app/features/invoicing/presentation/history/pages/invoic
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
 import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:involve_app/features/settings/presentation/widgets/sync_configuration_dialog.dart';
 import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
@@ -226,28 +227,34 @@ class _DashboardPageState extends State<DashboardPage> {
                         final icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
                         final color = isConnected ? Colors.greenAccent : Colors.redAccent;
                         final tooltip = isConnected
-                            ? 'Live socket connected (${AppConfig.baseUrl})'
+                            ? 'Live socket connected (${AppConfig.baseUrl})\nLong-press for Sync Configuration'
                             : (lastErr == null || lastErr.isEmpty)
-                                ? 'Live socket offline (${AppConfig.baseUrl})\nAuto-reconnect is checking the network'
-                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nAuto-reconnect is checking the network\nTap to retry now';
+                                ? 'Live socket offline (${AppConfig.baseUrl})\nTap to reconnect · Long-press for Sync Configuration'
+                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nTap to reconnect · Long-press for Sync Configuration';
 
-                        return IconButton(
-                          icon: Icon(icon, size: 20, color: color),
-                          tooltip: tooltip,
-                          onPressed: () async {
-                            await SocketService().reconnect();
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  SocketService().isConnected.value
-                                      ? 'Live socket connected'
-                                      : 'Reconnecting live socket…',
+                        return Tooltip(
+                          message: tooltip,
+                          child: GestureDetector(
+                            onTap: () async {
+                              await SocketService().reconnect();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    SocketService().isConnected.value
+                                        ? 'Live socket connected'
+                                        : 'Reconnecting live socket…',
+                                  ),
+                                  duration: const Duration(seconds: 2),
                                 ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                            onLongPress: () => showSyncConfigurationDialog(context),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              child: Icon(icon, size: 20, color: color),
+                            ),
+                          ),
                         );
                       },
                     );
@@ -306,9 +313,21 @@ class _DashboardPageState extends State<DashboardPage> {
                     case 'user_guide':
                       Navigator.pushNamed(context, '/user_guide');
                       break;
+                    case 'sync_config':
+                      showSyncConfigurationDialog(context);
+                      break;
                   }
                 },
                 itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'sync_config',
+                    child: ListTile(
+                      leading: Icon(Icons.cloud_sync_rounded),
+                      title: Text('Sync Configuration'),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'about',
                     child: ListTile(
