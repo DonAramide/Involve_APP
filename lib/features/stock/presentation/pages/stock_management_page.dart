@@ -17,6 +17,7 @@ import 'package:involve_app/features/stock/presentation/widgets/log_expense_dial
 import 'package:collection/collection.dart';
 import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
+import 'package:involve_app/features/stock/presentation/widgets/stock_up_dialog.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StockManagementPage extends StatefulWidget {
@@ -510,54 +511,28 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  void _showStockUpDialog(BuildContext context, Item item) {
-    final qtyController = TextEditingController();
-    final remarksController = TextEditingController();
-
-    showDialog(
+  Future<void> _showStockUpDialog(BuildContext context, Item item) async {
+    final result = await showDialog<StockUpResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Stock Up: ${item.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Current Stock: ${item.stockQty}', 
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: qtyController,
-              decoration: const InputDecoration(labelText: 'Quantity to Add'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: remarksController,
-              decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              final qty = int.tryParse(qtyController.text);
-              if (qty != null && qty > 0) {
-                context.read<StockBloc>().add(StockIncrementRequested(
-                      item.id!,
-                      qty,
-                      remarks: remarksController.text,
-                    ));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Added $qty to ${item.name}')),
-                );
-              }
-            },
-            child: const Text('ADD'),
-          ),
-        ],
+      builder: (ctx) => StockUpDialog(
+        itemName: item.name,
+        currentQty: item.stockQty,
       ),
+    );
+    if (result == null || !context.mounted) return;
+
+    context.read<StockBloc>().add(StockIncrementRequested(
+          item.id!,
+          result.quantity,
+          remarks: result.remarks,
+          supplierName: result.supplierName,
+          receiptNumber: result.receiptNumber,
+          trackingNumber: result.trackingNumber,
+          receivedAt: result.receivedAt,
+          receiptImage: result.receiptImage,
+        ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added ${result.quantity} to ${item.name}')),
     );
   }
 

@@ -73,6 +73,13 @@ class AppSettings extends Equatable {
   final bool allowGiveChange;
   final bool showNetworkIndicator;
 
+  /// Seed/demo values that must never be shown as a real business address.
+  static bool isPlaceholderAddress(String? value) {
+    final a = (value ?? '').trim().toLowerCase();
+    return a.isEmpty ||
+        a == '123 street' ||
+        a == 'please re-adjust settings';
+  }
 
   const AppSettings({
     this.id,

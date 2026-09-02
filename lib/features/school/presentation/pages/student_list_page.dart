@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
@@ -567,14 +568,11 @@ class _StudentListPageState extends State<StudentListPage> {
                       controller: parentPhoneController, 
                       decoration: const InputDecoration(labelText: 'Parent Phone *'),
                       keyboardType: TextInputType.phone,
-                      maxLength: 15,
+                      inputFormatters: PhoneNumberInput.formatters,
+                      maxLength: PhoneNumberInput.maxDigits,
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
-                        final cleanVal = v.replaceAll(' ', '');
-                        if (!RegExp(r'^\d{11,15}$').hasMatch(cleanVal)) {
-                          return 'Enter a valid phone (11-15 digits)';
-                        }
-                        return null;
+                        return PhoneNumberInput.validate(v, required: true, minDigits: 11);
                       },
                     ),
                   ],

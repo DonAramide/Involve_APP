@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/logo_compressor.dart';
 import '../../domain/entities/service_material.dart';
 import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
@@ -236,10 +240,7 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                                             )
                                           ]
                                         : catMaterials.map((m) => ListTile(
-                                            leading: CircleAvatar(
-                                              backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                                              child: const Icon(Icons.build_outlined, color: Colors.blue, size: 20),
-                                            ),
+                                            leading: _materialAvatar(context, m),
                                             title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                                             subtitle: Text('Default: ${CurrencyFormatter.formatWithSymbol(m.defaultPrice)}'),
                                             trailing: Row(
@@ -291,6 +292,52 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
     bool isAddingNewCategory = false;
     String? nameError;
     String? priceError;
+    Uint8List? imageBytes = material?.image;
+
+    Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        imageQuality: 80,
+      );
+      if (file == null) return;
+      final compressed = LogoCompressor.compress(
+        await file.readAsBytes(),
+        maxDimension: 512,
+        quality: 80,
+      );
+      setDialogState(() => imageBytes = compressed);
+    }
+
+    Future<void> chooseImageSource(void Function(void Function()) setDialogState) async {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Material / part photo', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      if (source != null) await pickImage(source, setDialogState);
+    }
 
     showDialog(
       context: context,
@@ -367,6 +414,47 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                     ),
                   ],
                   const SizedBox(height: 10),
+                  const Text('Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  if (imageBytes != null)
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            imageBytes!,
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setDialogState(() => imageBytes = null),
+                          tooltip: 'Remove photo',
+                          icon: const CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.black54,
+                            child: Icon(Icons.close, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: () => chooseImageSource(setDialogState),
+                      icon: const Icon(Icons.add_a_photo_outlined),
+                      label: const Text('Take photo or pick from gallery'),
+                    ),
+                  if (imageBytes != null) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () => chooseImageSource(setDialogState),
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Replace photo'),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                   TextField(
                     controller: priceCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -409,12 +497,14 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                       name: name,
                       category: category,
                       price: price,
+                      image: imageBytes,
                     ));
                   } else {
                     context.read<ServicesBloc>().add(AddServiceMaterial(
                       name: name,
                       category: category,
                       price: price,
+                      image: imageBytes,
                     ));
                   }
 
@@ -425,6 +515,51 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _materialAvatar(BuildContext context, ServiceMaterial material) {
+    return GestureDetector(
+      onTap: material.image == null ? null : () => _viewMaterialImage(context, material),
+      child: CircleAvatar(
+        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+        backgroundImage: material.image != null ? MemoryImage(material.image!) : null,
+        child: material.image == null
+            ? const Icon(Icons.build_outlined, color: Colors.blue, size: 20)
+            : null,
+      ),
+    );
+  }
+
+  void _viewMaterialImage(BuildContext context, ServiceMaterial material) {
+    final bytes = material.image;
+    if (bytes == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(material.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                ],
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }

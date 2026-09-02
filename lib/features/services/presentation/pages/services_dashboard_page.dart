@@ -313,6 +313,7 @@ class ServicesDashboardPage extends StatelessWidget {
       case 'in_progress': color = Colors.orange; break;
       case 'ready': color = Colors.green; break;
       case 'delivered': color = Colors.blue; break;
+      case 'cancelled': color = Colors.red; break;
       default: color = Colors.grey;
     }
     return Container(

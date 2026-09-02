@@ -201,7 +201,12 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
 
     on<AddServiceMaterial>((event, emit) async {
       try {
-        await getJobs.repository.addMaterial(name: event.name, category: event.category, price: event.price);
+        await getJobs.repository.addMaterial(
+          name: event.name,
+          category: event.category,
+          price: event.price,
+          image: event.image,
+        );
         final materials = await getJobs.repository.getMaterials();
         final catObjects = await getJobs.repository.getFullMaterialCategories();
         final catNames = catObjects.map((c) => c.name).toList();
@@ -246,6 +251,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           name: event.name,
           category: event.category,
           price: event.price,
+          image: event.image,
         );
         final materials = await getJobs.repository.getMaterials();
         final catObjects = await getJobs.repository.getFullMaterialCategories();

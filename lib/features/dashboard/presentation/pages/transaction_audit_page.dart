@@ -53,6 +53,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     'Paid',
     'Unsettled',
     'Pending',
+    'Payment Pending',
+    'Customer Debit',
     'Failed',
   ];
 
@@ -75,7 +77,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   }
 
   String _normalizeMethod(String? raw) {
-    final m = (raw ?? 'Cash').trim().toLowerCase();
+    final m = (raw ?? '').trim().toLowerCase();
+    if (m == 'unpaid' || m == 'none' || m == '—') return 'Unpaid';
     if (m.contains('pos') || m.contains('card') || m.contains('emv')) return 'POS';
     if (m.contains('transfer') || m.contains('virtual')) return 'Transfer';
     if (m.contains('wallet')) return 'Wallet';
@@ -85,8 +88,17 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     return raw?.trim().isNotEmpty == true ? raw!.trim() : 'Cash';
   }
 
+  bool _isCommittedOnAccount(String? methodRaw) {
+    final m = (methodRaw ?? '').trim().toLowerCase();
+    return m.contains('credit') ||
+        m.contains('pay later') ||
+        m.contains('paylater') ||
+        m == 'clear';
+  }
+
   String _normalizeStatus(String? raw) {
     final s = (raw ?? '').trim().toLowerCase();
+    if (s.isEmpty) return 'Pending';
     if (s.contains('fail') ||
         s.contains('declin') ||
         s.contains('abort') ||
@@ -94,14 +106,28 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       return 'Failed';
     }
     if (s.contains('unsettled')) return 'Unsettled';
+    if (s.contains('payment pending') ||
+        s == 'unpaid' ||
+        s.contains('unpaid') ||
+        s.contains('owing')) {
+      return 'Payment Pending';
+    }
+    if (s.contains('debit') ||
+        s == 'deferred' ||
+        s.contains('pay later') ||
+        s.contains('paylater')) {
+      return 'Customer Debit';
+    }
+    if (s.contains('partial')) return 'Pending';
     if (s.contains('pend') || s.contains('await')) return 'Pending';
     if (s.contains('settled') && !s.contains('unsettled')) return 'Paid';
-    if (s.contains('paid') ||
-        s.contains('approv') ||
+    if (s == 'paid' ||
+        s.startsWith('paid ') ||
+        s.contains('approved') ||
         s.contains('success')) {
       return 'Paid';
     }
-    return raw?.trim().isNotEmpty == true ? raw!.trim() : 'Pending';
+    return raw!.trim();
   }
 
   IconData _methodIcon(String method) {
@@ -116,6 +142,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         return Icons.savings_outlined;
       case 'Pay Later':
         return Icons.schedule;
+      case 'Unpaid':
+        return Icons.hourglass_empty;
       default:
         return Icons.payments;
     }
@@ -128,7 +156,10 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       case 'Unsettled':
         return const Color(0xFFF9A825); // amber / yellow
       case 'Pending':
+      case 'Payment Pending':
         return Colors.orange;
+      case 'Customer Debit':
+        return const Color(0xFF0277BD);
       case 'Failed':
         return Colors.red;
       default:
@@ -146,7 +177,13 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   String _displayStatus(TransactionAuditModel tx) {
     if (tx.isCardUnsettled) return 'Approved (unsettled)';
     if (tx.isCardSettled) return 'Settled';
+    if (_effectiveStatus(tx) == 'Payment Pending') return 'Payment Pending';
     return tx.status;
+  }
+
+  String _rowMethodStatus(TransactionAuditModel tx) {
+    if (_effectiveStatus(tx) == 'Payment Pending') return 'Payment Pending';
+    return '${tx.paymentMethod} · ${_displayStatus(tx)}';
   }
 
   Color _rowBackground(TransactionAuditModel tx) {
@@ -154,6 +191,36 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       return const Color(0xFFFFF8E1); // light yellow
     }
     return Colors.transparent;
+  }
+
+  List<Map<String, dynamic>> _jobItemMaps(ServiceJob job) {
+    if (job.items.isNotEmpty) {
+      return job.items
+          .map((i) => {'name': i.name, 'quantity': i.quantity.toInt()})
+          .toList();
+    }
+    return [
+      {'name': job.title, 'quantity': 1}
+    ];
+  }
+
+  _TxRow _pendingPaymentJobRow(ServiceJob job) {
+    final owing = job.balance > 1e-9 ? job.balance : job.totalAmount;
+    return _TxRow(
+      serviceJob: job,
+      audit: TransactionAuditModel(
+        id: 'pending-${job.id}',
+        type: 'SERVICE',
+        paymentMethod: 'Unpaid',
+        amount: owing,
+        status: 'Payment Pending',
+        staffName: 'Staff',
+        date: job.createdAt,
+        items: _jobItemMaps(job),
+        customerName: job.customerName ?? 'Client',
+        reference: job.jobId,
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -172,9 +239,41 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       final Map<String, _TxRow> byKey = {};
 
       for (final inv in invoices.take(300)) {
-        final method = _normalizeMethod(inv.paymentMethod);
-        final status = _normalizeStatus(inv.paymentStatus);
-        final amount = inv.amountPaid > 0 ? inv.amountPaid : inv.totalAmount;
+        // Service jobs are mirrored into getAllInvoices(). List them from
+        // real payments / outstanding balance below so a new unpaid job is
+        // not shown as Cash · Paid.
+        if (inv.invoiceNumber.startsWith('INV-SRV')) continue;
+
+        final noMoneyIn = inv.amountPaid <= 1e-9;
+        final methodRaw = (inv.paymentMethod ?? '').trim();
+        final statusRaw = (inv.paymentStatus ?? '').trim().toLowerCase();
+        final awaitingTransfer = methodRaw.toLowerCase().contains('transfer') ||
+            methodRaw.toLowerCase().contains('virtual') ||
+            statusRaw.contains('pend') ||
+            statusRaw.contains('await');
+
+        final String method;
+        final String status;
+        final double amount;
+        if (noMoneyIn) {
+          if (awaitingTransfer) {
+            method = _normalizeMethod(methodRaw);
+            status = 'Pending';
+          } else if (_isCommittedOnAccount(methodRaw)) {
+            method = 'Credit';
+            status = 'Customer Debit';
+          } else {
+            method = methodRaw.isEmpty ? 'Unpaid' : _normalizeMethod(methodRaw);
+            status = 'Payment Pending';
+          }
+          amount =
+              inv.balanceAmount > 1e-9 ? inv.balanceAmount : inv.totalAmount;
+        } else {
+          method = _normalizeMethod(inv.paymentMethod);
+          status = _normalizeStatus(inv.paymentStatus);
+          amount = inv.amountPaid;
+        }
+
         final key = 'inv:${inv.id ?? inv.invoiceNumber}';
         byKey[key] = _TxRow(
           invoice: inv,
@@ -251,15 +350,13 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                   status: 'Paid',
                   staffName: 'Staff',
                   date: pmt.createdAt,
-                  items: job.items.isNotEmpty
-                      ? job.items.map((i) => {'name': i.name, 'quantity': i.quantity.toInt()}).toList()
-                      : [{'name': job.title, 'quantity': 1}],
+                  items: _jobItemMaps(job),
                   customerName: job.customerName ?? 'Client',
                   reference: ref,
                 ),
               );
             }
-          } else if (job.amountPaid > 0) {
+          } else if (job.amountPaid > 1e-9) {
             final key = 'srv_job:${job.id}';
             byKey[key] = _TxRow(
               serviceJob: job,
@@ -271,13 +368,15 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                 status: 'Paid',
                 staffName: 'Staff',
                 date: job.createdAt,
-                items: job.items.isNotEmpty
-                    ? job.items.map((i) => {'name': i.name, 'quantity': i.quantity.toInt()}).toList()
-                    : [{'name': job.title, 'quantity': 1}],
+                items: _jobItemMaps(job),
                 customerName: job.customerName ?? 'Client',
                 reference: job.jobId,
               ),
             );
+          }
+
+          if (job.status.toLowerCase() != 'cancelled' && job.balance > 1e-9) {
+            byKey['srv_pending:${job.id}'] = _pendingPaymentJobRow(job);
           }
         }
       } catch (_) {}
@@ -492,6 +591,56 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                     ),
                   ],
                 ),
+                if (serviceJob != null &&
+                    _effectiveStatus(tx) == 'Payment Pending' &&
+                    serviceJob.status.toLowerCase() != 'cancelled' &&
+                    serviceJob.amountPaid <= 1e-9) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (dCtx) => AlertDialog(
+                            title: const Text('Cancel this job?'),
+                            content: Text(
+                              'No payment has been recorded for "${serviceJob.title}". '
+                              'Cancelling removes it from Payment Pending.',
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Keep job')),
+                              TextButton(
+                                onPressed: () => Navigator.pop(dCtx, true),
+                                child: const Text('Cancel job', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !context.mounted) return;
+                        try {
+                          await context.read<IServicesRepository>().updateJobStatus(serviceJob.id, 'cancelled');
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Job cancelled. No payment is due.')),
+                          );
+                          await _load();
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString().replaceAll('Exception: ', '')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                      label: const Text('Cancel job', style: TextStyle(color: Colors.red)),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -678,7 +827,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           Text(
-                                            '${tx.paymentMethod} · ${_displayStatus(tx)}',
+                                            _rowMethodStatus(tx),
                                             style: TextStyle(
                                               color: statusColor,
                                               fontWeight: FontWeight.w600,

@@ -228,8 +228,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         final tooltip = isConnected
                             ? 'Live socket connected (${AppConfig.baseUrl})'
                             : (lastErr == null || lastErr.isEmpty)
-                                ? 'Live socket offline (${AppConfig.baseUrl})\nTap to reconnect'
-                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nTap to reconnect';
+                                ? 'Live socket offline (${AppConfig.baseUrl})\nAuto-reconnect is checking the network'
+                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nAuto-reconnect is checking the network\nTap to retry now';
 
                         return IconButton(
                           icon: Icon(icon, size: 20, color: color),

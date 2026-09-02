@@ -110,6 +110,13 @@ class ServicesRepositoryImpl implements IServicesRepository {
     });
   }
 
+  bool _isWalletPaymentMethod(String method) =>
+      method == 'Customer Wallet' || method == 'Wallet';
+
+  /// Credit available for wallet pay = abs(negative balance). Owing (positive) = 0 credit.
+  double _walletCreditFromBalance(double balance) =>
+      balance < 0 ? -balance : 0.0;
+
   @override
   Future<void> addPayment({
     required String jobId,
@@ -117,8 +124,61 @@ class ServicesRepositoryImpl implements IServicesRepository {
     required String method,
     String? reference,
   }) async {
+    Map<String, dynamic>? walletLedgerEntry;
+
     await db.transaction(() async {
-      // 1. Create Payment
+      final job = await (db.select(db.serviceJobs)..where((t) => t.id.equals(jobId))).getSingle();
+      if (job.status.toLowerCase() == 'cancelled') {
+        throw Exception('This job was cancelled. Payment cannot be recorded.');
+      }
+      final isWallet = _isWalletPaymentMethod(method);
+
+      if (isWallet) {
+        if (job.customerId.isEmpty) {
+          throw Exception(
+              'Customer Wallet payment requires a customer on this job.');
+        }
+        final customer = await (db.select(db.customers)
+              ..where((t) => t.id.equals(job.customerId)))
+            .getSingleOrNull();
+        if (customer == null) {
+          throw Exception('Selected customer was not found.');
+        }
+        final availableCredit = _walletCreditFromBalance(customer.balance);
+        if (availableCredit + 1e-9 < amount) {
+          throw Exception(
+              'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
+              'Payment: ₦${amount.toStringAsFixed(2)}.');
+        }
+
+        final balanceBefore = customer.balance;
+        final balanceAfter = balanceBefore + amount;
+        await db.customUpdate(
+          'UPDATE customers SET balance = balance + ?, sync_status = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(amount),
+            Variable.withString('pending'),
+            Variable.withString(customer.id),
+          ],
+          updates: {db.customers},
+        );
+
+        walletLedgerEntry = {
+          'id': _uuid.v4(),
+          'customerId': customer.id,
+          'customerName': customer.name,
+          'amount': amount,
+          'type': 'DEBIT',
+          'reference': reference ?? 'JOB-$jobId',
+          'status': 'SUCCESS',
+          'createdAt': DateTime.now().toIso8601String(),
+          'source': 'service_payment',
+          'jobId': jobId,
+          'balanceBefore': balanceBefore,
+          'balanceAfter': balanceAfter,
+        };
+      }
+
       await db.into(db.servicePayments).insert(ServicePaymentsCompanion.insert(
         id: _uuid.v4(),
         jobId: jobId,
@@ -128,8 +188,6 @@ class ServicesRepositoryImpl implements IServicesRepository {
         createdAt: Value(DateTime.now()),
       ));
 
-      // 2. Update Job
-      final job = await (db.select(db.serviceJobs)..where((t) => t.id.equals(jobId))).getSingle();
       final newPaid = job.amountPaid + amount;
       final newBalance = job.totalAmount - newPaid;
 
@@ -140,10 +198,40 @@ class ServicesRepositoryImpl implements IServicesRepository {
         ),
       );
     });
+
+    final debitEntry = walletLedgerEntry;
+    if (debitEntry != null) {
+      final ledger = await _loadFundLedger();
+      ledger.insert(0, debitEntry);
+      await _saveFundLedger(ledger);
+    }
   }
 
   @override
   Future<void> updateJobStatus(String id, String status) async {
+    final job = await (db.select(db.serviceJobs)..where((t) => t.id.equals(id))).getSingle();
+    final current = job.status.toLowerCase();
+    final next = status.trim().toLowerCase();
+
+    if (current == 'cancelled' && next != 'cancelled') {
+      throw Exception('A cancelled job cannot be reopened.');
+    }
+
+    if (next == 'cancelled') {
+      if (job.amountPaid > 1e-9) {
+        throw Exception(
+          'This job has a payment recorded. Reverse or refund the payment before cancelling.',
+        );
+      }
+      await (db.update(db.serviceJobs)..where((t) => t.id.equals(id))).write(
+        ServiceJobsCompanion(
+          status: const Value('cancelled'),
+          balance: const Value(0.0),
+        ),
+      );
+      return;
+    }
+
     await (db.update(db.serviceJobs)..where((t) => t.id.equals(id))).write(
       ServiceJobsCompanion(
         status: Value(status),
@@ -154,8 +242,9 @@ class ServicesRepositoryImpl implements IServicesRepository {
   @override
   Future<List<ServiceCustomer>> getCustomers({String? query}) async {
     final queryBuilder = db.select(db.customers);
-    if (query != null && query.isNotEmpty) {
-      queryBuilder.where((t) => t.name.like('%$query%'));
+    if (query != null && query.trim().isNotEmpty) {
+      final clean = query.trim();
+      queryBuilder.where((t) => t.name.like('%$clean%') | t.phone.like('%$clean%'));
     }
     final results = await queryBuilder.get();
     return results.map((row) => _mapCustomer(row)).toList();
@@ -428,24 +517,27 @@ class ServicesRepositoryImpl implements IServicesRepository {
       name: r.name,
       category: r.category,
       defaultPrice: r.defaultPrice,
+      image: r.image,
     )).toList();
   }
 
   @override
-  Future<void> addMaterial({required String name, required String category, required double price}) async {
+  Future<void> addMaterial({required String name, required String category, required double price, Uint8List? image}) async {
     await db.into(db.serviceMaterials).insert(ServiceMaterialsCompanion.insert(
       name: name,
       category: category,
       defaultPrice: price,
+      image: Value(image),
     ));
   }
 
   @override
-  Future<void> updateMaterial({required int id, required String name, required String category, required double price}) async {
+  Future<void> updateMaterial({required int id, required String name, required String category, required double price, Uint8List? image}) async {
     await (db.update(db.serviceMaterials)..where((t) => t.id.equals(id))).write(ServiceMaterialsCompanion(
       name: Value(name),
       category: Value(category),
       defaultPrice: Value(price),
+      image: Value(image),
     ));
   }
 

@@ -42,12 +42,18 @@ class SocketService {
   static const int _maxBackoffSeconds = 60;   // cap at 60 s
   static const int _heartbeatIntervalSeconds = 25;
 
+  static const int _watchdogIntervalSeconds = 15;
+  static const int _connectTimeoutSeconds = 20;
+
   int _reconnectAttempts = 0;
   bool _intentionalDisconnect = false;         // set true when WE call disconnect()
   bool _reconnectInFlight = false;
+  DateTime? _reconnectInFlightAt;
   DateTime? _lastConnectivityReconnectAt;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
+  Timer? _watchdogTimer;
+  Timer? _connectTimeoutTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   Map<String, dynamic> _authPayload(String? token, String? tenantId) {
@@ -75,6 +81,7 @@ class SocketService {
     _socket = null;
     _boundServerUrl = null;
     _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
     _intentionalDisconnect = false;
   }
 
@@ -90,6 +97,7 @@ class SocketService {
     // Live presence stays up on every plan (emergency lock, broadcasts).
     // isOnlineSyncEnabled only gates data/outbox sync, not this socket.
     _ensureConnectivityListener();
+    _startWatchdog();
 
     // Reuse the existing manager. Recreating IO.io() + checkConnectivity()
     // on every retry made Android fire "Network restored" in a tight loop.
@@ -101,8 +109,9 @@ class SocketService {
       if (type != null) _lastType = type;
       if (_socket!.connected) _startHeartbeat();
       if (_socket!.connected || _reconnectInFlight) return;
-      _reconnectInFlight = true;
+      _markReconnectInFlight();
       _socket!.connect();
+      _armConnectTimeout();
       return;
     }
 
@@ -148,6 +157,9 @@ class SocketService {
       _reconnectAttempts = 0;        // reset backoff counter on success
       _intentionalDisconnect = false;
       _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
       _startHeartbeat();
       debugPrint('[SocketService] Socket successfully connected to server!');
       debugPrint('[SocketService] Emitting join_room with: tenantId=$tenantId, plan=$plan, type=$type, deviceId=$deviceId, businessName=$businessName');
@@ -187,6 +199,9 @@ class SocketService {
 
     _socket!.onConnectError((err) {
       _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
       isConnected.value = false;
       lastError.value = err?.toString();
       debugPrint('[SocketService] Connect Error: $err');
@@ -358,45 +373,118 @@ class SocketService {
     _socket!.onDisconnect((_) {
       isConnected.value = false;
       _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
       log('[SocketService] Socket disconnected.');
       if (!_intentionalDisconnect) {
         _scheduleReconnect();
       }
     });
 
-    _reconnectInFlight = true;
+    _markReconnectInFlight();
     _socket!.connect();
+    _armConnectTimeout();
+  }
+
+  bool _resultsHaveNetwork(List<ConnectivityResult> results) {
+    if (results.isEmpty) return true;
+    return results.any((r) => r != ConnectivityResult.none);
+  }
+
+  Future<bool> _isNetworkAvailable() async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      return _resultsHaveNetwork(results);
+    } catch (_) {
+      return true;
+    }
   }
 
   void _ensureConnectivityListener() {
     if (_connectivitySub != null) return;
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final hasNetwork = results.any((r) => r != ConnectivityResult.none);
-      if (!hasNetwork ||
-          isConnected.value ||
-          _reconnectInFlight ||
-          _intentionalDisconnect ||
-          _lastServerUrl == null) {
-        return;
+      if (_resultsHaveNetwork(results)) {
+        _onNetworkRestored();
       }
-      final now = DateTime.now();
-      if (_lastConnectivityReconnectAt != null &&
-          now.difference(_lastConnectivityReconnectAt!) < const Duration(seconds: 4)) {
-        return;
-      }
-      _lastConnectivityReconnectAt = now;
-      debugPrint('[SocketService] Network restored. Triggering reconnect...');
-      _cancelReconnectTimer();
-      unawaited(_doReconnect());
+    });
+    unawaited(_probeNetworkAndReconnect());
+  }
+
+  void _onNetworkRestored() {
+    if (_intentionalDisconnect || _lastServerUrl == null) return;
+    if (_socket == null) return;
+    if (isConnected.value && _socket?.connected == true) return;
+    final now = DateTime.now();
+    if (_lastConnectivityReconnectAt != null &&
+        now.difference(_lastConnectivityReconnectAt!) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastConnectivityReconnectAt = now;
+    debugPrint('[SocketService] Network restored. Triggering reconnect...');
+    _reconnectAttempts = 0;
+    _cancelReconnectTimer();
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+    unawaited(_doReconnect());
+  }
+
+  Future<void> _probeNetworkAndReconnect() async {
+    if (!await _isNetworkAvailable()) return;
+    _onNetworkRestored();
+  }
+
+  void _startWatchdog() {
+    _watchdogTimer ??= Timer.periodic(
+      const Duration(seconds: _watchdogIntervalSeconds),
+      (_) => unawaited(_watchdogTick()),
+    );
+  }
+
+  Future<void> _watchdogTick() async {
+    if (_intentionalDisconnect || _lastServerUrl == null) return;
+    if (isConnected.value && _socket?.connected == true) return;
+
+    if (_reconnectInFlight &&
+        _reconnectInFlightAt != null &&
+        DateTime.now().difference(_reconnectInFlightAt!) >
+            const Duration(seconds: _connectTimeoutSeconds)) {
+      debugPrint('[SocketService] Watchdog: connect hung, resetting.');
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
+    }
+
+    if (_reconnectInFlight) return;
+    if (!await _isNetworkAvailable()) return;
+    if (_reconnectTimer != null) return;
+    debugPrint('[SocketService] Watchdog: network up, socket down. Reconnecting...');
+    await _doReconnect();
+  }
+
+  void _markReconnectInFlight() {
+    _reconnectInFlight = true;
+    _reconnectInFlightAt = DateTime.now();
+  }
+
+  void _armConnectTimeout() {
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = Timer(const Duration(seconds: _connectTimeoutSeconds), () {
+      if (_intentionalDisconnect || isConnected.value) return;
+      debugPrint('[SocketService] Connect timed out after ${_connectTimeoutSeconds}s.');
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _scheduleReconnect();
     });
   }
 
   // ── Reconnect helpers ──────────────────────────────────────────────────────
 
   void _scheduleReconnect() {
-    if (_intentionalDisconnect || _reconnectInFlight || _reconnectTimer != null) {
-      return;
-    }
+    if (_intentionalDisconnect || _reconnectInFlight) return;
+    if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
+    _cancelReconnectTimer();
     // Exponential backoff: 2^attempt seconds, capped at _maxBackoffSeconds
     final delaySeconds = _reconnectAttempts == 0
         ? 2
@@ -404,17 +492,21 @@ class SocketService {
             ? _maxBackoffSeconds
             : (2 << _reconnectAttempts));
     debugPrint('[SocketService] Reconnect attempt ${_reconnectAttempts + 1} scheduled in ${delaySeconds}s...');
-    _reconnectTimer = Timer(Duration(seconds: delaySeconds), _doReconnect);
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _reconnectTimer = null;
+      unawaited(_doReconnect());
+    });
   }
 
   Future<void> _doReconnect() async {
+    _reconnectTimer = null;
     if (_intentionalDisconnect || _lastServerUrl == null) return;
     if (_reconnectInFlight) return;
     if (isConnected.value && _socket?.connected == true) return;
 
     debugPrint('[SocketService] Reconnecting (attempt ${_reconnectAttempts + 1})...');
     _reconnectAttempts++;
-    _reconnectInFlight = true;
+    _markReconnectInFlight();
 
     try {
       final token = tokenProvider != null ? await tokenProvider!() : _lastToken;
@@ -422,8 +514,10 @@ class SocketService {
         _applyAuth(token, _lastTenantId);
         if (!_socket!.connected) {
           _socket!.connect();
+          _armConnectTimeout();
         } else {
           _reconnectInFlight = false;
+          _reconnectInFlightAt = null;
         }
         return;
       }
@@ -438,6 +532,7 @@ class SocketService {
       );
     } catch (e) {
       _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
       debugPrint('[SocketService] Reconnect failed: $e');
       _scheduleReconnect();
     }
@@ -453,12 +548,18 @@ class SocketService {
     _heartbeatTimer = Timer.periodic(
       const Duration(seconds: _heartbeatIntervalSeconds),
       (_) {
-        if (_socket == null || _intentionalDisconnect || _reconnectInFlight) return;
-        if (_reconnectTimer != null) return;
+        if (_socket == null || _intentionalDisconnect) return;
         if (_socket!.connected) {
           _socket!.emit('ping_heartbeat', {'timestamp': DateTime.now().toIso8601String()});
         } else if (!isConnected.value) {
           debugPrint('[SocketService] Heartbeat: socket dead, scheduling reconnect.');
+          if (_reconnectInFlight &&
+              _reconnectInFlightAt != null &&
+              DateTime.now().difference(_reconnectInFlightAt!) >
+                  const Duration(seconds: _connectTimeoutSeconds)) {
+            _reconnectInFlight = false;
+            _reconnectInFlightAt = null;
+          }
           _scheduleReconnect();
         }
       },
@@ -476,8 +577,14 @@ class SocketService {
   /// Manually trigger a reconnect (e.g. called from a UI "Retry" button).
   Future<void> reconnect() async {
     _intentionalDisconnect = false;
+    _ensureConnectivityListener();
+    _startWatchdog();
     _cancelReconnectTimer();
     _reconnectAttempts = 0;
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     await _doReconnect();
   }
 
@@ -485,11 +592,16 @@ class SocketService {
     _intentionalDisconnect = true;
     _cancelReconnectTimer();
     _heartbeatTimer?.cancel();
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
     _socket?.disconnect();
     isConnected.value = false;
     _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
   }
 
   void _showBroadcastBanner(String message) {
@@ -668,6 +780,10 @@ class SocketService {
     _intentionalDisconnect = true;
     _cancelReconnectTimer();
     _heartbeatTimer?.cancel();
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
     _socket?.disconnect();
@@ -675,5 +791,6 @@ class SocketService {
     _socket = null;
     _boundServerUrl = null;
     _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
   }
 }

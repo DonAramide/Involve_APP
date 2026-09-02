@@ -3,6 +3,7 @@ import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -17,7 +18,9 @@ import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import '../utils/onboarding_navigator.dart';
+import '../utils/onboarding_draft_store.dart';
 import '../../data/nigeria_states_lgas.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
@@ -56,6 +59,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   String _selectedIndustry = 'retail';
   String _primaryColorHex = '#6366F1';
   bool _isLoading = false;
+  bool _isCapturingTelemetry = false;
+  String? _capturedDeviceId;
+  String? _capturedGpsLocation;
   int _currentStep = 0;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -88,14 +94,104 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   void initState() {
     super.initState();
     _pingServer();
-    final state = context.read<SettingsBloc>().state;
-    if (state.settings != null) {
-      final savedName = state.settings!.organizationName;
-      // Only pre-fill if there's a real saved name (not a placeholder)
-      if (savedName.isNotEmpty && savedName != 'My Business' && savedName != 'My Business (Reset)') {
-        _businessNameController.text = savedName;
+    _restoreDraft();
+  }
+
+  Future<void> _persistDraft({int? step}) async {
+    await OnboardingDraftStore.save({
+      'step': step ?? _currentStep,
+      'firstName': _firstNameController.text,
+      'lastName': _lastNameController.text,
+      'email': _emailController.text,
+      'password': _passwordController.text,
+      'confirmPassword': _confirmPasswordController.text,
+      'businessName': _businessNameController.text,
+      'phone': _phoneController.text,
+      'agentCode': _agentCodeController.text,
+      'countryDial': _selectedCountryCode.dialCode,
+      'streetAddress': _streetController.text,
+      'country': _selectedCountry,
+      'state': _selectedCountry == 'Nigeria' ? _selectedState : _stateController.text,
+      'lga': _selectedLga,
+      'industry': _selectedIndustry,
+      'themeColor': _primaryColorHex,
+      'deviceId': _capturedDeviceId,
+      'gpsLocation': _capturedGpsLocation,
+    });
+  }
+
+  Future<void> _restoreDraft() async {
+    final draft = await OnboardingDraftStore.load();
+    if (!mounted) return;
+
+    if (draft == null) {
+      final state = context.read<SettingsBloc>().state;
+      if (state.settings != null) {
+        final savedName = state.settings!.organizationName;
+        if (savedName.isNotEmpty &&
+            savedName != 'My Business' &&
+            savedName != 'My Business (Reset)') {
+          setState(() => _businessNameController.text = savedName);
+        }
+      }
+      return;
+    }
+
+    WestAfricanCountry? matchedCountry;
+    final savedDial = draft['countryDial']?.toString();
+    if (savedDial != null && savedDial.isNotEmpty) {
+      for (final c in westAfricanCountries) {
+        if (c.dialCode == savedDial) {
+          matchedCountry = c;
+          break;
+        }
       }
     }
+
+    setState(() {
+      _firstNameController.text = draft['firstName']?.toString() ?? _firstNameController.text;
+      _lastNameController.text = draft['lastName']?.toString() ?? _lastNameController.text;
+      _emailController.text = draft['email']?.toString() ?? _emailController.text;
+      _passwordController.text = draft['password']?.toString() ?? _passwordController.text;
+      _confirmPasswordController.text =
+          draft['confirmPassword']?.toString() ?? _confirmPasswordController.text;
+      _businessNameController.text =
+          draft['businessName']?.toString() ?? _businessNameController.text;
+      _phoneController.text = draft['phone']?.toString() ?? _phoneController.text;
+      _agentCodeController.text = draft['agentCode']?.toString() ?? _agentCodeController.text;
+      _streetController.text = draft['streetAddress']?.toString() ?? _streetController.text;
+      _selectedCountry = draft['country']?.toString() ?? _selectedCountry;
+      if (_selectedCountry == 'Nigeria') {
+        _selectedState = draft['state']?.toString();
+        _selectedLga = draft['lga']?.toString();
+      } else {
+        _stateController.text = draft['state']?.toString() ?? _stateController.text;
+      }
+      _selectedIndustry = draft['industry']?.toString() ?? _selectedIndustry;
+      _primaryColorHex = draft['themeColor']?.toString() ?? _primaryColorHex;
+      final savedDeviceId = draft['deviceId']?.toString();
+      if (_isValidDeviceId(savedDeviceId)) {
+        _capturedDeviceId = savedDeviceId;
+      }
+      final savedGps = draft['gpsLocation']?.toString();
+      if (_isValidGps(savedGps)) {
+        _capturedGpsLocation = savedGps;
+      }
+      if (matchedCountry != null) {
+        _selectedCountryCode = matchedCountry!;
+      }
+      final savedStep = draft['step'];
+      if (savedStep is int) {
+        _currentStep = savedStep.clamp(0, 3);
+      } else if (savedStep is num) {
+        _currentStep = savedStep.toInt().clamp(0, 3);
+      }
+    });
+  }
+
+  void _goToStep(int step) {
+    setState(() => _currentStep = step.clamp(0, 3));
+    _persistDraft(step: _currentStep);
   }
 
   String? _serverPingError;
@@ -154,32 +250,130 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
-  Future<String> _getCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return 'Location disabled';
+  bool _isValidDeviceId(String? id) {
+    final clean = (id ?? '').trim().toUpperCase();
+    if (clean.isEmpty || clean == 'UNKNOWN') return false;
+    return clean.length >= 4;
+  }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+  bool _isValidGps(String? location) {
+    final value = (location ?? '').trim();
+    return RegExp(r'Lat:\s*-?\d+(\.\d+)?,\s*Lng:\s*-?\d+(\.\d+)?').hasMatch(value);
+  }
+
+  void _showTelemetryError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  /// Blocks until this tablet has a real device ID and a live GPS fix.
+  Future<bool> _ensureDeviceTelemetry({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _isValidDeviceId(_capturedDeviceId) &&
+        _isValidGps(_capturedGpsLocation)) {
+      return true;
+    }
+    if (_isCapturingTelemetry) return false;
+
+    setState(() => _isCapturingTelemetry = true);
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (!_isValidDeviceId(deviceId)) {
+        _showTelemetryError(
+          'Could not read this device ID. Close other apps and try again.',
+        );
+        return false;
+      }
+
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showTelemetryError(
+          'Turn on GPS / location services, then tap Next again.',
+        );
+        await Geolocator.openLocationSettings();
+        return false;
+      }
+
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return 'Permissions denied';
       }
-      if (permission == LocationPermission.deniedForever) return 'Permissions denied forever';
+      if (permission == LocationPermission.denied) {
+        _showTelemetryError(
+          'Location permission is required before you can continue.',
+        );
+        return false;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _showTelemetryError(
+          'Location is blocked for Invify. Enable it in Settings, then try again.',
+        );
+        await Geolocator.openAppSettings();
+        return false;
+      }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      );
-      return 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+      late Position position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(const Duration(seconds: 20));
+      } on TimeoutException {
+        _showTelemetryError(
+          'Could not get a GPS fix. Move outdoors or near a window, then try again.',
+        );
+        return false;
+      }
+
+      final gps =
+          'Lat: ${position.latitude.toStringAsFixed(6)}, Lng: ${position.longitude.toStringAsFixed(6)}';
+      if (!_isValidGps(gps)) {
+        _showTelemetryError('GPS returned an invalid location. Please try again.');
+        return false;
+      }
+
+      if (!mounted) return false;
+      setState(() {
+        _capturedDeviceId = deviceId;
+        _capturedGpsLocation = gps;
+      });
+      await _persistDraft();
+      return true;
     } catch (e) {
-      return 'Unknown Location';
+      _showTelemetryError(
+        'Could not capture GPS and device ID. Enable location and try again.',
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _isCapturingTelemetry = false);
     }
   }
 
+  Future<String> _getCurrentLocation() async {
+    final ok = await _ensureDeviceTelemetry(forceRefresh: true);
+    return ok ? (_capturedGpsLocation ?? 'Unknown Location') : 'Unknown Location';
+  }
+
   Future<void> _submitOnboarding({required bool isTrial}) async {
-    if (_isLoading) return;
+    if (_isLoading || _isCapturingTelemetry) return;
 
     if (!_formKey.currentState!.validate()) {
       setState(() => _currentStep = 1);
+      return;
+    }
+
+    final telemetryReady = await _ensureDeviceTelemetry();
+    if (!telemetryReady || !mounted) return;
+    if (!_isValidDeviceId(_capturedDeviceId) || !_isValidGps(_capturedGpsLocation)) {
+      _showTelemetryError(
+        'Device ID and GPS are required before you can continue.',
+      );
       return;
     }
 
@@ -199,27 +393,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         debugPrint('Failed to fetch onboarding settings, using default channels.');
       }
 
-      // ── Collect Device ID and GPS Location before registration ──
-      final deviceId = await DeviceInfoService.getDeviceSuffix();
-      
-      // Use getLastKnownPosition or timeout getCurrentPosition to avoid 5+ second GPS hangs indoors
-      String gpsLocation = 'Unknown Location';
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-            Position? position = await Geolocator.getLastKnownPosition();
-            position ??= await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.medium,
-            ).timeout(const Duration(seconds: 2));
-            
-            gpsLocation = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
-          }
-        }
-      } catch (e) {
-        debugPrint('Geolocator timeout or error: $e');
-      }
+      final deviceId = _capturedDeviceId!;
+      final gpsLocation = _capturedGpsLocation!;
 
       // Format phone number with country dial code
       String nationalPhone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
@@ -250,7 +425,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       };
 
       if (mounted) {
+        await _persistDraft(step: 1);
         await OnboardingNavigator.proceed(context, payload, requiredChannels);
+        if (mounted) {
+          await _restoreDraft();
+          setState(() => _currentStep = 1);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -281,7 +461,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             if (_currentStep > 0) {
-              setState(() => _currentStep--);
+              _goToStep(_currentStep - 1);
             } else {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
@@ -565,6 +745,65 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ),
         const SizedBox(height: 32),
         Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101625),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: (_isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFF59E0B))
+                  .withOpacity(0.35),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                        ? Icons.verified
+                        : Icons.gps_not_fixed,
+                    color: _isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Device telemetry',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Device ID: ${_capturedDeviceId ?? 'Not captured yet'}',
+                style: TextStyle(color: Colors.grey[300], fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'GPS: ${_capturedGpsLocation ?? 'Not captured yet'}',
+                style: TextStyle(color: Colors.grey[300], fontSize: 12),
+              ),
+              if (!_isValidDeviceId(_capturedDeviceId) || !_isValidGps(_capturedGpsLocation)) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'GPS and device ID must be captured before you can submit.',
+                  style: TextStyle(color: Colors.orange[200], fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFF101625),
@@ -604,6 +843,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       style: const TextStyle(color: Colors.white),
       obscureText: obscure,
       keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
+      inputFormatters: isPhone ? PhoneNumberInput.formatters : null,
+      maxLength: isPhone ? PhoneNumberInput.maxDigits : null,
       decoration: InputDecoration(
         labelText: label,
         helperText: helperText,
@@ -723,10 +964,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       controller: _phoneController,
       style: const TextStyle(color: Colors.white),
       keyboardType: TextInputType.phone,
+      inputFormatters: PhoneNumberInput.formatters,
+      maxLength: PhoneNumberInput.maxDigits,
       decoration: InputDecoration(
         labelText: 'WhatsApp Contact',
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
-        helperText: 'Max 14 digits (West Africa regional code included)',
+        helperText: 'Max ${PhoneNumberInput.maxDigits} digits',
         helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
         prefixIcon: InkWell(
           onTap: _showCountryPickerBottomSheet,
@@ -775,11 +1018,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       validator: (value) {
         if (value == null || value.trim().isEmpty) return 'WhatsApp contact is required';
         final clean = value.trim().replaceAll(RegExp(r'\D'), '');
-        
-        // 1. Length check: must not exceed 14 digits
-        final fullDigits = '${_selectedCountryCode.dialCode.replaceAll('+', '')}$clean';
-        if (clean.length > 14 || fullDigits.length > 14) {
-          return 'Phone number cannot exceed 14 digits';
+        if (clean.length > PhoneNumberInput.maxDigits) {
+          return 'Phone number cannot exceed ${PhoneNumberInput.maxDigits} digits';
         }
         if (clean.length < _selectedCountryCode.minLength) {
           return 'Enter a valid ${_selectedCountryCode.name} number (min ${_selectedCountryCode.minLength} digits)';
@@ -987,7 +1227,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  setState(() => _currentStep++);
+                  _goToStep(_currentStep + 1);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6366F1),
@@ -1020,11 +1260,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (_currentStep > 0)
-            TextButton(onPressed: () => setState(() => _currentStep--), child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
+            TextButton(onPressed: () => _goToStep(_currentStep - 1), child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
           else
             const SizedBox.shrink(),
           ElevatedButton(
-            onPressed: () {
+            onPressed: _isCapturingTelemetry
+                ? null
+                : () async {
               if (_currentStep == 1 && !_formKey.currentState!.validate()) return;
               if (_currentStep == 2) {
                  if (_streetController.text.trim().isEmpty) {
@@ -1050,11 +1292,18 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                         return;
                      }
                  }
+                 final ready = await _ensureDeviceTelemetry();
+                 if (!ready || !mounted) return;
               }
-              setState(() => _currentStep++);
+              _goToStep(_currentStep + 1);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
-            child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            child: Text(
+              _isCapturingTelemetry && _currentStep == 2
+                  ? 'GETTING GPS & DEVICE ID…'
+                  : 'NEXT STEP',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       );
@@ -1066,9 +1315,16 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: () => _submitOnboarding(isTrial: false),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('ONBOARD & ACTIVATE DEVICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: (_isLoading || _isCapturingTelemetry)
+                ? null
+                : () => _submitOnboarding(isTrial: false),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: Text(
+              _isCapturingTelemetry
+                  ? 'GETTING GPS & DEVICE ID…'
+                  : 'ONBOARD & ACTIVATE DEVICE',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -1076,14 +1332,21 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           width: double.infinity,
           height: 50,
           child: OutlinedButton(
-            onPressed: () => _submitOnboarding(isTrial: true),
+            onPressed: (_isLoading || _isCapturingTelemetry)
+                ? null
+                : () => _submitOnboarding(isTrial: true),
             style: OutlinedButton.styleFrom(side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)), foregroundColor: const Color(0xFF10B981), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('START FREE 3-DAY TRIAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            child: Text(
+              _isCapturingTelemetry
+                  ? 'GETTING GPS & DEVICE ID…'
+                  : 'START FREE 3-DAY TRIAL',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
         ),
         const SizedBox(height: 16),
         Center(
-          child: TextButton(onPressed: () => setState(() => _currentStep = 2), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+          child: TextButton(onPressed: () => _goToStep(2), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
         ),
       ],
     );

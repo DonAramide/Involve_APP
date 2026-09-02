@@ -17,7 +17,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       if (result == null) {
         return const AppSettings(
           organizationName: 'My Business',
-          address: '123 Street',
+          address: '',
           phone: '000-000',
           currency: '₦',
         );
@@ -25,10 +25,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
       final bSettings = await db.select(db.businessSettings).getSingleOrNull();
       final entity = _toEntity(result, bSettings?.businessMode ?? 'retail');
       // Auto-normalize legacy currency
-      if (entity.currency == 'NGN') {
-        return entity.copyWith(currency: '₦');
+      var normalized = entity;
+      if (normalized.currency == 'NGN') {
+        normalized = normalized.copyWith(currency: '₦');
       }
-      return entity;
+      if (AppSettings.isPlaceholderAddress(normalized.address) &&
+          normalized.address.isNotEmpty) {
+        normalized = normalized.copyWith(address: '');
+      }
+      return normalized;
     } catch (e) {
       // Handle "Row too big" or other DB errors gracefully
       // by returning default settings. This allows the user

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,7 +10,8 @@ import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
 import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
-import '../../domain/entities/service_material.dart';
+import '../utils/create_job_draft_store.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
@@ -33,7 +36,11 @@ class _CreateJobPageState extends State<CreateJobPage> {
 
   List<String> _jobTitlePresets = [];
   bool _showDetailedBilling = false;
+  bool _projectPhotoExpanded = false;
   final List<ServiceJobItem> _selectedItems = [];
+  Key _titleFieldKey = UniqueKey();
+  Timer? _draftSaveTimer;
+  bool _draftReady = false;
 
   @override
   void initState() {
@@ -41,13 +48,23 @@ class _CreateJobPageState extends State<CreateJobPage> {
     context.read<ServicesBloc>().add(const SearchServiceCustomers());
     context.read<ServicesBloc>().add(const LoadServicePresets());
     context.read<ServicesBloc>().add(const LoadLaborPresets());
+    _titleController.addListener(_scheduleDraftSave);
+    _descController.addListener(_scheduleDraftSave);
+    _amountController.addListener(_scheduleDraftSave);
+    _laborAmountController.addListener(_scheduleDraftSave);
+    _restoreDraft();
   }
 
   @override
   void dispose() {
+    _draftSaveTimer?.cancel();
+    if (_draftReady && _hasUnsavedJobData()) {
+      unawaited(CreateJobDraftStore.save(_draftMap()));
+    }
     _titleController.dispose();
     _descController.dispose();
     _amountController.dispose();
+    _laborAmountController.dispose();
     super.dispose();
   }
 
@@ -85,9 +102,168 @@ class _CreateJobPageState extends State<CreateJobPage> {
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
-        setState(() => _imageBytes = bytes);
+        setState(() {
+          _imageBytes = bytes;
+          _projectPhotoExpanded = true;
+        });
+        _scheduleDraftSave();
       }
     }
+  }
+
+  bool _hasUnsavedJobData() {
+    return _selectedCustomerId != null ||
+        _titleController.text.trim().isNotEmpty ||
+        _descController.text.trim().isNotEmpty ||
+        _amountController.text.trim().isNotEmpty ||
+        _laborAmountController.text.trim().isNotEmpty ||
+        _dueDate != null ||
+        _imageBytes != null ||
+        _warrantyDuration != null ||
+        _showDetailedBilling ||
+        _selectedItems.isNotEmpty;
+  }
+
+  Map<String, dynamic> _draftMap() {
+    return {
+      'customerId': _selectedCustomerId,
+      'customerName': _selectedCustomerName,
+      'title': _titleController.text,
+      'description': _descController.text,
+      'amount': _amountController.text,
+      'laborAmount': _laborAmountController.text,
+      'dueDate': _dueDate?.toIso8601String(),
+      'warrantyDuration': _warrantyDuration,
+      'showDetailedBilling': _showDetailedBilling,
+      'projectPhotoExpanded': _projectPhotoExpanded,
+      'imageBase64': _imageBytes == null ? null : base64Encode(_imageBytes!),
+      'items': _selectedItems
+          .map((i) => {
+                'id': i.id,
+                'name': i.name,
+                'category': i.category,
+                'price': i.price,
+                'quantity': i.quantity,
+              })
+          .toList(),
+    };
+  }
+
+  Future<void> _restoreDraft() async {
+    final draft = await CreateJobDraftStore.load();
+    if (!mounted) return;
+    if (draft == null) {
+      _draftReady = true;
+      return;
+    }
+
+    Uint8List? image;
+    final rawImage = draft['imageBase64'] as String?;
+    if (rawImage != null && rawImage.isNotEmpty) {
+      try {
+        image = base64Decode(rawImage);
+      } catch (_) {}
+    }
+
+    DateTime? due;
+    final rawDue = draft['dueDate'] as String?;
+    if (rawDue != null && rawDue.isNotEmpty) {
+      due = DateTime.tryParse(rawDue);
+    }
+
+    final items = <ServiceJobItem>[];
+    final rawItems = draft['items'];
+    if (rawItems is List) {
+      for (final row in rawItems) {
+        if (row is! Map) continue;
+        items.add(ServiceJobItem(
+          id: (row['id'] as num?)?.toInt(),
+          name: (row['name'] as String?) ?? '',
+          category: row['category'] as String?,
+          price: (row['price'] as num?)?.toDouble() ?? 0,
+          quantity: (row['quantity'] as num?)?.toDouble() ?? 1,
+        ));
+      }
+    }
+
+    setState(() {
+      _selectedCustomerId = draft['customerId'] as String?;
+      _selectedCustomerName = draft['customerName'] as String?;
+      _titleController.text = (draft['title'] as String?) ?? '';
+      _descController.text = (draft['description'] as String?) ?? '';
+      _amountController.text = (draft['amount'] as String?) ?? '';
+      _laborAmountController.text = (draft['laborAmount'] as String?) ?? '';
+      _dueDate = due;
+      _imageBytes = image;
+      _warrantyDuration = draft['warrantyDuration'] as String?;
+      _showDetailedBilling = draft['showDetailedBilling'] == true;
+      _projectPhotoExpanded = draft['projectPhotoExpanded'] == true || image != null;
+      _selectedItems
+        ..clear()
+        ..addAll(items);
+      _titleFieldKey = UniqueKey();
+      _draftReady = true;
+    });
+  }
+
+  void _scheduleDraftSave() {
+    if (!_draftReady) return;
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(milliseconds: 400), () {
+      if (!_draftReady) return;
+      if (_hasUnsavedJobData()) {
+        unawaited(CreateJobDraftStore.save(_draftMap()));
+      } else {
+        unawaited(CreateJobDraftStore.clear());
+      }
+    });
+  }
+
+  Future<void> _confirmClearDraft() async {
+    if (!_hasUnsavedJobData()) {
+      await CreateJobDraftStore.clear();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear this job?'),
+        content: const Text(
+          'This removes the saved draft and all fields on this page. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _clearForm();
+  }
+
+  Future<void> _clearForm() async {
+    _draftReady = false;
+    await CreateJobDraftStore.clear();
+    if (!mounted) return;
+    setState(() {
+      _selectedCustomerId = null;
+      _selectedCustomerName = null;
+      _titleController.clear();
+      _descController.clear();
+      _amountController.clear();
+      _laborAmountController.clear();
+      _dueDate = null;
+      _imageBytes = null;
+      _warrantyDuration = null;
+      _showDetailedBilling = false;
+      _projectPhotoExpanded = false;
+      _selectedItems.clear();
+      _titleFieldKey = UniqueKey();
+      _draftReady = true;
+    });
   }
 
   @override
@@ -106,11 +282,21 @@ class _CreateJobPageState extends State<CreateJobPage> {
               _selectedCustomerId = last.id;
               _selectedCustomerName = last.name;
             });
+            _scheduleDraftSave();
           }
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Create New Job')),
+        appBar: AppBar(
+          title: const Text('Create New Job'),
+          actions: [
+            IconButton(
+              tooltip: 'Clear form',
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: _confirmClearDraft,
+            ),
+          ],
+        ),
         body: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -121,44 +307,83 @@ class _CreateJobPageState extends State<CreateJobPage> {
                 _buildCustomerSelector(),
                 const SizedBox(height: 24),
                 
-                // Project Image Section
-                const Text('Project Photos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Center(
-                  child: GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 150,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[300]!, width: 2),
-                        image: _imageBytes != null 
-                            ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
-                            : null,
-                      ),
-                      child: _imageBytes == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo_outlined, size: 40, color: Theme.of(context).primaryColor),
-                                const SizedBox(height: 8),
-                                const Text('Add Job/Expected Image', style: TextStyle(color: Colors.grey)),
-                              ],
-                            )
-                          : Container(
-                              alignment: Alignment.bottomRight,
-                              padding: const EdgeInsets.all(8),
-                              child: CircleAvatar(
-                                backgroundColor: Colors.black54,
-                                child: IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.white, size: 20),
-                                  onPressed: _pickImage,
-                                ),
+                // Project Image Section — optional; collapsed for hotel rooms and similar jobs
+                Card(
+                  margin: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                          backgroundImage: _imageBytes != null ? MemoryImage(_imageBytes!) : null,
+                          child: _imageBytes == null
+                              ? Icon(Icons.add_a_photo_outlined, color: Theme.of(context).primaryColor)
+                              : null,
+                        ),
+                        title: const Text('Project Photo', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          _imageBytes != null
+                              ? 'Photo attached. Tap to view or change.'
+                              : 'Optional. Skip for hotel rooms or when a photo cannot be taken.',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_imageBytes != null)
+                              IconButton(
+                                tooltip: 'Remove photo',
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() => _imageBytes = null);
+                                  _scheduleDraftSave();
+                                },
                               ),
+                            Icon(_projectPhotoExpanded ? Icons.expand_less : Icons.expand_more),
+                          ],
+                        ),
+                        onTap: () => setState(() => _projectPhotoExpanded = !_projectPhotoExpanded),
+                      ),
+                      if (_projectPhotoExpanded)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
+                              height: 150,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey[300]!, width: 2),
+                                image: _imageBytes != null
+                                    ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
+                                    : null,
+                              ),
+                              child: _imageBytes == null
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.add_a_photo_outlined, size: 40, color: Theme.of(context).primaryColor),
+                                        const SizedBox(height: 8),
+                                        const Text('Add Job / Expected Image', style: TextStyle(color: Colors.grey)),
+                                      ],
+                                    )
+                                  : Container(
+                                      alignment: Alignment.bottomRight,
+                                      padding: const EdgeInsets.all(8),
+                                      child: CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                                          onPressed: _pickImage,
+                                        ),
+                                      ),
+                                    ),
                             ),
-                    ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -172,6 +397,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
                     _jobTitlePresets = state.presets;
 
                     return Autocomplete<String>(
+                      key: _titleFieldKey,
+                      initialValue: TextEditingValue(text: _titleController.text),
                       optionsBuilder: (TextEditingValue textEditingValue) {
                         if (textEditingValue.text == '') return _jobTitlePresets;
                         return _jobTitlePresets.where((String option) {
@@ -239,6 +466,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         _amountController.text = _calculateTotal().toStringAsFixed(2);
                       }
                     });
+                    _scheduleDraftSave();
                   },
                 ),
                 if (!_showDetailedBilling)
@@ -324,6 +552,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                                   _selectedItems.removeWhere((i) => i.id == item.id);
                                   _updateTotal();
                                 });
+                                _scheduleDraftSave();
                               },
                             ),
                           ),
@@ -366,6 +595,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         .toList(),
                     onChanged: (val) {
                       setState(() => _warrantyDuration = val);
+                      _scheduleDraftSave();
                     },
                   ),
                 ],
@@ -435,7 +665,10 @@ class _CreateJobPageState extends State<CreateJobPage> {
           firstDate: DateTime.now(),
           lastDate: DateTime.now().add(const Duration(days: 365)),
         );
-        if (date != null) setState(() => _dueDate = date);
+        if (date != null) {
+          setState(() => _dueDate = date);
+          _scheduleDraftSave();
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -500,6 +733,13 @@ class _CreateJobPageState extends State<CreateJobPage> {
                           initiallyExpanded: true,
                           title: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                           children: items.map((m) => ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                              backgroundImage: m.image != null ? MemoryImage(m.image!) : null,
+                              child: m.image == null
+                                  ? const Icon(Icons.build_outlined, color: Colors.blue, size: 20)
+                                  : null,
+                            ),
                             title: Text(m.name),
                             subtitle: Text('Default: ₦${m.defaultPrice}'),
                             trailing: const Icon(Icons.add_circle_outline),
@@ -510,6 +750,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                                   _selectedItems.add(result);
                                   _updateTotal();
                                 });
+                                _scheduleDraftSave();
                                 Navigator.pop(context);
                               }
                             },
@@ -595,6 +836,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
             _selectedCustomerId = customer.id;
             _selectedCustomerName = customer.name;
           });
+          _scheduleDraftSave();
           Navigator.pop(context);
         },
       ),
@@ -622,6 +864,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
             image: _imageBytes,
             warrantyDuration: _warrantyDuration,
           ));
+      _draftReady = false;
+      unawaited(CreateJobDraftStore.clear());
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Job saved locally.')),
@@ -754,6 +998,8 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: const OutlineInputBorder(),

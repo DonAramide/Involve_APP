@@ -8658,6 +8658,30 @@ class $StockIncrementsTable extends StockIncrements
   late final GeneratedColumn<String> remarks = GeneratedColumn<String>(
       'remarks', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _supplierNameMeta =
+      const VerificationMeta('supplierName');
+  @override
+  late final GeneratedColumn<String> supplierName = GeneratedColumn<String>(
+      'supplier_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _receiptNumberMeta =
+      const VerificationMeta('receiptNumber');
+  @override
+  late final GeneratedColumn<String> receiptNumber = GeneratedColumn<String>(
+      'receipt_number', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _trackingNumberMeta =
+      const VerificationMeta('trackingNumber');
+  @override
+  late final GeneratedColumn<String> trackingNumber = GeneratedColumn<String>(
+      'tracking_number', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _receiptImageMeta =
+      const VerificationMeta('receiptImage');
+  @override
+  late final GeneratedColumn<Uint8List> receiptImage =
+      GeneratedColumn<Uint8List>('receipt_image', aliasedName, true,
+          type: DriftSqlType.blob, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -8700,6 +8724,10 @@ class $StockIncrementsTable extends StockIncrements
         quantityAfter,
         dateAdded,
         remarks,
+        supplierName,
+        receiptNumber,
+        trackingNumber,
+        receiptImage,
         syncId,
         updatedAt,
         createdAt,
@@ -8754,6 +8782,30 @@ class $StockIncrementsTable extends StockIncrements
       context.handle(_remarksMeta,
           remarks.isAcceptableOrUnknown(data['remarks']!, _remarksMeta));
     }
+    if (data.containsKey('supplier_name')) {
+      context.handle(
+          _supplierNameMeta,
+          supplierName.isAcceptableOrUnknown(
+              data['supplier_name']!, _supplierNameMeta));
+    }
+    if (data.containsKey('receipt_number')) {
+      context.handle(
+          _receiptNumberMeta,
+          receiptNumber.isAcceptableOrUnknown(
+              data['receipt_number']!, _receiptNumberMeta));
+    }
+    if (data.containsKey('tracking_number')) {
+      context.handle(
+          _trackingNumberMeta,
+          trackingNumber.isAcceptableOrUnknown(
+              data['tracking_number']!, _trackingNumberMeta));
+    }
+    if (data.containsKey('receipt_image')) {
+      context.handle(
+          _receiptImageMeta,
+          receiptImage.isAcceptableOrUnknown(
+              data['receipt_image']!, _receiptImageMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -8797,6 +8849,14 @@ class $StockIncrementsTable extends StockIncrements
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_added'])!,
       remarks: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}remarks']),
+      supplierName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}supplier_name']),
+      receiptNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}receipt_number']),
+      trackingNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tracking_number']),
+      receiptImage: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}receipt_image']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -8825,6 +8885,10 @@ class StockIncrementTable extends DataClass
   final int quantityAfter;
   final DateTime dateAdded;
   final String? remarks;
+  final String? supplierName;
+  final String? receiptNumber;
+  final String? trackingNumber;
+  final Uint8List? receiptImage;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -8838,6 +8902,10 @@ class StockIncrementTable extends DataClass
       required this.quantityAfter,
       required this.dateAdded,
       this.remarks,
+      this.supplierName,
+      this.receiptNumber,
+      this.trackingNumber,
+      this.receiptImage,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -8854,6 +8922,18 @@ class StockIncrementTable extends DataClass
     map['date_added'] = Variable<DateTime>(dateAdded);
     if (!nullToAbsent || remarks != null) {
       map['remarks'] = Variable<String>(remarks);
+    }
+    if (!nullToAbsent || supplierName != null) {
+      map['supplier_name'] = Variable<String>(supplierName);
+    }
+    if (!nullToAbsent || receiptNumber != null) {
+      map['receipt_number'] = Variable<String>(receiptNumber);
+    }
+    if (!nullToAbsent || trackingNumber != null) {
+      map['tracking_number'] = Variable<String>(trackingNumber);
+    }
+    if (!nullToAbsent || receiptImage != null) {
+      map['receipt_image'] = Variable<Uint8List>(receiptImage);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -8882,6 +8962,18 @@ class StockIncrementTable extends DataClass
       remarks: remarks == null && nullToAbsent
           ? const Value.absent()
           : Value(remarks),
+      supplierName: supplierName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplierName),
+      receiptNumber: receiptNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptNumber),
+      trackingNumber: trackingNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trackingNumber),
+      receiptImage: receiptImage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptImage),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -8908,6 +9000,10 @@ class StockIncrementTable extends DataClass
       quantityAfter: serializer.fromJson<int>(json['quantityAfter']),
       dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
       remarks: serializer.fromJson<String?>(json['remarks']),
+      supplierName: serializer.fromJson<String?>(json['supplierName']),
+      receiptNumber: serializer.fromJson<String?>(json['receiptNumber']),
+      trackingNumber: serializer.fromJson<String?>(json['trackingNumber']),
+      receiptImage: serializer.fromJson<Uint8List?>(json['receiptImage']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -8926,6 +9022,10 @@ class StockIncrementTable extends DataClass
       'quantityAfter': serializer.toJson<int>(quantityAfter),
       'dateAdded': serializer.toJson<DateTime>(dateAdded),
       'remarks': serializer.toJson<String?>(remarks),
+      'supplierName': serializer.toJson<String?>(supplierName),
+      'receiptNumber': serializer.toJson<String?>(receiptNumber),
+      'trackingNumber': serializer.toJson<String?>(trackingNumber),
+      'receiptImage': serializer.toJson<Uint8List?>(receiptImage),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -8942,6 +9042,10 @@ class StockIncrementTable extends DataClass
           int? quantityAfter,
           DateTime? dateAdded,
           Value<String?> remarks = const Value.absent(),
+          Value<String?> supplierName = const Value.absent(),
+          Value<String?> receiptNumber = const Value.absent(),
+          Value<String?> trackingNumber = const Value.absent(),
+          Value<Uint8List?> receiptImage = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -8955,6 +9059,14 @@ class StockIncrementTable extends DataClass
         quantityAfter: quantityAfter ?? this.quantityAfter,
         dateAdded: dateAdded ?? this.dateAdded,
         remarks: remarks.present ? remarks.value : this.remarks,
+        supplierName:
+            supplierName.present ? supplierName.value : this.supplierName,
+        receiptNumber:
+            receiptNumber.present ? receiptNumber.value : this.receiptNumber,
+        trackingNumber:
+            trackingNumber.present ? trackingNumber.value : this.trackingNumber,
+        receiptImage:
+            receiptImage.present ? receiptImage.value : this.receiptImage,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -8976,6 +9088,18 @@ class StockIncrementTable extends DataClass
           : this.quantityAfter,
       dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
       remarks: data.remarks.present ? data.remarks.value : this.remarks,
+      supplierName: data.supplierName.present
+          ? data.supplierName.value
+          : this.supplierName,
+      receiptNumber: data.receiptNumber.present
+          ? data.receiptNumber.value
+          : this.receiptNumber,
+      trackingNumber: data.trackingNumber.present
+          ? data.trackingNumber.value
+          : this.trackingNumber,
+      receiptImage: data.receiptImage.present
+          ? data.receiptImage.value
+          : this.receiptImage,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -8994,6 +9118,10 @@ class StockIncrementTable extends DataClass
           ..write('quantityAfter: $quantityAfter, ')
           ..write('dateAdded: $dateAdded, ')
           ..write('remarks: $remarks, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('trackingNumber: $trackingNumber, ')
+          ..write('receiptImage: $receiptImage, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -9012,6 +9140,10 @@ class StockIncrementTable extends DataClass
       quantityAfter,
       dateAdded,
       remarks,
+      supplierName,
+      receiptNumber,
+      trackingNumber,
+      $driftBlobEquality.hash(receiptImage),
       syncId,
       updatedAt,
       createdAt,
@@ -9028,6 +9160,10 @@ class StockIncrementTable extends DataClass
           other.quantityAfter == this.quantityAfter &&
           other.dateAdded == this.dateAdded &&
           other.remarks == this.remarks &&
+          other.supplierName == this.supplierName &&
+          other.receiptNumber == this.receiptNumber &&
+          other.trackingNumber == this.trackingNumber &&
+          $driftBlobEquality.equals(other.receiptImage, this.receiptImage) &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -9043,6 +9179,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
   final Value<int> quantityAfter;
   final Value<DateTime> dateAdded;
   final Value<String?> remarks;
+  final Value<String?> supplierName;
+  final Value<String?> receiptNumber;
+  final Value<String?> trackingNumber;
+  final Value<Uint8List?> receiptImage;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -9056,6 +9196,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     this.quantityAfter = const Value.absent(),
     this.dateAdded = const Value.absent(),
     this.remarks = const Value.absent(),
+    this.supplierName = const Value.absent(),
+    this.receiptNumber = const Value.absent(),
+    this.trackingNumber = const Value.absent(),
+    this.receiptImage = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -9070,6 +9214,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     this.quantityAfter = const Value.absent(),
     this.dateAdded = const Value.absent(),
     this.remarks = const Value.absent(),
+    this.supplierName = const Value.absent(),
+    this.receiptNumber = const Value.absent(),
+    this.trackingNumber = const Value.absent(),
+    this.receiptImage = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -9085,6 +9233,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     Expression<int>? quantityAfter,
     Expression<DateTime>? dateAdded,
     Expression<String>? remarks,
+    Expression<String>? supplierName,
+    Expression<String>? receiptNumber,
+    Expression<String>? trackingNumber,
+    Expression<Uint8List>? receiptImage,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -9099,6 +9251,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       if (quantityAfter != null) 'quantity_after': quantityAfter,
       if (dateAdded != null) 'date_added': dateAdded,
       if (remarks != null) 'remarks': remarks,
+      if (supplierName != null) 'supplier_name': supplierName,
+      if (receiptNumber != null) 'receipt_number': receiptNumber,
+      if (trackingNumber != null) 'tracking_number': trackingNumber,
+      if (receiptImage != null) 'receipt_image': receiptImage,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -9115,6 +9271,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       Value<int>? quantityAfter,
       Value<DateTime>? dateAdded,
       Value<String?>? remarks,
+      Value<String?>? supplierName,
+      Value<String?>? receiptNumber,
+      Value<String?>? trackingNumber,
+      Value<Uint8List?>? receiptImage,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -9128,6 +9288,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       quantityAfter: quantityAfter ?? this.quantityAfter,
       dateAdded: dateAdded ?? this.dateAdded,
       remarks: remarks ?? this.remarks,
+      supplierName: supplierName ?? this.supplierName,
+      receiptNumber: receiptNumber ?? this.receiptNumber,
+      trackingNumber: trackingNumber ?? this.trackingNumber,
+      receiptImage: receiptImage ?? this.receiptImage,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -9160,6 +9324,18 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     if (remarks.present) {
       map['remarks'] = Variable<String>(remarks.value);
     }
+    if (supplierName.present) {
+      map['supplier_name'] = Variable<String>(supplierName.value);
+    }
+    if (receiptNumber.present) {
+      map['receipt_number'] = Variable<String>(receiptNumber.value);
+    }
+    if (trackingNumber.present) {
+      map['tracking_number'] = Variable<String>(trackingNumber.value);
+    }
+    if (receiptImage.present) {
+      map['receipt_image'] = Variable<Uint8List>(receiptImage.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -9188,6 +9364,10 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
           ..write('quantityAfter: $quantityAfter, ')
           ..write('dateAdded: $dateAdded, ')
           ..write('remarks: $remarks, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('trackingNumber: $trackingNumber, ')
+          ..write('receiptImage: $receiptImage, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -17422,8 +17602,14 @@ class $ServiceMaterialsTable extends ServiceMaterials
   late final GeneratedColumn<double> defaultPrice = GeneratedColumn<double>(
       'default_price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _imageMeta = const VerificationMeta('image');
   @override
-  List<GeneratedColumn> get $columns => [id, category, name, defaultPrice];
+  late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
+      'image', aliasedName, true,
+      type: DriftSqlType.blob, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, category, name, defaultPrice, image];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -17458,6 +17644,10 @@ class $ServiceMaterialsTable extends ServiceMaterials
     } else if (isInserting) {
       context.missing(_defaultPriceMeta);
     }
+    if (data.containsKey('image')) {
+      context.handle(
+          _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
+    }
     return context;
   }
 
@@ -17475,6 +17665,8 @@ class $ServiceMaterialsTable extends ServiceMaterials
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       defaultPrice: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}default_price'])!,
+      image: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}image']),
     );
   }
 
@@ -17490,11 +17682,13 @@ class ServiceMaterialTable extends DataClass
   final String category;
   final String name;
   final double defaultPrice;
+  final Uint8List? image;
   const ServiceMaterialTable(
       {required this.id,
       required this.category,
       required this.name,
-      required this.defaultPrice});
+      required this.defaultPrice,
+      this.image});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -17502,6 +17696,9 @@ class ServiceMaterialTable extends DataClass
     map['category'] = Variable<String>(category);
     map['name'] = Variable<String>(name);
     map['default_price'] = Variable<double>(defaultPrice);
+    if (!nullToAbsent || image != null) {
+      map['image'] = Variable<Uint8List>(image);
+    }
     return map;
   }
 
@@ -17511,6 +17708,8 @@ class ServiceMaterialTable extends DataClass
       category: Value(category),
       name: Value(name),
       defaultPrice: Value(defaultPrice),
+      image:
+          image == null && nullToAbsent ? const Value.absent() : Value(image),
     );
   }
 
@@ -17522,6 +17721,7 @@ class ServiceMaterialTable extends DataClass
       category: serializer.fromJson<String>(json['category']),
       name: serializer.fromJson<String>(json['name']),
       defaultPrice: serializer.fromJson<double>(json['defaultPrice']),
+      image: serializer.fromJson<Uint8List?>(json['image']),
     );
   }
   @override
@@ -17532,16 +17732,22 @@ class ServiceMaterialTable extends DataClass
       'category': serializer.toJson<String>(category),
       'name': serializer.toJson<String>(name),
       'defaultPrice': serializer.toJson<double>(defaultPrice),
+      'image': serializer.toJson<Uint8List?>(image),
     };
   }
 
   ServiceMaterialTable copyWith(
-          {int? id, String? category, String? name, double? defaultPrice}) =>
+          {int? id,
+          String? category,
+          String? name,
+          double? defaultPrice,
+          Value<Uint8List?> image = const Value.absent()}) =>
       ServiceMaterialTable(
         id: id ?? this.id,
         category: category ?? this.category,
         name: name ?? this.name,
         defaultPrice: defaultPrice ?? this.defaultPrice,
+        image: image.present ? image.value : this.image,
       );
   ServiceMaterialTable copyWithCompanion(ServiceMaterialsCompanion data) {
     return ServiceMaterialTable(
@@ -17551,6 +17757,7 @@ class ServiceMaterialTable extends DataClass
       defaultPrice: data.defaultPrice.present
           ? data.defaultPrice.value
           : this.defaultPrice,
+      image: data.image.present ? data.image.value : this.image,
     );
   }
 
@@ -17560,13 +17767,15 @@ class ServiceMaterialTable extends DataClass
           ..write('id: $id, ')
           ..write('category: $category, ')
           ..write('name: $name, ')
-          ..write('defaultPrice: $defaultPrice')
+          ..write('defaultPrice: $defaultPrice, ')
+          ..write('image: $image')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, category, name, defaultPrice);
+  int get hashCode => Object.hash(
+      id, category, name, defaultPrice, $driftBlobEquality.hash(image));
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -17574,7 +17783,8 @@ class ServiceMaterialTable extends DataClass
           other.id == this.id &&
           other.category == this.category &&
           other.name == this.name &&
-          other.defaultPrice == this.defaultPrice);
+          other.defaultPrice == this.defaultPrice &&
+          $driftBlobEquality.equals(other.image, this.image));
 }
 
 class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
@@ -17582,17 +17792,20 @@ class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
   final Value<String> category;
   final Value<String> name;
   final Value<double> defaultPrice;
+  final Value<Uint8List?> image;
   const ServiceMaterialsCompanion({
     this.id = const Value.absent(),
     this.category = const Value.absent(),
     this.name = const Value.absent(),
     this.defaultPrice = const Value.absent(),
+    this.image = const Value.absent(),
   });
   ServiceMaterialsCompanion.insert({
     this.id = const Value.absent(),
     required String category,
     required String name,
     required double defaultPrice,
+    this.image = const Value.absent(),
   })  : category = Value(category),
         name = Value(name),
         defaultPrice = Value(defaultPrice);
@@ -17601,12 +17814,14 @@ class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
     Expression<String>? category,
     Expression<String>? name,
     Expression<double>? defaultPrice,
+    Expression<Uint8List>? image,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (category != null) 'category': category,
       if (name != null) 'name': name,
       if (defaultPrice != null) 'default_price': defaultPrice,
+      if (image != null) 'image': image,
     });
   }
 
@@ -17614,12 +17829,14 @@ class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
       {Value<int>? id,
       Value<String>? category,
       Value<String>? name,
-      Value<double>? defaultPrice}) {
+      Value<double>? defaultPrice,
+      Value<Uint8List?>? image}) {
     return ServiceMaterialsCompanion(
       id: id ?? this.id,
       category: category ?? this.category,
       name: name ?? this.name,
       defaultPrice: defaultPrice ?? this.defaultPrice,
+      image: image ?? this.image,
     );
   }
 
@@ -17638,6 +17855,9 @@ class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
     if (defaultPrice.present) {
       map['default_price'] = Variable<double>(defaultPrice.value);
     }
+    if (image.present) {
+      map['image'] = Variable<Uint8List>(image.value);
+    }
     return map;
   }
 
@@ -17647,7 +17867,8 @@ class ServiceMaterialsCompanion extends UpdateCompanion<ServiceMaterialTable> {
           ..write('id: $id, ')
           ..write('category: $category, ')
           ..write('name: $name, ')
-          ..write('defaultPrice: $defaultPrice')
+          ..write('defaultPrice: $defaultPrice, ')
+          ..write('image: $image')
           ..write(')'))
         .toString();
   }
@@ -25886,6 +26107,10 @@ typedef $$StockIncrementsTableCreateCompanionBuilder = StockIncrementsCompanion
   Value<int> quantityAfter,
   Value<DateTime> dateAdded,
   Value<String?> remarks,
+  Value<String?> supplierName,
+  Value<String?> receiptNumber,
+  Value<String?> trackingNumber,
+  Value<Uint8List?> receiptImage,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -25901,6 +26126,10 @@ typedef $$StockIncrementsTableUpdateCompanionBuilder = StockIncrementsCompanion
   Value<int> quantityAfter,
   Value<DateTime> dateAdded,
   Value<String?> remarks,
+  Value<String?> supplierName,
+  Value<String?> receiptNumber,
+  Value<String?> trackingNumber,
+  Value<Uint8List?> receiptImage,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -25955,6 +26184,19 @@ class $$StockIncrementsTableFilterComposer
 
   ColumnFilters<String> get remarks => $composableBuilder(
       column: $table.remarks, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get supplierName => $composableBuilder(
+      column: $table.supplierName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get trackingNumber => $composableBuilder(
+      column: $table.trackingNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<Uint8List> get receiptImage => $composableBuilder(
+      column: $table.receiptImage, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -26022,6 +26264,22 @@ class $$StockIncrementsTableOrderingComposer
   ColumnOrderings<String> get remarks => $composableBuilder(
       column: $table.remarks, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get supplierName => $composableBuilder(
+      column: $table.supplierName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get trackingNumber => $composableBuilder(
+      column: $table.trackingNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<Uint8List> get receiptImage => $composableBuilder(
+      column: $table.receiptImage,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -26084,6 +26342,18 @@ class $$StockIncrementsTableAnnotationComposer
 
   GeneratedColumn<String> get remarks =>
       $composableBuilder(column: $table.remarks, builder: (column) => column);
+
+  GeneratedColumn<String> get supplierName => $composableBuilder(
+      column: $table.supplierName, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get trackingNumber => $composableBuilder(
+      column: $table.trackingNumber, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get receiptImage => $composableBuilder(
+      column: $table.receiptImage, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -26152,6 +26422,10 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             Value<int> quantityAfter = const Value.absent(),
             Value<DateTime> dateAdded = const Value.absent(),
             Value<String?> remarks = const Value.absent(),
+            Value<String?> supplierName = const Value.absent(),
+            Value<String?> receiptNumber = const Value.absent(),
+            Value<String?> trackingNumber = const Value.absent(),
+            Value<Uint8List?> receiptImage = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -26166,6 +26440,10 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             quantityAfter: quantityAfter,
             dateAdded: dateAdded,
             remarks: remarks,
+            supplierName: supplierName,
+            receiptNumber: receiptNumber,
+            trackingNumber: trackingNumber,
+            receiptImage: receiptImage,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -26180,6 +26458,10 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             Value<int> quantityAfter = const Value.absent(),
             Value<DateTime> dateAdded = const Value.absent(),
             Value<String?> remarks = const Value.absent(),
+            Value<String?> supplierName = const Value.absent(),
+            Value<String?> receiptNumber = const Value.absent(),
+            Value<String?> trackingNumber = const Value.absent(),
+            Value<Uint8List?> receiptImage = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -26194,6 +26476,10 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             quantityAfter: quantityAfter,
             dateAdded: dateAdded,
             remarks: remarks,
+            supplierName: supplierName,
+            receiptNumber: receiptNumber,
+            trackingNumber: trackingNumber,
+            receiptImage: receiptImage,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -32470,6 +32756,7 @@ typedef $$ServiceMaterialsTableCreateCompanionBuilder
   required String category,
   required String name,
   required double defaultPrice,
+  Value<Uint8List?> image,
 });
 typedef $$ServiceMaterialsTableUpdateCompanionBuilder
     = ServiceMaterialsCompanion Function({
@@ -32477,6 +32764,7 @@ typedef $$ServiceMaterialsTableUpdateCompanionBuilder
   Value<String> category,
   Value<String> name,
   Value<double> defaultPrice,
+  Value<Uint8List?> image,
 });
 
 class $$ServiceMaterialsTableFilterComposer
@@ -32499,6 +32787,9 @@ class $$ServiceMaterialsTableFilterComposer
 
   ColumnFilters<double> get defaultPrice => $composableBuilder(
       column: $table.defaultPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<Uint8List> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnFilters(column));
 }
 
 class $$ServiceMaterialsTableOrderingComposer
@@ -32522,6 +32813,9 @@ class $$ServiceMaterialsTableOrderingComposer
   ColumnOrderings<double> get defaultPrice => $composableBuilder(
       column: $table.defaultPrice,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<Uint8List> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ServiceMaterialsTableAnnotationComposer
@@ -32544,6 +32838,9 @@ class $$ServiceMaterialsTableAnnotationComposer
 
   GeneratedColumn<double> get defaultPrice => $composableBuilder(
       column: $table.defaultPrice, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get image =>
+      $composableBuilder(column: $table.image, builder: (column) => column);
 }
 
 class $$ServiceMaterialsTableTableManager extends RootTableManager<
@@ -32578,24 +32875,28 @@ class $$ServiceMaterialsTableTableManager extends RootTableManager<
             Value<String> category = const Value.absent(),
             Value<String> name = const Value.absent(),
             Value<double> defaultPrice = const Value.absent(),
+            Value<Uint8List?> image = const Value.absent(),
           }) =>
               ServiceMaterialsCompanion(
             id: id,
             category: category,
             name: name,
             defaultPrice: defaultPrice,
+            image: image,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required String category,
             required String name,
             required double defaultPrice,
+            Value<Uint8List?> image = const Value.absent(),
           }) =>
               ServiceMaterialsCompanion.insert(
             id: id,
             category: category,
             name: name,
             defaultPrice: defaultPrice,
+            image: image,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

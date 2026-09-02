@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../../core/mpos/mpos_device_type.dart';
 import '../../../../core/pos/nibss_geo.dart';
@@ -39,6 +40,10 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
   List<ServicePayment> _payments = [];
   bool _isLoading = false;
 
+  bool get _isCancelled => _job.status.toLowerCase() == 'cancelled';
+  bool get _canCancelJob =>
+      !_isCancelled && _job.amountPaid <= 1e-9 && _payments.isEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +77,12 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       appBar: AppBar(
         title: Text(_job.jobId),
         actions: [
+          if (_canCancelJob)
+            IconButton(
+              icon: const Icon(Icons.cancel_outlined),
+              tooltip: 'Cancel job',
+              onPressed: () => _confirmCancelJob(context),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -101,6 +112,22 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                   ],
                   const SizedBox(height: 24),
                   _buildBalanceCard(context, currencySymbol),
+                  if (_isCancelled) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text(
+                        'This job is cancelled. No payment is due.',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   const Text('Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -239,9 +266,11 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => _showPaymentDialog(context, symbol),
+            onPressed: _isCancelled
+                ? null
+                : () => _showPaymentDialog(context, symbol),
             icon: const Icon(Icons.add_card),
-            label: const Text('Add Payment', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(_isCancelled ? 'Cancelled' : 'Add Payment', style: const TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -255,7 +284,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           child: Column(
             children: [
               OutlinedButton.icon(
-                onPressed: () => _showStatusPicker(context),
+                onPressed: _isCancelled ? null : () => _showStatusPicker(context),
                 icon: const Icon(Icons.edit_road, size: 18),
                 label: const Text('Status'),
                 style: OutlinedButton.styleFrom(
@@ -458,8 +487,27 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
               'enabled': isTransferAvailable,
               'badge': !isPro ? '(Pro required)' : '',
             },
-            {'name': 'Customer Wallet', 'icon': Icons.account_balance_wallet, 'color': Colors.teal, 'enabled': true, 'badge': ''},
+            {
+              'name': 'Customer Wallet',
+              'icon': Icons.account_balance_wallet,
+              'color': Colors.teal,
+              'enabled': isPro && currentCustomer != null,
+              'badge': !isPro
+                  ? '(Pro required)'
+                  : (currentCustomer == null ? '(No customer)' : ''),
+            },
           ];
+
+          final walletCredit = currentCustomer != null &&
+                  currentCustomer!.balance < 0
+              ? -currentCustomer!.balance
+              : 0.0;
+          final enteredAmt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+          final walletCoversAmount =
+              walletCredit + 1e-9 >= enteredAmt && enteredAmt > 0;
+          final walletBlocked = selectedMethod == 'Customer Wallet' &&
+              enteredAmt > 0 &&
+              !walletCoversAmount;
 
           return Padding(
             padding: EdgeInsets.only(
@@ -520,7 +568,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       border: const OutlineInputBorder(),
                     ),
                     onChanged: (_) {
-                      if (amountError != null) setDialogState(() => amountError = null);
+                      setDialogState(() {
+                        if (amountError != null) amountError = null;
+                      });
                     },
                   ),
                   const SizedBox(height: 8),
@@ -627,6 +677,10 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                             } else if (name == 'POS Card' && !hasTerminal) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('No MPOS Terminal configured. Please setup terminal in Printer Settings.')),
+                              );
+                            } else if (name == 'Customer Wallet' && currentCustomer == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('This job has no customer. Assign a customer before using wallet credit.')),
                               );
                             }
                             return;
@@ -802,6 +856,64 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                     ],
                   ],
 
+                  if (selectedMethod == 'Customer Wallet') ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: walletCoversAmount
+                            ? Colors.teal.withValues(alpha: 0.08)
+                            : Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: walletCoversAmount
+                              ? Colors.teal.withValues(alpha: 0.25)
+                              : Colors.red.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            walletCoversAmount
+                                ? Icons.account_balance_wallet
+                                : Icons.warning_amber_rounded,
+                            size: 22,
+                            color: walletCoversAmount ? Colors.teal : Colors.red,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  walletCoversAmount
+                                      ? 'Wallet credit: ${CurrencyFormatter.formatWithSymbol(walletCredit, symbol: symbol)}'
+                                      : 'Insufficient wallet credit',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: walletCoversAmount
+                                        ? Colors.teal
+                                        : Colors.red,
+                                  ),
+                                ),
+                                Text(
+                                  walletCoversAmount
+                                      ? 'This payment will be deducted from ${currentCustomer?.name ?? 'the customer'}\'s wallet.'
+                                      : 'Available: ${CurrencyFormatter.formatWithSymbol(walletCredit, symbol: symbol)}'
+                                          ' • Needed: ${CurrencyFormatter.formatWithSymbol(enteredAmt > 0 ? enteredAmt : remaining, symbol: symbol)}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
                   // Reference or Note
                   TextField(
                     controller: refCtrl,
@@ -818,7 +930,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: isProcessingPos
+                      onPressed: isProcessingPos || walletBlocked
                           ? null
                           : () async {
                               final amt = double.tryParse(amountCtrl.text.trim());
@@ -828,6 +940,71 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                               }
 
                               String? finalRef = refCtrl.text.trim().isNotEmpty ? refCtrl.text.trim() : null;
+
+                              if (selectedMethod == 'Customer Wallet') {
+                                if (!isPro) {
+                                  _showUpgradeDialog(context, 'Customer Wallet');
+                                  return;
+                                }
+                                if (_job.customerId.isEmpty) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Assign a customer to this job before using wallet credit.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                ServiceCustomer? latestCustomer;
+                                try {
+                                  latestCustomer =
+                                      await repo.getCustomerById(_job.customerId);
+                                } catch (_) {}
+                                if (latestCustomer == null) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Could not load this customer’s wallet. Please reopen the job and try again.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                final availableCredit = latestCustomer.balance < 0
+                                    ? -latestCustomer.balance
+                                    : 0.0;
+                                if (availableCredit + 1e-9 < amt) {
+                                  if (dialogCtx.mounted) {
+                                    await showDialog(
+                                      context: dialogCtx,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Insufficient Wallet Credit'),
+                                        content: Text(
+                                          'This customer does not have enough wallet credit for this payment.\n\n'
+                                          'Available credit: ${CurrencyFormatter.formatWithSymbol(availableCredit, symbol: symbol)}\n'
+                                          'Payment amount: ${CurrencyFormatter.formatWithSymbol(amt, symbol: symbol)}\n\n'
+                                          'Choose another payment method or top up the customer wallet first.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                currentCustomer = latestCustomer;
+                              }
 
                               // Process MPOS if POS Card is selected
                               if (selectedMethod == 'POS Card') {
@@ -1131,9 +1308,6 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       return;
     }
 
-    final ok = await _requestAdminPassword(pageContext);
-    if (!ok) return;
-
     if (!pageContext.mounted) return;
     showDialog(
       context: pageContext,
@@ -1224,6 +1398,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 8),
@@ -1393,7 +1569,49 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     );
   }
 
+  Future<void> _confirmCancelJob(BuildContext context) async {
+    if (!_canCancelJob) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel this job?'),
+        content: Text(
+          'No payment has been recorded for "${_job.title}". '
+          'Cancelling removes it from Payment Pending. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep job')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel job', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final repo = context.read<IServicesRepository>();
+      await repo.updateJobStatus(_job.id, 'cancelled');
+      if (!mounted) return;
+      context.read<ServicesBloc>().add(const LoadServicesJobs());
+      await _loadJobDetails();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Job cancelled. No payment is due.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showStatusPicker(BuildContext context) {
+    if (_isCancelled) return;
     final statuses = ['pending', 'in_progress', 'ready', 'delivered'];
     showModalBottomSheet(
       context: context,
@@ -1423,6 +1641,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       case 'in_progress': color = Colors.orange; break;
       case 'ready': color = Colors.green; break;
       case 'delivered': color = Colors.blue; break;
+      case 'cancelled': color = Colors.red; break;
       default: color = Colors.grey;
     }
     return Container(

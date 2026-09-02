@@ -20,6 +20,8 @@ abstract class IServicesRepository {
     Uint8List? image,
     String? warrantyDuration,
   });
+  /// Records a job payment. Customer Wallet / Wallet methods require enough
+  /// customer credit (negative [ServiceCustomer.balance]) and debit the wallet.
   Future<void> addPayment({
     required String jobId,
     required double amount,
@@ -74,8 +76,8 @@ abstract class IServicesRepository {
 
   // Material Presets
   Future<List<ServiceMaterial>> getMaterials({String? category});
-  Future<void> addMaterial({required String name, required String category, required double price});
-  Future<void> updateMaterial({required int id, required String name, required String category, required double price});
+  Future<void> addMaterial({required String name, required String category, required double price, Uint8List? image});
+  Future<void> updateMaterial({required int id, required String name, required String category, required double price, Uint8List? image});
   Future<void> deleteMaterial(int id);
 
   // Material Categories

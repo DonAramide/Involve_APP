@@ -4,6 +4,7 @@ import 'package:involve_app/features/invoicing/presentation/pages/customer_histo
 import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class CustomersListPage extends StatefulWidget {
@@ -14,6 +15,9 @@ class CustomersListPage extends StatefulWidget {
 }
 
 class _CustomersListPageState extends State<CustomersListPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -25,50 +29,164 @@ class _CustomersListPageState extends State<CustomersListPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Customers')),
-      body: BlocBuilder<ServicesBloc, ServicesState>(
-        builder: (context, state) {
-          final customers = state.customers;
+      body: Column(
+        children: [
+          // Search Input Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by name or phone...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                          context.read<ServicesBloc>().add(const SearchServiceCustomers());
+                        },
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              onChanged: (val) {
+                setState(() => _searchQuery = val.trim());
+                context.read<ServicesBloc>().add(SearchServiceCustomers(query: val.trim()));
+              },
+            ),
+          ),
+          Expanded(
+            child: BlocBuilder<ServicesBloc, ServicesState>(
+              builder: (context, state) {
+                final allCustomers = state.customers;
 
-          if (state.status == ServicesStatus.loading && customers.isEmpty) {
-            return const InvifyLoadingIndicator(message: 'FETCHING CUSTOMER DIRECTORY...');
-          }
+                if (state.status == ServicesStatus.loading && allCustomers.isEmpty) {
+                  return const InvifyLoadingIndicator(message: 'FETCHING CUSTOMER DIRECTORY...');
+                }
 
-          if (customers.isEmpty) {
-            return const Center(child: Text('No customers found. Add them during job creation!'));
-          }
+                // Filter locally for instant responsiveness
+                final queryLower = _searchQuery.toLowerCase();
+                final queryDigits = _searchQuery.replaceAll(RegExp(r'\D'), '');
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: customers.length,
-            itemBuilder: (context, index) {
-              final customer = customers[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(customer.phone ?? 'No phone'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CustomerHistoryPage(customer: customer),
+                final customers = allCustomers.where((c) {
+                  if (_searchQuery.isEmpty) return true;
+                  final nameMatch = c.name.toLowerCase().contains(queryLower);
+                  final phone = (c.phone ?? '').toLowerCase();
+                  final phoneMatch = phone.contains(queryLower);
+                  final phoneDigits = phone.replaceAll(RegExp(r'\D'), '');
+                  final digitMatch = queryDigits.isNotEmpty && phoneDigits.contains(queryDigits);
+                  return nameMatch || phoneMatch || digitMatch;
+                }).toList();
+
+                if (customers.isEmpty) {
+                  if (_searchQuery.isNotEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.person_search_outlined, size: 56, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No customers matching "$_searchQuery"',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                                context.read<ServicesBloc>().add(const SearchServiceCustomers());
+                              },
+                              icon: const Icon(Icons.clear),
+                              label: const Text('Clear Search'),
+                            ),
+                          ],
+                        ),
                       ),
                     );
-                    // Refresh so newly generated VA details appear in list state.
-                    if (mounted) {
-                      context.read<ServicesBloc>().add(const SearchServiceCustomers());
-                    }
+                  }
+                  return const Center(child: Text('No customers found. Add them during job creation!'));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: customers.length,
+                  itemBuilder: (context, index) {
+                    final customer = customers[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                          child: const Icon(Icons.person),
+                        ),
+                        title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(customer.phone ?? 'No phone'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          final servicesBloc = context.read<ServicesBloc>();
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CustomerHistoryPage(customer: customer),
+                            ),
+                          );
+                          // Refresh so newly generated VA details appear in list state.
+                          if (mounted) {
+                            servicesBloc.add(SearchServiceCustomers(query: _searchQuery));
+                          }
+                        },
+                      ),
+                    );
                   },
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCustomerDialog,
@@ -106,6 +224,8 @@ class _CustomersListPageState extends State<CustomersListPage> {
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: const OutlineInputBorder(),

@@ -1,3 +1,5 @@
+import 'phone_number_input.dart';
+
 class InputValidator {
   static String? validateNotEmpty(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
@@ -20,11 +22,7 @@ class InputValidator {
     return null;
   }
 
-  static String? validatePhone(String? value) {
-    if (value == null || value.isEmpty) return 'Phone number required';
-    if (!RegExp(r'^[0-9+\s-]{7,15}$').hasMatch(value)) {
-      return 'Enter a valid phone number';
-    }
-    return null;
+  static String? validatePhone(String? value, {bool required = true}) {
+    return PhoneNumberInput.validate(value, required: required, minDigits: required ? 7 : 0);
   }
 }

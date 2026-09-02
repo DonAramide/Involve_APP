@@ -12,6 +12,7 @@ import 'package:involve_app/features/services/domain/repositories/services_repos
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/service_booking_dialog.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
@@ -1534,6 +1535,8 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                     hintText: 'e.g. 08012345678',
                   ),
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   onChanged: (val) async {
                     final phone = val.trim();
                     if (phone.length >= 10 && selectedCustomerId == null) {
@@ -1556,8 +1559,8 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                   validator: (val) {
                     if (val == null || val.isEmpty) return 'Phone number required';
                     final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                    if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                      return 'Phone must be 11 to 15 digits';
+                    if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                      return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
                     }
                     return null;
                   },
@@ -1779,13 +1782,15 @@ void _showExternalCustomerDialog(
                   hintText: 'e.g. 08012345678',
                 ),
                 keyboardType: TextInputType.phone,
+                inputFormatters: PhoneNumberInput.formatters,
+                maxLength: PhoneNumberInput.maxDigits,
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
                     return 'Phone number required';
                   }
                   final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                    return 'Phone must be 11 to 15 digits';
+                  if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                    return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
                   }
                   return null;
                 },

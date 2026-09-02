@@ -81,6 +81,7 @@ class ServiceMaterials extends Table {
   TextColumn get category => text()(); // Categories requested by user
   TextColumn get name => text().unique()();
   RealColumn get defaultPrice => real()();
+  BlobColumn get image => blob().nullable()();
 }
 
 @DataClassName('ServiceJobItemTable')

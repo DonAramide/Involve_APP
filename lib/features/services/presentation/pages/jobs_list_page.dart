@@ -156,6 +156,7 @@ class _JobsListPageState extends State<JobsListPage> {
       {'label': 'In Progress', 'value': 'in_progress'},
       {'label': 'Ready', 'value': 'ready'},
       {'label': 'Delivered', 'value': 'delivered'},
+      {'label': 'Cancelled', 'value': 'cancelled'},
     ];
 
     return Container(
@@ -263,6 +264,7 @@ class _JobsListPageState extends State<JobsListPage> {
       case 'in_progress': color = Colors.orange; break;
       case 'ready': color = Colors.green; break;
       case 'delivered': color = Colors.blue; break;
+      case 'cancelled': color = Colors.red; break;
       default: color = Colors.grey;
     }
     return Container(

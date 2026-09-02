@@ -62,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 86;
+  int get schemaVersion => 88;
 
   @override
   MigrationStrategy get migration {
@@ -440,6 +440,15 @@ class AppDatabase extends _$AppDatabase {
         if (from < 86) {
           // Schema V86: Staff personal bank code for salary payouts
           await _safeAddColumn(m, staff, staff.bankCode);
+        }
+        if (from < 87) {
+          await _safeAddColumn(m, stockIncrements, stockIncrements.supplierName);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.receiptNumber);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.trackingNumber);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.receiptImage);
+        }
+        if (from < 88) {
+          await _safeAddColumn(m, serviceMaterials, serviceMaterials.image);
         }
       },
       beforeOpen: (details) async {

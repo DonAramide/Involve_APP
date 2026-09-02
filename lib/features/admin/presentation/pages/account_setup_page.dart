@@ -1,12 +1,16 @@
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:involve_app/core/utils/terminology.dart';
 // lib/features/admin/presentation/pages/account_setup_page.dart
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../settings/domain/entities/settings.dart';
 import '../../../../core/utils/device_info_service.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -38,21 +42,85 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   String _deviceSuffix = 'LOADING...';
   String _persistentId = 'INITIALIZING...';
   
+  late TextEditingController _userNameController;
   late TextEditingController _businessNameController;
   late TextEditingController _phoneController;
+  late TextEditingController _emailController;
+  late TextEditingController _addressController;
   late TextEditingController _cacController;
+  late TextEditingController _taxIdController;
+  late TextEditingController _businessDescriptionController;
 
   bool _initializedControllers = false;
+  bool _draftLoaded = false;
+  Map<String, String> _formDraft = {};
   static const _storage = FlutterSecureStorage();
+  static const _formDraftKey = 'account_setup_form_draft';
 
   @override
   void initState() {
     super.initState();
+    _userNameController = TextEditingController();
     _businessNameController = TextEditingController();
     _phoneController = TextEditingController();
+    _emailController = TextEditingController();
+    _addressController = TextEditingController();
     _cacController = TextEditingController();
+    _taxIdController = TextEditingController();
+    _businessDescriptionController = TextEditingController();
     _loadHardwareTelemetry();
     _loadPersistedToggles();
+    _loadUserProfile();
+    _loadFormDraft();
+  }
+
+  Future<void> _loadFormDraft() async {
+    try {
+      final raw = await _storage.read(key: _formDraftKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          _formDraft = decoded.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _draftLoaded = true);
+  }
+
+  Future<void> _persistFormDraft() async {
+    final data = {
+      'ownerName': _userNameController.text,
+      'businessName': _businessNameController.text,
+      'phone': _phoneController.text,
+      'email': _emailController.text,
+      'address': _addressController.text,
+      'cac': _cacController.text,
+      'taxId': _taxIdController.text,
+      'description': _businessDescriptionController.text,
+    };
+    await _storage.write(key: _formDraftKey, value: jsonEncode(data));
+  }
+
+  String _draftOr(String key, String fallback) {
+    final v = _formDraft[key];
+    if (v != null && v.trim().isNotEmpty) return v;
+    return fallback;
+  }
+
+  Future<void> _loadUserProfile() async {
+    final storedOwner = await _storage.read(key: 'account_profile_owner_name');
+    final storedWebUser = await _storage.read(key: 'online_web_username');
+    if (mounted) {
+      if (storedOwner != null && storedOwner.trim().isNotEmpty) {
+        setState(() {
+          _userNameController.text = storedOwner.trim();
+        });
+      } else if (storedWebUser != null && storedWebUser.trim().isNotEmpty && _userNameController.text.isEmpty) {
+        setState(() {
+          _userNameController.text = storedWebUser.trim();
+        });
+      }
+    }
   }
 
   Future<void> _loadPersistedToggles() async {
@@ -84,9 +152,15 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
 
   @override
   void dispose() {
+    _persistFormDraft();
+    _userNameController.dispose();
     _businessNameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
+    _addressController.dispose();
     _cacController.dispose();
+    _taxIdController.dispose();
+    _businessDescriptionController.dispose();
     super.dispose();
   }
 
@@ -185,10 +259,33 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
           final planName = state.userPlan?.planType.toUpperCase() ?? 'PRO / LIFETIME';
           final isProTier = state.userPlan?.isPro == true || state.userPlan?.isLifetime == true || state.userPlan?.planType == 'enterprise' || state.userPlan?.planType == 'premium';
           
-          if (!_initializedControllers) {
-            _businessNameController.text = state.settings?.organizationName ?? 'Invify Enterprise Node';
-            _phoneController.text = state.settings?.phone ?? '+234 800 000 0000';
-            _cacController.text = state.settings?.cacNumber ?? '';
+          if (!_initializedControllers && _draftLoaded && state.settings != null) {
+            _businessNameController.text = _draftOr(
+              'businessName',
+              state.settings!.organizationName,
+            );
+            _phoneController.text = PhoneNumberInput.clamp(
+              _draftOr('phone', state.settings!.phone),
+            );
+            _emailController.text = _draftOr('email', state.settings!.email ?? '');
+            final savedAddress = AppSettings.isPlaceholderAddress(state.settings!.address)
+                ? ''
+                : state.settings!.address;
+            _addressController.text = _draftOr('address', savedAddress);
+            _cacController.text = _draftOr('cac', state.settings!.cacNumber ?? '');
+            _taxIdController.text = _draftOr('taxId', state.settings!.taxId ?? '');
+            _businessDescriptionController.text = _draftOr(
+              'description',
+              state.settings!.businessDescription ?? '',
+            );
+            if (_userNameController.text.trim().isEmpty) {
+              _userNameController.text = _draftOr('ownerName', 'Administrator');
+            } else {
+              final draftedOwner = _formDraft['ownerName'];
+              if (draftedOwner != null && draftedOwner.trim().isNotEmpty) {
+                _userNameController.text = draftedOwner.trim();
+              }
+            }
             _initializedControllers = true;
           }
 
@@ -259,18 +356,255 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
               ),
 
               const SizedBox(height: 32),
+
+              // ── 1. USER & BUSINESS PROFILE CARD ──
               Text(
-                'Device Enrollment & Tenant Setup',
+                'User Profile & Business Details',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.primary),
               ),
               const SizedBox(height: 8),
               Text(
-                'Preloaded device string matching target backend node. Please verify credentials below to finalize cloud linkage.',
+                'View and update your administrator contact profile, registered business name, phone number, email, and physical address.',
                 style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withOpacity(0.6)),
               ),
               const SizedBox(height: 16),
 
-              // Dynamic Hardware Hub Container
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: colorScheme.primary.withOpacity(0.15)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Profile Header Preview (Avatar + Name + Mode)
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: colorScheme.primary.withOpacity(0.12),
+                          backgroundImage: (state.settings?.logo != null && state.settings!.logo!.isNotEmpty)
+                              ? MemoryImage(state.settings!.logo!)
+                              : null,
+                          child: (state.settings?.logo == null || state.settings!.logo!.isEmpty)
+                              ? Text(
+                                  (_businessNameController.text.isNotEmpty ? _businessNameController.text[0] : 'I').toUpperCase(),
+                                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: colorScheme.primary),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _businessNameController.text.isNotEmpty ? _businessNameController.text : 'Invify Enterprise',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _userNameController.text.isNotEmpty ? _userNameController.text : 'Account Administrator',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.primary),
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      (state.settings?.businessMode ?? 'Retail').toUpperCase(),
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _emailController.text.isNotEmpty ? _emailController.text : 'No email configured',
+                                      style: TextStyle(fontSize: 10, color: colorScheme.onSurface.withOpacity(0.5)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(height: 1),
+                    const SizedBox(height: 20),
+
+                    // 1. Full Name / Contact Person
+                    _buildProfileInputField(
+                      controller: _userNameController,
+                      label: 'Full Name / Contact Person',
+                      hint: 'e.g. John Doe',
+                      icon: Icons.person_outline_rounded,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 2. Email Address
+                    _buildProfileInputField(
+                      controller: _emailController,
+                      label: 'Email Address',
+                      hint: 'e.g. admin@business.com',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 3. Authorized Phone Number
+                    _buildProfileInputField(
+                      controller: _phoneController,
+                      label: 'Authorized Phone Contact',
+                      hint: 'e.g. +234 800 000 0000',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: PhoneNumberInput.formatters,
+                      maxLength: PhoneNumberInput.maxDigits,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 4. Organization / Business Name
+                    _buildProfileInputField(
+                      controller: _businessNameController,
+                      label: 'Organization / Business Name',
+                      hint: 'e.g. Invify Enterprise',
+                      icon: Icons.business_outlined,
+                      readOnly: isProTier,
+                      theme: theme,
+                      suffixIcon: isProTier
+                          ? Tooltip(
+                              message: 'Organization bound permanently under Pro Cloud Linkage relay.',
+                              child: Icon(Icons.lock_rounded, size: 16, color: Colors.amber.shade700),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 5. Business Physical Address
+                    _buildProfileInputField(
+                      controller: _addressController,
+                      label: 'Business Physical Address',
+                      hint: 'e.g. 123 Commercial Way, Victoria Island, Lagos',
+                      icon: Icons.location_on_outlined,
+                      maxLines: 2,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 6. CAC Registration Number
+                    _buildProfileInputField(
+                      controller: _cacController,
+                      label: 'CAC Registration Number',
+                      hint: 'e.g. RC-123456 or BN-987654',
+                      icon: Icons.corporate_fare_rounded,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 7. Tax Identification Number (TIN)
+                    _buildProfileInputField(
+                      controller: _taxIdController,
+                      label: 'Tax Identification Number (TIN / VAT)',
+                      hint: 'e.g. 12345678-0001 (Optional)',
+                      icon: Icons.receipt_long_outlined,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 8. Nature of Business / Description
+                    _buildProfileInputField(
+                      controller: _businessDescriptionController,
+                      label: 'Nature of Business / Description',
+                      hint: 'e.g. Retail fashion store, food distributor, or academy',
+                      icon: Icons.description_outlined,
+                      maxLines: 2,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 18),
+
+                    // CAC Document Upload UI
+                    Text(
+                      'CAC Certificate / Registration Document',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _uploadCacDocument(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library, size: 16),
+                            label: const Text('Upload Gallery'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _uploadCacDocument(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt, size: 16),
+                            label: const Text('Capture Camera'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Save Profile Details Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.save_rounded, size: 18),
+                        label: const Text(
+                          'Save Profile Changes',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                        ),
+                        onPressed: () => _saveProfileDetails(context, state),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── 2. HARDWARE DEVICE ENROLLMENT & RELAY SETUP ──
+              Text(
+                'Device Hardware Enrollment & Node Relay',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.primary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Preloaded device hardware serial matching cloud tenant node. Verify link status or manage your Pro subscription.',
+                style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withOpacity(0.6)),
+              ),
+              const SizedBox(height: 16),
+
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -288,7 +622,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white12 : colorScheme.primary.withOpacity(0.05), 
+                        color: isDark ? Colors.white12 : colorScheme.primary.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -308,7 +642,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white24 : colorScheme.primary.withOpacity(0.1), 
+                              color: isDark ? Colors.white24 : colorScheme.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text('READ-ONLY', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colorScheme.primary)),
@@ -317,88 +651,34 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
-                    // Business Name confirmation input
-                    Text('Organization / Business Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _businessNameController,
-                      readOnly: isProTier,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: isProTier ? (isDark ? Colors.white12 : Colors.grey.shade200) : (isDark ? Colors.white10 : Colors.grey.shade50),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.05))),
-                        suffixIcon: isProTier ? Tooltip(
-                          message: 'Organization bound permanently under Pro Cloud Linkage relay.',
-                          child: Icon(Icons.lock_rounded, size: 16, color: Colors.amber.shade700),
-                        ) : null,
-                      ),
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isProTier ? colorScheme.onSurface.withOpacity(0.5) : colorScheme.onSurface),
-                    ),
-                    const SizedBox(height: 12),
 
-                    // Phone number confirmation input
-                    Text('Authorized Phone Contact', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.05))),
+                    // Target Production Node & UUID
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white10 : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: colorScheme.onSurface.withOpacity(0.08)),
                       ),
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // CAC registration input
-                    Text('CAC Registration Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _cacController,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.05))),
-                        hintText: 'e.g. BN-123456 or RC-987654',
-                        hintStyle: TextStyle(fontSize: 11, color: colorScheme.onSurface.withOpacity(0.3)),
+                      child: Row(
+                        children: [
+                          Icon(Icons.fingerprint_rounded, color: colorScheme.secondary, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Persistent Device UUID', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurface.withOpacity(0.7))),
+                                const SizedBox(height: 2),
+                                Text(_persistentId, style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: colorScheme.onSurface.withOpacity(0.8))),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // CAC Document Upload UI
-                    Text('CAC Document', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _uploadCacDocument(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library, size: 16),
-                            label: const Text('Gallery'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _uploadCacDocument(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt, size: 16),
-                            label: const Text('Camera'),
-                          ),
-                        ),
-                      ],
                     ),
                     const SizedBox(height: 20),
 
-                    // Enrollment broadcast actions & Premium Status Renewal View
                     if (isProTier) ...[
                       // Next Activation Date View
                       Container(
@@ -429,7 +709,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    state.userPlan?.expiryDate != null 
+                                    state.userPlan?.expiryDate != null
                                         ? '${state.userPlan!.expiryDate!.toLocal().toString().split(' ')[0]} (Active Relay)'
                                         : 'Lifetime / Unrestricted Node Relay',
                                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
@@ -441,98 +721,68 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Save Profile Updates & Downgrade Actions
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: colorScheme.error,
-                                side: BorderSide(color: colorScheme.error.withOpacity(0.3)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              icon: const Icon(Icons.arrow_downward_rounded, size: 16),
-                              label: const Text('Downgrade Plan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              onPressed: () {
-                                FocusScope.of(context).unfocus();
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    backgroundColor: Theme.of(context).cardColor,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                    title: Row(
-                                      children: [
-                                        Icon(Icons.warning_amber_rounded, color: colorScheme.error),
-                                        const SizedBox(width: 8),
-                                        const Text('Confirm Downgrade', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                    content: const Text(
-                                      'Are you sure you want to downgrade your active subscription profile to Basic Tier? Enterprise telemetry channels and encryption keys will transition to local sandbox boundaries.',
-                                      style: TextStyle(fontSize: 13, height: 1.4),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: colorScheme.error,
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                        onPressed: () async {
-                                          Navigator.pop(ctx);
-                                          await StorageService.clearProExpiryDate();
-                                          if (mounted) {
-                                            context.read<SettingsBloc>().add(LoadSettings());
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: const Text('Plan profile transitioned to Basic Tier.'),
-                                                backgroundColor: colorScheme.secondary,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        child: const Text('Confirm Downgrade', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
+
+                      // Downgrade Plan Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.error,
+                            side: BorderSide(color: colorScheme.error.withOpacity(0.3)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                          label: const Text('Downgrade Subscription to Basic', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            FocusScope.of(context).unfocus();
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: Theme.of(context).cardColor,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+                                    const SizedBox(width: 8),
+                                    const Text('Confirm Downgrade', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                content: const Text(
+                                  'Are you sure you want to downgrade your active subscription profile to Basic Tier? Enterprise telemetry channels and encryption keys will transition to local sandbox boundaries.',
+                                  style: TextStyle(fontSize: 13, height: 1.4),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Cancel'),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: colorScheme.onPrimary,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: colorScheme.error,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await StorageService.clearProExpiryDate();
+                                      if (mounted) {
+                                        context.read<SettingsBloc>().add(LoadSettings());
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: const Text('Plan profile transitioned to Basic Tier.'),
+                                            backgroundColor: colorScheme.secondary,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Confirm Downgrade', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
                               ),
-                              icon: const Icon(Icons.save_rounded, size: 16),
-                              label: const Text('Save Profile Updates', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              onPressed: () {
-                                FocusScope.of(context).unfocus();
-                                if (state.settings != null) {
-                                  final updatedSettings = state.settings!.copyWith(
-                                    organizationName: _businessNameController.text.trim(),
-                                    phone: _phoneController.text.trim(),
-                                    cacNumber: _cacController.text.trim(),
-                                  );
-                                  context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: const Text('Organization credentials saved locally.'), backgroundColor: colorScheme.primary),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        ],
+                            );
+                          },
+                        ),
                       ),
                     ] else ...[
                       SizedBox(
@@ -548,7 +798,9 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                           label: const Text('Confirm Enrollment & Upgrade to Pro Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                           onPressed: () async {
                             FocusScope.of(context).unfocus();
-                            
+
+                            await _persistFormDraft();
+
                             // 1. Mandatory KYC Upload for Pro users
                             final kycCompleted = await Navigator.push(
                               context,
@@ -564,23 +816,42 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                                   ),
                                 );
                               }
-                              return; // Stop the upgrade process if KYC isn't completed
+                              return;
                             }
 
-                            // Save data locally first as per user rule: "if you have gto save data save it"
+                            // Save data locally first
                             if (state.settings != null) {
                               final updatedSettings = state.settings!.copyWith(
-                                organizationName: _businessNameController.text.trim(),
-                                phone: _phoneController.text.trim(),
+                                organizationName: _businessNameController.text.trim().isNotEmpty
+                                    ? _businessNameController.text.trim()
+                                    : state.settings!.organizationName,
+                                phone: _phoneController.text.trim().isNotEmpty
+                                    ? _phoneController.text.trim()
+                                    : state.settings!.phone,
+                                email: _emailController.text.trim(),
+                                address: () {
+                                  final typed = _addressController.text.trim();
+                                  if (typed.isEmpty ||
+                                      AppSettings.isPlaceholderAddress(typed)) {
+                                    return '';
+                                  }
+                                  return typed;
+                                }(),
                                 cacNumber: _cacController.text.trim(),
+                                taxId: _taxIdController.text.trim(),
+                                businessDescription: _businessDescriptionController.text.trim(),
                               );
                               context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
+                              final adminName = _userNameController.text.trim();
+                              if (adminName.isNotEmpty) {
+                                await _storage.write(key: 'account_profile_owner_name', value: adminName);
+                              }
                             }
 
                             // Derive real live production tenant namespace
                             final cleanOrg = _businessNameController.text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
                             final derivedTenant = '$cleanOrg-$_deviceSuffix';
-                            
+
                             await SecurityService().setTenantId(derivedTenant);
 
                             bool networkSuccess = false;
@@ -591,8 +862,13 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                               final client = sl<FinanceRepository>().apiClient;
                               final payload = {
                                 'organization_name': _businessNameController.text.trim(),
+                                'owner_name': _userNameController.text.trim(),
+                                'email': _emailController.text.trim(),
                                 'phone_contact': _phoneController.text.trim(),
+                                'address': _addressController.text.trim(),
                                 'cac_number': _cacController.text.trim(),
+                                'tax_id': _taxIdController.text.trim(),
+                                'business_description': _businessDescriptionController.text.trim(),
                                 'device_serial_hash': _deviceSuffix,
                                 'persistent_uuid': _persistentId,
                                 'derived_tenant_id': derivedTenant,
@@ -600,11 +876,11 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                                 'plan': state.userPlan?.planType ?? 'pro',
                                 'business_mode': state.settings?.businessMode ?? 'retail',
                               };
-                              
+
                               debugPrint('*** Executing Live Network Handshake Dispatch ***');
                               debugPrint('POST /api/admin/register-device');
                               debugPrint('Payload: $payload');
-                              
+
                               await ProgressDialogUtils.showDancingProgress(
                                 context,
                                 () async => await client.post('/api/admin/register-device', data: payload),
@@ -621,7 +897,6 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                               if (networkSuccess) {
                                 _showUpgradePrompt(derivedTenant);
                               } else {
-                                // Display lovely server error message dialog as requested
                                 showDialog(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
@@ -637,7 +912,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                                         const SizedBox(width: 12),
                                         const Expanded(
                                           child: Text(
-                                            'Server Connection Error', 
+                                            'Server Connection Error',
                                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                                           ),
                                         ),
@@ -655,11 +930,11 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                                         Container(
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50, 
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50,
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
-                                            errorMessage, 
+                                            errorMessage,
                                             style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Theme.of(context).colorScheme.error),
                                           ),
                                         ),
@@ -1146,6 +1421,140 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _saveProfileDetails(BuildContext context, SettingsState state) async {
+    FocusScope.of(context).unfocus();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final settingsBloc = context.read<SettingsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (state.settings != null) {
+      final updatedSettings = state.settings!.copyWith(
+        organizationName: _businessNameController.text.trim().isNotEmpty
+            ? _businessNameController.text.trim()
+            : state.settings!.organizationName,
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : state.settings!.phone,
+        email: _emailController.text.trim(),
+        address: () {
+          final typed = _addressController.text.trim();
+          if (typed.isEmpty || AppSettings.isPlaceholderAddress(typed)) {
+            return '';
+          }
+          return typed;
+        }(),
+        cacNumber: _cacController.text.trim(),
+        taxId: _taxIdController.text.trim(),
+        businessDescription: _businessDescriptionController.text.trim(),
+      );
+
+      final adminName = _userNameController.text.trim();
+      if (adminName.isNotEmpty) {
+        await _storage.write(key: 'account_profile_owner_name', value: adminName);
+      }
+
+      if (mounted) {
+        settingsBloc.add(UpdateAppSettings(updatedSettings));
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text('User profile & business details saved successfully!'),
+                ),
+              ],
+            ),
+            backgroundColor: colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildProfileInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required ThemeData theme,
+    String? hint,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    bool readOnly = false,
+    Widget? suffixIcon,
+  }) {
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 15, color: colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface.withOpacity(0.85),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          readOnly: readOnly,
+          maxLines: maxLines,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
+          keyboardType: keyboardType,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: readOnly ? colorScheme.onSurface.withOpacity(0.5) : colorScheme.onSurface,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: readOnly
+                ? (isDark ? Colors.white12 : Colors.grey.shade200)
+                : (isDark ? Colors.white10 : Colors.grey.shade50),
+            hintText: hint,
+            hintStyle: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withOpacity(0.35),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: maxLines > 1 ? 12 : 10,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.12)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.08)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+            ),
+            suffixIcon: suffixIcon,
+          ),
+        ),
+      ],
     );
   }
 

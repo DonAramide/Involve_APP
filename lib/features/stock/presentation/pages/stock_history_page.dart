@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -46,10 +48,23 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
               itemBuilder: (ctx, index) {
                 final entry = state.history[index];
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green[100],
-                    child: const Icon(Icons.add, color: Colors.green),
-                  ),
+                  leading: entry.receiptImage != null && entry.receiptImage!.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () => _showReceiptPhoto(context, entry),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.memory(
+                              Uint8List.fromList(entry.receiptImage!),
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        )
+                      : CircleAvatar(
+                          backgroundColor: Colors.green[100],
+                          child: const Icon(Icons.add, color: Colors.green),
+                        ),
                   title: Row(
                     children: [
                       Text('+${entry.quantityAdded}', 
@@ -62,12 +77,19 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (entry.supplierName != null && entry.supplierName!.isNotEmpty)
+                        Text('Supplier: ${entry.supplierName!}'),
+                      if (entry.receiptNumber != null && entry.receiptNumber!.isNotEmpty)
+                        Text('Receipt: ${entry.receiptNumber!}'),
+                      if (entry.trackingNumber != null && entry.trackingNumber!.isNotEmpty)
+                        Text('Tracking: ${entry.trackingNumber!}'),
                       if (entry.remarks != null && entry.remarks!.isNotEmpty)
                         Text('Remarks: ${entry.remarks!}'),
                       Text(DateFormat('MMM dd, yyyy - hh:mm a').format(entry.dateAdded),
                            style: const TextStyle(fontSize: 12)),
                     ],
                   ),
+                  isThreeLine: true,
                 );
               },
             );
@@ -76,6 +98,32 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
           }
           return const SizedBox();
         },
+      ),
+    );
+  }
+
+  void _showReceiptPhoto(BuildContext context, StockHistoryEntry entry) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              automaticallyImplyLeading: false,
+              title: const Text('Receipt / stock photo'),
+              actions: [
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+              ],
+            ),
+            Flexible(
+              child: Image.memory(
+                Uint8List.fromList(entry.receiptImage!),
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

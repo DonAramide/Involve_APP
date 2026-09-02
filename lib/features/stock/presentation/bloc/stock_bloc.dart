@@ -107,7 +107,16 @@ class StockBloc extends Bloc<StockEvent, StockState> {
 
   Future<void> _onStockIncrementRequested(StockIncrementRequested event, Emitter<StockState> emit) async {
     try {
-      await increaseStock(event.itemId, event.quantity, event.remarks);
+      await increaseStock(
+        event.itemId,
+        event.quantity,
+        event.remarks,
+        supplierName: event.supplierName,
+        receiptNumber: event.receiptNumber,
+        trackingNumber: event.trackingNumber,
+        receivedAt: event.receivedAt,
+        receiptImage: event.receiptImage,
+      );
       add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to increase stock: ${e.toString()}', items: state.items, categories: state.categories));
@@ -182,8 +191,19 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await addCategory(event.name, businessMode: event.businessMode);
       add(LoadCategories(businessMode: event.businessMode));
     } catch (e) {
-      emit(StockError('Failed to add category: ${e.toString()}', items: state.items, categories: state.categories));
+      emit(StockError(_friendlyCategoryError(e, event.name), items: state.items, categories: state.categories));
     }
+  }
+
+  String _friendlyCategoryError(Object error, String name) {
+    final raw = error.toString();
+    if (raw.contains('already exists')) {
+      return 'Category "$name" is already on the list.';
+    }
+    if (raw.contains('UNIQUE constraint') || raw.contains('SQLITE_CONSTRAINT_UNIQUE')) {
+      return 'Category "$name" is already on the list.';
+    }
+    return 'Could not add category. Please try again.';
   }
 
   Future<void> _onDeleteCategory(DeleteCategory event, Emitter<StockState> emit) async {

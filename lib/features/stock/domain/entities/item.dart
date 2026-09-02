@@ -117,6 +117,10 @@ class StockHistoryEntry extends Equatable {
   final int quantityAfter;
   final DateTime dateAdded;
   final String? remarks;
+  final String? supplierName;
+  final String? receiptNumber;
+  final String? trackingNumber;
+  final List<int>? receiptImage;
 
   const StockHistoryEntry({
     this.id,
@@ -126,8 +130,23 @@ class StockHistoryEntry extends Equatable {
     required this.quantityAfter,
     required this.dateAdded,
     this.remarks,
+    this.supplierName,
+    this.receiptNumber,
+    this.trackingNumber,
+    this.receiptImage,
   });
 
   @override
-  List<Object?> get props => [id, itemId, quantityAdded, quantityBefore, quantityAfter, dateAdded, remarks];
+  List<Object?> get props => [
+        id,
+        itemId,
+        quantityAdded,
+        quantityBefore,
+        quantityAfter,
+        dateAdded,
+        remarks,
+        supplierName,
+        receiptNumber,
+        trackingNumber,
+      ];
 }

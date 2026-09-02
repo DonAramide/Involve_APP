@@ -9,8 +9,10 @@ import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/services/socket_service.dart';
+import 'onboarding_draft_store.dart';
 
 class OnboardingNavigator {
   static Future<void> proceed(BuildContext context, Map<String, dynamic> payload, List<String> requiredChannels, {bool isMounted = true}) async {
@@ -62,7 +64,7 @@ class OnboardingNavigator {
       }
 
       if (isMounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => nextScreen));
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => nextScreen));
       }
     }
   }
@@ -137,6 +139,7 @@ class OnboardingNavigator {
       // so LandingPage does not send them to the activation-key screen.
       await StorageService.setOnboardingCompleted(true);
       await StorageService.saveTrialStartDate(DateTime.now());
+      await OnboardingDraftStore.clear();
 
       if (isMounted) {
         // Sync the business name globally
@@ -144,10 +147,19 @@ class OnboardingNavigator {
           final settingsBloc = context.read<SettingsBloc>();
           final currentSettings = settingsBloc.state.settings;
           if (currentSettings != null) {
+            final street = (payload['streetAddress']?.toString() ?? '').trim();
+            final nextAddress = street.isNotEmpty
+                ? street
+                : (AppSettings.isPlaceholderAddress(currentSettings.address)
+                    ? ''
+                    : currentSettings.address);
+            final nextEmail = (payload['email']?.toString() ?? '').trim().toLowerCase();
             settingsBloc.add(UpdateAppSettings(
               currentSettings.copyWith(
                 organizationName: payload['businessName'] ?? currentSettings.organizationName,
                 phone: payload['phone'] ?? currentSettings.phone,
+                email: nextEmail.isNotEmpty ? nextEmail : currentSettings.email,
+                address: nextAddress,
               )
             ));
           }

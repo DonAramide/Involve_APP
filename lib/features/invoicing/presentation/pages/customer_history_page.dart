@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:collection/collection.dart';
@@ -1635,11 +1636,13 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
                     hintText: 'e.g. 08012345678',
                   ),
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Phone number is required';
                     final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                    if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                      return 'Phone must be 11 to 15 digits';
+                    if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                      return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
                     }
                     return null;
                   },
