@@ -81,7 +81,7 @@ export class AdminController {
   private static getGlobalSettingsData() {
     return { 
       support_phone: '+234 800 INVIFY',
-      support_email: 'support@iips.app',
+      support_email: 'support@invify.org',
       support_whatsapp: '+2348023552282',
       broadcast_message: '',
       audit_retention_hours: 72,
@@ -983,7 +983,9 @@ export class AdminController {
         plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
         duration: `${a.duration_days} Days`,
         expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        status: a.is_used ? 'USED' : 'ACTIVE'
+        status: a.is_used ? 'USED' : 'ACTIVE',
+        createdBy: a.created_by || null,
+        createdAt: a.created_at || null,
       }));
 
       return res.status(200).json({

@@ -228,11 +228,50 @@ export class DeviceController {
    * Generates a new activation key
    */
   static async createActivation(req: Request, res: Response) {
-    try {
-      const user = (req as any).user;
-      let tenantId = user?.tenantId;
+    const user = (req as any).user;
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    let tenantId = user?.tenantId;
+    const operatorEmail = user?.email || 'unknown';
+    const operatorName = user?.name || operatorEmail.split('@')[0]?.toUpperCase() || 'Unknown';
 
-      if (user?.role === 'super_admin') {
+    const logGenerateAudit = async (
+      status: 'success' | 'failed',
+      details: { code?: string; error?: string; durationDays?: number; planIndex?: number; deviceSuffix?: string } = {},
+    ) => {
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'GENERATE_ACTIVATION_CODE',
+          user_email: operatorEmail,
+          user_name: operatorName,
+          ip_address: ip,
+          target: details.code || details.deviceSuffix || '-',
+          status,
+          tenant_id: tenantId || null,
+          metadata: {
+            tenant_id: tenantId || null,
+            created_by: operatorEmail,
+            duration_days: details.durationDays,
+            plan_index: details.planIndex,
+            device_suffix: details.deviceSuffix,
+            error: details.error,
+          },
+        });
+      } catch (err: any) {
+        console.error('[DeviceController] Failed to write generate-activation audit log:', err.message);
+      }
+    };
+
+    try {
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      if (isPlatform) {
         tenantId = req.body.tenantId || tenantId;
       }
 
@@ -294,12 +333,24 @@ export class DeviceController {
           .single();
 
         if (error) throw error;
+        await logGenerateAudit('success', {
+          code: data.activation_code,
+          durationDays: durationDaysNum,
+          planIndex: Number(planIndex) || 0,
+          deviceSuffix: deviceSuffix || '0',
+        });
         return res.status(201).json({ 
           activation_code: data.activation_code,
           expires_at: data.expires_at
         });
       } catch (dbErr: any) {
         if (isNetworkTimeout(dbErr)) {
+          await logGenerateAudit('failed', {
+            durationDays: durationDaysNum,
+            planIndex: Number(planIndex) || 0,
+            deviceSuffix: deviceSuffix || '0',
+            error: 'Database unavailable',
+          });
           return res.status(503).json({ 
             error: 'Database unavailable', 
             retryable: true,
@@ -310,6 +361,7 @@ export class DeviceController {
       }
     } catch (error: any) {
       console.error('[DeviceController] createActivation Error:', error.message);
+      await logGenerateAudit('failed', { error: error.message });
       return res.status(500).json({ error: error.message });
     }
   }
