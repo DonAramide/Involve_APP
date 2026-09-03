@@ -34,6 +34,10 @@ describe('Phase 2 — Security & Financial Lockdown', () => {
       ['post', '/payments/intents/abc/cancel'],
       ['post', '/payments/intents/abc/refund'],
       ['get', '/payments/history'],
+      ['get', '/api/admin/finance/disputes'],
+      ['post', '/api/admin/finance/disputes'],
+      ['post', '/api/admin/finance/disputes/abc/approve'],
+      ['post', '/api/admin/finance/disputes/abc/reject'],
     ] as const;
 
     paths.forEach(([method, path]) => {

@@ -9,6 +9,7 @@ import { PaymentGatewayConvergenceService } from '../services/gateway.service';
 import { QuasarWebhookService } from '../integrations/quasar/quasar-webhook.service';
 import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
+import { FinancialDisputeService } from '../services/financial-dispute.service';
 
 
 
@@ -43,6 +44,14 @@ export class WebhookController {
         event.event.startsWith('card.transaction.')
       ) {
         return WebhookController._handleCardTransactionWebhook(req, res, event, signature, rawBody);
+      }
+
+      // Maker-checker dispute debit (refund / chargeback / manual debit)
+      if (
+        typeof event?.event === 'string' &&
+        event.event.startsWith('dispute.debit.')
+      ) {
+        return WebhookController._handleDisputeDebitWebhook(req, res, event, signature, rawBody);
       }
 
       // 1. RESOLVE TRANSACTION & TENANT (Never trust tenantId from payload)
@@ -747,6 +756,102 @@ export class WebhookController {
     });
 
     console.log(`[Event] Emit payment.failed for ${reference}`);
+  }
+
+  private static async _verifyQuasarWebhookSignature(
+    event: any,
+    signature: string,
+    rawBody: string,
+    resolvedTenantId: string | null,
+  ): Promise<boolean> {
+    const candidateSecrets: string[] = [];
+    const pushSecret = (value?: string | null) => {
+      if (value && typeof value === 'string' && value.length >= 8 && !candidateSecrets.includes(value)) {
+        candidateSecrets.push(value);
+      }
+    };
+    if (resolvedTenantId) {
+      try {
+        const integration = await QuasarIntegrationStore.getByInvifyTenantId(resolvedTenantId);
+        if (integration) pushSecret(QuasarIntegrationStore.decryptSigningSecret(integration));
+      } catch {
+        /* ignore */
+      }
+    }
+    pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
+    pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+
+    for (const secret of candidateSecrets) {
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) return true;
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, undefined)) return true;
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Webhook] Dispute HMAC mismatch — accepting in development');
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Quasar dispute debit notifications — complete maker-checker cases left APPROVED_EXECUTING
+   * after a sync timeout. Never credits wallets; completePosted debits USER_WALLET fail-closed.
+   */
+  private static async _handleDisputeDebitWebhook(
+    req: Request,
+    res: Response,
+    event: any,
+    signature: string,
+    rawBody: string,
+  ) {
+    const caseId = event?.data?.invifyCaseId || event?.data?.invify_case_id || event?.data?.metadata?.invifyCaseId;
+    let resolvedTenantId: string | null = null;
+    if (caseId) {
+      try {
+        const row = await FinancialDisputeService.getById(String(caseId));
+        resolvedTenantId = row.tenant_id;
+      } catch {
+        /* fall through */
+      }
+    }
+    if (!resolvedTenantId && event?.data?.tenantId) {
+      try {
+        const mapped = await QuasarIntegrationStore.getByQuasarTenantId(String(event.data.tenantId));
+        resolvedTenantId = mapped?.invify_tenant_id || null;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const isValid = await WebhookController._verifyQuasarWebhookSignature(
+      event,
+      signature,
+      rawBody,
+      resolvedTenantId,
+    );
+    if (!isValid) {
+      return res.status(401).json({ error: 'Auth failure' });
+    }
+
+    try {
+      const result = await FinancialDisputeService.applyQuasarWebhook(event);
+      if (resolvedTenantId) {
+        await AuditService.log({
+          eventType: 'webhook.received',
+          reference: String(caseId || event?.data?.id || 'dispute-debit'),
+          tenantId: resolvedTenantId,
+          payload: event,
+        });
+      }
+      return res.status(200).json({ received: true, event: event.event, result });
+    } catch (err: any) {
+      console.error('[Webhook] dispute.debit handler:', err.message);
+      return res.status(200).json({
+        received: true,
+        event: event.event,
+        note: err.message,
+        case: err.case || undefined,
+      });
+    }
   }
 
   /**

@@ -922,6 +922,69 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/auth/change-password
+   * Authenticated user sets a new password after proving the current one.
+   */
+  static async changePassword(req: Request, res: Response) {
+    try {
+      const user = (req as any).user || {};
+      const userId = String(user.id || '').trim();
+      const email = String(user.email || '').trim().toLowerCase();
+      const currentPassword = String(req.body?.currentPassword || req.body?.oldPassword || '');
+      const newPassword = String(req.body?.newPassword || '');
+
+      if (!userId || !email) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current password and new password are required.' });
+      }
+
+      const { data: verified, error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (verifyError || !verified?.session) {
+        return res.status(401).json({ error: 'Current password is incorrect.' });
+      }
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        /* ignore */
+      }
+
+      const policy = evaluatePasswordPolicy(newPassword, { email, currentPassword });
+      if (!policy.ok) {
+        return res.status(400).json({
+          error: policy.errors[0],
+          code: 'PASSWORD_POLICY',
+          checks: policy.checks,
+        });
+      }
+
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: newPassword,
+      });
+      if (authError) {
+        return res.status(400).json({ error: authError.message || 'Failed to update password.' });
+      }
+
+      await supabaseAdmin
+        .from('users')
+        .update({ require_password_reset: false })
+        .eq('id', userId);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Password changed successfully. Please log in again on other devices.',
+      });
+    } catch (error: any) {
+      console.error('[AuthController] changePassword Error:', error.message);
+      return res.status(500).json({ error: 'Failed to change password' });
+    }
+  }
+
   public static async sendWhatsappOtp(req: Request, res: Response): Promise<void> {
     try {
       const { phone } = req.body;

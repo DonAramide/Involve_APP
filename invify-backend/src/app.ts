@@ -91,6 +91,7 @@ import { DatabaseStore } from './modules/financial-platform/infrastructure/Datab
 import { InvestigationQueueService } from './modules/financial-platform/reconciliation/InvestigationQueueService';
 import { QuasarConnector } from './modules/financial-platform/infrastructure/QuasarConnector';
 import { HealthController } from './controllers/health.controller';
+import { FinancialDisputeController } from './controllers/financial-dispute.controller';
 
 import { authenticate, optionalAuthenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
@@ -265,6 +266,7 @@ app.post('/public/onboarding/report-issue', OnboardingController.reportIssue);
 // Platform User Authentication & MFA / Recovery
 app.post('/api/auth/login', authLimiter, AuthController.login);
 app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
+app.post('/api/auth/change-password', authLimiter, authenticate, AuthController.changePassword);
 app.post('/api/auth/mfa/setup', authLimiter, AuthController.mfaSetup);
 app.post('/api/auth/mfa/verify', authLimiter, AuthController.mfaVerify);
 app.post('/api/auth/refresh', authLimiter, AuthController.refresh);
@@ -532,7 +534,7 @@ registerCollisionAdmin('get', '/settings', authenticate, checkRole(['super_admin
 registerCollisionAdmin('patch', '/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
 registerCollisionAdmin('get', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
 registerCollisionAdmin('patch', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
-app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
+registerCollisionAdmin('post', '/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
 // Quasar POS encryption key (card switch ICC crypto)
 app.get('/admin/quasar/integrations', authenticate, checkRole(['super_admin']), AdminController.listQuasarIntegrations);
@@ -722,6 +724,57 @@ app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin'
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
 app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
+
+const financeDisputeRoles = [
+  'super_admin',
+  'admin',
+  'admin_finance',
+  'admin_treasury',
+  'admin_risk',
+  'finance_staff',
+] as const;
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.list,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.create,
+);
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes/:id',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.get,
+);
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes/:id/audit',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.audit,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes/:id/approve',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.approve,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes/:id/reject',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.reject,
+);
 
 // Card settlement reconciliation (processor file upload → mark Quasar pull settled)
 import {
@@ -1269,8 +1322,12 @@ io.on('connection', (socket: Socket) => {
   socket.data.ip = socketClientIp(socket);
   console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId} IP: ${socket.data.ip})`);
 
-  // Join tenant room immediately so emergency_lock reaches devices even if
-  // the client never emits join_room (or emits it late).
+  // Join global + tenant rooms immediately so broadcasts and emergency_lock
+  // reach devices even if the client never emits join_room (or emits it late).
+  socket.join('all');
+  if (socket.data.deviceId) {
+    socket.join(`device:${socket.data.deviceId}`);
+  }
   if (socket.data.tenantId) {
     socket.join(`tenant:${socket.data.tenantId}`);
     console.log(`[Socket.io] Auto-joined tenant:${socket.data.tenantId} for ${socket.id}`);

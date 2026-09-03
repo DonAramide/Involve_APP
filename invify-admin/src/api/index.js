@@ -117,8 +117,9 @@ export const adminApi = {
   createUser: (data) => api.post('/api/admin/users', data),
   updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
   sendInvite: (data) => api.post('/admin/invites', data),
-  getProfile: () => api.get('/admin/profile'),
-  updateProfile: (data) => api.patch('/admin/profile', data),
+  getProfile: () => api.get('/api/admin/profile'),
+  updateProfile: (data) => api.patch('/api/admin/profile', data),
+  changePassword: (data) => api.post('/api/auth/change-password', data),
   getGlobalSettings: () => api.get('/api/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/api/admin/settings', data),
   listQuasarIntegrations: () => api.get('/admin/quasar/integrations'),
@@ -167,7 +168,15 @@ export const adminApi = {
   updateComplaintStatus: (id, status) => api.patch(`/api/admin/complaints/${id}/status`, { status }),
 
   // Live Broadcasts
-  sendBroadcast: (data) => api.post('/admin/broadcast', data),
+  sendBroadcast: (data) => api.post('/api/admin/broadcast', data),
+
+  // Maker-checker refunds / chargebacks / manual Quasar debit
+  listFinancialDisputes: (params) => api.get('/api/admin/finance/disputes', { params }),
+  createFinancialDispute: (data) => api.post('/api/admin/finance/disputes', data),
+  getFinancialDispute: (id) => api.get(`/api/admin/finance/disputes/${id}`),
+  getFinancialDisputeAudit: (id) => api.get(`/api/admin/finance/disputes/${id}/audit`),
+  approveFinancialDispute: (id, data) => api.post(`/api/admin/finance/disputes/${id}/approve`, data || {}),
+  rejectFinancialDispute: (id, data) => api.post(`/api/admin/finance/disputes/${id}/reject`, data || {}),
 
   // Retention & Insights
   getRetentionSuggestion: () => api.get('/admin/retention/suggestion'),

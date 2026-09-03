@@ -680,4 +680,67 @@ export class QuasarPaymentsClient {
       { ...opts, idempotencyKey },
     );
   }
+
+  /**
+   * POST /payments/intents/{reference}/refunds
+   * Existing payment-intent refund. Amount is kobo.
+   */
+  async createIntentRefund(
+    reference: string,
+    params: { amount: number; reason?: string },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const idempotencyKey = opts?.idempotencyKey ?? `intent-refund:${reference}:${params.amount}`;
+    return this.client.post(
+      `/payments/intents/${encodeURIComponent(reference)}/refunds`,
+      { amount: Math.round(params.amount), reason: params.reason },
+      { ...opts, idempotencyKey },
+    );
+  }
+
+  /**
+   * POST /disputes/debits — Maker-checker chargeback / manual tenant debit.
+   * Invify only calls this after a distinct checker has approved the case.
+   * Amount is kobo. Idempotency-Key is required.
+   */
+  async createDisputeDebit(
+    params: {
+      invifyTenantId: string;
+      quasarTenantId?: string | null;
+      invifyCaseId: string;
+      amount: number;
+      currency?: string;
+      type: 'REFUND' | 'CHARGEBACK' | 'MANUAL_DEBIT';
+      reason: string;
+      originalPaymentReference?: string;
+      makerEmail: string;
+      checkerEmail: string;
+      metadata?: Record<string, any>;
+    },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const idempotencyKey = opts?.idempotencyKey ?? `dispute-debit:${params.invifyCaseId}`;
+    return this.client.post(
+      '/disputes/debits',
+      {
+        invifyTenantId: params.invifyTenantId,
+        quasarTenantId: params.quasarTenantId || undefined,
+        invifyCaseId: params.invifyCaseId,
+        amount: Math.round(params.amount),
+        currency: params.currency ?? 'NGN',
+        type: params.type,
+        reason: params.reason,
+        originalPaymentReference: params.originalPaymentReference,
+        makerEmail: params.makerEmail,
+        checkerEmail: params.checkerEmail,
+        metadata: params.metadata || {},
+      },
+      { ...opts, idempotencyKey },
+    );
+  }
+
+  /** GET /disputes/debits/{id} */
+  async getDisputeDebit(debitId: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/disputes/debits/${encodeURIComponent(debitId)}`, opts);
+  }
 }

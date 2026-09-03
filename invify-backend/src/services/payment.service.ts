@@ -431,10 +431,10 @@ export class PaymentService {
     let providerRefund: any;
     try {
       const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
-      providerRefund = await (paymentsClient as any).client.post(
-        `/payments/intents/${transaction.reference}/refunds`,
-        { amount: Math.round(amount) },
-      );
+      providerRefund = await paymentsClient.createIntentRefund(transaction.reference, {
+        amount: Math.round(amount),
+        reason,
+      });
     } catch (err: any) {
       console.error(`[PaymentService] Quasar refund failed — failing closed (no local SUCCESS):`, err.message);
       await AuditService.log({
