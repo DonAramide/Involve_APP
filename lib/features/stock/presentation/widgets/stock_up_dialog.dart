@@ -90,45 +90,49 @@ class _StockUpDialogState extends State<StockUpDialog> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: source,
-      maxWidth: 1280,
-      imageQuality: 80,
-    );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    setState(() => _receiptImage = bytes);
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: 1280,
+        imageQuality: 80,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() => _receiptImage = bytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}. $e',
+          ),
+        ),
+      );
+    }
   }
 
-  Future<void> _chooseImageSource() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Receipt / stock photo', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take photo'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from gallery'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-            const SizedBox(height: 8),
-          ],
+  Widget _photoSourceButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _pickImage(ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('Take photo'),
+          ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _pickImage(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Gallery'),
+          ),
+        ),
+      ],
     );
-    if (source != null) await _pickImage(source);
   }
 
   void _submit() {
@@ -251,18 +255,10 @@ class _StockUpDialogState extends State<StockUpDialog> {
                   ],
                 )
               else
-                OutlinedButton.icon(
-                  onPressed: _chooseImageSource,
-                  icon: const Icon(Icons.add_a_photo_outlined),
-                  label: const Text('Take photo or pick from gallery'),
-                ),
+                _photoSourceButtons(),
               if (_receiptImage != null) ...[
                 const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _chooseImageSource,
-                  icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Replace photo'),
-                ),
+                _photoSourceButtons(),
               ],
             ],
           ),

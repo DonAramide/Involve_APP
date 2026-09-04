@@ -86,15 +86,13 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImageFrom(ImageSource source) async {
     try {
       if (kIsWeb) {
-        // Use file_picker for web - better browser support
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           type: FileType.image,
           allowMultiple: false,
         );
-        
         if (result != null && result.files.isNotEmpty) {
           setState(() {
             _imageBytes = result.files.first.bytes;
@@ -103,40 +101,18 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         return;
       }
 
-      // Show selection dialog for mobile
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        builder: (ctx) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 600,
+        imageQuality: 85,
       );
 
-      if (source != null) {
-        final picker = ImagePicker();
-        final XFile? image = await picker.pickImage(
-          source: source,
-          maxWidth: 600,
-          imageQuality: 85,
-        );
-        
-        if (image != null) {
-          final bytes = await image.readAsBytes();
-          setState(() {
-            _imageBytes = bytes;
-          });
-        }
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -185,7 +161,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
             children: [
               // Image Picker
               GestureDetector(
-                onTap: _pickImage,
+                onTap: () => _pickImageFrom(ImageSource.gallery),
                 child: Container(
                   height: 100,
                   width: 100,
@@ -201,6 +177,26 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                       ? const Icon(Icons.add_a_photo, color: Colors.grey)
                       : null,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickImageFrom(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                      label: const Text('Take photo'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickImageFrom(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text('Gallery'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               
