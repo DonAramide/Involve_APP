@@ -45,6 +45,36 @@ export function isMfaChallengePending() {
   }
 }
 
+/** Live access token that already cleared MFA. Stale challenge leftovers must not hijack it. */
+export function hasVerifiedOperatorSession() {
+  if (!readAccessToken()) return false;
+  try {
+    return localStorage.getItem('mfa_status_verified') !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+const SOFT_SESSION_FAILURE_MARKERS = [
+  '/api/notifications',
+  '/notifications',
+  '/api/dashboard/',
+  '/dashboard/',
+  '/api/v1/runtime/config',
+  '/v1/runtime/config',
+  '/api/v1/finance',
+  '/api/finance',
+  '/api/v1/wallet',
+  '/api/inventory',
+  '/api/v1/inventory',
+];
+
+/** Background/overview GETs that should degrade instead of wiping the operator session. */
+export function isSoftSessionFailureUrl(url) {
+  const value = String(url || '').toLowerCase();
+  return SOFT_SESSION_FAILURE_MARKERS.some((marker) => value.includes(marker));
+}
+
 const AUTH_PATH_MARKERS = [
   '/api/auth/login',
   '/api/auth/refresh',
@@ -85,9 +115,15 @@ export function readRefreshToken() {
 
 export function persistAuthenticatedSession(tokenData = {}) {
   logoutGeneration = 0;
-  if (tokenData.token) localStorage.setItem('invify_token', tokenData.token);
-  if (tokenData.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenData.refreshToken);
+  const accessToken = tokenData.token || tokenData.access_token;
+  const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
+  if (accessToken) {
+    localStorage.setItem('invify_token', accessToken);
+    localStorage.setItem('invify_access_token', accessToken);
+    localStorage.setItem('supabase_token', accessToken);
+  }
+  if (refreshToken) {
+    localStorage.setItem('invify_refresh_token', refreshToken);
   }
   const user = tokenData.user || {};
   if (user.id) localStorage.setItem('operator_userId', user.id);
@@ -96,6 +132,11 @@ export function persistAuthenticatedSession(tokenData = {}) {
   if (user.tenantId) localStorage.setItem('tenant_id', user.tenantId);
   localStorage.setItem('mfa_status_verified', 'true');
   clearMfaChallengeState();
+  try {
+    localStorage.setItem('invify_last_activity_at', String(Date.now()));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearMfaChallengeState() {
@@ -236,13 +277,15 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
         return Promise.reject(error);
       }
 
+      const keepSession = isSoftSessionFailureUrl(original.url);
+
       if (original._invifyRetry) {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
 
       if (!usableRefreshToken(readRefreshToken())) {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
 
@@ -253,7 +296,7 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
         original.headers.Authorization = `Bearer ${readAccessToken()}`;
         return api.request(original);
       } catch {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
     },

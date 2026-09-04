@@ -1,19 +1,19 @@
 <!-- invify-admin/src/pages/applications/SideloadIntegrityPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16 fit overflow-hidden" style="height: calc(100vh - 50px);">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16 fit overflow-hidden" style="height: calc(100vh - 50px);">
     
     <!-- Header strip -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="verified_user" size="sm" color="cyan-3" />
+        <q-icon name="verified_user" size="sm" :color="prefs.isDarkMode ? 'cyan-3' : 'primary'" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Sideload & Package Cryptographic Integrity Center</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">PACKAGE_LINEAGE_MODELING // FORENSIC_ANCESTRY_AUDIT</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Sideload & Package Cryptographic Integrity Center</div>
+          <div class="text-metric-mono text-secondary" style="font-size: 10px;">PACKAGE_LINEAGE_MODELING // FORENSIC_ANCESTRY_AUDIT</div>
         </div>
       </div>
       
       <!-- Temporal Horizon Switch -->
-      <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
+      <div class="row items-center op-gap-8 no-wrap text-caption text-secondary">
         <span class="v-hide-xs">Forensic Retention:</span>
         <q-btn-toggle
           v-model="lineageRetentionHorizon"
@@ -24,56 +24,56 @@
             { label: 'Forensic Max', value: 'max' }
           ]"
           dense flat
-          toggle-color="cyan-4"
-          toggle-text-color="black"
-          class="bg-[#12161a] border-muted text-metric-sm"
+          :toggle-color="prefs.isDarkMode ? 'cyan-4' : 'primary'"
+          :toggle-text-color="prefs.isDarkMode ? 'black' : 'white'"
+          class="bg-panel border-muted text-metric-sm"
         />
       </div>
     </div>
 
     <!-- UPPER ROW: Package Assurance Index -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column shrink-0">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="panel-card bg-panel border-muted rounded-borders column shrink-0 shadow-sm">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="fingerprint" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Fleet wide Cryptographic Trust Index Scoring</span>
+          <q-icon name="fingerprint" size="xs" :color="prefs.isDarkMode ? 'cyan-3' : 'primary'" />
+          <span class="text-operator-title text-main text-weight-bold">Fleet wide Cryptographic Trust Index Scoring</span>
         </div>
-        <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">UNAUTHORIZED APK DRIFT TRACE</span>
+        <span class="text-metric-mono" :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'" style="font-size: 10px;">UNAUTHORIZED APK DRIFT TRACE</span>
       </div>
 
       <div class="panel-body q-pa-sm row items-center justify-between op-gap-16 text-center">
         
         <div class="col column">
-          <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">99.91%</span>
-          <span class="text-grey-5" style="font-size: 10px;">Lineage Verification</span>
+          <span class="text-metric-mono text-positive text-weight-bold" style="font-size: 18px;">99.91%</span>
+          <span class="text-secondary" style="font-size: 10px;">Lineage Verification</span>
         </div>
 
         <div class="col column border-left">
-          <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 18px;">2 Flagged</span>
-          <span class="text-grey-5" style="font-size: 10px;">Sideload Exceptions</span>
+          <span class="text-metric-mono text-weight-bold" :class="prefs.isDarkMode ? 'text-amber-4' : 'text-amber-9'" style="font-size: 18px;">2 Flagged</span>
+          <span class="text-secondary" style="font-size: 10px;">Sideload Exceptions</span>
         </div>
 
         <div class="col column border-left">
-          <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 18px;">0 Downgrades</span>
-          <span class="text-grey-5" style="font-size: 10px;">Rollback Attenuation</span>
+          <span class="text-metric-mono text-negative text-weight-bold" style="font-size: 18px;">0 Downgrades</span>
+          <span class="text-secondary" style="font-size: 10px;">Rollback Attenuation</span>
         </div>
 
         <div class="col column border-left">
-          <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 18px;">256-Bit</span>
-          <span class="text-grey-5" style="font-size: 10px;">ECDSA Chain Base</span>
+          <span class="text-metric-mono text-weight-bold" :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'" style="font-size: 18px;">256-Bit</span>
+          <span class="text-secondary" style="font-size: 10px;">ECDSA Chain Base</span>
         </div>
 
       </div>
     </div>
 
     <!-- MAIN GRID SECTION: FINAL REFINEMENT #3: Forensic-Grade Package Lineage Modeling Matrix -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col min-h-0 fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
+    <div class="panel-card bg-panel border-muted rounded-borders column col min-h-0 fit shadow-sm">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="account_tree" size="xs" color="amber-4" />
-          <span class="text-operator-title text-white text-weight-bold">Forensic-Grade Package Lineage Modeling & Ancestry Chains</span>
+          <q-icon name="account_tree" size="xs" :color="prefs.isDarkMode ? 'amber-4' : 'amber-9'" />
+          <span class="text-operator-title text-main text-weight-bold">Forensic-Grade Package Lineage Modeling & Ancestry Chains</span>
         </div>
-        <span class="text-metric-mono text-amber-3" style="font-size: 10px;">TRACKING SIGNING CERTIFICATE TRANSITIONS</span>
+        <span class="text-metric-mono" :class="prefs.isDarkMode ? 'text-amber-3' : 'text-amber-9'" style="font-size: 10px;">TRACKING SIGNING CERTIFICATE TRANSITIONS</span>
       </div>
 
       <div class="col overflow-auto q-pa-xs custom-scrollbar">
@@ -81,71 +81,71 @@
           <q-item 
             v-for="lin in lineageChainsList" 
             :key="lin.id"
-            class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-4 hover-row"
+            class="q-px-sm q-py-xs bg-subpanel rounded-borders column op-gap-4 hover-row"
             :class="lin.riskSeverity === 'CRITICAL' ? 'border-left-critical' : 'border-left-warning'"
           >
             <!-- Top Lineage Identity -->
             <div class="row items-center justify-between no-wrap fit">
               <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ lin.packageName }}</span>
-                <q-chip dense size="xs" :color="lin.riskSeverity === 'CRITICAL' ? 'red-10' : 'amber-10'" :text-color="lin.riskSeverity === 'CRITICAL' ? 'red-2' : 'amber-2'" class="text-weight-bold">
+                <span class="text-main text-weight-bold text-caption">{{ lin.packageName }}</span>
+                <q-chip dense size="xs" :color="lin.riskSeverity === 'CRITICAL' ? 'red-10' : 'amber-10'" text-color="white" class="text-weight-bold">
                   {{ lin.exceptionType }}
                 </q-chip>
               </div>
 
               <div class="row items-center op-gap-4">
-                <span class="text-metric-mono text-grey-5" style="font-size: 11px;">
-                  Trust Weight: <span :class="lin.trustScore < 50 ? 'text-red-4 text-weight-bold' : 'text-green-4'">{{ lin.trustScore }}/100</span>
+                <span class="text-metric-mono text-secondary" style="font-size: 11px;">
+                  Trust Weight: <span :class="lin.trustScore < 50 ? 'text-negative text-weight-bold' : 'text-positive text-weight-bold'">{{ lin.trustScore }}/100</span>
                 </span>
               </div>
             </div>
 
             <!-- FORENSIC ANCESTRY TRANSITIONS TIMELINE STRIP -->
-            <div class="bg-[#111417] q-pa-xs rounded-borders column op-gap-2">
-              <span class="text-metric-mono text-grey-6 q-px-xs" style="font-size: 9px;">CRYPTOGRAPHIC ANCESTRY TRAJECTORY:</span>
+            <div class="bg-panel q-pa-xs rounded-borders column op-gap-2 border-main">
+              <span class="text-metric-mono text-secondary q-px-xs text-weight-bold" style="font-size: 9px;">CRYPTOGRAPHIC ANCESTRY TRAJECTORY:</span>
               
-              <div class="row items-center justify-between no-wrap q-px-xs text-grey-4" style="font-size: 10px;">
+              <div class="row items-center justify-between no-wrap q-px-xs text-secondary" style="font-size: 10px;">
                 <!-- Step 1 -->
                 <div class="column">
-                  <span class="text-grey-6" style="font-size: 9px;">Origin Lineage</span>
-                  <span class="text-metric-mono text-green-4">{{ lin.ancestrySteps.origin }}</span>
+                  <span class="text-muted" style="font-size: 9px;">Origin Lineage</span>
+                  <span class="text-metric-mono text-positive text-weight-bold">{{ lin.ancestrySteps.origin }}</span>
                 </div>
-                <q-icon name="arrow_forward" size="xs" color="grey-7" />
+                <q-icon name="arrow_forward" size="xs" color="grey-6" />
                 
                 <!-- Step 2 -->
                 <div class="column">
-                  <span class="text-grey-6" style="font-size: 9px;">Cert Transition</span>
-                  <span class="text-metric-mono text-amber-4">{{ lin.ancestrySteps.transition }}</span>
+                  <span class="text-muted" style="font-size: 9px;">Cert Transition</span>
+                  <span class="text-metric-mono text-weight-bold" :class="prefs.isDarkMode ? 'text-amber-4' : 'text-amber-9'">{{ lin.ancestrySteps.transition }}</span>
                 </div>
-                <q-icon name="arrow_forward" size="xs" color="grey-7" />
+                <q-icon name="arrow_forward" size="xs" color="grey-6" />
 
                 <!-- Step 3 Observed State -->
                 <div class="column text-right">
-                  <span class="text-grey-6" style="font-size: 9px;">Observed Status</span>
-                  <span class="text-metric-mono text-white text-weight-bold">{{ lin.ancestrySteps.current }}</span>
+                  <span class="text-muted" style="font-size: 9px;">Observed Status</span>
+                  <span class="text-metric-mono text-main text-weight-bold">{{ lin.ancestrySteps.current }}</span>
                 </div>
               </div>
             </div>
 
             <!-- Context string -->
-            <div class="text-grey-4" style="font-size: 11px;">
-              Sideload Origin Trace: <span class="text-white text-weight-medium">"{{ lin.sideloadOrigin }}"</span> // Lineage Drift: <span class="text-amber-3">{{ lin.driftSummary }}</span>
+            <div class="text-secondary" style="font-size: 11px;">
+              Sideload Origin Trace: <span class="text-main font-mono text-weight-bold">"{{ lin.sideloadOrigin }}"</span> // Lineage Drift: <span class="text-weight-bold" :class="prefs.isDarkMode ? 'text-amber-3' : 'text-amber-9'">{{ lin.driftSummary }}</span>
             </div>
 
             <!-- Action Controllers -->
-            <div class="row items-center justify-between border-top q-pt-xs text-grey-5" style="font-size: 10px;">
-              <span>Target Partition Scope: <span class="text-metric-mono text-white">{{ lin.tenantScope }}</span></span>
+            <div class="row items-center justify-between border-top q-pt-xs text-secondary" style="font-size: 10px;">
+              <span>Target Partition Scope: <span class="text-metric-mono text-main font-bold">{{ lin.tenantScope }}</span></span>
               
               <div class="row items-center op-gap-4">
                 <q-btn 
-                  dense flat size="xs" color="amber-3" label="Force Attestation Sync" 
+                  dense flat size="xs" color="amber-8" label="Force Attestation Sync" 
                   @click="forceAttestationSync(lin.id)" 
-                  class="bg-[#241c12] q-px-xs text-metric-sm" 
+                  class="bg-subpanel q-px-xs text-metric-sm" 
                 />
                 <q-btn 
-                  dense flat size="xs" color="red-4" label="Trigger Lineage Rollback" 
+                  dense flat size="xs" color="negative" label="Trigger Lineage Rollback" 
                   @click="triggerLineageRollback(lin)" 
-                  class="bg-[#241212] q-px-xs text-weight-bold text-metric-sm" 
+                  class="bg-subpanel q-px-xs text-weight-bold text-metric-sm" 
                 />
               </div>
             </div>
@@ -153,7 +153,7 @@
         </q-list>
       </div>
 
-      <div class="panel-footer bg-[#161b20] q-pa-xs border-top text-center text-grey-6 shrink-0" style="font-size: 10px;">
+      <div class="panel-footer bg-subpanel q-pa-xs border-top text-center text-secondary shrink-0" style="font-size: 10px;">
         Integrity Center protocol: Bounded packages matching explicit signature downgrade loops trigger auto-quarantine hardware hooks instantaneously.
       </div>
     </div>
@@ -164,7 +164,9 @@
 <script setup>
 import { ref } from 'vue'
 import { Notify } from 'quasar'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 
+const { prefs } = useOperatorPreferences()
 const lineageRetentionHorizon = ref('30d')
 
 // 1. Static base arrays complete with FINAL REFINEMENT #3: Forensic-Grade Package Lineage Modeling

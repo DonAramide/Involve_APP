@@ -10,7 +10,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const PRODUCTION_DEFAULT = 'https://api-quasar.iips.app/api/v1';
+const PRODUCTION_DEFAULT = 'https://api-quasar.invify.org/api/v1';
 
 /** Only set via setQuasarBaseUrlOverride after an admin save. */
 let explicitOverride: string | null = null;

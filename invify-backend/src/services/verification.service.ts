@@ -17,12 +17,23 @@ export class VerificationService {
     return Math.floor(min + Math.random() * (max - min + 1)).toString();
   }
 
+  public static normalizePurpose(purpose?: string): PurposeType {
+    if (!purpose) return 'SIGNUP';
+    const upper = String(purpose).trim().toUpperCase();
+    if (upper === 'ONBOARDING' || upper === 'SIGNUP') return 'SIGNUP';
+    if (['PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(upper)) {
+      return upper as PurposeType;
+    }
+    return 'SIGNUP';
+  }
+
   public async sendOTP(
     identifier: string, // Email or Phone
     channel: ChannelType,
-    purpose: PurposeType,
+    purpose: PurposeType | string,
     tenantId?: string
   ): Promise<boolean> {
+    const safePurpose = VerificationService.normalizePurpose(purpose);
     const rawOtp = this.generateOTP();
     const variant = require('../config/build-variant').BuildVariantService.getInstance();
     if (variant.isLocal() && process.env.LOG_OTP_IN_LOCAL === 'true') {
@@ -51,7 +62,7 @@ export class VerificationService {
       .update({ status: 'CANCELLED' })
       .match({ 
          channel, 
-         purpose, 
+         purpose: safePurpose, 
          status: 'PENDING' 
       })
       .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized);
@@ -64,7 +75,7 @@ export class VerificationService {
         phone,
         code: hashedOtp,
         channel,
-        purpose,
+        purpose: safePurpose,
         status: 'PENDING',
         attempt_count: 0,
         expires_at: expiresAt
@@ -78,7 +89,7 @@ export class VerificationService {
     // Delegate to actual sender
     let sent = false;
     if (channel === 'EMAIL') {
-      if (purpose === 'PASSWORD_RESET') {
+      if (safePurpose === 'PASSWORD_RESET') {
         sent = await emailService.sendPasswordResetCode(normalized, rawOtp);
       } else {
         sent = await emailService.sendVerificationCode(normalized, rawOtp);
@@ -94,7 +105,7 @@ export class VerificationService {
     identifier: string,
     code: string,
     channel: ChannelType,
-    purpose: PurposeType
+    purpose: PurposeType | string
   ): Promise<boolean> {
     const result = await this.verifyOTPDetailed(identifier, code, channel, purpose);
     return result.ok;
@@ -104,8 +115,9 @@ export class VerificationService {
     identifier: string,
     code: string,
     channel: ChannelType,
-    purpose: PurposeType
+    purpose: PurposeType | string
   ): Promise<{ ok: boolean; error?: string }> {
+    const safePurpose = VerificationService.normalizePurpose(purpose);
     const normalized =
       channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
 
@@ -115,7 +127,7 @@ export class VerificationService {
       .select('*')
       .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
       .eq('channel', channel)
-      .eq('purpose', purpose)
+      .eq('purpose', safePurpose)
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false })
       .limit(1)

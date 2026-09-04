@@ -149,7 +149,7 @@
                 </q-banner>
                 <div class="text-caption text-grey-6">
                   Leave blank to fall back to <code>QUASAR_BASE_URL</code> env, then production
-                  <code>https://api-quasar.iips.app/api/v1</code>.
+                  <code>https://api-quasar.invify.org/api/v1</code>.
                   Pasting a full <code>…/pos/card-transaction</code> URL is OK — it will be normalized to the base.
                 </div>
               </div>
@@ -163,7 +163,7 @@
                     <q-btn
                       dense outline color="cyan-4" size="sm" no-caps
                       label="Production"
-                      @click="mockSettings.quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'"
+                      @click="mockSettings.quasarBaseUrl = 'https://api-quasar.invify.org/api/v1'"
                     />
                   </div>
                 </q-banner>
@@ -688,7 +688,7 @@ const mockSettings = ref({
   timezone: 'UTC',
   requireMFA: true,
   strictIPBinding: true,
-  sessionTimeout: 15,
+    sessionTimeout: 6,
   primaryColor: '#26A69A',
   logoUrl: 'https://cdn.invify.com/enterprise-logo.png',
   hideInvifyWatermark: false,
@@ -707,16 +707,16 @@ const mockSettings = ref({
 
 const quasarBaseNormalized = computed(() => {
   let u = String(mockSettings.value.quasarBaseUrl || '').trim();
-  if (!u) return 'https://api-quasar.iips.app/api/v1';
+  if (!u) return 'https://api-quasar.invify.org/api/v1';
   u = u.split('?')[0].split('#')[0].replace(/\/+$/, '');
   const suffixes = ['/pos/card-transaction', '/pos/icc-data', '/pos/transactionFromMpos', '/pos/icc'];
   for (const s of suffixes) {
     if (u.toLowerCase().endsWith(s)) {
       u = u.slice(0, -s.length).replace(/\/+$/, '');
-      break;
+      break
     }
   }
-  return u || 'https://api-quasar.iips.app/api/v1';
+  return u || 'https://api-quasar.invify.org/api/v1';
 });
 const quasarCardTransactionPreview = computed(() => `${quasarBaseNormalized.value}/pos/card-transaction`);
 const quasarIccDataPreview = computed(() => `${quasarBaseNormalized.value}/pos/icc-data`);

@@ -1,7 +1,7 @@
 // src/controllers/onboarding.controller.ts
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
-import { verificationService } from '../services/verification.service';
+import { verificationService, VerificationService } from '../services/verification.service';
 import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisioning.service';
 import jwt from 'jsonwebtoken';
 import { BuildVariantService } from '../config/build-variant';
@@ -35,6 +35,35 @@ function generateTenantCode(phone: string | undefined | null): string {
     return last10.split('').reverse().join('');
   }
   return Math.floor(1000000000 + Math.random() * 9000000000).toString();
+}
+
+function ownerContactFields(input: {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  businessName?: string;
+  city?: string;
+  country?: string;
+}) {
+  const firstName = String(input.firstName || '').trim();
+  const lastName = String(input.lastName || '').trim();
+  const email = String(input.email || '').trim().toLowerCase();
+  return {
+    owner_email: email || null,
+    owner_name: `${firstName} ${lastName}`.trim() || null,
+    settings: {
+      owner_profile: {
+        firstName,
+        lastName,
+        email,
+        phone: String(input.phone || '').trim(),
+        businessName: String(input.businessName || '').trim(),
+        city: String(input.city || '').trim(),
+        country: String(input.country || '').trim(),
+      },
+    },
+  };
 }
 
 
@@ -238,6 +267,79 @@ export class OnboardingController {
   }
 
   /**
+   * Helper to check if an email already exists in users, tenants (owner_email), or local users_db.json
+   */
+  public static async isEmailExisting(email: string): Promise<boolean> {
+    if (!email) return false;
+    const normalized = email.trim().toLowerCase();
+
+    // 1. Check users table
+    try {
+      const { data: userData } = await supabaseAdmin
+        .from('users')
+        .select('id, email')
+        .ilike('email', normalized)
+        .limit(1);
+
+      if (userData && userData.length > 0) return true;
+    } catch (err: any) {
+      console.warn('[OnboardingController] Error checking users table for email:', err.message);
+    }
+
+    // 2. Check tenants table (owner_email)
+    try {
+      const { data: tenantData } = await supabaseAdmin
+        .from('tenants')
+        .select('id, owner_email')
+        .ilike('owner_email', normalized)
+        .limit(1);
+
+      if (tenantData && tenantData.length > 0) return true;
+    } catch (err: any) {
+      console.warn('[OnboardingController] Error checking tenants table for email:', err.message);
+    }
+
+    // 3. Check local users_db.json if available
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dbPath = path.join(__dirname, '../../users_db.json');
+      if (fs.existsSync(dbPath)) {
+        const users = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+        if (Array.isArray(users) && users.some((u: any) => (u.email || '').toLowerCase() === normalized)) {
+          return true;
+        }
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  /**
+   * GET/POST /auth/check-email and /api/auth/check-email
+   */
+  public static async checkEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const emailRaw = req.method === 'GET' ? req.query.email : req.body?.email;
+      if (!emailRaw || typeof emailRaw !== 'string') {
+        res.status(400).json({ error: 'Valid email is required.' });
+        return;
+      }
+      const normalized = emailRaw.trim().toLowerCase();
+      const exists = await OnboardingController.isEmailExisting(normalized);
+      res.status(200).json({
+        exists,
+        message: exists
+          ? 'An account with this email already exists.'
+          : 'Email is available.'
+      });
+    } catch (error: any) {
+      console.error('[OnboardingController] checkEmail error:', error.message);
+      res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+  }
+
+  /**
    * POST /auth/send-email-otp
    */
   public static async sendEmailOtp(req: Request, res: Response): Promise<void> {
@@ -248,7 +350,23 @@ export class OnboardingController {
         return;
       }
       const normalized = email.trim().toLowerCase();
-      await verificationService.sendOTP(normalized, 'EMAIL', purpose);
+
+      // For registration / signup, prevent sending OTP if email already exists
+      const isSignup = !purpose || purpose.toUpperCase() === 'SIGNUP' || purpose.toUpperCase() === 'ONBOARDING';
+      if (isSignup) {
+        const exists = await OnboardingController.isEmailExisting(normalized);
+        if (exists) {
+          res.status(409).json({
+            success: false,
+            code: 'EMAIL_ALREADY_EXISTS',
+            error: 'An account with this email already exists. Please sign in or use a different email.'
+          });
+          return;
+        }
+      }
+
+      const safePurpose = VerificationService.normalizePurpose(purpose);
+      await verificationService.sendOTP(normalized, 'EMAIL', safePurpose);
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendEmailOtp error:', error.message);
@@ -264,13 +382,14 @@ export class OnboardingController {
       const emailRaw = req.body?.email;
       // App sends `code`; admin web historically sent `otp`
       const code = req.body?.code || req.body?.otp;
-      const purpose = req.body?.purpose || 'SIGNUP';
+      const rawPurpose = req.body?.purpose || 'SIGNUP';
+      const safePurpose = VerificationService.normalizePurpose(rawPurpose);
       if (!emailRaw || !code) {
         res.status(400).json({ error: 'Email and code are required.' });
         return;
       }
       const email = String(emailRaw).trim().toLowerCase();
-      const result = await verificationService.verifyOTPDetailed(email, String(code).trim(), 'EMAIL', purpose);
+      const result = await verificationService.verifyOTPDetailed(email, String(code).trim(), 'EMAIL', safePurpose);
       if (result.ok) {
         res.status(200).json({ success: true, message: 'Email verified successfully.' });
       } else {
@@ -292,7 +411,8 @@ export class OnboardingController {
         res.status(400).json({ error: 'Valid phone number is required.' });
         return;
       }
-      await verificationService.sendOTP(phone.trim(), 'WHATSAPP', purpose);
+      const safePurpose = VerificationService.normalizePurpose(purpose);
+      await verificationService.sendOTP(phone.trim(), 'WHATSAPP', safePurpose);
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendWhatsappOtp error:', error.message);
@@ -307,13 +427,14 @@ export class OnboardingController {
     try {
       const phoneRaw = req.body?.phone;
       const code = req.body?.code || req.body?.otp;
-      const purpose = req.body?.purpose || 'SIGNUP';
+      const rawPurpose = req.body?.purpose || 'SIGNUP';
+      const safePurpose = VerificationService.normalizePurpose(rawPurpose);
       if (!phoneRaw || !code) {
         res.status(400).json({ error: 'Phone and code are required.' });
         return;
       }
       const phone = String(phoneRaw).trim();
-      const result = await verificationService.verifyOTPDetailed(phone, String(code).trim(), 'WHATSAPP', purpose);
+      const result = await verificationService.verifyOTPDetailed(phone, String(code).trim(), 'WHATSAPP', safePurpose);
       if (result.ok) {
         res.status(200).json({ success: true, message: 'WhatsApp number verified successfully.' });
       } else {
@@ -340,6 +461,18 @@ export class OnboardingController {
 
       if (!email || !password) {
         res.status(400).json({ success: false, error: 'Missing required fields' });
+        return;
+      }
+
+      // Restrict using existing email
+      const normalizedEmail = (email || '').trim().toLowerCase();
+      const emailExists = await OnboardingController.isEmailExisting(normalizedEmail);
+      if (emailExists) {
+        res.status(409).json({
+          success: false,
+          code: 'EMAIL_ALREADY_EXISTS',
+          error: 'An account with this email already exists. Please log in or use a different email.'
+        });
         return;
       }
 
@@ -423,7 +556,9 @@ export class OnboardingController {
                 ...(state && { state }),
                 ...(lga && { lga }),
                 ...(streetAddress && { street_address: streetAddress }),
-                ...(effectiveLocation && { location: effectiveLocation })
+                ...(effectiveLocation && { location: effectiveLocation }),
+                ...(email && { owner_email: String(email).trim().toLowerCase() }),
+                ...(`${firstName || ''} ${lastName || ''}`.trim() && { owner_name: `${firstName} ${lastName}`.trim() }),
               }).eq('id', match.id);
               console.log(`[OnboardingController] Exact device ${effectiveDeviceId} already registered to tenant ${match.id} as Device #${deviceNumber}. Updated address info if provided.`);
             } else {
@@ -436,7 +571,9 @@ export class OnboardingController {
                 ...(state && { state }),
                 ...(lga && { lga }),
                 ...(streetAddress && { street_address: streetAddress }),
-                ...(effectiveLocation && { location: effectiveLocation })
+                ...(effectiveLocation && { location: effectiveLocation }),
+                ...(email && { owner_email: String(email).trim().toLowerCase() }),
+                ...(`${firstName || ''} ${lastName || ''}`.trim() && { owner_name: `${firstName} ${lastName}`.trim() }),
               }).eq('id', match.id);
               console.log(`[OnboardingController] Duplicate business detected. Linking as Device #${deviceNumber} to tenant ${match.id}`);
             }
@@ -449,7 +586,9 @@ export class OnboardingController {
                 ...(state && { state }),
                 ...(lga && { lga }),
                 ...(streetAddress && { street_address: streetAddress }),
-                ...(effectiveLocation && { location: effectiveLocation })
+                ...(effectiveLocation && { location: effectiveLocation }),
+                ...(email && { owner_email: String(email).trim().toLowerCase() }),
+                ...(`${firstName || ''} ${lastName || ''}`.trim() && { owner_name: `${firstName} ${lastName}`.trim() }),
             }).eq('id', match.id);
             console.log(`[OnboardingController] Duplicate business detected (no device ID). Linking as Device #${deviceNumber} to tenant ${match.id}`);
           }
@@ -476,7 +615,16 @@ export class OnboardingController {
             country: country || null,
             state: state || null,
             lga: lga || null,
-            street_address: streetAddress || null
+            street_address: streetAddress || null,
+            ...ownerContactFields({
+              firstName,
+              lastName,
+              email,
+              phone,
+              businessName: tenantName,
+              city: lga,
+              country,
+            }),
           };
           if (effectiveLocation) insertPayload.location = effectiveLocation;
 
@@ -526,6 +674,17 @@ export class OnboardingController {
             });
           } else {
             console.warn('[OnboardingController] Auth user creation failed or user exists:', authError?.message);
+            const { error: fallbackUserErr } = await supabaseAdmin.from('users').insert({
+              id: require('crypto').randomUUID(),
+              tenant_id: finalTenantId,
+              name: `${firstName} ${lastName}`.trim() || email,
+              email,
+              role: 'owner',
+              require_password_reset: false,
+            });
+            if (fallbackUserErr) {
+              console.warn('[OnboardingController] Fallback owner user insert failed:', fallbackUserErr.message);
+            }
           }
         } catch (err: any) {
           console.error('[OnboardingController] Exception creating auth user:', err.message);

@@ -426,7 +426,7 @@ const triggerPromotion = (channelTarget) => {
   operationalEventBusSingleton.emitUpstream('PROMOTE_RELEASE_CHANNEL_BUNDLE', {
     targetChannel: channelTarget,
     timestamp: new Date().toISOString(),
-    operatorStr: 'sysadmin@IIPS.app'
+    operatorStr: 'sysadmin@invify.org'
   })
 
   Notify.create({

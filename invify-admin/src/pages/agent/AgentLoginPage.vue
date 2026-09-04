@@ -223,6 +223,7 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
+import { stampIdleActivity } from '../../auth/idleLogout'
 import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
 const $q = useQuasar()
@@ -353,6 +354,7 @@ const handleLogin = async () => {
     } else {
       localStorage.setItem('invify_agent_token', res.data.token)
       localStorage.setItem('invify_agent_info', JSON.stringify(res.data.agent))
+      stampIdleActivity()
       router.push('/agent/dashboard')
     }
   } catch (err) {
@@ -400,6 +402,7 @@ const handleChangePassword = async () => {
 
     localStorage.setItem('invify_agent_token', res.data.token)
     localStorage.setItem('invify_agent_info', JSON.stringify(res.data.agent))
+    stampIdleActivity()
     
     $q.notify({ type: 'positive', message: 'Password updated successfully', position: 'top-right' })
     router.push('/agent/dashboard')

@@ -34,7 +34,7 @@ export const DeliveryPriorityLanes = {
  * Base abstract canonical blueprint required across all message serialization payloads
  */
 export const CanonicalEnvelopeSchema = {
-  $id: "https://schemas.IIPS.app/broadcast/canonical-envelope.v1.json",
+  $id: "https://schemas.invify.org/broadcast/canonical-envelope.v1.json",
   title: "Canonical Broadcast Envelope Schema",
   type: "object",
   required: [

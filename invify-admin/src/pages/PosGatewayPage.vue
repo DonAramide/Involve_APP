@@ -89,7 +89,7 @@
                 </div>
                 <div class="row q-gutter-sm">
                   <q-btn dense outline color="purple-4" label="Production" no-caps
-                    @click="quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'" :dark="prefs.isDarkMode" />
+                    @click="quasarBaseUrl = 'https://api-quasar.invify.org/api/v1'" :dark="prefs.isDarkMode" />
                 </div>
               </div>
               <div class="col-12 col-md-4">
@@ -1046,7 +1046,7 @@ const quasarBaseUrl = ref('')
 const savingQuasarUrl = ref(false)
 const normalizeQuasarBase = (raw) => {
   let u = String(raw || '').trim()
-  if (!u) return 'https://api-quasar.iips.app/api/v1'
+  if (!u) return 'https://api-quasar.invify.org/api/v1'
   u = u.split('?')[0].split('#')[0].replace(/\/+$/, '')
   const suffixes = ['/pos/card-transaction', '/pos/icc-data', '/pos/transactionFromMpos', '/pos/icc']
   for (const s of suffixes) {
@@ -1055,7 +1055,7 @@ const normalizeQuasarBase = (raw) => {
       break
     }
   }
-  return u || 'https://api-quasar.iips.app/api/v1'
+  return u || 'https://api-quasar.invify.org/api/v1'
 }
 const quasarCardTxPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/card-transaction`)
 const quasarIccPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/icc-data`)

@@ -35,13 +35,13 @@
          <div v-if="isSuperAdmin" class="col-12 col-md-3">
              <q-select
                v-model="selectedTenant"
-               :options="tenantOptions"
+               :options="tenantFilterOptions"
                label="Filter by Tenant"
                dark filled dense emit-value map-options
                @update:model-value="fetchUsers"
              />
          </div>
-         <div class="col-12 col-md-2">
+         <div class="col-12 col-md-3">
             <q-select
                v-model="selectedRole"
                :options="roleOptions"
@@ -93,11 +93,11 @@
       <template v-slot:body-cell-role="props">
         <q-td :props="props" class="text-center">
           <q-chip 
-            :color="roleColors[props.value] || 'grey-8'" 
+            :color="roleColors[String(props.value || '').toLowerCase()] || 'grey-8'" 
             text-color="white" 
             size="sm" dense
           >
-            {{ props.value.replace('_', ' ').toUpperCase() }}
+            {{ String(props.value || '').replaceAll('_', ' ').toUpperCase() }}
           </q-chip>
         </q-td>
       </template>
@@ -160,7 +160,7 @@
              <div class="col-6">
                  <q-select
                    v-model="form.tenantId"
-                   :options="tenantOptions"
+                   :options="tenantAssignOptions"
                    label="Assign Tenant"
                    dark filled dense emit-value map-options
                    :disable="isPlatformRole(form.role)"
@@ -217,7 +217,7 @@ const tenants = ref([])
 const modalVisible = ref(false)
 const isEditing = ref(false)
 const searchText = ref('')
-const selectedTenant = ref(null)
+const selectedTenant = ref('all')
 const selectedRole = ref('all')
 const errorMessage = ref('')
 
@@ -259,16 +259,23 @@ const generateUUID = () => {
   }
 }
 
+const tenantLabel = (row) => {
+  const joined = row?.tenants?.name
+  if (joined) return joined
+  const match = tenantList.value.find((t) => t.id === row?.tenant_id)
+  if (match?.name) return match.name
+  return row?.tenant_id || 'Platform'
+}
+
 const columns = [
   { name: 'name', label: 'USER IDENTITY', field: 'name', align: 'left', sortable: true },
   { name: 'role', label: 'ACCESS LEVEL', field: 'role', align: 'center', sortable: true },
-  { name: 'tenant', label: 'TENANT', field: row => row.tenants?.name || 'Platform', align: 'left' },
+  { name: 'tenant', label: 'TENANT', field: tenantLabel, align: 'left' },
   { name: 'is_active', label: 'STATUS', field: 'is_active', align: 'center' },
   { name: 'actions', label: 'CONTROLS', field: 'id', align: 'right' }
 ]
 
-const roleOptions = [
-  { label: 'All Roles', value: 'all' },
+const ROLE_CATALOG = [
   { label: 'Super Admin', value: 'super_admin' },
   { label: 'Admin Finance', value: 'admin_finance' },
   { label: 'Admin Treasury', value: 'admin_treasury' },
@@ -276,9 +283,35 @@ const roleOptions = [
   { label: 'Admin Ops', value: 'admin_ops' },
   { label: 'Admin Executive', value: 'admin_executive' },
   { label: 'Admin Deploy', value: 'admin_deploy' },
+  { label: 'Owner', value: 'owner' },
   { label: 'Tenant Admin', value: 'tenant_admin' },
+  { label: 'Admin', value: 'admin' },
+  { label: 'Cashier', value: 'cashier' },
   { label: 'Staff', value: 'staff' }
 ]
+
+function prettyRoleLabel(role) {
+  const known = ROLE_CATALOG.find((r) => r.value === role)
+  if (known) return known.label
+  return String(role || '')
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+const roleOptions = computed(() => {
+  const seen = new Set(ROLE_CATALOG.map((r) => r.value))
+  const fromData = users.value
+    .map((u) => String(u?.role || '').trim().toLowerCase())
+    .filter((role) => role && !seen.has(role))
+  fromData.forEach((role) => seen.add(role))
+  const extras = [...new Set(fromData)].map((value) => ({
+    label: prettyRoleLabel(value),
+    value
+  }))
+  return [{ label: 'All Roles', value: 'all' }, ...ROLE_CATALOG, ...extras]
+})
 
 const roleColors = {
   'super_admin': 'deep-orange-10',
@@ -288,7 +321,10 @@ const roleColors = {
   'admin_ops': 'blue-9',
   'admin_executive': 'purple-9',
   'admin_deploy': 'cyan-9',
+  'owner': 'blue-grey-7',
   'tenant_admin': 'indigo-10',
+  'admin': 'blue-grey-8',
+  'cashier': 'teal-8',
   'staff': 'blue-grey-8'
 }
 
@@ -298,22 +334,35 @@ const filteredUsers = computed(() => {
     const emailVal = (u.email || '').toLowerCase();
     const searchVal = (searchText.value || '').toLowerCase();
     const matchesSearch = nameVal.includes(searchVal) || emailVal.includes(searchVal);
-    const matchesRole = selectedRole.value === 'all' || u.role === selectedRole.value;
+    const roleVal = String(u.role || '').toLowerCase();
+    const matchesRole = selectedRole.value === 'all' || roleVal === selectedRole.value;
     return matchesSearch && matchesRole;
   });
 })
 
-const tenantOptions = computed(() => [
+const tenantList = computed(() => (Array.isArray(tenants.value) ? tenants.value : []))
+
+const tenantFilterOptions = computed(() => [
+  { label: 'All Tenants', value: 'all' },
+  { label: 'Platform (No Tenant)', value: 'platform' },
+  ...tenantList.value.map(t => ({ label: t.name, value: t.id }))
+])
+
+const tenantAssignOptions = computed(() => [
   { label: 'Platform (No Tenant)', value: null },
-  ...tenants.value.map(t => ({ label: t.name, value: t.id }))
+  ...tenantList.value.map(t => ({ label: t.name, value: t.id }))
 ])
 
 const fetchUsers = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const { data } = await adminApi.getUsers({ tenantId: selectedTenant.value })
-    users.value = data
+    const params = {}
+    if (selectedTenant.value && selectedTenant.value !== 'all') {
+      params.tenantId = selectedTenant.value
+    }
+    const { data } = await adminApi.getUsers(params)
+    users.value = Array.isArray(data) ? data : []
   } catch (error) {
     if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
       errorMessage.value = 'SYSTEM_HALT: Backend telemetry server is offline or unreachable. Please verify port configuration.'
@@ -444,9 +493,21 @@ const forceResetPassword = (user) => {
 }
 
 onMounted(async () => {
-  fetchUsers()
-  const tRes = await adminApi.getTenants()
-  tenants.value = tRes.data
+  try {
+    const tRes = await adminApi.getTenants({ limit: 1000 })
+    const payload = tRes?.data
+    tenants.value = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.tenants)
+          ? payload.tenants
+          : []
+  } catch (error) {
+    console.error('[UsersPage] Failed to load tenants:', error)
+    tenants.value = []
+  }
+  await fetchUsers()
 })
 </script>
 

@@ -2,30 +2,33 @@ import 'package:flutter/material.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
 
 class UpgradeDialog extends StatelessWidget {
-  const UpgradeDialog({super.key});
+  final String? title;
+  final String? message;
+  const UpgradeDialog({super.key, this.title, this.message});
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.star, color: Colors.amber),
-          SizedBox(width: 8),
-          Text('Upgrade to Pro'),
+          const Icon(Icons.star, color: Colors.amber),
+          const SizedBox(width: 8),
+          Text(title ?? 'Upgrade Plan'),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text('Service Billing is a premium feature.'),
-          SizedBox(height: 16),
-          Text('Unlock these benefits:', style: TextStyle(fontWeight: FontWeight.bold)),
-          SizedBox(height: 8),
-          _BenefitItem('Daily & Hourly Billing'),
-          _BenefitItem('Hospitality & Event Support'),
-          _BenefitItem('Advanced Receipt Formats'),
-          _BenefitItem('Priority Support'),
+        children: [
+          Text(message ?? 'This feature is available on all plans except Basic and Free Tier.'),
+          const SizedBox(height: 16),
+          const Text('Unlock these benefits:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const _BenefitItem('Unlimited Staff & Staff Bank/VA Accounts'),
+          const _BenefitItem('Daily & Hourly Billing'),
+          const _BenefitItem('Hospitality & Event Support'),
+          const _BenefitItem('Advanced Receipt Formats'),
+          const _BenefitItem('Priority Support'),
         ],
       ),
       actions: [

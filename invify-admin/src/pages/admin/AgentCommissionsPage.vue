@@ -1,8 +1,8 @@
 <template>
-  <q-page class="q-pa-lg text-white command-center-page" style="background: #071220; min-height: 100vh;">
+  <q-page class="q-pa-lg bg-main text-main command-center-page" style="min-height: 100vh;">
     
     <!-- EXECUTIVE HEADER -->
-    <div class="row items-center justify-between q-mb-lg header-panel border-main q-pa-md rounded-borders">
+    <div class="row items-center justify-between q-mb-lg header-panel bg-panel border-main q-pa-md rounded-borders">
       <div class="column col-12 col-md-8">
         <div class="text-caption text-grey-5 font-mono">
           System Configuration > <span class="text-cyan-4 text-weight-bold">Incentive Command Center</span>

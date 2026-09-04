@@ -239,7 +239,7 @@ class ResultService {
               ),
               pw.SizedBox(height: 20),
               pw.Center(
-                child: pw.Text('Powered by Invify.iips.app', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+                child: pw.Text('Powered by Invify.org', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
               ),
             ],
           );
@@ -385,7 +385,7 @@ class ResultService {
       commands.add(DividerCommand());
     }
 
-    commands.add(TextCommand('Powered by Invify.iips.app', align: 'center'));
+    commands.add(TextCommand('Powered by Invify.org', align: 'center'));
     commands.add(SizedBoxCommand(height: 3)); // feed paper
 
     return commands;

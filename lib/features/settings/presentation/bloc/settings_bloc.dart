@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
@@ -11,7 +10,6 @@ import '../../../../core/services/backup_service.dart';
 import '../../../../core/license/storage_service.dart';
 import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
-import '../../domain/entities/settings.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -232,6 +230,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         planType: serverPlan.planType,
         expiryDate: serverPlan.expiryDate,
       );
+    }
+
+    // 3c. If device access was granted from portal or isActivated is true
+    final isActivated = await LicenseService.isActivated(settings.organizationName);
+    if (isActivated) {
+      return const UserPlan(planType: 'pro');
     }
 
     // 4. Check for Trial validity

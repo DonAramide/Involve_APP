@@ -332,7 +332,7 @@
           <!-- Mandatory Audit Reason Annotations -->
           <q-input
             v-model="auditReasonText"
-            :dark="useOperatorPreferences().prefs.value.isDarkMode"
+            :dark="prefs.isDarkMode"
             dense
             filled
             label="Mandatory Operator Reason Annotation *"
@@ -370,6 +370,10 @@ import { operationalEventBusSingleton } from '../../services/realtime/Operationa
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { deviceApi } from '../../api'
 import { supabase } from '../../supabase'
+import { useQuasar } from 'quasar'
+import { userFacingApiError } from '../../utils/userFacingApiError'
+
+const $q = useQuasar()
 
 const route = useRoute()
 const router = useRouter()
@@ -423,7 +427,7 @@ const filteredDevices = computed(() => {
   } else if (activePreset.value === 'incident') {
     res = res.filter(d => d.integrity !== 'HEALTHY' || d.onlineState === 'DEGRADED')
   } else if (activePreset.value === 'rollout_fail') {
-    res = res.filter(d => d.otaStatus.includes('FAILED') || d.otaStatus.includes('STALE'))
+    res = res.filter(d => String(d.otaStatus || '').includes('FAILED') || String(d.otaStatus || '').includes('STALE'))
   }
 
   // Handle external query route bindings matching Cross-Panel Correlations
@@ -591,7 +595,7 @@ const dispatchAuthorizedCommand = () => {
     targetDeviceId: targetId,
     commandType: actionStr,
     auditAnnotation: auditString,
-    authorizedBy: 'sysadmin@IIPS.app'
+    authorizedBy: 'sysadmin@invify.org'
   })
 
   // Mutate base arrays optimistically
@@ -653,8 +657,9 @@ onMounted(async () => {
   // Dynamically pull real backend registered physical client instances
   try {
     const { data } = await deviceApi.getDevices()
-    if (data && Array.isArray(data) && data.length > 0) {
-      const realNodes = data.map(d => {
+    const list = Array.isArray(data) ? data : (data?.devices || data?.data || [])
+    if (list.length > 0) {
+      const realNodes = list.map(d => {
         const info = d.device_info || {}
         return {
           deviceId: d.device_id || d.id,
@@ -680,10 +685,12 @@ onMounted(async () => {
       baseDevicesArray.value = realNodes
     }
   } catch (err) {
-    console.warn('Real-time backend client registry sweep pending cluster stability verification.')
+    console.warn('Real-time backend client registry sweep pending cluster stability verification.', err)
+    $q.notify({ type: 'negative', message: userFacingApiError(err, 'Failed to load device explorer') })
   }
 
   // Setup Supabase Realtime Subscription for the public devices table with a unique mount channel name
+  try {
   const channelName = `public:devices:${Math.random().toString(36).substring(7)}`;
   realtimeChannel = supabase.channel(channelName)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {
@@ -728,6 +735,9 @@ onMounted(async () => {
       }
     })
     .subscribe()
+  } catch (err) {
+    console.warn('[DeviceExplorer] realtime subscribe skipped', err)
+  }
 
   // Start live relative ticking
   tickerInterval = setInterval(updateRelativeTimeStrings, 1000)
@@ -735,7 +745,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (tickerInterval) clearInterval(tickerInterval)
-  if (realtimeChannel) supabase.removeChannel(realtimeChannel)
+  if (realtimeChannel) {
+    try { supabase.removeChannel(realtimeChannel) } catch { /* ignore */ }
+  }
 })
 </script>
 

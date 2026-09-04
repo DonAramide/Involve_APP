@@ -7,6 +7,17 @@ export interface ExecutiveSummaryDTO {
   walletBalance: number;
   totalCollected: number;
   revenueInRange: number;
+  totalQuasarCollected?: number;
+  totalQuasarRemitted?: number;
+  pendingQuasarRemittance?: number;
+  pendingVirtualAccountFunds?: number;
+  unsweptVirtualAccount?: {
+    total: number;
+    customer: number;
+    staff: number;
+    student: number;
+    unmapped: number;
+  };
   studentMetrics: { total: number; paid: number; owing: number };
   alerts: { unmatchedCount: number; failedPayoutsCount: number };
 }
@@ -52,10 +63,23 @@ export class FinanceRepository {
           walletBalance: data.walletBalance || 0,
           totalCollected: data.totalCollected || 0,
           revenueInRange: data.revenueInRange || 0,
+          totalQuasarCollected: data.totalQuasarCollected || 0,
+          totalQuasarRemitted: data.totalQuasarRemitted || 0,
+          pendingQuasarRemittance: data.pendingQuasarRemittance || 0,
+          pendingVirtualAccountFunds: data.pendingVirtualAccountFunds || 0,
+          unsweptVirtualAccount: data.unsweptVirtualAccount || {
+            total: data.pendingVirtualAccountFunds || 0,
+            customer: 0,
+            staff: 0,
+            student: 0,
+            unmapped: 0,
+          },
           salesSummary: data.salesSummary || {
             totalInvoiced: 0,
             totalCollected: 0,
             card: 0,
+            vaTransfer: 0,
+            bankTransfer: 0,
             transfer: 0,
             cash: 0,
             wallet: 0,

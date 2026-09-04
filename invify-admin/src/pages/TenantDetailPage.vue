@@ -1183,15 +1183,23 @@ const ownerUser = computed(() => {
 const ownerProfile = computed(() => {
   const fromSettings = tenant.value?.settings?.owner_profile || {}
   const owner = ownerUser.value
+  const device = (registeredDevices.value || [])[0] || {}
+  const firstText = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || '').trim()
+      if (s) return s
+    }
+    return ''
+  }
   return {
-    firstName: fromSettings.firstName || '',
-    lastName: fromSettings.lastName || '',
-    email: fromSettings.email || owner?.email || '',
-    phone: fromSettings.phone || tenant.value?.phone || owner?.phone || '',
-    businessName: fromSettings.businessName || tenant.value?.name || '',
-    city: fromSettings.city || tenant.value?.lga || '',
-    country: fromSettings.country || tenant.value?.country || '',
-    name: owner?.name || '',
+    firstName: firstText(fromSettings.firstName),
+    lastName: firstText(fromSettings.lastName),
+    email: firstText(fromSettings.email, tenant.value?.owner_email, owner?.email, device.ownerEmail),
+    phone: firstText(fromSettings.phone, tenant.value?.phone, owner?.phone),
+    businessName: firstText(fromSettings.businessName, tenant.value?.name),
+    city: firstText(fromSettings.city, tenant.value?.lga),
+    country: firstText(fromSettings.country, tenant.value?.country),
+    name: firstText(fromSettings.name, tenant.value?.owner_name, owner?.name),
   }
 })
 

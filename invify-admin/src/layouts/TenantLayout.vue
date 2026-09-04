@@ -78,7 +78,7 @@
               </q-item>
               
               <!-- Quick access triggers -->
-              <q-item v-if="['retail', 'hospitality', 'healthcare'].includes(activeIndustry.toLowerCase())" clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
+              <q-item v-if="['retail', 'hospitality', 'healthcare', 'services', 'service', 'invify_services'].includes(activeIndustry.toLowerCase())" clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
                 <q-item-section avatar><q-icon name="vpn_key" size="xs" color="amber-4" /></q-item-section>
                 <q-item-section class="text-white text-weight-bold">Device Activation</q-item-section>
               </q-item>
@@ -309,18 +309,13 @@ const industryNavigationTree = computed(() => {
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' },
       { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: 'RETAIL' }
     ]
-  } else if (mode === 'services' || mode === 'service') {
+  } else if (mode === 'services' || mode === 'service' || mode === 'hospitality' || mode === 'invify_services') {
     return [
-      { label: 'Service Jobs Ledger', path: '/tenant/transactions', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
+      { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
       { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: 'SERVICE' },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'SERVICE' },
+      { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: 'SERVICE' },
       { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: 'SERVICE' }
-    ]
-  } else if (mode === 'hospitality') {
-    return [
-      { label: 'Service Order Matrix', path: '/tenant/hospitality/rooms', icon: 'dry_cleaning', color: 'indigo-4', mode: 'HOTEL' },
-      { label: 'Appointments & Bookings', path: '/tenant/hospitality/bookings', icon: 'calendar_today', color: 'cyan-4', mode: 'HOTEL' },
-      { label: 'Service Catalog Invoicing', path: '/tenant/hospitality/billing', icon: 'receipt', color: 'green-4', mode: 'HOTEL' }
     ]
   } else if (mode === 'logistics') {
     return [

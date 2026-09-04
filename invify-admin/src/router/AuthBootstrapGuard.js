@@ -1,6 +1,7 @@
 // invify-admin/src/router/AuthBootstrapGuard.js
 
 import { loginPathForContext, homePathForRole, hasPlatformStaffRole } from '../utils/authLoginPaths'
+import { clearMfaChallengeState, hasVerifiedOperatorSession } from '../auth/session'
 
 /**
  * Enterprise Production-Grade Authentication Gate & Session Rehydration Interceptor.
@@ -28,14 +29,17 @@ export function registerAuthBootstrapGuard(router) {
     // 1. Extract state storage parameters
     const token = localStorage.getItem('invify_token')
     const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    const pendingSetupToken = sessionStorage.getItem('mfa_setup_token')
-    const pendingChallengeToken = sessionStorage.getItem('mfa_challenge_token')
-    const pendingMfaToken = pendingSetupToken || pendingChallengeToken
-    
-    // Evaluate if token verification demands Multi-Factor challenge clearance
-    // If token exists but an explicit flag requires challenge resolution, or setup tokens exist
-    const isMfaPending = !!pendingMfaToken || localStorage.getItem('mfa_status_verified') === 'false'
-    const isVerifiedSession = !!token && !isMfaPending
+    const isVerifiedSession = hasVerifiedOperatorSession()
+    if (isVerifiedSession) {
+      // Leftover challenge tokens from a later login attempt must not eject a live session.
+      clearMfaChallengeState()
+    }
+    const pendingMfaToken = isVerifiedSession
+      ? null
+      : (sessionStorage.getItem('mfa_setup_token') || sessionStorage.getItem('mfa_challenge_token'))
+    const isMfaPending = !isVerifiedSession && (
+      !!pendingMfaToken || localStorage.getItem('mfa_status_verified') === 'false'
+    )
 
     // 0. Public Website Routes
     // Extremely conservative public route bypass to ensure public pages never require auth.

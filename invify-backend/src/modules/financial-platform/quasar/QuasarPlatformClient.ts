@@ -14,7 +14,7 @@ export class QuasarPlatformClient {
     private credentialProvider: CredentialProvider,
     private circuitBreaker: CircuitBreaker,
     private retryPolicy: RetryPolicy,
-    private baseUrl: string = process.env.QUASAR_BASE_URL || 'https://api-quasar.iips.app/api/v1'
+    private baseUrl: string = process.env.QUASAR_BASE_URL || 'https://api-quasar.invify.org/api/v1'
   ) {
     this.http = axios.create({
       baseURL: this.baseUrl,

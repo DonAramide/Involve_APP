@@ -92,7 +92,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 
@@ -178,7 +178,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 
@@ -320,7 +320,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 
@@ -445,7 +445,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
       TextCommand('-' * width),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 
@@ -516,7 +516,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 
@@ -640,7 +640,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 1),
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Thank you for choosing ${settings.organizationName}!', align: 'center'),
-      TextCommand('Powered by Invify.iips.app', align: 'center'),
+      TextCommand('Powered by Invify.org', align: 'center'),
     ];
   }
 

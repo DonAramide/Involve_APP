@@ -107,11 +107,26 @@ class LicenseService {
       return true;
     }
 
-    // 2. Check for Lifetime status
+    // 2. Check for Server Activated Plan (QR activation, portal activation, device validation)
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      final p = serverPlan.planType.toLowerCase().trim();
+      if (p != 'free_trial' && p != 'trial' && p != 'free') {
+        return true;
+      }
+    }
+
+    // 3. Check for Device Access Granted from Portal
+    final accessGranted = await StorageService.isDeviceAccessGranted();
+    if (accessGranted && serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      return true;
+    }
+
+    // 4. Check for Lifetime status
     await StorageService.isBusinessNameLocked(); // Simplistic check for now, can be improved
     // Note: isDeviceAuthorized is better for lifetime, but it's in SecurityService
 
-    // 3. Check for Activation Code License
+    // 5. Check for Activation Code License
     final license = await getActiveLicense(currentBusinessName);
     if (license == null) return false;
     
@@ -133,6 +148,8 @@ class LicenseService {
 
     return true;
   }
+
+  static Future<bool> isProActive(String? currentBusinessName) => isActivated(currentBusinessName);
 
   static Future<bool> isDateTampered() async {
     final lastOpened = await StorageService.getLastOpenedDate();

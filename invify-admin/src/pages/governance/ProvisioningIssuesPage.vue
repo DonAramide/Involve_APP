@@ -135,6 +135,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { userFacingApiError } from '../../utils/userFacingApiError'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
@@ -176,7 +177,7 @@ const fetchComplaints = async () => {
     const { data } = await adminApi.getComplaints()
     complaints.value = data.data || data || []
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load complaints' })
+    $q.notify({ type: 'negative', message: userFacingApiError(err, 'Failed to load complaints') })
   } finally {
     loading.value = false
   }

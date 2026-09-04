@@ -446,19 +446,26 @@ class _InvoiceSuccessPageState extends State<InvoiceSuccessPage>
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            color: Colors.green.shade500,
+                            color: widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                ? Colors.amber.shade700
+                                : Colors.green.shade500,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green.shade500.withOpacity(0.4),
+                                color: (widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                        ? Colors.amber.shade700
+                                        : Colors.green.shade500)
+                                    .withOpacity(0.4),
                                 blurRadius: 24,
                                 spreadRadius: 4,
                                 offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.check,
+                          child: Icon(
+                            widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                ? Icons.hourglass_top_rounded
+                                : Icons.check,
                             color: Colors.white,
                             size: 56,
                           ),
@@ -472,7 +479,9 @@ class _InvoiceSuccessPageState extends State<InvoiceSuccessPage>
                         children: [
                           Text(
                             widget.successTitle ??
-                                'Invoice Created Successfully!',
+                                (widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                    ? 'Invoice Created (Awaiting Payment)'
+                                    : 'Invoice Created Successfully!'),
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w900,

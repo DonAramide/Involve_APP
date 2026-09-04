@@ -273,7 +273,7 @@ const dispatchTrustRestorationCommand = () => {
   console.log(`[QuarantineManager] Authorizing Trust Restoration Release payload:`, {
     targetId,
     annotation,
-    operator: 'sysadmin@IIPS.app'
+    operator: 'sysadmin@invify.org'
   })
 
   // Broadcast upward via Unified Event Bus
@@ -281,7 +281,7 @@ const dispatchTrustRestorationCommand = () => {
     targetDeviceId: targetId,
     remediationLog: annotation,
     timestamp: new Date().toISOString(),
-    authorizedBy: 'sysadmin@IIPS.app'
+    authorizedBy: 'sysadmin@invify.org'
   })
 
   Notify.create({

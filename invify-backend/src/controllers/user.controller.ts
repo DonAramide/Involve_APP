@@ -20,23 +20,36 @@ export class UserController {
         roleNorm === 'internal_staff' ||
         roleNorm.startsWith('admin_');
 
-      let query = supabaseAdmin.from('users').select('*');
-
-      // Isolation: platform operators see everyone (optional tenant filter).
-      // Tenant admins only see their own tenant.
-      if (!isPlatform) {
-        if (!tenantId) {
-          return res.status(403).json({ error: 'Tenant context required' });
+      const applyScope = (query: any) => {
+        if (!isPlatform) {
+          return query.eq('tenant_id', tenantId);
         }
-        query = query.eq('tenant_id', tenantId);
-      } else if (req.query.tenantId) {
-        query = query.eq('tenant_id', req.query.tenantId);
+        const requested = String(req.query.tenantId ?? '').trim().toLowerCase();
+        const skipFilter = !requested || ['all', 'null', 'undefined', 'global'].includes(requested);
+        if (skipFilter) return query;
+        if (requested === 'platform' || requested === 'none') {
+          return query.is('tenant_id', null);
+        }
+        return query.eq('tenant_id', String(req.query.tenantId).trim());
+      };
+
+      if (!isPlatform && !tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' });
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(2000);
+      let result = await applyScope(supabaseAdmin.from('users').select('*, tenants(id, name)'))
+        .order('created_at', { ascending: false })
+        .limit(2000);
 
-      if (error) throw error;
-      return res.status(200).json(Array.isArray(data) ? data : []);
+      if (result.error) {
+        console.warn('[UserController] users/tenants embed failed, retrying without join:', result.error.message);
+        result = await applyScope(supabaseAdmin.from('users').select('*'))
+          .order('created_at', { ascending: false })
+          .limit(2000);
+      }
+
+      if (result.error) throw result.error;
+      return res.status(200).json(Array.isArray(result.data) ? result.data : []);
     } catch (error: any) {
       console.error('[UserController] listUsers Error:', error.message);
       return res.status(503).json({ error: 'Database unavailable', message: error.message, retryable: true, retryAfterMs: 2000 });

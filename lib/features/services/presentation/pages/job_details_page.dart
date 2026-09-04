@@ -26,6 +26,9 @@ import '../templates/service_pdf_generator.dart';
 import 'service_payment_success_page.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
+import '../utils/job_staff_store.dart';
 
 class JobDetailsPage extends StatefulWidget {
   final ServiceJob job;
@@ -38,6 +41,7 @@ class JobDetailsPage extends StatefulWidget {
 class _JobDetailsPageState extends State<JobDetailsPage> {
   late ServiceJob _job;
   List<ServicePayment> _payments = [];
+  JobStaffAssignment? _assignedStaff;
   bool _isLoading = false;
 
   bool get _isCancelled => _job.status.toLowerCase() == 'cancelled';
@@ -57,10 +61,13 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       final repo = context.read<IServicesRepository>();
       final updated = await repo.getJobById(_job.id);
       final pms = await repo.getJobPayments(_job.id);
+      final assignment = await JobStaffStore.getAssignment(_job.id) ??
+          await JobStaffStore.getAssignment(_job.jobId);
       if (mounted) {
         setState(() {
           _job = updated;
           _payments = pms;
+          _assignedStaff = assignment;
           _isLoading = false;
         });
       }
@@ -172,6 +179,66 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           ),
         ],
         const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _assignStaff(context),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _assignedStaff != null ? Colors.blue.withValues(alpha: 0.08) : Colors.amber.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _assignedStaff != null ? Colors.blue.withValues(alpha: 0.3) : Colors.amber.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.badge_outlined,
+                  size: 18,
+                  color: _assignedStaff != null ? Colors.blue.shade700 : Colors.amber.shade900,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _assignedStaff != null ? 'ASSIGNED SERVICE STAFF' : 'STAFF ASSIGNMENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _assignedStaff != null ? Colors.blue.shade800 : Colors.amber.shade900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        _assignedStaff != null
+                            ? _assignedStaff!.staffName
+                            : 'Tap to Assign Staff to this Service (PIN Login)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _assignedStaff != null ? Colors.black87 : Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    _assignedStaff != null ? 'CHANGE' : 'ASSIGN',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: _assignedStaff != null ? Colors.blue.shade50 : Colors.amber.shade100,
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(_job.description ?? 'No description provided', style: TextStyle(color: Colors.grey[600])),
         const SizedBox(height: 16),
         Row(
@@ -189,6 +256,31 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _assignStaff(BuildContext context) async {
+    final staff = await showDialog<Staff>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const StaffAuthDialog(),
+    );
+    if (staff != null && mounted) {
+      await JobStaffStore.assignStaff(_job.id, staff.id!, staff.name);
+      await JobStaffStore.assignStaff(_job.jobId, staff.id!, staff.name);
+      setState(() {
+        _assignedStaff = JobStaffAssignment(
+          staffId: staff.id!,
+          staffName: staff.name,
+          assignedAt: DateTime.now(),
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Service job ${_job.jobId} assigned to ${staff.name}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Widget _buildBalanceCard(BuildContext context, String symbol) {
@@ -551,6 +643,80 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                         Text(
                           CurrencyFormatter.formatWithSymbol(_job.balance, symbol: symbol),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _assignedStaff != null
+                          ? Colors.blue.withValues(alpha: 0.06)
+                          : Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _assignedStaff != null
+                            ? Colors.blue.shade200
+                            : Colors.amber.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.badge_outlined,
+                              size: 16,
+                              color: _assignedStaff != null
+                                  ? Colors.blue.shade700
+                                  : Colors.amber.shade900,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _assignedStaff != null
+                                  ? 'Staff: ${_assignedStaff!.staffName}'
+                                  : 'Staff: Not Assigned',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _assignedStaff != null
+                                    ? Colors.black87
+                                    : Colors.amber.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        InkWell(
+                          onTap: () async {
+                            final s = await showDialog<Staff>(
+                              context: context,
+                              barrierDismissible: true,
+                              builder: (c) => const StaffAuthDialog(),
+                            );
+                            if (s != null && mounted) {
+                              await JobStaffStore.assignStaff(_job.id, s.id!, s.name);
+                              await JobStaffStore.assignStaff(_job.jobId, s.id!, s.name);
+                              setState(() {
+                                _assignedStaff = JobStaffAssignment(
+                                  staffId: s.id!,
+                                  staffName: s.name,
+                                  assignedAt: DateTime.now(),
+                                );
+                              });
+                              setDialogState(() {});
+                            }
+                          },
+                          child: Text(
+                            _assignedStaff != null ? 'Change' : 'Assign Staff',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1185,7 +1351,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                 'terminalId': terminalId,
                 'amount': amount,
                 'emvData': payment.emvData!.toJson(),
-                'staffName': 'Services Mode',
+                'staffName': _assignedStaff?.staffName ?? 'Services Mode',
                 'items': [
                   {
                     'name': _job.title.isNotEmpty ? _job.title : 'Service Job #${_job.id.substring(0, 8)}',

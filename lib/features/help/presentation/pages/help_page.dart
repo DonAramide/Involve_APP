@@ -66,7 +66,7 @@ class _HelpPageState extends State<HelpPage> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Version 1.6.0',
+                  'Version 1.0.0',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -159,7 +159,7 @@ class _HelpPageState extends State<HelpPage> {
           const SizedBox(height: 16),
           GestureDetector(
             onTap: () async {
-              final Uri emailUri = Uri.parse('mailto:support@iips.app?subject=Support Request');
+              final Uri emailUri = Uri.parse('mailto:support@invify.org?subject=Support Request');
               if (await canLaunchUrl(emailUri)) {
                 await launchUrl(emailUri);
               }
@@ -168,7 +168,7 @@ class _HelpPageState extends State<HelpPage> {
               child: ListTile(
                 leading: Icon(Icons.email, color: Colors.deepPurple),
                 title: Text('Email Support'),
-                subtitle: Text('support@iips.app'),
+                subtitle: Text('support@invify.org'),
               ),
             ),
           ),
@@ -213,7 +213,7 @@ class _HelpPageState extends State<HelpPage> {
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () async {
-              final Uri uri = Uri.parse('https://iips.app');
+              final Uri uri = Uri.parse('https://invify.org');
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri);
               }
@@ -222,7 +222,7 @@ class _HelpPageState extends State<HelpPage> {
               child: ListTile(
                 leading: Icon(Icons.language, color: Colors.deepPurple),
                 title: Text('Official Website'),
-                subtitle: Text('https://iips.app'),
+                subtitle: Text('https://invify.org'),
               ),
             ),
           ),

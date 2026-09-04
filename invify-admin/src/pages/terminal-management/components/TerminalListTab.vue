@@ -81,6 +81,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { terminalApi } from 'src/api/terminalApi'
+import { userFacingApiError } from 'src/utils/userFacingApiError'
 
 const $q = useQuasar()
 const loading = ref(false)
@@ -154,7 +155,7 @@ const fetchData = async () => {
     console.error('[TerminalListTab] load failed', error)
     $q.notify({
       type: 'negative',
-      message: error?.response?.data?.error || `Failed to load ${inventoryTab.value}`,
+      message: userFacingApiError(error, `Failed to load ${inventoryTab.value}`),
     })
   } finally {
     loading.value = false
@@ -189,7 +190,7 @@ const saveEdit = async () => {
     editDialog.value = false
     fetchData()
   } catch (error) {
-    $q.notify({ type: 'negative', message: error.response?.data?.error || 'Failed to update record' })
+    $q.notify({ type: 'negative', message: userFacingApiError(error, 'Failed to update record') })
   } finally {
     saving.value = false
   }

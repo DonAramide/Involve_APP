@@ -282,6 +282,8 @@
             color="primary" 
             label-color="grey-6"
             input-class="text-black"
+            maxlength="13"
+            counter
           />
           
           <!-- Elegant 3-Radio Identity Selector Block (Staff, Admin, Finance) -->

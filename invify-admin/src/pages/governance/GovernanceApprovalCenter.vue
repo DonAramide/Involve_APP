@@ -313,7 +313,7 @@ const getOperatorLabel = (emailOrUser) => {
     'fleet_manager@invify.app': 'Fleet Manager',
     'ciso@invify.app': 'Chief Info Security Officer',
     'current_user@invify.app': 'Active Operator',
-    'superadmin@iips.app': 'Super Admin Master'
+    'superadmin@invify.org': 'Super Admin Master'
   }
   const cleanEmail = emailOrUser.toLowerCase().trim()
   const name = map[cleanEmail] || 'Platform Agent'

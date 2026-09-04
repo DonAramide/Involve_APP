@@ -139,8 +139,11 @@
                   <q-input
                     v-model="profile.phone"
                     dark outlined dense
+                    type="tel"
                     label="Phone Number"
                     placeholder="+234 800 000 0000"
+                    maxlength="13"
+                    counter
                     class="profile-input"
                   >
                     <template v-slot:prepend><q-icon name="phone" color="indigo-4" size="xs" /></template>
@@ -223,7 +226,7 @@
                 <q-icon name="lock_reset" color="amber-4" size="sm" />
                 <div class="text-h6 text-weight-bold text-white">Change Password</div>
               </div>
-              <div class="text-caption text-grey-5 q-mb-lg">Use a strong password with at least 8 characters, uppercase letters, and numbers.</div>
+              <div class="text-caption text-grey-5 q-mb-lg">Use a strong password with at least 9 characters, uppercase, lowercase, a number, and a symbol.</div>
 
               <div class="column q-gutter-y-md">
                 <q-input
@@ -252,11 +255,8 @@
                   </template>
                 </q-input>
 
-                <!-- Password strength meter -->
                 <div v-if="security.newPassword">
-                  <div class="text-metric-sm text-grey-5 q-mb-xs">Password Strength</div>
-                  <q-linear-progress :value="passwordStrength.score / 4" :color="passwordStrength.color" dark class="rounded-borders" style="height: 6px;" />
-                  <div class="text-metric-sm q-mt-xs" :class="`text-${passwordStrength.color}`">{{ passwordStrength.label }}</div>
+                  <PasswordStrengthHints :password="security.newPassword" :email="profile.email" :current-password="security.currentPassword" />
                 </div>
 
                 <q-input
@@ -643,6 +643,8 @@
 import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { api, adminApi } from '../../../../api';
+import { evaluatePasswordPolicy } from '../../../../utils/passwordPolicy';
+import PasswordStrengthHints from '../../../../components/PasswordStrengthHints.vue';
 
 const $q = useQuasar();
 const activeTab = ref('profile');
@@ -760,33 +762,45 @@ const security = ref({
   mfaEnabled: localStorage.getItem('mfa_status_verified') !== 'false',
 });
 
-const passwordStrength = computed(() => {
-  const p = security.value.newPassword;
-  let score = 0;
-  if (p.length >= 8) score++;
-  if (/[A-Z]/.test(p)) score++;
-  if (/[0-9]/.test(p)) score++;
-  if (/[^A-Za-z0-9]/.test(p)) score++;
-  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-  const colors = ['', 'red-4', 'amber-4', 'light-blue-4', 'green-4'];
-  return { score, label: labels[score] || 'Too short', color: colors[score] || 'grey-5' };
-});
+const passwordPolicy = computed(() =>
+  evaluatePasswordPolicy(security.value.newPassword, {
+    email: profile.value.email,
+    currentPassword: security.value.currentPassword,
+  })
+);
 
 const canChangePassword = computed(() =>
-  security.value.currentPassword &&
-  security.value.newPassword &&
+  !!security.value.currentPassword &&
+  !!security.value.newPassword &&
   security.value.newPassword === security.value.confirmPassword &&
-  security.value.newPassword.length >= 8
+  passwordPolicy.value.ok
 );
 
 const changePassword = async () => {
+  if (!canChangePassword.value) return;
   saving.value.password = true;
-  await new Promise(r => setTimeout(r, 1100));
-  saving.value.password = false;
-  security.value.currentPassword = '';
-  security.value.newPassword = '';
-  security.value.confirmPassword = '';
-  $q.notify({ type: 'positive', message: 'Password changed successfully. Please log in again on other devices.', icon: 'lock' });
+  try {
+    await adminApi.changePassword({
+      currentPassword: security.value.currentPassword,
+      newPassword: security.value.newPassword,
+    });
+    security.value.currentPassword = '';
+    security.value.newPassword = '';
+    security.value.confirmPassword = '';
+    $q.notify({
+      type: 'positive',
+      message: 'Password changed successfully. Please log in again on other devices.',
+      icon: 'lock',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error || 'Failed to change password.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.password = false;
+  }
 };
 
 const toggleMfa = (val) => {

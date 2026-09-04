@@ -1,6 +1,6 @@
 {
   "support_phone": "+234 800 INVIFY",
-  "support_email": "support@iips.app",
+  "support_email": "support@invify.org",
   "support_whatsapp": "+2348023552282",
   "broadcast_message": "Welcome to Invify! Activate with your code or start your free 3-day trial.",
   "audit_retention_hours": 72,
@@ -24,7 +24,7 @@
   "whatsapp_business_account_id": "",
   "quasar_client_id": "",
   "quasar_client_secret": "",
-  "quasar_base_url": "http://192.168.1.193:4000/api/v1",
+  "quasar_base_url": "https://api-quasar.iips.app/api/v1",
   "lesson_ai_api_key": "",
   "daily_payout_time": "09:09",
   "manual_dispatch_fee": 9,

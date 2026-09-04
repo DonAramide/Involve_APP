@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
@@ -24,6 +23,7 @@ import '../utils/onboarding_draft_store.dart';
 import '../../data/nigeria_states_lgas.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
@@ -40,6 +40,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _emailFocusNode = FocusNode();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -60,6 +61,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   String _primaryColorHex = '#6366F1';
   bool _isLoading = false;
   bool _isCapturingTelemetry = false;
+  bool _isCheckingEmail = false;
+  String? _emailCheckError;
   String? _capturedDeviceId;
   String? _capturedGpsLocation;
   int _currentStep = 0;
@@ -93,8 +96,33 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   @override
   void initState() {
     super.initState();
+    _emailController.addListener(_onEmailChanged);
+    _emailFocusNode.addListener(_onEmailFocusChanged);
     _pingServer();
     _restoreDraft();
+  }
+
+  void _onEmailChanged() {
+    if (_emailCheckError != null) {
+      setState(() => _emailCheckError = null);
+    }
+  }
+
+  void _onEmailFocusChanged() async {
+    if (!_emailFocusNode.hasFocus && _currentStep == 1) {
+      final email = _emailController.text.trim();
+      final emailRegex = RegExp(r'^[\w\.-]+@[\w-]+\.[a-zA-Z]{2,}$');
+      if (email.isNotEmpty && emailRegex.hasMatch(email)) {
+        final exists = await _checkEmailExists(email);
+        if (exists && mounted) {
+          setState(() {
+            _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+          });
+          _formKey.currentState?.validate();
+          await _showExistingEmailDialog(email);
+        }
+      }
+    }
   }
 
   Future<void> _persistDraft({int? step}) async {
@@ -190,6 +218,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   }
 
   void _goToStep(int step) {
+    if (_currentStep == 1 && step > 1 && _emailCheckError != null) {
+      _formKey.currentState?.validate();
+      return;
+    }
     setState(() => _currentStep = step.clamp(0, 3));
     _persistDraft(step: _currentStep);
   }
@@ -360,11 +392,169 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     return ok ? (_capturedGpsLocation ?? 'Unknown Location') : 'Unknown Location';
   }
 
+  Future<bool> _checkEmailExists(String email) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+
+    setState(() => _isCheckingEmail = true);
+
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      validateStatus: (status) => status != null && status < 500,
+    ));
+
+    final urls = [
+      '${AppConfig.baseUrl}/api/auth/check-email',
+      '${AppConfig.baseUrl}/auth/check-email',
+      if (AppConfig.baseUrl.contains(':3004')) ...[
+        '${AppConfig.baseUrl3000}/api/auth/check-email',
+        '${AppConfig.baseUrl3000}/auth/check-email',
+      ],
+      // Fallback LAN / local URLs
+      'http://192.168.1.193:3004/api/auth/check-email',
+      'http://192.168.1.193:3004/auth/check-email',
+      'http://10.0.2.2:3004/api/auth/check-email',
+      'http://localhost:3004/api/auth/check-email',
+    ];
+
+    bool found = false;
+
+    try {
+      for (final url in urls) {
+        try {
+          final res = await dio.post(url, data: {'email': normalized});
+          if (res.statusCode == 200 && res.data != null && res.data is Map) {
+            if (res.data['exists'] == true) {
+              found = true;
+              return true;
+            }
+            if (res.data['exists'] == false) {
+              found = false;
+              break;
+            }
+          }
+          if (res.statusCode == 409 ||
+              (res.data is Map &&
+                  (res.data['exists'] == true || res.data['code'] == 'EMAIL_ALREADY_EXISTS'))) {
+            found = true;
+            return true;
+          }
+        } catch (_) {}
+      }
+
+      // Direct Supabase RPC check fallback if backend endpoints were unreachable or did not report
+      if (!found) {
+        try {
+          final escaped = normalized.replaceAll("'", "''");
+          final query = "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists";
+          final rpcRes = await Supabase.instance.client.rpc('execute_sql', params: {'sql_query': query});
+          if (rpcRes is List && rpcRes.isNotEmpty && rpcRes.first is Map) {
+            if (rpcRes.first['exists'] == true) {
+              found = true;
+              return true;
+            }
+          }
+        } catch (e) {
+          debugPrint('[CheckEmail] Supabase direct check fallback error: $e');
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingEmail = false);
+      }
+    }
+    return found;
+  }
+
+  Future<void> _showExistingEmailDialog(String email) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.amber.shade700.withOpacity(0.5)),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.amber.shade400, size: 28),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Email Already Registered',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: RichText(
+          text: TextSpan(
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+            children: [
+              const TextSpan(text: 'An account associated with '),
+              TextSpan(
+                text: email,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              const TextSpan(
+                text: ' already exists.\n\nIf you already have an Invify account, you can link this device directly via QR code from your web dashboard. Otherwise, please enter a different email address.',
+              ),
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _emailFocusNode.requestFocus();
+              _emailController.selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _emailController.text.length,
+              );
+            },
+            child: const Text('Use Different Email', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _startLinkQrScan(context);
+            },
+            icon: const Icon(Icons.qr_code_scanner, size: 16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            label: const Text('Link This Device', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitOnboarding({required bool isTrial}) async {
-    if (_isLoading || _isCapturingTelemetry) return;
+    if (_isLoading || _isCapturingTelemetry || _isCheckingEmail) return;
 
     if (!_formKey.currentState!.validate()) {
       setState(() => _currentStep = 1);
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final emailExists = await _checkEmailExists(email);
+    if (emailExists) {
+      if (mounted) {
+        setState(() {
+          _currentStep = 1;
+          _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+        });
+        _formKey.currentState!.validate();
+        await _showExistingEmailDialog(email);
+      }
       return;
     }
 
@@ -664,7 +854,35 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ],
           ),
           const SizedBox(height: 20),
-          _buildTextField(_emailController, 'Email Address', Icons.email, isEmail: true),
+          _buildTextField(
+            _emailController, 
+            'Email Address', 
+            Icons.email, 
+            isEmail: true,
+            focusNode: _emailFocusNode,
+            suffixIcon: _isCheckingEmail
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)),
+                    ),
+                  )
+                : null,
+            customValidator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Email is required';
+              final trimmed = value.trim();
+              final emailRegex = RegExp(r'^[\w\.-]+@[\w-]+\.[a-zA-Z]{2,}$');
+              if (!emailRegex.hasMatch(trimmed)) {
+                return 'Enter a valid email address';
+              }
+              if (_emailCheckError != null) {
+                return _emailCheckError;
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 20),
           _buildTextField(
             _passwordController, 
@@ -823,7 +1041,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       ],
     );
   }
-
   Widget _buildTextField(
     TextEditingController controller, 
     String label, 
@@ -836,10 +1053,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     String? helperText,
     bool? isObscured,
     VoidCallback? onToggleObscure,
+    FocusNode? focusNode,
+    Widget? suffixIcon,
   }) {
     final obscure = isPassword ? (isObscured ?? _obscurePassword) : false;
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       style: const TextStyle(color: Colors.white),
       obscureText: obscure,
       keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
@@ -851,7 +1071,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
         prefixIcon: Icon(icon, color: const Color(0xFF818CF8)),
-        suffixIcon: isPassword
+        suffixIcon: suffixIcon ?? (isPassword
             ? IconButton(
                 icon: Icon(
                   obscure ? Icons.visibility_off : Icons.visibility,
@@ -863,7 +1083,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                   });
                 },
               )
-            : null,
+            : null),
         filled: true,
         fillColor: const Color(0xFF101625),
         enabledBorder: OutlineInputBorder(
@@ -1264,10 +1484,24 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           else
             const SizedBox.shrink(),
           ElevatedButton(
-            onPressed: _isCapturingTelemetry
+            onPressed: (_isCapturingTelemetry || _isCheckingEmail)
                 ? null
                 : () async {
-              if (_currentStep == 1 && !_formKey.currentState!.validate()) return;
+              if (_currentStep == 1) {
+                if (!_formKey.currentState!.validate()) return;
+                final email = _emailController.text.trim();
+                final exists = await _checkEmailExists(email);
+                if (exists) {
+                  if (!mounted) return;
+                  setState(() {
+                    _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+                  });
+                  _formKey.currentState!.validate();
+                  await _showExistingEmailDialog(email);
+                  return;
+                }
+              }
+              if (!mounted) return;
               if (_currentStep == 2) {
                  if (_streetController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Street Address is required')));
@@ -1299,9 +1533,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
             child: Text(
-              _isCapturingTelemetry && _currentStep == 2
-                  ? 'GETTING GPS & DEVICE ID…'
-                  : 'NEXT STEP',
+              _isCheckingEmail && _currentStep == 1
+                  ? 'CHECKING EMAIL…'
+                  : _isCapturingTelemetry && _currentStep == 2
+                      ? 'GETTING GPS & DEVICE ID…'
+                      : 'NEXT STEP',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
@@ -1354,6 +1590,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
   @override
   void dispose() {
+    _emailController.removeListener(_onEmailChanged);
+    _emailFocusNode.removeListener(_onEmailFocusChanged);
+    _emailFocusNode.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();

@@ -51,7 +51,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
     if (authenticated && mounted) {
       final staffId = session['staffId'];
       try {
-        final staff = staffList.firstWhere((s) => s.id == staffId);
+        final staff = staffList.firstWhere((s) => s.id.toString() == staffId.toString());
         final settingsBloc = context.read<SettingsBloc>();
         settingsBloc.add(ResetFailedAttempts());
         Navigator.pop(context, staff);
@@ -75,7 +75,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
               return AlertDialog(
                 title: const Text('Staff Authentication'),
                 content: const Text(
-                  'No staff members found. Please go to Settings > Staff Management to add staff before using this feature.',
+                  'No staff members found. Please go to Admin Hub > System Setup > Staff Management to add staff before using this feature.',
                   style: TextStyle(color: Colors.red),
                 ),
                 actions: [
@@ -83,11 +83,17 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                     onPressed: () => Navigator.pop(context),
                     child: const Text('CANCEL'),
                   ),
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context); // Close dialog
+                      Navigator.pushNamed(context, '/system_setup');
                     },
-                    child: const Text('OK'),
+                    icon: const Icon(Icons.admin_panel_settings, size: 16),
+                    label: const Text('GO TO ADMIN HUB'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               );
@@ -212,7 +218,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
       // Prompt to save biometric if available
       if (_isBiometricAvailable) {
         final session = await _biometricService.getSecureSession();
-        if (session == null || session['staffId'] != _selectedStaff!.id) {
+        if (session == null || session['staffId']?.toString() != _selectedStaff!.id?.toString()) {
           final shouldEnroll = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(

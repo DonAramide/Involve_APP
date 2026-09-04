@@ -1,7 +1,9 @@
 // src/controllers/finance.controller.ts
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
+import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { splitUnsweptVirtualAccountFunds } from '../utils/virtual-account-funds';
 
 export class ExecutiveFinanceController {
   /**
@@ -36,7 +38,10 @@ export class ExecutiveFinanceController {
         studentsRes,
         customersRes,
         unmatchedRes,
-        failedPayoutsRes
+        failedPayoutsRes,
+        customerVaRes,
+        staffVaRes,
+        studentVaRes,
       ] = await Promise.all([
         supabaseAdmin.from('wallets').select('balance').eq('tenant_id', tenantId).single(),
         invoiceQuery,
@@ -44,20 +49,35 @@ export class ExecutiveFinanceController {
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
         supabaseAdmin
           .from('transactions_log')
-          .select('amount, type, reference')
+          .select('amount, type, reference, metadata')
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT']),
         supabaseAdmin
           .from('transactions_log')
-          .select('amount')
+          .select('amount, type, reference, metadata')
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['SWEEP', 'DEBIT', 'WITHDRAWAL']),
         supabaseAdmin.from('students').select('id, admission_number, running_balance').eq('school_id', tenantId),
         supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'PENDING').is('metadata->studentId', null),
-        supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'FAILED').eq('type', 'payout')
+        supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'FAILED').eq('type', 'payout'),
+        supabaseAdmin
+          .from('customers')
+          .select('virtual_account_number')
+          .eq('tenant_id', tenantId)
+          .not('virtual_account_number', 'is', null),
+        supabaseAdmin
+          .from('users')
+          .select('virtual_account_number')
+          .eq('tenant_id', tenantId)
+          .not('virtual_account_number', 'is', null),
+        supabaseAdmin
+          .from('students')
+          .select('virtual_account_number')
+          .eq('school_id', tenantId)
+          .not('virtual_account_number', 'is', null),
       ]);
 
       const wallet = walletRes.data;
@@ -74,7 +94,8 @@ export class ExecutiveFinanceController {
       let totalInvoiced = 0;
       let totalCollected = 0;
       let card = 0;
-      let transfer = 0;
+      let vaTransfer = 0;
+      let bankTransfer = 0;
       let cash = 0;
       let walletAmount = 0;
       const invoiceCount = invoices?.length || 0;
@@ -85,28 +106,28 @@ export class ExecutiveFinanceController {
         totalInvoiced += amt;
         totalCollected += paid;
 
-        const method = (inv.payment_method || '').toLowerCase();
-        if (method === 'cash') {
+        const rail = classifyInvoicePaymentMethod(inv.payment_method);
+        if (rail === 'cash') {
           cash += paid;
-        } else if (method === 'transfer') {
-          transfer += paid;
-        } else if (method === 'card' || method === 'pos') {
+        } else if (rail === 'va_transfer') {
+          vaTransfer += paid;
+        } else if (rail === 'bank_transfer') {
+          bankTransfer += paid;
+        } else if (rail === 'card') {
           card += paid;
-        } else if (method === 'wallet') {
+        } else if (rail === 'wallet') {
           walletAmount += paid;
         }
       }
 
       const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0) || 0;
 
-      // Invoice rails (card/POS/transfer) — legacy Quasar sales path
-      let totalQuasarFromInvoices = 0;
+      // Only card/POS + Quasar VA invoices. Tenant personal-bank transfers stay out.
+      let totalQuasarFromCardInvoices = 0;
       for (const inv of (allInvoices || [])) {
         const paid = Number(inv.amount_paid || 0);
-        const method = (inv.payment_method || '').toLowerCase();
-        if (method === 'transfer' || method === 'card' || method === 'pos') {
-          totalQuasarFromInvoices += paid;
-        }
+        const rail = classifyInvoicePaymentMethod(inv.payment_method);
+        if (rail === 'card') totalQuasarFromCardInvoices += paid;
       }
 
       // Live Quasar VA / webhook deposits (dedupe by reference)
@@ -122,23 +143,20 @@ export class ExecutiveFinanceController {
         if (amount > 0) totalQuasarFromDeposits += amount;
       }
 
-      const totalQuasarSwept =
-        (quasarSweeps || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0;
-
-      // Prefer deposits when present (sandbox VA flow); otherwise invoice rails.
-      const totalQuasarCollected =
-        totalQuasarFromDeposits > 0
-          ? totalQuasarFromDeposits + totalQuasarFromInvoices
-          : totalQuasarFromInvoices;
-
       const totalQuasarRemitted = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
-      // Funds still held / awaiting remittance to merchant bank
-      const pendingQuasarRemittance = Math.max(0, totalQuasarCollected - totalQuasarRemitted);
-      // VA credits not yet swept into tenant wallet (matches Virtual Accounts Sweep)
-      const pendingVirtualAccountFunds = Math.max(
+      const unsweptVa = splitUnsweptVirtualAccountFunds({
+        transactions: [...(quasarCredits || []), ...(quasarSweeps || [])],
+        customerVas: (customerVaRes.data || []).map((row: any) => row.virtual_account_number),
+        staffVas: (staffVaRes.data || []).map((row: any) => row.virtual_account_number),
+        studentVas: (studentVaRes.data || []).map((row: any) => row.virtual_account_number),
+      });
+      const pendingVirtualAccountFunds = unsweptVa.total;
+      // Held = unswept customer/staff VA + card not yet remitted. Own-bank is excluded.
+      const pendingQuasarRemittance = Math.max(
         0,
-        totalQuasarFromDeposits - totalQuasarSwept,
+        pendingVirtualAccountFunds + totalQuasarFromCardInvoices - totalQuasarRemitted,
       );
+      const totalQuasarCollected = pendingQuasarRemittance + totalQuasarRemitted;
 
       let totalCount = 0;
       let owingCount = 0;
@@ -183,21 +201,31 @@ export class ExecutiveFinanceController {
         walletBalance: wallet?.balance || 0,
         totalCollected: allTimeCollected + totalQuasarFromDeposits,
         revenueInRange: totalCollected,
-        /** All-time Quasar inflows (VA deposits + card/transfer invoices) */
+        /** All-time Quasar inflows (VA deposits + card invoices). Own-bank transfers excluded. */
         totalQuasarCollected,
         /** Successful remittances / payouts to merchant */
         totalQuasarRemitted,
         /** Still to remit = Quasar collections − remitted */
         pendingQuasarRemittance,
-        /** VA credits not yet swept into tenant wallet */
+        /** VA credits not yet swept into tenant wallet (already on a customer or staff VA) */
         pendingVirtualAccountFunds,
+        unsweptVirtualAccount: {
+          total: pendingVirtualAccountFunds,
+          customer: unsweptVa.customer,
+          staff: unsweptVa.staff,
+          student: unsweptVa.student,
+          unmapped: unsweptVa.unmapped,
+        },
         salesSummary: {
           totalInvoiced,
           totalCollected,
           card,
-          transfer,
+          vaTransfer,
+          bankTransfer,
+          transfer: bankTransfer,
           cash,
           wallet: walletAmount,
+          cardAndTransfer: card + vaTransfer,
           invoiceCount
         },
         studentMetrics: {

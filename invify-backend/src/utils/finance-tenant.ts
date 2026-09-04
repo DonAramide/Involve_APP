@@ -1,9 +1,24 @@
 import { Request } from 'express';
 
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+/** Drop empty / sentinel tenant ids that are not a real merchant. */
+function usableTenantId(value: unknown): string | undefined {
+  const s = String(value ?? '').trim();
+  if (!s || s === 'undefined' || s === 'null' || s === 'global' || s === 'system') {
+    return undefined;
+  }
+  return s;
+}
+
 /**
  * Resolve the authoritative tenant for financial operations.
  * Client-supplied x-tenant-id / body.tenantId must never override a
  * non–super-admin user's authenticated tenant.
+ * Platform operators may select a tenant via body, query, params, or X-Tenant-ID.
  */
 export function resolveAuthoritativeTenantId(req: Request): string {
   const user = (req as any).user;
@@ -17,16 +32,18 @@ export function resolveAuthoritativeTenantId(req: Request): string {
   const isSuperAdmin = role === 'super_admin' || role.split(',').map((r: string) => r.trim()).includes('super_admin');
 
   if (isSuperAdmin) {
-    const fromBody = req.body?.tenantId;
-    const fromQuery = typeof req.query?.tenantId === 'string' ? req.query.tenantId : undefined;
-    const fromParams = (req.params as any)?.tenantId;
-    const chosen = fromBody || fromQuery || fromParams || user.tenantId;
-    if (!chosen || chosen === 'undefined' || chosen === 'null') {
+    const chosen =
+      usableTenantId(req.body?.tenantId) ||
+      usableTenantId(req.query?.tenantId) ||
+      usableTenantId((req.params as any)?.tenantId) ||
+      usableTenantId(firstHeader(req.headers['x-tenant-id'])) ||
+      usableTenantId(user.tenantId);
+    if (!chosen) {
       const err: any = new Error('tenantId is required for platform operators');
       err.status = 400;
       throw err;
     }
-    return String(chosen);
+    return chosen;
   }
 
   if (!user.tenantId || user.tenantId === 'undefined' || user.tenantId === 'null') {

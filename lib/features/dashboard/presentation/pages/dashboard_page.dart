@@ -640,8 +640,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
-    final isSchool = settings?.businessMode == 'school';
-    final isServices = settings?.businessMode == 'services';
+    final isSchool = settings?.isSchoolMode == true;
+    final isServices = settings?.isServicesMode == true;
     final lockTrialBasic = _isTrialOrBasicPlan(userPlan);
     
     final allItems = <_DashboardMenuItem>[

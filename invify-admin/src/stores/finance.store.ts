@@ -22,13 +22,23 @@ export interface FinanceSummaryViewModel {
   revenueTrend: string;
   pendingSettlementFormatted: string;
   heldFundsFormatted: string;
+  platformHeldFormatted: string;
+  platformCollectedFormatted: string;
+  platformRemittedFormatted: string;
+  unsweptVaFormatted: string;
+  unsweptCustomerVaFormatted: string;
+  unsweptStaffVaFormatted: string;
+  unsweptUnmappedVaFormatted: string;
   salesSummary?: {
     totalInvoiced: number;
     totalCollected: number;
     card: number;
+    vaTransfer: number;
+    bankTransfer: number;
     transfer: number;
     cash: number;
     wallet: number;
+    cardAndTransfer?: number;
     invoiceCount: number;
   };
   studentMetrics: {
@@ -60,6 +70,10 @@ export const useFinanceStore = defineStore('finance', {
   }),
   actions: {
     hydrate() {
+      const tenantId = resolveTenantId();
+      if (!tenantId || tenantId === 'global' || tenantId === 'system') {
+        return;
+      }
       this.fetchSummary(true);
       this.fetchTransactions(true);
       this.subscribe();
@@ -110,7 +124,8 @@ export const useFinanceStore = defineStore('finance', {
           FinanceRepository.getPayoutStats(tenantId, { refresh: forceRefresh })
         ]);
 
-        const formatCurrency = (val: number) => `₦${Number(val || 0).toLocaleString()}`;
+        const formatCurrency = (val: number) =>
+          `₦${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         this.summary = {
           balanceFormatted: formatCurrency(walletData.balance),
@@ -118,7 +133,14 @@ export const useFinanceStore = defineStore('finance', {
           revenueTrend: execSummary.revenueInRange > 0 ? `+₦${execSummary.revenueInRange.toLocaleString()}` : 'No recent revenue',
           pendingSettlementFormatted: formatCurrency(payoutStats.pendingSettlement),
           heldFundsFormatted: formatCurrency(payoutStats.heldFunds),
-          salesSummary: (execSummary as any).salesSummary,
+          platformHeldFormatted: formatCurrency(execSummary.pendingQuasarRemittance || 0),
+          platformCollectedFormatted: formatCurrency(execSummary.totalQuasarCollected || 0),
+          platformRemittedFormatted: formatCurrency(execSummary.totalQuasarRemitted || 0),
+          unsweptVaFormatted: formatCurrency(execSummary.pendingVirtualAccountFunds || 0),
+          unsweptCustomerVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.customer || 0),
+          unsweptStaffVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.staff || 0),
+          unsweptUnmappedVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.unmapped || 0),
+          salesSummary: execSummary.salesSummary,
           studentMetrics: execSummary.studentMetrics,
           alerts: {
             unmatchedCount: execSummary.alerts.unmatchedCount,

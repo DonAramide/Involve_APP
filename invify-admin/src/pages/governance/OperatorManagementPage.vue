@@ -165,7 +165,7 @@
               :dark="prefs.isDarkMode"
               filled
               dense
-              placeholder="e.g. core-operator@IIPS.app"
+              placeholder="e.g. core-operator@invify.org"
               class="bg-subpanel text-main rounded-borders"
               required
             />

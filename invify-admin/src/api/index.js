@@ -62,6 +62,13 @@ function resolveClientTenantId() {
     : null;
 }
 
+/** Attach active tenant so platform-operator payout APIs do not 400. */
+function withClientTenantId(payload) {
+  const tenantId = resolveClientTenantId();
+  if (!tenantId) return payload ? { ...payload } : {};
+  return { ...(payload || {}), tenantId };
+}
+
 api.interceptors.request.use((config) => {
   const token = readAccessToken();
   if (token) {
@@ -136,11 +143,16 @@ export const adminApi = {
   issueQuasarLiveApiKey: (data) =>
     api.post('/admin/quasar/api-key/issue-live', data),
   getPlatformPayoutSettings: () => api.get('/api/payout/platform-settings'),
-  getTenantPayoutSettings: () => api.get('/api/payout/settings'),
-  saveTenantPayoutSettings: (data) => api.post('/api/payout/settings', data),
-  getPayoutBanks: (params) => api.get('/api/payout/banks', { params }),
-  resolvePayoutAccount: (data) => api.post('/api/payout/resolve-account', data),
-  initiatePayout: (data) => api.post('/api/payout/withdraw', data),
+  getTenantPayoutSettings: () =>
+    api.get('/api/payout/settings', { params: withClientTenantId() }),
+  saveTenantPayoutSettings: (data) =>
+    api.post('/api/payout/settings', withClientTenantId(data)),
+  getPayoutBanks: (params) =>
+    api.get('/api/payout/banks', { params: withClientTenantId(params) }),
+  resolvePayoutAccount: (data) =>
+    api.post('/api/payout/resolve-account', withClientTenantId(data)),
+  initiatePayout: (data) =>
+    api.post('/api/payout/withdraw', withClientTenantId(data)),
   getTenantStaff: () => api.get('/api/staff'),
   payStaffSalary: (id, data) => api.post(`/api/staff/${id}/pay-salary`, data),
   getUserDevices: (params) => api.get('/api/admin/user-devices', { params }),
@@ -229,6 +241,10 @@ export const financeApi = {
   getInvoices: () => api.get('/api/v1/finance/invoices'),
   getInvoice: (id) => api.get(`/api/v1/finance/invoices/${id}`),
   createInvoice: (data) => api.post('/api/v1/finance/invoices', data),
+};
+
+export const servicesApi = {
+  getSummary: (params) => api.get('/api/v1/services/summary', { params }),
 };
 
 export const crmApi = {

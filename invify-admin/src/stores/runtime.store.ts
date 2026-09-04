@@ -83,6 +83,9 @@ export const useRuntimeStore = defineStore('runtime', {
         if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
           localStorage.setItem('tenant_id', this.config.tenant.id);
         }
+        if (this.config?.tenant?.businessMode) {
+          localStorage.setItem('tenant_type', this.config.tenant.businessMode);
+        }
         this.lastHydrated = Date.now();
         this.error = null;
       } catch (err: any) {
@@ -102,6 +105,9 @@ export const useRuntimeStore = defineStore('runtime', {
         this.config = response.data;
         if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
           localStorage.setItem('tenant_id', this.config.tenant.id);
+        }
+        if (this.config?.tenant?.businessMode) {
+          localStorage.setItem('tenant_type', this.config.tenant.businessMode);
         }
         this.lastHydrated = Date.now();
         this.error = null;

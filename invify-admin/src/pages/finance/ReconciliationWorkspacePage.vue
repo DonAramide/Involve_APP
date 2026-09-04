@@ -428,6 +428,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useCurrency } from '../../composables/useCurrency';
 import { reconciliationApi } from '../../api';
 import { useQuasar } from 'quasar';
+import { userFacingApiError } from '../../utils/userFacingApiError';
 
 const { currentCurrency } = useCurrency();
 const $q = useQuasar();
@@ -497,7 +498,7 @@ const loadData = async () => {
     }));
   } catch (error) {
     console.error('Failed to load reconciliation data', error);
-    $q.notify({ color: 'negative', message: 'Failed to load reconciliation data' });
+    $q.notify({ color: 'negative', message: userFacingApiError(error, 'Failed to load reconciliation data') });
   }
 };
 

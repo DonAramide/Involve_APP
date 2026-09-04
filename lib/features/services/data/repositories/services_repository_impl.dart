@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +10,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_analytics.dart';
 import '../../domain/entities/service_material.dart';
 import '../../domain/repositories/services_repository.dart';
+import '../../presentation/utils/job_staff_store.dart';
 
 class ServicesRepositoryImpl implements IServicesRepository {
   final AppDatabase db;
@@ -33,11 +33,18 @@ class ServicesRepositoryImpl implements IServicesRepository {
     }
 
     final results = await joinedQuery.get();
-    return results.map((row) {
+    return Future.wait(results.map((row) async {
       final job = row.readTable(db.serviceJobs);
       final customer = row.readTableOrNull(db.customers);
-      return _mapJob(job, customerName: customer?.name);
-    }).toList();
+      final assignment = await JobStaffStore.getAssignment(job.id) ??
+          await JobStaffStore.getAssignment(job.jobId);
+      return _mapJob(
+        job,
+        customerName: customer?.name,
+        staffId: assignment?.staffId,
+        staffName: assignment?.staffName,
+      );
+    }));
   }
 
   @override
@@ -59,7 +66,16 @@ class ServicesRepositoryImpl implements IServicesRepository {
       quantity: r.quantity,
     )).toList();
 
-    return _mapJob(jobTable, customerName: customerTable?.name, items: items);
+    final assignment = await JobStaffStore.getAssignment(id) ??
+        await JobStaffStore.getAssignment(jobTable.jobId);
+
+    return _mapJob(
+      jobTable,
+      customerName: customerTable?.name,
+      items: items,
+      staffId: assignment?.staffId,
+      staffName: assignment?.staffName,
+    );
   }
 
   @override
@@ -108,6 +124,12 @@ class ServicesRepositoryImpl implements IServicesRepository {
         }
       }
     });
+
+    final latestStaff = await JobStaffStore.getLatestStaff();
+    if (latestStaff != null) {
+      await JobStaffStore.assignStaff(id, latestStaff.staffId, latestStaff.staffName);
+      await JobStaffStore.assignStaff(formattedJobId, latestStaff.staffId, latestStaff.staffName);
+    }
   }
 
   bool _isWalletPaymentMethod(String method) =>
@@ -727,7 +749,13 @@ class ServicesRepositoryImpl implements IServicesRepository {
     return nextValue;
   }
 
-  ServiceJob _mapJob(ServiceJobTable row, {String? customerName, List<ServiceJobItem> items = const []}) {
+  ServiceJob _mapJob(
+    ServiceJobTable row, {
+    String? customerName,
+    List<ServiceJobItem> items = const [],
+    int? staffId,
+    String? staffName,
+  }) {
     return ServiceJob(
       id: row.id,
       jobId: row.jobId,
@@ -745,6 +773,8 @@ class ServicesRepositoryImpl implements IServicesRepository {
       image: row.image,
       createdAt: row.createdAt,
       warrantyDuration: row.warrantyDuration,
+      staffId: staffId,
+      staffName: staffName,
     );
   }
 

@@ -124,13 +124,13 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 8),
             InkWell(
               onTap: () async {
-                final Uri uri = Uri.parse('https://iips.app');
+                final Uri uri = Uri.parse('https://invify.org');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri);
                 }
               },
               child: const Text(
-                'www.iips.app',
+                'www.invify.org',
                 style: TextStyle(
                   color: Colors.blue,
                   decoration: TextDecoration.underline,

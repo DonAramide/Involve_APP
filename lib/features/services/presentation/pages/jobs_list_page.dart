@@ -229,9 +229,27 @@ class _JobsListPageState extends State<JobsListPage> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4.0),
-          child: Text(
-            job.jobId,
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                job.jobId,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              if (job.staffName != null && (job.staffName as String).isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.badge_outlined, size: 12, color: Colors.blue.shade700),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Staff: ${job.staffName}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue.shade700),
+                    ),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
         trailing: Column(

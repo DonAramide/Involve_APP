@@ -54,6 +54,7 @@ export function resolvePostAuthRedirect(roleStr, redirect) {
 
 export function loginPathForContext({ pathname, role } = {}) {
   const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '')
+  if (String(path || '').toLowerCase().startsWith('/agent')) return '/agent/login'
   if (isTenantSurfacePath(path)) return '/tenant/login'
 
   const roleStr = String(role || (typeof localStorage !== 'undefined' ? localStorage.getItem('operator_role') : '') || '')

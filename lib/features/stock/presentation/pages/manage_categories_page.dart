@@ -28,7 +28,11 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
         listener: (context, state) {
           if (state is StockError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
         },

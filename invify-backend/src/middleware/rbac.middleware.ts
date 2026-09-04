@@ -72,14 +72,14 @@ export const checkRole = (allowedRoles: string[]) => {
       
       if (userRoles.includes('admin_finance')) {
         // admin_finance has privilege "Read/Write Ledgers"
-        if (path.startsWith('/admin/ledger') || path.startsWith('/admin/payments') || path.startsWith('/api/reconciliation') || path.startsWith('/api/finance/executive-summary')) {
+        if (path.startsWith('/admin/ledger') || path.startsWith('/admin/payments') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/finance/executive-summary') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit')) {
           return next();
         }
       }
 
       if (userRoles.includes('admin_treasury')) {
         // admin_treasury has privilege "Batch Payouts, Wallet Adjustments"
-        if (path.startsWith('/wallet') || path.startsWith('/api/payout') || path.startsWith('/api/finance/executive-summary')) {
+        if (path.startsWith('/wallet') || path.startsWith('/api/payout') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/school') || path.startsWith('/school') || path.includes('card-settlement') || path.startsWith('/api/dashboard') || path.startsWith('/dashboard') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit') || isAdminSurface('/admin/inventory')) {
           return next();
         }
       }

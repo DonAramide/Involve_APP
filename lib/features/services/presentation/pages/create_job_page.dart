@@ -14,6 +14,11 @@ import '../utils/create_job_draft_store.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
+import '../utils/job_staff_store.dart';
 
 class CreateJobPage extends StatefulWidget {
   const CreateJobPage({super.key});
@@ -26,6 +31,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCustomerId;
   String? _selectedCustomerName;
+  Staff? _selectedStaff;
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _amountController = TextEditingController();
@@ -48,6 +54,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
     context.read<ServicesBloc>().add(const SearchServiceCustomers());
     context.read<ServicesBloc>().add(const LoadServicePresets());
     context.read<ServicesBloc>().add(const LoadLaborPresets());
+    context.read<StaffBloc>().add(LoadStaffList());
     _titleController.addListener(_scheduleDraftSave);
     _descController.addListener(_scheduleDraftSave);
     _amountController.addListener(_scheduleDraftSave);
@@ -113,6 +120,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
 
   bool _hasUnsavedJobData() {
     return _selectedCustomerId != null ||
+        _selectedStaff != null ||
         _titleController.text.trim().isNotEmpty ||
         _descController.text.trim().isNotEmpty ||
         _amountController.text.trim().isNotEmpty ||
@@ -128,6 +136,10 @@ class _CreateJobPageState extends State<CreateJobPage> {
     return {
       'customerId': _selectedCustomerId,
       'customerName': _selectedCustomerName,
+      'staffId': _selectedStaff?.id,
+      'staffName': _selectedStaff?.name,
+      'staffCode': _selectedStaff?.staffCode,
+      'staffRole': _selectedStaff?.role,
       'title': _titleController.text,
       'description': _descController.text,
       'amount': _amountController.text,
@@ -186,9 +198,20 @@ class _CreateJobPageState extends State<CreateJobPage> {
       }
     }
 
+    Staff? staff;
+    if (draft['staffId'] != null && draft['staffName'] != null) {
+      staff = Staff(
+        id: (draft['staffId'] as num).toInt(),
+        name: draft['staffName'] as String,
+        staffCode: draft['staffCode'] as String? ?? '',
+        role: draft['staffRole'] as String? ?? 'STAFF',
+      );
+    }
+
     setState(() {
       _selectedCustomerId = draft['customerId'] as String?;
       _selectedCustomerName = draft['customerName'] as String?;
+      _selectedStaff = staff;
       _titleController.text = (draft['title'] as String?) ?? '';
       _descController.text = (draft['description'] as String?) ?? '';
       _amountController.text = (draft['amount'] as String?) ?? '';
@@ -305,6 +328,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildCustomerSelector(),
+                const SizedBox(height: 16),
+                _buildStaffSelector(),
                 const SizedBox(height: 24),
                 
                 // Project Image Section — optional; collapsed for hotel rooms and similar jobs
@@ -843,11 +868,139 @@ class _CreateJobPageState extends State<CreateJobPage> {
     );
   }
 
-  void _submit() {
+  Widget _buildStaffSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Assigned Staff (Required)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (_selectedStaff != null)
+              TextButton(
+                onPressed: _authenticateStaff,
+                child: const Text('Change Staff', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _authenticateStaff,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _selectedStaff != null ? Colors.blue.withValues(alpha: 0.06) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _selectedStaff != null ? Colors.blue.shade300 : Colors.grey.shade300,
+                width: _selectedStaff != null ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: _selectedStaff != null ? Colors.blue.shade100 : Colors.grey.shade200,
+                  child: Icon(
+                    Icons.badge_outlined,
+                    color: _selectedStaff != null ? Colors.blue.shade800 : Colors.grey.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedStaff != null ? 'Assigned Staff (PIN Verified)' : 'Service Staff Assignment',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedStaff != null ? Colors.blue.shade700 : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedStaff != null
+                            ? '${_selectedStaff!.name} (ID: ${_selectedStaff!.staffId ?? "None"})'
+                            : 'Select Staff & Login with 4-Digit PIN',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _selectedStaff != null ? FontWeight.bold : FontWeight.normal,
+                          color: _selectedStaff != null ? Colors.black87 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_selectedStaff != null)
+                  Chip(
+                    avatar: const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    label: const Text('PIN VERIFIED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
+                    backgroundColor: Colors.green.shade50,
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )
+                else
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _authenticateStaff() async {
+    final staff = await showDialog<Staff>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const StaffAuthDialog(),
+    );
+    if (staff != null && mounted) {
+      setState(() {
+        _selectedStaff = staff;
+      });
+      _scheduleDraftSave();
+    }
+  }
+
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCustomerId == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select or create a customer')));
         return;
+      }
+
+      // If staff is not yet assigned/authenticated, require staff authentication
+      if (_selectedStaff == null) {
+        final staffList = context.read<StaffBloc>().state.staffList;
+        if (staffList.isNotEmpty) {
+          final staff = await showDialog<Staff>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const StaffAuthDialog(),
+          );
+          if (staff == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Staff PIN authentication is required to create a service job')),
+              );
+            }
+            return;
+          }
+          if (mounted) {
+            setState(() => _selectedStaff = staff);
+          }
+        }
+      }
+
+      if (_selectedStaff != null) {
+        await JobStaffStore.saveLatestStaff(_selectedStaff!.id!, _selectedStaff!.name);
       }
 
       final total = double.parse(_amountController.text);

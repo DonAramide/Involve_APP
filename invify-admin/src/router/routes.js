@@ -455,6 +455,7 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true, permission: 'tenant.dashboard.view' } },
+      { path: 'services/jobs', component: () => import('src/domains/tenant/services/pages/TenantServiceJobsPage.vue'), meta: { title: 'Service Jobs', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'transactions', component: () => import('src/domains/tenant/transactions/pages/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'retail/inventory', component: () => import('src/domains/tenant/inventory/pages/TenantInventoryPage.vue'), meta: { title: 'Inventory Stock Matrix', requiresAuth: true, permission: 'tenant.inventory.view' } },
       { path: 'retail/invoices', component: () => import('src/domains/tenant/transactions/pages/TenantInvoicesPage.vue'), meta: { title: 'Billing Invoices', requiresAuth: true, permission: 'tenant.transaction.view' } },

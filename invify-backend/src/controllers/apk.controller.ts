@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
 import { resolveApkObjectKey } from '../utils/apk-object-key';
+import { createContaboS3Client, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 export const apkUploadMiddleware = upload.single('file');
@@ -13,16 +14,6 @@ function publicApkDownloadUrl(apkId: string): string {
   const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || '').replace(/\/+$/, '');
   return base ? `${base}/api/apk/${apkId}/download` : `/api/apk/${apkId}/download`;
 }
-
-const s3Client = new S3Client({
-  endpoint: process.env.CONTABO_ENDPOINT || '',
-  region: process.env.CONTABO_REGION || 'usc1',
-  credentials: {
-    accessKeyId: process.env.CONTABO_ACCESS_KEY || '',
-    secretAccessKey: process.env.CONTABO_SECRET_KEY || ''
-  },
-  forcePathStyle: true // Needed for Contabo Object Storage
-});
 
 import { io } from '../app';
 
@@ -53,10 +44,15 @@ export class ApkController {
         return res.status(400).json({ error: 'name, packageName, and version are required' });
       }
 
-      const bucket = process.env.CONTABO_BUCKET;
+      const bucket = resolveContaboBucket();
+      if (!bucket) {
+        return res.status(503).json({
+          error: 'Object storage is not configured (CONTABO_BUCKET is missing).',
+        });
+      }
       const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
 
-      // Upload to Contabo S3
+      const s3Client = createContaboS3Client();
       await s3Client.send(new PutObjectCommand({
         Bucket: bucket,
         Key: objectKey,
@@ -72,7 +68,7 @@ export class ApkController {
         if (!baseUrl.endsWith('/')) baseUrl += '/';
         s3Url = `${baseUrl}${objectKey}`;
       } else {
-        let endpointUrl = (process.env.CONTABO_ENDPOINT || '').trim();
+        let endpointUrl = resolveContaboEndpoint();
         if (!endpointUrl.endsWith('/')) endpointUrl += '/';
         const tenantId = (process.env.CONTABO_TENANT_ID || process.env.CONTABO_CUSTOMER_ID || '0d205683f3b543beb7298e9b68e26b0f').trim();
         const bucketPath = tenantId && !bucket?.includes(':') ? `${tenantId}:${bucket}` : bucket;
@@ -134,7 +130,8 @@ export class ApkController {
         return res.status(404).json({ error: 'APK storage key is missing' });
       }
 
-      const bucket = process.env.CONTABO_BUCKET || 'iips.stargazer.bucket';
+      const bucket = resolveContaboBucket();
+      const s3Client = createContaboS3Client();
       
       try {
         const object = await s3Client.send(new GetObjectCommand({

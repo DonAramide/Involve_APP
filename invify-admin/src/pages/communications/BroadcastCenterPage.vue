@@ -506,7 +506,11 @@ const loadLiveFleetSnapshot = async () => {
     const live = liveRes.data || {}
     connectedNow.value = Number(live.connectedDevices || 0)
     connectedDeviceIds.value = Array.isArray(live.devices)
-      ? live.devices.map((d) => d.deviceId).filter(Boolean)
+      ? live.devices.map((d) => {
+          const id = d.deviceId || d.socketId
+          const ip = d.ip && d.ip !== 'unknown' ? d.ip : null
+          return ip ? `${id} @ ${ip}` : id
+        }).filter(Boolean)
       : []
     triggerPreflightSimulation()
   } finally {
@@ -656,10 +660,10 @@ const executeOperationalBroadcast = async () => {
           broadcastId: envelope.broadcastId,
         })
       } catch (socketErr) {
-        console.error('[BroadcastCenter] Direct /admin/broadcast failed:', socketErr)
+        console.error('[BroadcastCenter] Direct /api/admin/broadcast failed:', socketErr)
         $q?.notify({
           message: 'Audit saved, but device socket push failed',
-          caption: socketErr?.response?.data?.error || socketErr?.message || 'Check backend auth /admin/broadcast',
+          caption: socketErr?.response?.data?.error || socketErr?.message || 'Check backend auth /api/admin/broadcast',
           color: 'amber-10',
           textColor: 'black',
           icon: 'warning',
@@ -800,7 +804,11 @@ onMounted(() => {
       const live = res.data || {}
       connectedNow.value = Number(live.connectedDevices || 0)
       connectedDeviceIds.value = Array.isArray(live.devices)
-        ? live.devices.map((d) => d.deviceId).filter(Boolean)
+        ? live.devices.map((d) => {
+            const id = d.deviceId || d.socketId
+            const ip = d.ip && d.ip !== 'unknown' ? d.ip : null
+            return ip ? `${id} @ ${ip}` : id
+          }).filter(Boolean)
         : []
     }).catch(() => {})
   }, 10000)

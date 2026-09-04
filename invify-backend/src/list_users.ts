@@ -44,7 +44,7 @@ async function run() {
   console.log(`Found ${users.length} users in Auth.`);
   
   // Case-insensitive search
-  const superadminEmail = 'superadmin@IIPS.app';
+  const superadminEmail = 'superadmin@invify.org';
   const superadminPass = 'AdminPass123!';
   const existingAdmin = users.find((u: any) => u.email?.toLowerCase() === superadminEmail.toLowerCase());
 

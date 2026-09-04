@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 /// Shared Free Trial lock for VA generation (school / retail / services / staff).
 /// Returns `true` when blocked (dialog shown); caller should return early.
@@ -9,6 +12,23 @@ Future<bool> showFreeTrialVaLockedIfNeeded(
   BuildContext context, {
   String? businessName,
 }) async {
+  // 1. Pro plan in SettingsBloc is never locked
+  try {
+    final userPlan = context.read<SettingsBloc>().state.userPlan;
+    if (userPlan != null && userPlan.isValid && userPlan.isPro) {
+      return false;
+    }
+  } catch (_) {}
+
+  // 2. Direct check on server-activated plan for activated devices
+  final serverPlan = await StorageService.getServerActivatedPlan();
+  if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+    final p = serverPlan.planType.toLowerCase().trim();
+    if (p == 'pro' || p == 'premium' || p == 'enterprise' || p == 'lifetime' || p == 'standard') {
+      return false;
+    }
+  }
+
   final onFreeTrial = await LicenseService.isOnFreeTrialOnly(businessName: businessName);
   if (!onFreeTrial) return false;
   if (!context.mounted) return true;

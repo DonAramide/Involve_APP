@@ -9,10 +9,10 @@
       <q-form @submit="handleSignup" class="column op-gap-8 q-mt-sm">
         <q-input v-model="form.name" dark filled dense label="Full Legal Name" class="bg-panel-darker text-caption" required />
         <q-input v-model="form.email" dark filled dense type="email" label="Email Address" class="bg-panel-darker text-caption" required />
-        <q-input v-model="form.phone" dark filled dense label="Primary Phone Number" class="bg-panel-darker text-caption" required />
+        <q-input v-model="form.phone" dark filled dense type="tel" label="Primary Phone Number" class="bg-panel-darker text-caption" maxlength="13" counter required />
         
         <div class="row items-center justify-between no-wrap op-gap-8">
-          <q-input v-model="form.whatsappNumber" dark filled dense label="WhatsApp Number" class="bg-panel-darker text-caption col" :disable="sameAsPhone" required />
+          <q-input v-model="form.whatsappNumber" dark filled dense type="tel" label="WhatsApp Number" class="bg-panel-darker text-caption col" maxlength="13" counter :disable="sameAsPhone" required />
           <q-checkbox v-model="sameAsPhone" dark dense label="Same as Phone" color="cyan-3" class="text-caption text-muted" />
         </div>
         

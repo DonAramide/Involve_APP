@@ -859,7 +859,12 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final newBalance = (invoice.totalAmount - newAmountPaid).clamp(0.0, double.infinity);
     final String newStatus;
     
-    if (method == 'Transfer') {
+    final normalizedMethod = method.trim().toLowerCase();
+    final isTransferMethod = normalizedMethod == 'transfer' || 
+        normalizedMethod == 'virtualaccount' || 
+        normalizedMethod == 'va transfer';
+    
+    if (isTransferMethod) {
       newStatus = 'Pending';
     } else if (newBalance <= 0) {
       newStatus = 'Paid';

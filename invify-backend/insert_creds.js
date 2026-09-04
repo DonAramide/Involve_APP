@@ -18,7 +18,7 @@ async function setCredentials() {
   const userPayload = {
     credential_type: 'API_KEY',
     environment: 'PRODUCTION',
-    plaintext_value: 'support@iips.app',
+    plaintext_value: 'support@invify.org',
     key_name: 'SMTP_USER',
     expires_at: null,
     rotate_existing: true

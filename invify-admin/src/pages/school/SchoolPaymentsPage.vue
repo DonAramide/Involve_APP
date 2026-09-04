@@ -178,6 +178,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { schoolApi, adminApi } from 'src/api'
+import { userFacingApiError } from 'src/utils/userFacingApiError'
 
 const $q = useQuasar()
 const route = useRoute()
@@ -319,14 +320,14 @@ async function fetchAll() {
   } catch (e) {
     console.error(e)
     payments.value = []
-    errors.push(e?.response?.data?.error || e?.response?.data?.message || 'payments')
+    errors.push(userFacingApiError(e, 'payments'))
   }
   try {
     await fetchDisputes()
   } catch (e) {
     console.error(e)
     disputes.value = []
-    errors.push(e?.response?.data?.error || e?.response?.data?.message || 'disputes')
+    errors.push(userFacingApiError(e, 'disputes'))
   } finally {
     loading.value = false
   }

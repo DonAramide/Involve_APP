@@ -7,6 +7,7 @@ import { BillingService } from '../services/billing.service';
 import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
 import { NotificationService } from '../services/notification.service';
+import { hydrateTenantOwnerContact } from '../utils/owner-contact';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -988,12 +989,16 @@ export class AdminController {
         createdAt: a.created_at || null,
       }));
 
+      const rawUsers = usersRes.data || [];
+      const tenant = hydrateTenantOwnerContact(tenantRes.data, rawUsers, registeredDevices);
+
       return res.status(200).json({
-        tenant: tenantRes.data,
-        users: (usersRes.data || []).map((u: any) => ({
+        tenant,
+        users: rawUsers.map((u: any) => ({
           ...u,
           // Surface tenant phone on owner rows when users.phone column is empty
-          phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenantRes.data?.phone : null) || null,
+          phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.phone : null) || null,
+          email: u.email || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.owner_email : null) || null,
         })),
         wallet: { balance: walletInfo.balance }, // Normalized structure for frontend
         recentUsage: usageRes.data,
@@ -1608,7 +1613,7 @@ export class AdminController {
       if (hasProfileFields && tenantId) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
-          .select('settings, name, phone, country, lga')
+          .select('settings, name, phone, country, lga, owner_email, owner_name')
           .eq('id', tenantId)
           .maybeSingle();
 
@@ -1616,6 +1621,12 @@ export class AdminController {
           ? { ...(tenantRow.settings as object) }
           : {};
         const prevOwner = (existingSettings as any).owner_profile || {};
+        const { data: currentUser } = await supabaseAdmin
+          .from('users')
+          .select('email')
+          .eq('id', userId)
+          .maybeSingle();
+        const ownerEmail = String(currentUser?.email || prevOwner.email || '').trim().toLowerCase();
         const owner_profile = {
           ...prevOwner,
           ...(firstName !== undefined ? { firstName: String(firstName || '').trim() } : {}),
@@ -1625,6 +1636,7 @@ export class AdminController {
           ...(city !== undefined ? { city: String(city || '').trim() } : {}),
           ...(country !== undefined ? { country: String(country || '').trim() } : {}),
           ...(bio !== undefined ? { bio: String(bio || '').trim() } : {}),
+          ...(ownerEmail ? { email: ownerEmail } : {}),
           updatedAt: new Date().toISOString(),
           updatedBy: userId,
         };
@@ -1632,6 +1644,9 @@ export class AdminController {
         const tenantUpdate: Record<string, any> = {
           settings: { ...existingSettings, owner_profile },
         };
+        if (ownerEmail && !tenantRow?.owner_email) {
+          tenantUpdate.owner_email = ownerEmail;
+        }
 
         // Keep tenant business/contact/location in sync for Admin Portal
         if (businessName !== undefined && String(businessName).trim()) {

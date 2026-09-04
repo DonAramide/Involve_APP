@@ -349,6 +349,7 @@ import CardSettlementUploadDialog from '../../components/finance/CardSettlementU
 import { cardSettlementApi } from '../../api';
 import { onMounted } from 'vue';
 import { Notify } from 'quasar';
+import { userFacingApiError } from '../../utils/userFacingApiError';
 const { currentCurrency } = useCurrency();
 
 import { ref, computed } from 'vue'
@@ -409,7 +410,7 @@ async function loadBatches() {
       created_at: b.created_at ? new Date(b.created_at).toLocaleString() : 'N/A',
     }))
   } catch (e) {
-    Notify.create({ type: 'negative', message: 'Failed to load settlement batches' })
+    Notify.create({ type: 'negative', message: userFacingApiError(e, 'Failed to load settlement batches') })
   }
 }
 

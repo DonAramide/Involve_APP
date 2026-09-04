@@ -514,7 +514,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           ),
                         ),
                         const Center(
-                            child: Text('Powered by Invify.iips.app',
+                            child: Text('Powered by Invify.org',
                                 style: TextStyle(
                                     fontSize: 10, color: Colors.grey))),
                       ],
@@ -1116,6 +1116,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         _terminalConfig!.posSerialNumber!.isNotEmpty;
     final isPosEnabled = isPro && hasTerminal;
 
+    final staffList = context.read<StaffBloc>().state.staffList;
+    final hasConfiguredVa = staffList.any((s) => s.virtualAccountNumber != null && s.virtualAccountNumber!.trim().isNotEmpty);
+    final isVaEnabled = isPro && hasConfiguredVa;
+
     return Column(
       children: [
         RadioListTile<String>(
@@ -1132,7 +1136,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         ),
         if (isPosEnabled)
           RadioListTile<String>(
-            title: const Text('POS'),
+            title: const Text('POS Card Settlement'),
             value: 'POS',
             groupValue: state.paymentMethod,
             dense: true,
@@ -1146,7 +1150,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         else
           RadioListTile<String>(
             title: Row(children: [
-              const Text('POS', style: TextStyle(color: Colors.grey)),
+              const Text('POS Card', style: TextStyle(color: Colors.grey)),
               const SizedBox(width: 8),
               Text(
                 !isPro
@@ -1190,7 +1194,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             contentPadding: EdgeInsets.zero,
             onChanged: null,
           ),
-        if (isPro)
+        if (isVaEnabled)
           RadioListTile<String>(
             title: const Text('Pay with Transfer (Virtual Account)',
                 style:
@@ -1207,12 +1211,14 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           )
         else
           RadioListTile<String>(
-            title: Row(children: const [
-              Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.grey)),
-              SizedBox(width: 8),
+            title: Row(children: [
+              const Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.grey)),
+              const SizedBox(width: 8),
               Text(
-                '(Pro Plan required)',
-                style: TextStyle(fontSize: 10, color: Colors.red),
+                !isPro
+                    ? '(Pro Plan required)'
+                    : '(Virtual Account not set up on portal)',
+                style: const TextStyle(fontSize: 10, color: Colors.red),
               ),
             ]),
             value: 'VirtualAccount',

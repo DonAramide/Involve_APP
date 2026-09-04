@@ -15,8 +15,7 @@ import { useRuntimeStore } from '../../../../stores/runtime.store';
 const store = useRuntimeStore();
 
 onMounted(async () => {
-  // Trigger hydration if not already done by router guard
-  if (!store.hydrated) {
+  if (!store.isReady) {
     await store.hydrate();
   }
 });

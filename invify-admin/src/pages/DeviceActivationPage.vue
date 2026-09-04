@@ -355,7 +355,7 @@
           </div>
           
           <div class="q-mt-xl text-caption text-weight-bold text-amber-2 letter-spacing-3 opacity-8">
-            Powered by www.invify.iips.app
+            Powered by www.invify.org
           </div>
         </q-card-section>
 

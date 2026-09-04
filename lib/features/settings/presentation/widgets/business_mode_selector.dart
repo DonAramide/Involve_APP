@@ -47,7 +47,7 @@ class BusinessModeSelector extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Switch between Retail and School logic',
+                        'Switch between Retail, School, and Services logic',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
@@ -59,9 +59,9 @@ class BusinessModeSelector extends StatelessWidget {
                     child: Icon(Icons.lock, color: Colors.grey, size: 16),
                   ),
                 DropdownButton<String>(
-                  value: settings.businessMode,
+                  value: _selectableMode(settings.businessMode),
                   underline: const SizedBox(),
-                  disabledHint: Text(settings.businessMode == 'school' ? 'School Mode' : 'Retail (Default)'),
+                  disabledHint: Text(_modeLabel(settings.businessMode)),
                   items: const [
                     DropdownMenuItem(value: 'retail', child: Text('Retail (Default)')),
                     DropdownMenuItem(value: 'school', child: Text('School Mode')),
@@ -77,5 +77,28 @@ class BusinessModeSelector extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _selectableMode(String mode) {
+    final normalized = mode.toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (normalized == 'service' || normalized == 'hospitality' || normalized == 'invify_services') {
+      return 'services';
+    }
+    if (normalized == 'school' || normalized == 'education' || normalized == 'invify_school') {
+      return 'school';
+    }
+    if (normalized == 'services') return 'services';
+    return 'retail';
+  }
+
+  String _modeLabel(String mode) {
+    switch (_selectableMode(mode)) {
+      case 'school':
+        return 'School Mode';
+      case 'services':
+        return 'Services Mode';
+      default:
+        return 'Retail (Default)';
+    }
   }
 }

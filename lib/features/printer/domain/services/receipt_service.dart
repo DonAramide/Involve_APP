@@ -335,7 +335,7 @@ class ReceiptService {
               pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 10)),
               pw.SizedBox(height: 10),
               pw.Center(
-                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.iips.app', 
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.org', 
                     style: pw.TextStyle(fontSize: 8, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
               ),
               pw.SizedBox(height: 10),
@@ -537,7 +537,7 @@ class ReceiptService {
 
               pw.SizedBox(height: 30),
               pw.Center(
-                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.iips.app', 
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.org', 
                     style: pw.TextStyle(fontSize: 10, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
               ),
             ],
@@ -830,7 +830,7 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                   pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.iips.app', 
+                   pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.org', 
                        style: pw.TextStyle(fontSize: 8, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
                    pw.Text(settings.address, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
                 ],
@@ -1138,7 +1138,7 @@ class ReceiptService {
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                       pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.iips.app', 
+                       pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.org', 
                            style: pw.TextStyle(color: isPro ? PdfColors.blue100 : PdfColors.white, fontSize: 8, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
                        pw.Text('www.involve.com', style: const pw.TextStyle(color: PdfColors.white, fontSize: 8)),
                     ],
@@ -1332,7 +1332,7 @@ class ReceiptService {
               pw.Text(invoice.invoiceNumber, style: const pw.TextStyle(fontSize: 8)),
               pw.SizedBox(height: 10),
               pw.Center(
-                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.iips.app', 
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by Invify.org', 
                     style: pw.TextStyle(fontSize: 10, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
               ),
               pw.SizedBox(height: 10),

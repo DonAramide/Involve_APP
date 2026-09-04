@@ -1,19 +1,10 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { BuildVariantService } from '../config/build-variant';
+import { createContaboS3Client, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 dotenv.config();
-
-const s3Client = new S3Client({
-  endpoint: process.env.CONTABO_ENDPOINT,
-  region: process.env.CONTABO_REGION || 'default',
-  credentials: {
-    accessKeyId: process.env.CONTABO_ACCESS_KEY || '',
-    secretAccessKey: process.env.CONTABO_SECRET_KEY || ''
-  },
-  forcePathStyle: true // Important for many S3-compatible providers
-});
 
 export class S3Service {
   /**
@@ -31,7 +22,7 @@ export class S3Service {
         throw new Error('Contabo S3 credentials (CONTABO_ACCESS_KEY, CONTABO_SECRET_KEY, CONTABO_ENDPOINT) are required in staging/production');
       }
     }
-    const bucket = process.env.CONTABO_BUCKET || 'iips.stargazer.bucket';
+    const bucket = resolveContaboBucket();
     const ext = path.extname(originalName) || '.bin';
     const fileName = `${folder}/${uuidv4()}${ext}`;
 
@@ -44,10 +35,10 @@ export class S3Service {
     });
 
     try {
-      await s3Client.send(command);
+      await createContaboS3Client().send(command);
       
       // Construct the public URL
-      let endpoint = process.env.CONTABO_ENDPOINT || '';
+      let endpoint = resolveContaboEndpoint();
       // Ensure no trailing slash
       if (endpoint.endsWith('/')) {
         endpoint = endpoint.slice(0, -1);

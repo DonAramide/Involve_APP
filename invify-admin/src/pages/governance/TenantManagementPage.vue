@@ -257,7 +257,7 @@ const executeImpersonationHandshake = async () => {
     const expiry = Date.now() + 900000 // 15m cap exactly
     const ctx = {
       targetTenantId: targetTenantRecord.value.id,
-      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@IIPS.app',
+      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@invify.org',
       expiresAt: expiry,
       reason: auditReasonInput.value
     }
@@ -272,7 +272,7 @@ const executeImpersonationHandshake = async () => {
     const expiry = Date.now() + 900000
     const ctx = {
       targetTenantId: targetTenantRecord.value.id,
-      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@IIPS.app',
+      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@invify.org',
       expiresAt: expiry,
       reason: auditReasonInput.value
     }

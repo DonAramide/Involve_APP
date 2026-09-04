@@ -195,9 +195,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 _ActionTile(
                   label: 'Account Set up',
-                  icon: Icons.cloud_sync_rounded,
-                  onTap: isBasicOrFree ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
-                  isGated: isBasicOrFree,
+                  icon: Icons.manage_accounts_rounded,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
                 ),
                 _ActionTile(
                   label: 'Online Login',

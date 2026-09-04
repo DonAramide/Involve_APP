@@ -18,7 +18,7 @@
  *
  * Run with:
  *   QUASAR_SANDBOX_CERT=true \
- *   QUASAR_BASE_URL=https://api-quasar.iips.app/api/v1 \
+ *   QUASAR_BASE_URL=https://api-quasar.invify.org/api/v1 \
  *   QUASAR_SANDBOX_SK=sk_test_... \
  *   npm test -- --testPathPattern=07.sandbox
  */

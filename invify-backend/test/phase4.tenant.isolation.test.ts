@@ -47,4 +47,26 @@ describe('Phase 4 tenant isolation regressions', () => {
     });
     expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
   });
+
+  test('super_admin may select tenant via x-tenant-id header', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('super_admin still requires a real tenant when only sentinels are present', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: 'system' },
+      headers: { 'x-tenant-id': 'global' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(() => resolveAuthoritativeTenantId(req)).toThrow(/tenantId is required/);
+  });
 });

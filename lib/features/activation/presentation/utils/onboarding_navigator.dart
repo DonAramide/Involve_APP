@@ -118,6 +118,19 @@ class OnboardingNavigator {
           
           signupSuccess = true;
           break;
+        } on DioException catch (dioErr) {
+          debugPrint('Signup error on $url: $dioErr');
+          if (dioErr.response?.statusCode == 409 ||
+              (dioErr.response?.data is Map &&
+                  (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                   dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+            lastError = 'An account with this email already exists. Please sign in or use a different email.';
+            break;
+          }
+          lastError = friendlyApiError(
+            dioErr,
+            fallback: 'Could not create your account. Please try again.',
+          );
         } catch (e) {
           debugPrint('Signup error on $url: $e');
           lastError = friendlyApiError(
@@ -198,9 +211,27 @@ class OnboardingNavigator {
     String? lastError;
     for (var url in urls) {
       try {
-        await dio.post(url, data: {type == 'email' ? 'email' : 'phone': identifier});
+        await dio.post(
+          url,
+          data: {
+            type == 'email' ? 'email' : 'phone': identifier,
+            'purpose': 'SIGNUP',
+          },
+        );
         otpSent = true;
         break;
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 409 ||
+            (dioErr.response?.data is Map &&
+                (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                 dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+          lastError = 'An account with this email already exists. Please sign in or use a different email.';
+          break;
+        }
+        lastError = friendlyApiError(
+          dioErr,
+          fallback: 'Could not send $type verification code.',
+        );
       } catch (e) {
         lastError = friendlyApiError(
           e,

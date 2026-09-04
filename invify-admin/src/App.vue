@@ -3,12 +3,34 @@
 </template>
 
 <script setup>
-import { useQuasar } from 'quasar'
+import { onMounted, onUnmounted } from 'vue'
+import { Notify, useQuasar } from 'quasar'
 import { watch } from 'vue'
+import { api } from './api'
+import { consumeIdleLogoutNotice, startIdleLogoutWatchdog } from './auth/idleLogout'
 import { useOperatorPreferences } from './composables/useOperatorPreferences'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
+
+let stopIdleWatchdog = null
+
+onMounted(() => {
+  if (consumeIdleLogoutNotice()) {
+    Notify.create({
+      type: 'warning',
+      icon: 'timer_off',
+      message: 'You were logged out after 6 minutes of inactivity. Please sign in again.',
+      position: 'top',
+      timeout: 6000,
+    })
+  }
+  stopIdleWatchdog = startIdleLogoutWatchdog({ api, Notify })
+})
+
+onUnmounted(() => {
+  if (stopIdleWatchdog) stopIdleWatchdog()
+})
 
 // Autorun root-level theme synchronization to guarantee consistent styles on all pages
 watch(() => prefs.value.isDarkMode, (isDark) => {

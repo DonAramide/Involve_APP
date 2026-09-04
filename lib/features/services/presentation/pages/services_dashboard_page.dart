@@ -21,6 +21,13 @@ class ServicesDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencySymbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final bloc = context.read<ServicesBloc>();
+      if (bloc.state.status == ServicesStatus.initial) {
+        bloc.add(const LoadServicesJobs());
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(

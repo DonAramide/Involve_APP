@@ -108,6 +108,7 @@
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { terminalApi } from 'src/api/terminalApi'
+import { userFacingApiError } from 'src/utils/userFacingApiError'
 import TerminalListTab from './components/TerminalListTab.vue'
 import TerminalAssignmentsTab from './components/TerminalAssignmentsTab.vue'
 import TerminalAuditTab from './components/TerminalAuditTab.vue'
@@ -191,12 +192,8 @@ const handleImport = async () => {
     if (error.response) {
       if (typeof error.response.data === 'string' && error.response.data.includes('<html')) {
         errorMsg = `Server error (${error.response.status}). The server might be down or unreachable.`;
-      } else if (error.response.data && error.response.data.error) {
-        errorMsg = error.response.data.error;
-      } else if (error.response.data && error.response.data.message) {
-        errorMsg = error.response.data.message;
       } else {
-        errorMsg = `Server returned ${error.response.status}`;
+        errorMsg = userFacingApiError(error, `Server returned ${error.response.status}`);
       }
     } else if (error.message) {
       errorMsg = error.message;

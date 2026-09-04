@@ -32,7 +32,7 @@
                      ]
     },
     {
-        "text":  "operator@IIPS.app",
+        "text":  "operator@invify.org",
         "route":  "/login",
         "pageTitle":  "Enterprise Portal Login",
         "keywords":  [
@@ -8328,7 +8328,7 @@
                      ]
     },
     {
-        "text":  "e.g. core-operator@IIPS.app",
+        "text":  "e.g. core-operator@invify.org",
         "route":  "/governance/operators",
         "pageTitle":  "Operator Management",
         "keywords":  [
@@ -28777,7 +28777,7 @@
                      ]
     },
     {
-        "text":  "Authorized by: secops@IIPS.app",
+        "text":  "Authorized by: secops@invify.org",
         "route":  "/apps/forbidden",
         "pageTitle":  "Forbidden Applications",
         "keywords":  [
@@ -36591,7 +36591,7 @@
                      ]
     },
     {
-        "text":  "Powered by www.invify.iips.app",
+        "text":  "Powered by www.invify.org",
         "route":  "/tenants/:id",
         "pageTitle":  "TenantDetail",
         "keywords":  [
@@ -38303,7 +38303,7 @@
                      ]
     },
     {
-        "text":  "Powered by www.invify.iips.app",
+        "text":  "Powered by www.invify.org",
         "route":  "/devices",
         "pageTitle":  "DeviceActivation",
         "keywords":  [

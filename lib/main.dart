@@ -76,6 +76,7 @@ import 'package:involve_app/core/sync/domain/services/finance_api_batch_handler.
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/widgets/idle_logout_guard.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/payment_ledger_test_page.dart';
 import 'package:involve_app/features/school_finance/presentation/pages/school_finance_dashboard.dart';
@@ -849,6 +850,9 @@ class _InvolveAppState extends State<InvolveApp> {
               ),
             ),
             navigatorObservers: [AppRouteObserver(context)],
+            builder: (context, child) => IdleLogoutGuard(
+              child: child ?? const SizedBox.shrink(),
+            ),
             home: const LandingPage(),
             routes: {
               DashboardPage.routeName: (_) => const DashboardPage(),

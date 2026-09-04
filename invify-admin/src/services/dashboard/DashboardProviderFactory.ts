@@ -9,22 +9,20 @@ export class DashboardProviderFactory {
 
   static getInstance(): DashboardDataProvider {
     if (!this.instance) {
-      const variant = getBuildVariant();
-      
-      switch (variant) {
-        case BuildVariant.LOCAL:
-          this.instance = new StagingDashboardProvider();
-          break;
-        case BuildVariant.STAGING:
-          this.instance = new StagingDashboardProvider();
-          break;
-        case BuildVariant.PROD:
-          this.instance = new ProdDashboardProvider();
-          break;
+      let variant: BuildVariant = BuildVariant.STAGING
+      try {
+        variant = getBuildVariant()
+      } catch {
+        variant = BuildVariant.STAGING
       }
-      console.log(`[DashboardProviderFactory] Initialized provider for variant: ${variant}`);
+
+      this.instance =
+        variant === BuildVariant.PROD
+          ? new ProdDashboardProvider()
+          : new StagingDashboardProvider()
+      console.log(`[DashboardProviderFactory] Initialized provider for variant: ${variant}`)
     }
-    
-    return this.instance;
+
+    return this.instance
   }
 }

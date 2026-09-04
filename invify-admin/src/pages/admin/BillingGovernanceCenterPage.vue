@@ -1,6 +1,6 @@
 <!-- invify-admin/src/pages/admin/BillingGovernanceCenterPage.vue -->
 <template>
-  <q-page class="q-pa-xl text-white" style="background: #05070d; min-height: 100vh; position: relative; overflow: hidden;">
+  <q-page class="q-pa-xl bg-main text-main" style="min-height: 100vh; position: relative; overflow: hidden;">
     <div class="ambient-glow" />
 
     <!-- Master Governance Header -->

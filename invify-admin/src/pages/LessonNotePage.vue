@@ -1,11 +1,11 @@
 <!-- invify-admin/src/pages/LessonNotePage.vue -->
 <template>
-  <q-page class="q-pa-lg bg-dark text-white">
+  <q-page class="q-pa-lg bg-main text-main">
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">AI Lesson Planner</h1>
-        <div class="text-grey-6">Curriculum-aligned lesson note generation with NERDC standards.</div>
+        <h1 class="text-h4 text-weight-bolder q-ma-none text-main letter-spacing-1">AI Lesson Planner</h1>
+        <div class="text-secondary">Curriculum-aligned lesson note generation with NERDC standards.</div>
       </div>
     </div>
 
@@ -13,39 +13,39 @@
     <div class="row q-col-gutter-lg">
       <!-- Controls -->
       <div class="col-12 col-md-4">
-        <q-card class="bg-blue-grey-10 shadow-2 border-indigo">
+        <q-card class="bg-panel border-main shadow-2" :dark="prefs.isDarkMode" flat>
           <q-card-section>
-            <div class="text-subtitle1 text-weight-bold q-mb-md">Target Curriculum</div>
+            <div class="text-subtitle1 text-weight-bold text-main q-mb-md">Target Curriculum</div>
             <div class="q-gutter-md">
               <q-select
                 v-model="form.class_level"
                 :options="classOptions"
                 label="Class Level"
-                dark filled dense emit-value map-options
+                :dark="prefs.isDarkMode" filled dense emit-value map-options
               />
               <q-select
                 v-model="form.subjectName"
                 :options="filteredSubjectOptions"
                 label="Subject Name"
-                dark filled dense 
+                :dark="prefs.isDarkMode" filled dense 
                 use-input
                 input-debounce="300"
                 @filter="filterSubjects"
                 emit-value map-options
               />
-              <q-input v-model="form.topic" label="Specific Topic" dark filled dense placeholder="e.g. Number Systems" />
+              <q-input v-model="form.topic" label="Specific Topic" :dark="prefs.isDarkMode" filled dense placeholder="e.g. Number Systems" />
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
-                  <q-select v-model="form.term" :options="termOptions" label="Term" dark filled dense emit-value map-options />
+                  <q-select v-model="form.term" :options="termOptions" label="Term" :dark="prefs.isDarkMode" filled dense emit-value map-options />
                 </div>
                 <div class="col-6">
-                  <q-input v-model="form.week" label="Week" type="number" dark filled dense prefix="Wk " />
+                  <q-input v-model="form.week" label="Week" type="number" :dark="prefs.isDarkMode" filled dense prefix="Wk " />
                 </div>
               </div>
             </div>
           </q-card-section>
 
-          <q-separator dark />
+          <q-separator :dark="prefs.isDarkMode" />
 
           <q-card-actions vertical class="q-pa-md">
             <q-btn 
@@ -55,6 +55,7 @@
               :loading="generating" 
               @click="generateNote(false)"
               class="glossy"
+              :dark="prefs.isDarkMode"
             />
             <q-btn 
               v-if="currentNote"
@@ -65,13 +66,14 @@
               @click="generateNote(true)"
               class="q-mt-sm"
               size="sm"
+              :dark="prefs.isDarkMode"
             />
           </q-card-actions>
         </q-card>
 
-        <q-card v-if="currentNote" class="bg-blue-grey-10 q-mt-md shadow-2 border-indigo">
+        <q-card v-if="currentNote" class="bg-panel border-main q-mt-md shadow-2" :dark="prefs.isDarkMode" flat>
           <q-card-section class="row items-center">
-             <div class="text-subtitle2 text-grey-6">Display Mode</div>
+             <div class="text-subtitle2 text-secondary">Display Mode</div>
              <q-space />
              <q-btn-toggle
                v-model="viewMode"
@@ -223,11 +225,11 @@
           </q-card-section>
         </q-card>
 
-        <q-card v-else class="bg-blue-grey-10 shadow-2 relative-position" style="min-height: 400px">
-           <q-inner-loading :showing="generating" class="bg-blue-grey-10">
+        <q-card v-else class="bg-panel border-main shadow-2 relative-position" :dark="prefs.isDarkMode" flat style="min-height: 400px">
+           <q-inner-loading :showing="generating" :dark="prefs.isDarkMode">
                <div class="text-center">
                  <q-spinner-cube color="indigo-4" size="4em" />
-                 <div class="q-mt-md text-weight-bold text-indigo-3 text-subtitle1">{{ loadingMessage }}</div>
+                 <div class="q-mt-md text-weight-bold text-primary text-subtitle1">{{ loadingMessage }}</div>
                </div>
            </q-inner-loading>
 
@@ -235,31 +237,32 @@
               <q-spinner-dots color="indigo-4" size="3em" />
            </div>
            <div v-else-if="topics.length > 0" class="q-pa-lg">
-              <div class="text-h6 q-mb-md text-indigo-3 text-weight-bold">Available Topics for {{ form.term }} Term</div>
+              <div class="text-h6 q-mb-md text-primary text-weight-bold">Available Topics for {{ form.term }} Term</div>
               <div class="row q-col-gutter-sm">
                  <div v-for="t in topics" :key="t.id" class="col-12 col-md-6">
                     <q-card 
                       flat bordered 
                       class="cursor-pointer topic-card transition-3" 
-                      :class="form.topic === t.topic ? 'border-indigo-bright bg-indigo-10' : 'bg-blue-grey-11 border-grey-9'"
+                      :class="form.topic === t.topic ? (prefs.isDarkMode ? 'border-indigo-bright bg-indigo-10' : 'bg-blue-1 border-primary') : 'bg-subpanel border-main'"
                       @click="form.topic = t.topic; form.week = t.week"
+                      :dark="prefs.isDarkMode"
                     >
                        <q-card-section class="q-pa-md">
                           <div class="row items-center no-wrap">
-                             <div class="week-badge q-mr-md">WK {{ t.week }}</div>
-                             <div class="text-subtitle2 text-weight-bold">{{ t.topic }}</div>
+                             <div class="week-badge q-mr-md" :class="prefs.isDarkMode ? 'bg-indigo-9 text-white' : 'bg-primary text-white'">WK {{ t.week }}</div>
+                             <div class="text-subtitle2 text-weight-bold text-main">{{ t.topic }}</div>
                              <q-space />
-                             <q-icon v-if="form.topic === t.topic" name="check_circle" color="green-4" />
+                             <q-icon v-if="form.topic === t.topic" name="check_circle" color="positive" />
                           </div>
                        </q-card-section>
                     </q-card>
                  </div>
               </div>
            </div>
-           <div v-else class="column items-center text-grey-8 flex flex-center q-pa-xl" style="height: 400px">
+           <div v-else class="column items-center text-secondary flex flex-center q-pa-xl" style="height: 400px">
               <q-icon name="auto_awesome" size="4em" class="q-mb-md" />
-              <div class="text-h6">No Topics Found in Curriculum</div>
-              <div class="text-caption">Try changing the Class, Subject, or Term to see available topics.</div>
+              <div class="text-h6 text-main">No Topics Found in Curriculum</div>
+              <div class="text-caption text-secondary">Try changing the Class, Subject, or Term to see available topics.</div>
            </div>
         </q-card>
       </div>
@@ -272,7 +275,9 @@ import { ref, inject } from 'vue'
 import { useQuasar } from 'quasar'
 import { aiApi } from '../api'
 import { useUsage } from '../composables/useUsage'
+import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 
+const { prefs } = useOperatorPreferences()
 const $q = useQuasar()
 const { isHardLimit, fetchUsage } = useUsage()
 const triggerUpgradeModal = inject('triggerUpgradeModal')

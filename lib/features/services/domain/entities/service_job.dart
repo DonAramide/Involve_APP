@@ -18,6 +18,8 @@ class ServiceJob extends Equatable {
   final Uint8List? image;
   final DateTime createdAt;
   final String? warrantyDuration;
+  final int? staffId;
+  final String? staffName;
 
   const ServiceJob({
     required this.id,
@@ -36,7 +38,51 @@ class ServiceJob extends Equatable {
     this.image,
     required this.createdAt,
     this.warrantyDuration,
+    this.staffId,
+    this.staffName,
   });
+
+  ServiceJob copyWith({
+    String? id,
+    String? jobId,
+    String? customerId,
+    String? customerName,
+    String? title,
+    String? description,
+    double? totalAmount,
+    double? amountPaid,
+    double? laborAmount,
+    double? balance,
+    String? status,
+    List<ServiceJobItem>? items,
+    DateTime? dueDate,
+    Uint8List? image,
+    DateTime? createdAt,
+    String? warrantyDuration,
+    int? staffId,
+    String? staffName,
+  }) {
+    return ServiceJob(
+      id: id ?? this.id,
+      jobId: jobId ?? this.jobId,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      totalAmount: totalAmount ?? this.totalAmount,
+      amountPaid: amountPaid ?? this.amountPaid,
+      laborAmount: laborAmount ?? this.laborAmount,
+      balance: balance ?? this.balance,
+      status: status ?? this.status,
+      items: items ?? this.items,
+      dueDate: dueDate ?? this.dueDate,
+      image: image ?? this.image,
+      createdAt: createdAt ?? this.createdAt,
+      warrantyDuration: warrantyDuration ?? this.warrantyDuration,
+      staffId: staffId ?? this.staffId,
+      staffName: staffName ?? this.staffName,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -56,6 +102,8 @@ class ServiceJob extends Equatable {
         image,
         createdAt,
         warrantyDuration,
+        staffId,
+        staffName,
       ];
 }
 

@@ -66,7 +66,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
         try {
           final response = await dio.post(
             url,
-            data: {'email': _email, 'code': pin, 'otp': pin},
+            data: {'email': _email, 'code': pin, 'otp': pin, 'purpose': 'SIGNUP'},
           );
           if (response.statusCode == 200 && (response.data?['success'] != false)) {
             otpVerified = true;
@@ -121,9 +121,21 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
       String? lastError;
       for (final url in urls) {
         try {
-          await dio.post(url, data: {'email': _email});
+          await dio.post(url, data: {'email': _email, 'purpose': 'SIGNUP'});
           sent = true;
           break;
+        } on DioException catch (dioErr) {
+          if (dioErr.response?.statusCode == 409 ||
+              (dioErr.response?.data is Map &&
+                  (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                   dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+            lastError = 'An account with this email already exists. Please sign in or use a different email.';
+            break;
+          }
+          lastError = friendlyApiError(
+            dioErr,
+            fallback: 'Could not resend the code. Please try again.',
+          );
         } catch (e) {
           lastError = friendlyApiError(
             e,

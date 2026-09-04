@@ -23,7 +23,7 @@ export class QuasarService {
    * Sends MPOS transaction backup to Quasar for device-processed transactions.
    */
   async sendMposBackup(payload: any): Promise<{ id: string; reference: string; status: string; replayed: boolean }> {
-    const baseUrl = process.env.QUASAR_API_URL || 'https://api-quasar.iips.app';
+    const baseUrl = process.env.QUASAR_API_URL || 'https://api-quasar.invify.org';
     const res = await fetch(`${baseUrl}/api/v1/pos/transactionFromMpos`, {
       method: "POST",
       headers: {

@@ -11,6 +11,8 @@ const otpRateLimiter = rateLimit({
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 
+router.get('/check-email', OnboardingController.checkEmail);
+router.post('/check-email', OnboardingController.checkEmail);
 router.post('/send-email-otp', otpRateLimiter, OnboardingController.sendEmailOtp);
 router.post('/verify-email-otp', otpRateLimiter, OnboardingController.verifyEmailOtp);
 router.post('/send-whatsapp-otp', otpRateLimiter, OnboardingController.sendWhatsappOtp);

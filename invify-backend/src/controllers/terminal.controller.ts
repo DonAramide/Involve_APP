@@ -14,7 +14,12 @@ function getAdminId(req: Request): string {
 }
 
 function getIpAddress(req: Request): string {
-  return (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || 'unknown';
+  const forwarded = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim();
+  const real = (req.headers['x-real-ip'] as string)?.trim();
+  let ip = forwarded || real || req.ip || req.socket.remoteAddress || 'unknown';
+  ip = ip.replace(/^::ffff:/, '');
+  if (ip === '::1') ip = '127.0.0.1';
+  return ip;
 }
 
 function parseFileToRows(buffer: Buffer, mimetype: string, originalName: string): any[] {

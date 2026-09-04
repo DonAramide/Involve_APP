@@ -273,6 +273,17 @@ class AppSettings extends Equatable {
     );
   }
 
+  String get normalizedBusinessMode {
+    final mode = businessMode.toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (mode == 'service' || mode == 'hospitality' || mode == 'invify_services') return 'services';
+    if (mode == 'education' || mode == 'invify_school') return 'school';
+    if (mode == 'invify_retail') return 'retail';
+    return mode;
+  }
+
+  bool get isServicesMode => normalizedBusinessMode == 'services';
+  bool get isSchoolMode => normalizedBusinessMode == 'school';
+
   @override
   List<Object?> get props => [
         id,

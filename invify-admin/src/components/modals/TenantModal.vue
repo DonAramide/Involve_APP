@@ -75,8 +75,11 @@
                 <q-input 
                   v-model="form.support_phone" 
                   label="Agent Phone" 
+                  type="tel"
                   dark filled dense
                   placeholder="+234..."
+                  maxlength="13"
+                  counter
                 />
                 <q-input 
                   v-model="form.support_email" 

@@ -75,9 +75,9 @@
           <q-form @submit="onboardAgent" class="column op-gap-8">
             <q-input v-model="newAgent.name" dark filled dense label="Full Legal Name" placeholder="e.g. John Doe" class="bg-panel-darker text-caption" required />
             <q-input v-model="newAgent.email" dark filled dense type="email" label="Email Address" placeholder="agent@example.com" class="bg-panel-darker text-caption" required />
-            <q-input v-model="newAgent.phone" dark filled dense label="Primary Phone Number" placeholder="+1234567890" class="bg-panel-darker text-caption" required />
+            <q-input v-model="newAgent.phone" dark filled dense type="tel" label="Primary Phone Number" placeholder="+1234567890" class="bg-panel-darker text-caption" maxlength="13" counter required />
             <div class="row items-center justify-between no-wrap op-gap-8">
-              <q-input v-model="newAgent.whatsappNumber" dark filled dense label="WhatsApp Number" placeholder="+1234567890" class="bg-panel-darker text-caption col" :disable="sameAsPhone" required />
+              <q-input v-model="newAgent.whatsappNumber" dark filled dense type="tel" label="WhatsApp Number" placeholder="+1234567890" class="bg-panel-darker text-caption col" maxlength="13" counter :disable="sameAsPhone" required />
               <q-checkbox v-model="sameAsPhone" dark dense label="Same as Phone" color="cyan-3" class="text-caption text-muted" />
             </div>
             <q-input v-model="newAgent.address" dark filled dense type="textarea" rows="2" label="Full Residential Address" placeholder="123 Main St..." class="bg-panel-darker text-caption" required />

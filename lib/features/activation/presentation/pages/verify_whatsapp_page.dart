@@ -63,7 +63,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
         try {
           final response = await dio.post(
             url,
-            data: {'phone': phone, 'code': pin, 'otp': pin},
+            data: {'phone': phone, 'code': pin, 'otp': pin, 'purpose': 'SIGNUP'},
           );
           if (response.statusCode == 200 && (response.data?['success'] != false)) {
             otpVerified = true;
@@ -118,7 +118,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
       String? lastError;
       for (final url in urls) {
         try {
-          await dio.post(url, data: {'phone': phone});
+          await dio.post(url, data: {'phone': phone, 'purpose': 'SIGNUP'});
           otpSent = true;
           break;
         } catch (e) {

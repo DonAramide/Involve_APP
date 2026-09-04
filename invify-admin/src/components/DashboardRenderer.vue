@@ -19,14 +19,14 @@
 <script setup>
 import { computed } from 'vue';
 import { useRuntimeStore } from '../stores/runtime.store';
-import { DashboardRegistry } from '../registries/DashboardRegistry';
+import { getDashboardConfig } from '../registries/DashboardRegistry';
 import { WidgetRegistry } from '../registries/WidgetRegistry';
 
 const store = useRuntimeStore();
 
 const resolvedWidgets = computed(() => {
-  const mode = (store.businessMode || '').toLowerCase();
-  const dashboardConfig = DashboardRegistry[mode] || { grid: [] };
+  const mode = store.businessMode || (typeof localStorage !== 'undefined' && localStorage.getItem('tenant_type')) || '';
+  const dashboardConfig = getDashboardConfig(mode);
   
   if (!dashboardConfig.grid) return [];
 
