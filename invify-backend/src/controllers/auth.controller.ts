@@ -579,20 +579,42 @@ export class AuthController {
       // Check tenant plan restriction for Web Dashboard access
       // Basic / free trial cannot use the web portal — Standard or Premium required.
       if (profile.tenant_id && profile.tenant_id !== SYSTEM_TENANT_UUID) {
-        const { data: tenant } = await supabaseAdmin
+        const { data: tenant, error: tenantPlanError } = await supabaseAdmin
           .from('tenants')
-          .select('plan, subscription_plan')
+          .select('plan')
           .eq('id', profile.tenant_id)
           .single();
 
+        if (tenantPlanError) {
+          console.error(
+            '[AuthController] tenant plan lookup failed:',
+            tenantPlanError.message,
+          );
+          try {
+            await supabase.auth.signOut();
+          } catch (_) {
+            /* ignore */
+          }
+          return res.status(503).json({
+            error: 'TENANT_PLAN_UNAVAILABLE',
+            message:
+              'Unable to verify subscription plan. Please try again or contact support.',
+          });
+        }
+
         if (tenant) {
-          const plan = String(
-            (tenant as any).plan || (tenant as any).subscription_plan || '',
-          )
+          const plan = String((tenant as any).plan || '')
             .toLowerCase()
-            .trim();
-          const blockedPlans = ['basic', 'free', 'trial', 'free_trial'];
-          if (blockedPlans.includes(plan)) {
+            .trim()
+            .replace(/[\s-]+/g, '_');
+          const blockedPlans = [
+            'basic',
+            'free',
+            'trial',
+            'free_trial',
+            'free_tier',
+          ];
+          if (!plan || blockedPlans.includes(plan)) {
             try {
               await supabase.auth.signOut();
             } catch (_) {
