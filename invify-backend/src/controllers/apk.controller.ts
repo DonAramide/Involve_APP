@@ -2,10 +2,10 @@ import fs from 'fs';
 import os from 'os';
 import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
 import { resolveApkObjectKey } from '../utils/apk-object-key';
-import { createContaboS3Client, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
+import { createContaboS3Client, putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 
 const APK_MAX_BYTES = 500 * 1024 * 1024;
 
@@ -51,20 +51,6 @@ function storageUploadErrorMessage(error: any): string {
     return 'Contabo Object Storage rejected the upload (S3-compatible APIs do not accept AWS default checksums).';
   }
   return raw || 'APK upload failed';
-}
-
-function apkPutObjectInput(bucket: string, objectKey: string, body: Buffer) {
-  const input: Record<string, unknown> = {
-    Bucket: bucket,
-    Key: objectKey,
-    Body: body,
-    ContentLength: body.byteLength,
-    ContentType: 'application/vnd.android.package-archive',
-  };
-  if (process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true') {
-    input.ACL = 'public-read';
-  }
-  return input;
 }
 
 function removeTempApk(filePath?: string) {
@@ -124,9 +110,12 @@ export class ApkController {
       }
       const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
       const body = await fs.promises.readFile(tempPath);
-
-      const s3Client = createContaboS3Client();
-      await s3Client.send(new PutObjectCommand(apkPutObjectInput(bucket, objectKey, body) as any));
+      await putContaboObject({
+        bucket,
+        key: objectKey,
+        body,
+        contentType: 'application/vnd.android.package-archive',
+      });
 
       // Construct public URL with Contabo tenant ID format: https://<endpoint>/<tenantId>:<bucket>/<key>
       let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
