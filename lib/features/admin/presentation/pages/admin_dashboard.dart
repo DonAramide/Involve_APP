@@ -20,6 +20,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/utils/device_info_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 import 'package:dio/dio.dart';
+import '../../../settings/domain/entities/user_plan.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -170,8 +172,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildQuickActions(BuildContext context, bool isMaster) {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
-        final isProUser = settingsState.userPlan?.isPro == true || settingsState.userPlan?.isLifetime == true || settingsState.userPlan?.planType == 'enterprise' || settingsState.userPlan?.planType == 'premium';
-        final isBasicOrFree = settingsState.userPlan?.isBasic == true || settingsState.userPlan?.planType == 'free_trial' || settingsState.userPlan?.isValid != true;
+        final plan = settingsState.userPlan;
+        final isProUser = plan?.hasOnlineAccess == true;
+        final isBasicOrFree = plan == null || plan.isBasicTier;
+        final linkDeviceLocked = !isProUser; // Standard or Premium required
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,13 +223,56 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _ActionTile(
                   label: 'Link New Device',
                   icon: Icons.qr_code_2,
-                  onTap: () => _showLinkQrDialog(context),
+                  onTap: linkDeviceLocked
+                      ? () => _showLinkDevicePlanLock(context)
+                      : () => _showLinkQrDialog(context),
+                  isGated: linkDeviceLocked,
                 ),
               ],
             ),
           ],
         );
       },
+    );
+  }
+
+  void _showLinkDevicePlanLock(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.orange.shade800),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Feature Locked')),
+          ],
+        ),
+        content: Text(
+          'Link New Device requires a Standard or Premium plan.\n\n'
+          '• ${UserPlan.basicSummary}\n'
+          '• ${UserPlan.standardSummary}\n'
+          '• ${UserPlan.premiumSummary}\n\n'
+          'Upgrade to unlock this module.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('NOT NOW'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamed(context, ActivationPage.routeName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('UPGRADE'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -279,11 +326,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               Icon(Icons.lock_outline_rounded, color: Colors.amber.shade700),
               const SizedBox(width: 8),
-              const Text('Pro Tier Feature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Web Access Locked', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           content: const Text(
-            'Online Web Access credentials configuration requires an active Pro subscription model. Please navigate to Account Set up to activate your premium relay link.',
+            'You need to upgrade to Standard or Premium to have access to the web.',
             style: TextStyle(fontSize: 13, height: 1.4),
           ),
           actions: [
@@ -296,7 +343,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage()));
+                Navigator.pushNamed(context, ActivationPage.routeName);
               },
               child: const Text('Upgrade Plan', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -788,6 +835,7 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visuallyLocked = isGated || onTap == null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -797,12 +845,12 @@ class _ActionTile extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.withOpacity(0.2)),
           borderRadius: BorderRadius.circular(12),
-          color: onTap == null ? Colors.grey.withOpacity(0.05) : null,
+          color: visuallyLocked ? Colors.grey.withOpacity(0.05) : null,
         ),
         child: Column(
           children: [
             Opacity(
-              opacity: onTap == null ? 0.3 : 1.0,
+              opacity: visuallyLocked ? 0.3 : 1.0,
               child: Icon(icon, size: 28),
             ),
             const SizedBox(height: 12),
@@ -811,7 +859,7 @@ class _ActionTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: onTap == null ? Colors.grey : null,
+                color: visuallyLocked ? Colors.grey : null,
               ),
               textAlign: TextAlign.center,
             ),

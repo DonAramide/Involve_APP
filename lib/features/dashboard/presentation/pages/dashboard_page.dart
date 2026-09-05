@@ -591,11 +591,18 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  /// Trial + Basic tiers (anything that is not a paid Pro/Standard/Lifetime plan).
-  bool _isTrialOrBasicPlan(UserPlan? plan) =>
-      plan == null || plan.isBasic || plan.isFreeTrial;
+  /// Basic / trial (offline limited) — not Standard or Premium.
+  bool _isBasicPlan(UserPlan? plan) =>
+      plan == null || plan.isBasicTier;
 
-  void _showFeaturePlanLock(BuildContext context, String featureName) {
+  void _showFeaturePlanLock(
+    BuildContext context,
+    String featureName, {
+    String requiredPlan = 'Standard',
+  }) {
+    final requirement = requiredPlan == 'Premium'
+        ? '$featureName requires a Premium plan.'
+        : '$featureName requires a Standard or Premium plan.';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -608,20 +615,16 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         content: Text(
-          '$featureName is available on Pro plans.\n\n'
-          'Trial and Basic users can activate a license to unlock this module.',
+          '$requirement\n\n'
+          '• ${UserPlan.basicSummary}\n'
+          '• ${UserPlan.standardSummary}\n'
+          '• ${UserPlan.premiumSummary}\n\n'
+          'Upgrade to unlock this module.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('NOT NOW'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushNamed(context, '/go_pro');
-            },
-            child: const Text('GO PRO'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -632,7 +635,7 @@ class _DashboardPageState extends State<DashboardPage> {
               backgroundColor: Colors.deepOrange,
               foregroundColor: Colors.white,
             ),
-            child: const Text('ACTIVATE'),
+            child: const Text('UPGRADE'),
           ),
         ],
       ),
@@ -642,7 +645,9 @@ class _DashboardPageState extends State<DashboardPage> {
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
     final isSchool = settings?.isSchoolMode == true;
     final isServices = settings?.isServicesMode == true;
-    final lockTrialBasic = _isTrialOrBasicPlan(userPlan);
+    final lockBasic = _isBasicPlan(userPlan);
+    // Multi Device: Basic locked; Standard (up to 3) and Premium (unlimited) unlocked.
+    final lockMultiDevice = !(userPlan?.allowsMultiDevice ?? false);
     
     final allItems = <_DashboardMenuItem>[
       if (!isSchool) ...[
@@ -736,39 +741,46 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.deepOrange,
         onTap: () => _verifyAndNavigateToAdminHub(context),
       ),
-      if (!lockTrialBasic) ...[
-        _DashboardMenuItem(
-          id: 'cloud_metrics',
-          title: 'CLOUD METRICS',
-          icon: Icons.cloud_done_outlined,
-          color: Colors.indigo,
-          onTap: () {
-            Navigator.pushNamed(context, '/cloud_metrics');
-          },
-        ),
-        _DashboardMenuItem(
-          id: 'finance_analytics',
-          title: 'FINANCE ANALYTICS',
-          icon: Icons.insights,
-          color: Colors.blueAccent,
-          onTap: () => _verifyAndNavigateToFinance(context, '/admin_finance'),
-        ),
-        _DashboardMenuItem(
-          id: 'reconciliation',
-          title: 'RECONCILIATION',
-          icon: Icons.account_balance,
-          color: Colors.teal,
-          onTap: () => _verifyAndNavigateToFinance(context, '/executive_finance'),
-        ),
-      ] else ...[
-        _DashboardMenuItem(
-          id: 'go_pro',
-          title: 'GO PRO / CLOUD',
-          icon: Icons.cloud_upload,
-          color: Colors.deepPurple,
-          onTap: () => Navigator.pushNamed(context, '/go_pro'),
-        ),
-      ],
+      _DashboardMenuItem(
+        id: 'cloud_metrics',
+        title: 'CLOUD METRICS',
+        icon: Icons.cloud_done_outlined,
+        color: Colors.indigo,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Cloud Metrics')
+            : () => Navigator.pushNamed(context, '/cloud_metrics'),
+      ),
+      _DashboardMenuItem(
+        id: 'finance_analytics',
+        title: 'FINANCE ANALYTICS',
+        icon: Icons.insights,
+        color: Colors.blueAccent,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Finance Analytics')
+            : () => _verifyAndNavigateToFinance(context, '/admin_finance'),
+      ),
+      _DashboardMenuItem(
+        id: 'reconciliation',
+        title: 'RECONCILIATION',
+        icon: Icons.account_balance,
+        color: Colors.teal,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Reconciliation')
+            : () => _verifyAndNavigateToFinance(context, '/executive_finance'),
+      ),
+      _DashboardMenuItem(
+        id: 'multi_device',
+        title: 'MULTI DEVICE',
+        icon: Icons.devices,
+        color: Colors.deepPurple,
+        isLocked: lockMultiDevice,
+        onTap: lockMultiDevice
+            ? () => _showFeaturePlanLock(context, 'Multi Device')
+            : () => Navigator.pushNamed(context, '/device_sync'),
+      ),
     ];
 
     if (isServices) {
@@ -813,6 +825,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'cloud_metrics',
           'finance_analytics',
           'reconciliation',
+          'multi_device',
         ].contains(i.id)),
       ];
     }
@@ -845,8 +858,8 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'FINANCE DASHBOARD',
           icon: Icons.dashboard_customize,
           color: Colors.blueGrey,
-          isLocked: lockTrialBasic,
-          onTap: lockTrialBasic
+          isLocked: lockBasic,
+          onTap: lockBasic
               ? () => _showFeaturePlanLock(context, 'Finance Dashboard')
               : () => _verifyAndNavigateToFinance(context, '/school_finance'),
         ),
@@ -890,8 +903,8 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'LESSON NOTES',
           icon: Icons.note_alt,
           color: Colors.teal,
-          isLocked: lockTrialBasic,
-          onTap: lockTrialBasic
+          isLocked: lockBasic,
+          onTap: lockBasic
               ? () => _showFeaturePlanLock(context, 'Lesson Notes')
               : () => Navigator.pushNamed(context, '/lesson_notes_list'),
         ),
@@ -1049,22 +1062,22 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildPlanBadge(UserPlan plan) {
-    final isLifetime = plan.isLifetime;
+    final isPremium = plan.isPremium;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isLifetime 
-              ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] // Gold for Lifetime
-              : [const Color(0xFFE0E0E0), const Color(0xFFBDBDBD)], // Silver for Pro
+          colors: isPremium 
+              ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] // Gold for Premium
+              : [const Color(0xFFE0E0E0), const Color(0xFFBDBDBD)], // Silver for Standard
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: (isLifetime ? Colors.orange : Colors.grey).withOpacity(0.3),
+            color: (isPremium ? Colors.orange : Colors.grey).withOpacity(0.3),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1074,15 +1087,15 @@ class _DashboardPageState extends State<DashboardPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isLifetime ? Icons.stars : Icons.verified,
+            isPremium ? Icons.stars : Icons.verified,
             size: 9,
-            color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
+            color: isPremium ? Colors.brown[900] : Colors.blueGrey[900],
           ),
           const SizedBox(width: 3),
           Text(
-            plan.planType.toUpperCase(),
+            plan.displayName,
             style: TextStyle(
-              color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
+              color: isPremium ? Colors.brown[900] : Colors.blueGrey[900],
               fontSize: 8.5,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.3,

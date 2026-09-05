@@ -840,6 +840,7 @@ class _InvolveAppState extends State<InvolveApp> {
             ),
             darkTheme: ThemeData(
               fontFamily: kIsWeb ? 'sans-serif' : null,
+              brightness: Brightness.dark,
               colorScheme: ColorScheme.fromSeed(
                 seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3), 
                 brightness: Brightness.dark,
@@ -847,6 +848,22 @@ class _InvolveAppState extends State<InvolveApp> {
               useMaterial3: true,
               textSelectionTheme: TextSelectionThemeData(
                 cursorColor: Color(state.settings?.primaryColor ?? 0xFF2196F3),
+              ),
+              chipTheme: ChipThemeData(
+                labelStyle: const TextStyle(color: Colors.white),
+                secondaryLabelStyle: const TextStyle(color: Colors.white),
+                backgroundColor: const Color(0xFF2C2C2C),
+                selectedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3).withValues(alpha: 0.35),
+                side: const BorderSide(color: Color(0xFF8A8A8A)),
+              ),
+              listTileTheme: const ListTileThemeData(
+                textColor: Colors.white,
+                iconColor: Color(0xFFCFCFCF),
+                subtitleTextStyle: TextStyle(color: Color(0xFFC8C8C8), fontSize: 13),
+              ),
+              inputDecorationTheme: const InputDecorationTheme(
+                hintStyle: TextStyle(color: Color(0xFFB0B0B0)),
+                labelStyle: TextStyle(color: Color(0xFFE0E0E0)),
               ),
             ),
             navigatorObservers: [AppRouteObserver(context)],

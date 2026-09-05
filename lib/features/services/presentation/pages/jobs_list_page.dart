@@ -38,6 +38,8 @@ class _JobsListPageState extends State<JobsListPage> {
   @override
   Widget build(BuildContext context) {
     final currencySymbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -59,11 +61,13 @@ class _JobsListPageState extends State<JobsListPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                 child: TextField(
                   controller: _searchController,
+                  style: TextStyle(color: scheme.onSurface),
                   decoration: InputDecoration(
                     hintText: 'Search by customer or job ID...',
-                    prefixIcon: const Icon(Icons.search),
+                    hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.55)),
+                    prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: Colors.grey[100],
+                    fillColor: isDark ? scheme.surfaceContainerHighest : scheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -97,13 +101,13 @@ class _JobsListPageState extends State<JobsListPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
+                    Icon(Icons.search_off, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(height: 16),
                     Text(
                       _selectedStatus == null 
                           ? 'No jobs found.' 
                           : 'No jobs found for this status.',
-                      style: TextStyle(color: Colors.grey[600]),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     TextButton(
                       onPressed: () {
@@ -158,6 +162,7 @@ class _JobsListPageState extends State<JobsListPage> {
       {'label': 'Delivered', 'value': 'delivered'},
       {'label': 'Cancelled', 'value': 'cancelled'},
     ];
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       height: 50,
@@ -181,10 +186,13 @@ class _JobsListPageState extends State<JobsListPage> {
                 // Auto-refresh from DB with new filter
                 context.read<ServicesBloc>().add(LoadServicesJobs(status: _selectedStatus));
               },
-              selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+              backgroundColor: scheme.surfaceContainerHighest,
+              selectedColor: scheme.primaryContainer,
+              side: BorderSide(color: isSelected ? scheme.primary : scheme.outline),
+              checkmarkColor: scheme.onPrimaryContainer,
               labelStyle: TextStyle(
-                color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
               ),
             ),
           );
@@ -194,12 +202,15 @@ class _JobsListPageState extends State<JobsListPage> {
   }
 
   Widget _buildJobCard(BuildContext context, dynamic job, String symbol) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
+      color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
@@ -207,21 +218,21 @@ class _JobsListPageState extends State<JobsListPage> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor.withOpacity(0.1),
+            color: scheme.primary.withValues(alpha: isDark ? 0.22 : 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.work_outline, color: Theme.of(context).primaryColor),
+          child: Icon(Icons.work_outline, color: scheme.primary),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               job.customerName ?? 'Walk-in Customer',
-              style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 13, fontWeight: FontWeight.bold),
+              style: TextStyle(color: scheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
             ),
             Text(
               job.title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: scheme.onSurface),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -234,17 +245,21 @@ class _JobsListPageState extends State<JobsListPage> {
             children: [
               Text(
                 job.jobId,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
               ),
               if (job.staffName != null && (job.staffName as String).isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Icon(Icons.badge_outlined, size: 12, color: Colors.blue.shade700),
+                    Icon(Icons.badge_outlined, size: 12, color: isDark ? Colors.lightBlueAccent : Colors.blue.shade700),
                     const SizedBox(width: 4),
                     Text(
                       'Staff: ${job.staffName}',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue.shade700),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.lightBlueAccent : Colors.blue.shade700,
+                      ),
                     ),
                   ],
                 ),
@@ -258,7 +273,7 @@ class _JobsListPageState extends State<JobsListPage> {
           children: [
             Text(
               CurrencyFormatter.formatWithSymbol(job.totalAmount, symbol: symbol),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: scheme.onSurface),
             ),
             const SizedBox(height: 4),
             _buildStatusChip(job.status),
@@ -276,19 +291,20 @@ class _JobsListPageState extends State<JobsListPage> {
   }
 
   Widget _buildStatusChip(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color color;
     switch (status) {
-      case 'pending': color = Colors.grey; break;
-      case 'in_progress': color = Colors.orange; break;
-      case 'ready': color = Colors.green; break;
-      case 'delivered': color = Colors.blue; break;
-      case 'cancelled': color = Colors.red; break;
-      default: color = Colors.grey;
+      case 'pending': color = isDark ? Colors.grey.shade300 : Colors.grey.shade700; break;
+      case 'in_progress': color = isDark ? Colors.orangeAccent : Colors.orange; break;
+      case 'ready': color = isDark ? Colors.greenAccent : Colors.green; break;
+      case 'delivered': color = isDark ? Colors.lightBlueAccent : Colors.blue; break;
+      case 'cancelled': color = isDark ? Colors.redAccent : Colors.red; break;
+      default: color = isDark ? Colors.grey.shade300 : Colors.grey;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: isDark ? 0.22 : 0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

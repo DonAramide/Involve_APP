@@ -4828,6 +4828,38 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("allow_give_change" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _servicesMaterialsEnabledMeta =
+      const VerificationMeta('servicesMaterialsEnabled');
+  @override
+  late final GeneratedColumn<bool> servicesMaterialsEnabled =
+      GeneratedColumn<bool>(
+          'services_materials_enabled', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("services_materials_enabled" IN (0, 1))'),
+          defaultValue: const Constant(true));
+  static const VerificationMeta _servicesLaborEnabledMeta =
+      const VerificationMeta('servicesLaborEnabled');
+  @override
+  late final GeneratedColumn<bool> servicesLaborEnabled = GeneratedColumn<bool>(
+      'services_labor_enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("services_labor_enabled" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _servicesDescriptionFormatEnabledMeta =
+      const VerificationMeta('servicesDescriptionFormatEnabled');
+  @override
+  late final GeneratedColumn<bool> servicesDescriptionFormatEnabled =
+      GeneratedColumn<bool>(
+          'services_description_format_enabled', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("services_description_format_enabled" IN (0, 1))'),
+          defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4889,7 +4921,10 @@ class $SettingsTable extends Settings
         adminSignature,
         showAdminSignature,
         warrantyEnabled,
-        allowGiveChange
+        allowGiveChange,
+        servicesMaterialsEnabled,
+        servicesLaborEnabled,
+        servicesDescriptionFormatEnabled
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5233,6 +5268,26 @@ class $SettingsTable extends Settings
           allowGiveChange.isAcceptableOrUnknown(
               data['allow_give_change']!, _allowGiveChangeMeta));
     }
+    if (data.containsKey('services_materials_enabled')) {
+      context.handle(
+          _servicesMaterialsEnabledMeta,
+          servicesMaterialsEnabled.isAcceptableOrUnknown(
+              data['services_materials_enabled']!,
+              _servicesMaterialsEnabledMeta));
+    }
+    if (data.containsKey('services_labor_enabled')) {
+      context.handle(
+          _servicesLaborEnabledMeta,
+          servicesLaborEnabled.isAcceptableOrUnknown(
+              data['services_labor_enabled']!, _servicesLaborEnabledMeta));
+    }
+    if (data.containsKey('services_description_format_enabled')) {
+      context.handle(
+          _servicesDescriptionFormatEnabledMeta,
+          servicesDescriptionFormatEnabled.isAcceptableOrUnknown(
+              data['services_description_format_enabled']!,
+              _servicesDescriptionFormatEnabledMeta));
+    }
     return context;
   }
 
@@ -5369,6 +5424,14 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.bool, data['${effectivePrefix}warranty_enabled'])!,
       allowGiveChange: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}allow_give_change'])!,
+      servicesMaterialsEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}services_materials_enabled'])!,
+      servicesLaborEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}services_labor_enabled'])!,
+      servicesDescriptionFormatEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}services_description_format_enabled'])!,
     );
   }
 
@@ -5439,6 +5502,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showAdminSignature;
   final bool warrantyEnabled;
   final bool allowGiveChange;
+  final bool servicesMaterialsEnabled;
+  final bool servicesLaborEnabled;
+  final bool servicesDescriptionFormatEnabled;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -5499,7 +5565,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.adminSignature,
       required this.showAdminSignature,
       required this.warrantyEnabled,
-      required this.allowGiveChange});
+      required this.allowGiveChange,
+      required this.servicesMaterialsEnabled,
+      required this.servicesLaborEnabled,
+      required this.servicesDescriptionFormatEnabled});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5595,6 +5664,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_admin_signature'] = Variable<bool>(showAdminSignature);
     map['warranty_enabled'] = Variable<bool>(warrantyEnabled);
     map['allow_give_change'] = Variable<bool>(allowGiveChange);
+    map['services_materials_enabled'] =
+        Variable<bool>(servicesMaterialsEnabled);
+    map['services_labor_enabled'] = Variable<bool>(servicesLaborEnabled);
+    map['services_description_format_enabled'] =
+        Variable<bool>(servicesDescriptionFormatEnabled);
     return map;
   }
 
@@ -5686,6 +5760,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showAdminSignature: Value(showAdminSignature),
       warrantyEnabled: Value(warrantyEnabled),
       allowGiveChange: Value(allowGiveChange),
+      servicesMaterialsEnabled: Value(servicesMaterialsEnabled),
+      servicesLaborEnabled: Value(servicesLaborEnabled),
+      servicesDescriptionFormatEnabled: Value(servicesDescriptionFormatEnabled),
     );
   }
 
@@ -5766,6 +5843,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showAdminSignature: serializer.fromJson<bool>(json['showAdminSignature']),
       warrantyEnabled: serializer.fromJson<bool>(json['warrantyEnabled']),
       allowGiveChange: serializer.fromJson<bool>(json['allowGiveChange']),
+      servicesMaterialsEnabled:
+          serializer.fromJson<bool>(json['servicesMaterialsEnabled']),
+      servicesLaborEnabled:
+          serializer.fromJson<bool>(json['servicesLaborEnabled']),
+      servicesDescriptionFormatEnabled:
+          serializer.fromJson<bool>(json['servicesDescriptionFormatEnabled']),
     );
   }
   @override
@@ -5836,6 +5919,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showAdminSignature': serializer.toJson<bool>(showAdminSignature),
       'warrantyEnabled': serializer.toJson<bool>(warrantyEnabled),
       'allowGiveChange': serializer.toJson<bool>(allowGiveChange),
+      'servicesMaterialsEnabled':
+          serializer.toJson<bool>(servicesMaterialsEnabled),
+      'servicesLaborEnabled': serializer.toJson<bool>(servicesLaborEnabled),
+      'servicesDescriptionFormatEnabled':
+          serializer.toJson<bool>(servicesDescriptionFormatEnabled),
     };
   }
 
@@ -5899,7 +5987,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<Uint8List?> adminSignature = const Value.absent(),
           bool? showAdminSignature,
           bool? warrantyEnabled,
-          bool? allowGiveChange}) =>
+          bool? allowGiveChange,
+          bool? servicesMaterialsEnabled,
+          bool? servicesLaborEnabled,
+          bool? servicesDescriptionFormatEnabled}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -5973,6 +6064,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showAdminSignature: showAdminSignature ?? this.showAdminSignature,
         warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
         allowGiveChange: allowGiveChange ?? this.allowGiveChange,
+        servicesMaterialsEnabled:
+            servicesMaterialsEnabled ?? this.servicesMaterialsEnabled,
+        servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
+        servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
+            this.servicesDescriptionFormatEnabled,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -6116,6 +6212,16 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       allowGiveChange: data.allowGiveChange.present
           ? data.allowGiveChange.value
           : this.allowGiveChange,
+      servicesMaterialsEnabled: data.servicesMaterialsEnabled.present
+          ? data.servicesMaterialsEnabled.value
+          : this.servicesMaterialsEnabled,
+      servicesLaborEnabled: data.servicesLaborEnabled.present
+          ? data.servicesLaborEnabled.value
+          : this.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled:
+          data.servicesDescriptionFormatEnabled.present
+              ? data.servicesDescriptionFormatEnabled.value
+              : this.servicesDescriptionFormatEnabled,
     );
   }
 
@@ -6181,7 +6287,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('adminSignature: $adminSignature, ')
           ..write('showAdminSignature: $showAdminSignature, ')
           ..write('warrantyEnabled: $warrantyEnabled, ')
-          ..write('allowGiveChange: $allowGiveChange')
+          ..write('allowGiveChange: $allowGiveChange, ')
+          ..write('servicesMaterialsEnabled: $servicesMaterialsEnabled, ')
+          ..write('servicesLaborEnabled: $servicesLaborEnabled, ')
+          ..write(
+              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled')
           ..write(')'))
         .toString();
   }
@@ -6247,7 +6357,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         $driftBlobEquality.hash(adminSignature),
         showAdminSignature,
         warrantyEnabled,
-        allowGiveChange
+        allowGiveChange,
+        servicesMaterialsEnabled,
+        servicesLaborEnabled,
+        servicesDescriptionFormatEnabled
       ]);
   @override
   bool operator ==(Object other) =>
@@ -6314,7 +6427,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
               other.adminSignature, this.adminSignature) &&
           other.showAdminSignature == this.showAdminSignature &&
           other.warrantyEnabled == this.warrantyEnabled &&
-          other.allowGiveChange == this.allowGiveChange);
+          other.allowGiveChange == this.allowGiveChange &&
+          other.servicesMaterialsEnabled == this.servicesMaterialsEnabled &&
+          other.servicesLaborEnabled == this.servicesLaborEnabled &&
+          other.servicesDescriptionFormatEnabled ==
+              this.servicesDescriptionFormatEnabled);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -6378,6 +6495,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showAdminSignature;
   final Value<bool> warrantyEnabled;
   final Value<bool> allowGiveChange;
+  final Value<bool> servicesMaterialsEnabled;
+  final Value<bool> servicesLaborEnabled;
+  final Value<bool> servicesDescriptionFormatEnabled;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -6439,6 +6559,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showAdminSignature = const Value.absent(),
     this.warrantyEnabled = const Value.absent(),
     this.allowGiveChange = const Value.absent(),
+    this.servicesMaterialsEnabled = const Value.absent(),
+    this.servicesLaborEnabled = const Value.absent(),
+    this.servicesDescriptionFormatEnabled = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -6501,6 +6624,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showAdminSignature = const Value.absent(),
     this.warrantyEnabled = const Value.absent(),
     this.allowGiveChange = const Value.absent(),
+    this.servicesMaterialsEnabled = const Value.absent(),
+    this.servicesLaborEnabled = const Value.absent(),
+    this.servicesDescriptionFormatEnabled = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -6565,6 +6691,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showAdminSignature,
     Expression<bool>? warrantyEnabled,
     Expression<bool>? allowGiveChange,
+    Expression<bool>? servicesMaterialsEnabled,
+    Expression<bool>? servicesLaborEnabled,
+    Expression<bool>? servicesDescriptionFormatEnabled,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -6645,6 +6774,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'show_admin_signature': showAdminSignature,
       if (warrantyEnabled != null) 'warranty_enabled': warrantyEnabled,
       if (allowGiveChange != null) 'allow_give_change': allowGiveChange,
+      if (servicesMaterialsEnabled != null)
+        'services_materials_enabled': servicesMaterialsEnabled,
+      if (servicesLaborEnabled != null)
+        'services_labor_enabled': servicesLaborEnabled,
+      if (servicesDescriptionFormatEnabled != null)
+        'services_description_format_enabled': servicesDescriptionFormatEnabled,
     });
   }
 
@@ -6708,7 +6843,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<Uint8List?>? adminSignature,
       Value<bool>? showAdminSignature,
       Value<bool>? warrantyEnabled,
-      Value<bool>? allowGiveChange}) {
+      Value<bool>? allowGiveChange,
+      Value<bool>? servicesMaterialsEnabled,
+      Value<bool>? servicesLaborEnabled,
+      Value<bool>? servicesDescriptionFormatEnabled}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -6777,6 +6915,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
       allowGiveChange: allowGiveChange ?? this.allowGiveChange,
+      servicesMaterialsEnabled:
+          servicesMaterialsEnabled ?? this.servicesMaterialsEnabled,
+      servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
+          this.servicesDescriptionFormatEnabled,
     );
   }
 
@@ -6971,6 +7114,18 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (allowGiveChange.present) {
       map['allow_give_change'] = Variable<bool>(allowGiveChange.value);
     }
+    if (servicesMaterialsEnabled.present) {
+      map['services_materials_enabled'] =
+          Variable<bool>(servicesMaterialsEnabled.value);
+    }
+    if (servicesLaborEnabled.present) {
+      map['services_labor_enabled'] =
+          Variable<bool>(servicesLaborEnabled.value);
+    }
+    if (servicesDescriptionFormatEnabled.present) {
+      map['services_description_format_enabled'] =
+          Variable<bool>(servicesDescriptionFormatEnabled.value);
+    }
     return map;
   }
 
@@ -7036,7 +7191,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('adminSignature: $adminSignature, ')
           ..write('showAdminSignature: $showAdminSignature, ')
           ..write('warrantyEnabled: $warrantyEnabled, ')
-          ..write('allowGiveChange: $allowGiveChange')
+          ..write('allowGiveChange: $allowGiveChange, ')
+          ..write('servicesMaterialsEnabled: $servicesMaterialsEnabled, ')
+          ..write('servicesLaborEnabled: $servicesLaborEnabled, ')
+          ..write(
+              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled')
           ..write(')'))
         .toString();
   }
@@ -18923,6 +19082,581 @@ class ServiceExpenseCategoriesCompanion
   }
 }
 
+class $ServiceDescriptionFormatCategoriesTable
+    extends ServiceDescriptionFormatCategories
+    with
+        TableInfo<$ServiceDescriptionFormatCategoriesTable,
+            ServiceDescriptionFormatCategoryTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceDescriptionFormatCategoriesTable(this.attachedDatabase,
+      [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_description_format_categories';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ServiceDescriptionFormatCategoryTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ServiceDescriptionFormatCategoryTable map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceDescriptionFormatCategoryTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ServiceDescriptionFormatCategoriesTable createAlias(String alias) {
+    return $ServiceDescriptionFormatCategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceDescriptionFormatCategoryTable extends DataClass
+    implements Insertable<ServiceDescriptionFormatCategoryTable> {
+  final int id;
+  final String name;
+  final DateTime createdAt;
+  const ServiceDescriptionFormatCategoryTable(
+      {required this.id, required this.name, required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ServiceDescriptionFormatCategoriesCompanion toCompanion(bool nullToAbsent) {
+    return ServiceDescriptionFormatCategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ServiceDescriptionFormatCategoryTable.fromJson(
+      Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceDescriptionFormatCategoryTable(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ServiceDescriptionFormatCategoryTable copyWith(
+          {int? id, String? name, DateTime? createdAt}) =>
+      ServiceDescriptionFormatCategoryTable(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  ServiceDescriptionFormatCategoryTable copyWithCompanion(
+      ServiceDescriptionFormatCategoriesCompanion data) {
+    return ServiceDescriptionFormatCategoryTable(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceDescriptionFormatCategoryTable(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceDescriptionFormatCategoryTable &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class ServiceDescriptionFormatCategoriesCompanion
+    extends UpdateCompanion<ServiceDescriptionFormatCategoryTable> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  const ServiceDescriptionFormatCategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  ServiceDescriptionFormatCategoriesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.createdAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<ServiceDescriptionFormatCategoryTable> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  ServiceDescriptionFormatCategoriesCompanion copyWith(
+      {Value<int>? id, Value<String>? name, Value<DateTime>? createdAt}) {
+    return ServiceDescriptionFormatCategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceDescriptionFormatCategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ServiceDescriptionFormatFieldsTable
+    extends ServiceDescriptionFormatFields
+    with
+        TableInfo<$ServiceDescriptionFormatFieldsTable,
+            ServiceDescriptionFormatFieldTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceDescriptionFormatFieldsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _categoryIdMeta =
+      const VerificationMeta('categoryId');
+  @override
+  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+      'category_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES service_description_format_categories (id)'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _fieldTypeMeta =
+      const VerificationMeta('fieldType');
+  @override
+  late final GeneratedColumn<String> fieldType = GeneratedColumn<String>(
+      'field_type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('text'));
+  static const VerificationMeta _sortOrderMeta =
+      const VerificationMeta('sortOrder');
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+      'sort_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, categoryId, name, fieldType, sortOrder, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_description_format_fields';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ServiceDescriptionFormatFieldTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+          _categoryIdMeta,
+          categoryId.isAcceptableOrUnknown(
+              data['category_id']!, _categoryIdMeta));
+    } else if (isInserting) {
+      context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('field_type')) {
+      context.handle(_fieldTypeMeta,
+          fieldType.isAcceptableOrUnknown(data['field_type']!, _fieldTypeMeta));
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(_sortOrderMeta,
+          sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ServiceDescriptionFormatFieldTable map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceDescriptionFormatFieldTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      categoryId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}category_id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      fieldType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}field_type'])!,
+      sortOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ServiceDescriptionFormatFieldsTable createAlias(String alias) {
+    return $ServiceDescriptionFormatFieldsTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceDescriptionFormatFieldTable extends DataClass
+    implements Insertable<ServiceDescriptionFormatFieldTable> {
+  final int id;
+  final int categoryId;
+  final String name;
+  final String fieldType;
+  final int sortOrder;
+  final DateTime createdAt;
+  const ServiceDescriptionFormatFieldTable(
+      {required this.id,
+      required this.categoryId,
+      required this.name,
+      required this.fieldType,
+      required this.sortOrder,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['category_id'] = Variable<int>(categoryId);
+    map['name'] = Variable<String>(name);
+    map['field_type'] = Variable<String>(fieldType);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ServiceDescriptionFormatFieldsCompanion toCompanion(bool nullToAbsent) {
+    return ServiceDescriptionFormatFieldsCompanion(
+      id: Value(id),
+      categoryId: Value(categoryId),
+      name: Value(name),
+      fieldType: Value(fieldType),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ServiceDescriptionFormatFieldTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceDescriptionFormatFieldTable(
+      id: serializer.fromJson<int>(json['id']),
+      categoryId: serializer.fromJson<int>(json['categoryId']),
+      name: serializer.fromJson<String>(json['name']),
+      fieldType: serializer.fromJson<String>(json['fieldType']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'categoryId': serializer.toJson<int>(categoryId),
+      'name': serializer.toJson<String>(name),
+      'fieldType': serializer.toJson<String>(fieldType),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ServiceDescriptionFormatFieldTable copyWith(
+          {int? id,
+          int? categoryId,
+          String? name,
+          String? fieldType,
+          int? sortOrder,
+          DateTime? createdAt}) =>
+      ServiceDescriptionFormatFieldTable(
+        id: id ?? this.id,
+        categoryId: categoryId ?? this.categoryId,
+        name: name ?? this.name,
+        fieldType: fieldType ?? this.fieldType,
+        sortOrder: sortOrder ?? this.sortOrder,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  ServiceDescriptionFormatFieldTable copyWithCompanion(
+      ServiceDescriptionFormatFieldsCompanion data) {
+    return ServiceDescriptionFormatFieldTable(
+      id: data.id.present ? data.id.value : this.id,
+      categoryId:
+          data.categoryId.present ? data.categoryId.value : this.categoryId,
+      name: data.name.present ? data.name.value : this.name,
+      fieldType: data.fieldType.present ? data.fieldType.value : this.fieldType,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceDescriptionFormatFieldTable(')
+          ..write('id: $id, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('name: $name, ')
+          ..write('fieldType: $fieldType, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, categoryId, name, fieldType, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceDescriptionFormatFieldTable &&
+          other.id == this.id &&
+          other.categoryId == this.categoryId &&
+          other.name == this.name &&
+          other.fieldType == this.fieldType &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class ServiceDescriptionFormatFieldsCompanion
+    extends UpdateCompanion<ServiceDescriptionFormatFieldTable> {
+  final Value<int> id;
+  final Value<int> categoryId;
+  final Value<String> name;
+  final Value<String> fieldType;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  const ServiceDescriptionFormatFieldsCompanion({
+    this.id = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.fieldType = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  ServiceDescriptionFormatFieldsCompanion.insert({
+    this.id = const Value.absent(),
+    required int categoryId,
+    required String name,
+    this.fieldType = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  })  : categoryId = Value(categoryId),
+        name = Value(name);
+  static Insertable<ServiceDescriptionFormatFieldTable> custom({
+    Expression<int>? id,
+    Expression<int>? categoryId,
+    Expression<String>? name,
+    Expression<String>? fieldType,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (categoryId != null) 'category_id': categoryId,
+      if (name != null) 'name': name,
+      if (fieldType != null) 'field_type': fieldType,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  ServiceDescriptionFormatFieldsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? categoryId,
+      Value<String>? name,
+      Value<String>? fieldType,
+      Value<int>? sortOrder,
+      Value<DateTime>? createdAt}) {
+    return ServiceDescriptionFormatFieldsCompanion(
+      id: id ?? this.id,
+      categoryId: categoryId ?? this.categoryId,
+      name: name ?? this.name,
+      fieldType: fieldType ?? this.fieldType,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (fieldType.present) {
+      map['field_type'] = Variable<String>(fieldType.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceDescriptionFormatFieldsCompanion(')
+          ..write('id: $id, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('name: $name, ')
+          ..write('fieldType: $fieldType, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CurriculumMapTable extends CurriculumMap
     with TableInfo<$CurriculumMapTable, CurriculumMapTable> {
   @override
@@ -21305,6 +22039,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ServiceLaborPresetsTable(this);
   late final $ServiceExpenseCategoriesTable serviceExpenseCategories =
       $ServiceExpenseCategoriesTable(this);
+  late final $ServiceDescriptionFormatCategoriesTable
+      serviceDescriptionFormatCategories =
+      $ServiceDescriptionFormatCategoriesTable(this);
+  late final $ServiceDescriptionFormatFieldsTable
+      serviceDescriptionFormatFields =
+      $ServiceDescriptionFormatFieldsTable(this);
   late final $CurriculumMapTable curriculumMap = $CurriculumMapTable(this);
   late final $LessonNotesTable lessonNotes = $LessonNotesTable(this);
   late final $OutboxTableTable outboxTable = $OutboxTableTable(this);
@@ -21344,6 +22084,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         serviceMaterialCategories,
         serviceLaborPresets,
         serviceExpenseCategories,
+        serviceDescriptionFormatCategories,
+        serviceDescriptionFormatFields,
         curriculumMap,
         lessonNotes,
         outboxTable
@@ -24291,6 +25033,9 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showAdminSignature,
   Value<bool> warrantyEnabled,
   Value<bool> allowGiveChange,
+  Value<bool> servicesMaterialsEnabled,
+  Value<bool> servicesLaborEnabled,
+  Value<bool> servicesDescriptionFormatEnabled,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -24353,6 +25098,9 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showAdminSignature,
   Value<bool> warrantyEnabled,
   Value<bool> allowGiveChange,
+  Value<bool> servicesMaterialsEnabled,
+  Value<bool> servicesLaborEnabled,
+  Value<bool> servicesDescriptionFormatEnabled,
 });
 
 class $$SettingsTableFilterComposer
@@ -24573,6 +25321,19 @@ class $$SettingsTableFilterComposer
   ColumnFilters<bool> get allowGiveChange => $composableBuilder(
       column: $table.allowGiveChange,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get servicesMaterialsEnabled => $composableBuilder(
+      column: $table.servicesMaterialsEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get servicesLaborEnabled => $composableBuilder(
+      column: $table.servicesLaborEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get servicesDescriptionFormatEnabled =>
+      $composableBuilder(
+          column: $table.servicesDescriptionFormatEnabled,
+          builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -24801,6 +25562,19 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get allowGiveChange => $composableBuilder(
       column: $table.allowGiveChange,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get servicesMaterialsEnabled => $composableBuilder(
+      column: $table.servicesMaterialsEnabled,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get servicesLaborEnabled => $composableBuilder(
+      column: $table.servicesLaborEnabled,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get servicesDescriptionFormatEnabled =>
+      $composableBuilder(
+          column: $table.servicesDescriptionFormatEnabled,
+          builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -24991,6 +25765,17 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get allowGiveChange => $composableBuilder(
       column: $table.allowGiveChange, builder: (column) => column);
+
+  GeneratedColumn<bool> get servicesMaterialsEnabled => $composableBuilder(
+      column: $table.servicesMaterialsEnabled, builder: (column) => column);
+
+  GeneratedColumn<bool> get servicesLaborEnabled => $composableBuilder(
+      column: $table.servicesLaborEnabled, builder: (column) => column);
+
+  GeneratedColumn<bool> get servicesDescriptionFormatEnabled =>
+      $composableBuilder(
+          column: $table.servicesDescriptionFormatEnabled,
+          builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -25079,6 +25864,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showAdminSignature = const Value.absent(),
             Value<bool> warrantyEnabled = const Value.absent(),
             Value<bool> allowGiveChange = const Value.absent(),
+            Value<bool> servicesMaterialsEnabled = const Value.absent(),
+            Value<bool> servicesLaborEnabled = const Value.absent(),
+            Value<bool> servicesDescriptionFormatEnabled = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -25141,6 +25929,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             showAdminSignature: showAdminSignature,
             warrantyEnabled: warrantyEnabled,
             allowGiveChange: allowGiveChange,
+            servicesMaterialsEnabled: servicesMaterialsEnabled,
+            servicesLaborEnabled: servicesLaborEnabled,
+            servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -25203,6 +25994,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showAdminSignature = const Value.absent(),
             Value<bool> warrantyEnabled = const Value.absent(),
             Value<bool> allowGiveChange = const Value.absent(),
+            Value<bool> servicesMaterialsEnabled = const Value.absent(),
+            Value<bool> servicesLaborEnabled = const Value.absent(),
+            Value<bool> servicesDescriptionFormatEnabled = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -25265,6 +26059,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             showAdminSignature: showAdminSignature,
             warrantyEnabled: warrantyEnabled,
             allowGiveChange: allowGiveChange,
+            servicesMaterialsEnabled: servicesMaterialsEnabled,
+            servicesLaborEnabled: servicesLaborEnabled,
+            servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -33652,6 +34449,570 @@ typedef $$ServiceExpenseCategoriesTableProcessedTableManager
         ),
         ServiceExpenseCategoryTable,
         PrefetchHooks Function()>;
+typedef $$ServiceDescriptionFormatCategoriesTableCreateCompanionBuilder
+    = ServiceDescriptionFormatCategoriesCompanion Function({
+  Value<int> id,
+  required String name,
+  Value<DateTime> createdAt,
+});
+typedef $$ServiceDescriptionFormatCategoriesTableUpdateCompanionBuilder
+    = ServiceDescriptionFormatCategoriesCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<DateTime> createdAt,
+});
+
+final class $$ServiceDescriptionFormatCategoriesTableReferences
+    extends BaseReferences<
+        _$AppDatabase,
+        $ServiceDescriptionFormatCategoriesTable,
+        ServiceDescriptionFormatCategoryTable> {
+  $$ServiceDescriptionFormatCategoriesTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$ServiceDescriptionFormatFieldsTable,
+          List<ServiceDescriptionFormatFieldTable>>
+      _serviceDescriptionFormatFieldsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.serviceDescriptionFormatFields,
+              aliasName: $_aliasNameGenerator(
+                  db.serviceDescriptionFormatCategories.id,
+                  db.serviceDescriptionFormatFields.categoryId));
+
+  $$ServiceDescriptionFormatFieldsTableProcessedTableManager
+      get serviceDescriptionFormatFieldsRefs {
+    final manager = $$ServiceDescriptionFormatFieldsTableTableManager(
+            $_db, $_db.serviceDescriptionFormatFields)
+        .filter((f) => f.categoryId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult
+        .readTableOrNull(_serviceDescriptionFormatFieldsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$ServiceDescriptionFormatCategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatCategoriesTable> {
+  $$ServiceDescriptionFormatCategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> serviceDescriptionFormatFieldsRefs(
+      Expression<bool> Function(
+              $$ServiceDescriptionFormatFieldsTableFilterComposer f)
+          f) {
+    final $$ServiceDescriptionFormatFieldsTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.serviceDescriptionFormatFields,
+            getReferencedColumn: (t) => t.categoryId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ServiceDescriptionFormatFieldsTableFilterComposer(
+                  $db: $db,
+                  $table: $db.serviceDescriptionFormatFields,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$ServiceDescriptionFormatCategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatCategoriesTable> {
+  $$ServiceDescriptionFormatCategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ServiceDescriptionFormatCategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatCategoriesTable> {
+  $$ServiceDescriptionFormatCategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> serviceDescriptionFormatFieldsRefs<T extends Object>(
+      Expression<T> Function(
+              $$ServiceDescriptionFormatFieldsTableAnnotationComposer a)
+          f) {
+    final $$ServiceDescriptionFormatFieldsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.serviceDescriptionFormatFields,
+            getReferencedColumn: (t) => t.categoryId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ServiceDescriptionFormatFieldsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.serviceDescriptionFormatFields,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$ServiceDescriptionFormatCategoriesTableTableManager
+    extends RootTableManager<
+        _$AppDatabase,
+        $ServiceDescriptionFormatCategoriesTable,
+        ServiceDescriptionFormatCategoryTable,
+        $$ServiceDescriptionFormatCategoriesTableFilterComposer,
+        $$ServiceDescriptionFormatCategoriesTableOrderingComposer,
+        $$ServiceDescriptionFormatCategoriesTableAnnotationComposer,
+        $$ServiceDescriptionFormatCategoriesTableCreateCompanionBuilder,
+        $$ServiceDescriptionFormatCategoriesTableUpdateCompanionBuilder,
+        (
+          ServiceDescriptionFormatCategoryTable,
+          $$ServiceDescriptionFormatCategoriesTableReferences
+        ),
+        ServiceDescriptionFormatCategoryTable,
+        PrefetchHooks Function({bool serviceDescriptionFormatFieldsRefs})> {
+  $$ServiceDescriptionFormatCategoriesTableTableManager(
+      _$AppDatabase db, $ServiceDescriptionFormatCategoriesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceDescriptionFormatCategoriesTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceDescriptionFormatCategoriesTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServiceDescriptionFormatCategoriesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ServiceDescriptionFormatCategoriesCompanion(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ServiceDescriptionFormatCategoriesCompanion.insert(
+            id: id,
+            name: name,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$ServiceDescriptionFormatCategoriesTableReferences(
+                        db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {serviceDescriptionFormatFieldsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (serviceDescriptionFormatFieldsRefs)
+                  db.serviceDescriptionFormatFields
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (serviceDescriptionFormatFieldsRefs)
+                    await $_getPrefetchedData<
+                            ServiceDescriptionFormatCategoryTable,
+                            $ServiceDescriptionFormatCategoriesTable,
+                            ServiceDescriptionFormatFieldTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$ServiceDescriptionFormatCategoriesTableReferences
+                                ._serviceDescriptionFormatFieldsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ServiceDescriptionFormatCategoriesTableReferences(
+                                    db, table, p0)
+                                .serviceDescriptionFormatFieldsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.categoryId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ServiceDescriptionFormatCategoriesTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $ServiceDescriptionFormatCategoriesTable,
+        ServiceDescriptionFormatCategoryTable,
+        $$ServiceDescriptionFormatCategoriesTableFilterComposer,
+        $$ServiceDescriptionFormatCategoriesTableOrderingComposer,
+        $$ServiceDescriptionFormatCategoriesTableAnnotationComposer,
+        $$ServiceDescriptionFormatCategoriesTableCreateCompanionBuilder,
+        $$ServiceDescriptionFormatCategoriesTableUpdateCompanionBuilder,
+        (
+          ServiceDescriptionFormatCategoryTable,
+          $$ServiceDescriptionFormatCategoriesTableReferences
+        ),
+        ServiceDescriptionFormatCategoryTable,
+        PrefetchHooks Function({bool serviceDescriptionFormatFieldsRefs})>;
+typedef $$ServiceDescriptionFormatFieldsTableCreateCompanionBuilder
+    = ServiceDescriptionFormatFieldsCompanion Function({
+  Value<int> id,
+  required int categoryId,
+  required String name,
+  Value<String> fieldType,
+  Value<int> sortOrder,
+  Value<DateTime> createdAt,
+});
+typedef $$ServiceDescriptionFormatFieldsTableUpdateCompanionBuilder
+    = ServiceDescriptionFormatFieldsCompanion Function({
+  Value<int> id,
+  Value<int> categoryId,
+  Value<String> name,
+  Value<String> fieldType,
+  Value<int> sortOrder,
+  Value<DateTime> createdAt,
+});
+
+final class $$ServiceDescriptionFormatFieldsTableReferences
+    extends BaseReferences<_$AppDatabase, $ServiceDescriptionFormatFieldsTable,
+        ServiceDescriptionFormatFieldTable> {
+  $$ServiceDescriptionFormatFieldsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $ServiceDescriptionFormatCategoriesTable _categoryIdTable(
+          _$AppDatabase db) =>
+      db.serviceDescriptionFormatCategories.createAlias($_aliasNameGenerator(
+          db.serviceDescriptionFormatFields.categoryId,
+          db.serviceDescriptionFormatCategories.id));
+
+  $$ServiceDescriptionFormatCategoriesTableProcessedTableManager
+      get categoryId {
+    final $_column = $_itemColumn<int>('category_id')!;
+
+    final manager = $$ServiceDescriptionFormatCategoriesTableTableManager(
+            $_db, $_db.serviceDescriptionFormatCategories)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_categoryIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$ServiceDescriptionFormatFieldsTableFilterComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatFieldsTable> {
+  $$ServiceDescriptionFormatFieldsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fieldType => $composableBuilder(
+      column: $table.fieldType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  $$ServiceDescriptionFormatCategoriesTableFilterComposer get categoryId {
+    final $$ServiceDescriptionFormatCategoriesTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.categoryId,
+            referencedTable: $db.serviceDescriptionFormatCategories,
+            getReferencedColumn: (t) => t.id,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ServiceDescriptionFormatCategoriesTableFilterComposer(
+                  $db: $db,
+                  $table: $db.serviceDescriptionFormatCategories,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return composer;
+  }
+}
+
+class $$ServiceDescriptionFormatFieldsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatFieldsTable> {
+  $$ServiceDescriptionFormatFieldsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fieldType => $composableBuilder(
+      column: $table.fieldType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+      column: $table.sortOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  $$ServiceDescriptionFormatCategoriesTableOrderingComposer get categoryId {
+    final $$ServiceDescriptionFormatCategoriesTableOrderingComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.categoryId,
+            referencedTable: $db.serviceDescriptionFormatCategories,
+            getReferencedColumn: (t) => t.id,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ServiceDescriptionFormatCategoriesTableOrderingComposer(
+                  $db: $db,
+                  $table: $db.serviceDescriptionFormatCategories,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return composer;
+  }
+}
+
+class $$ServiceDescriptionFormatFieldsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ServiceDescriptionFormatFieldsTable> {
+  $$ServiceDescriptionFormatFieldsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get fieldType =>
+      $composableBuilder(column: $table.fieldType, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ServiceDescriptionFormatCategoriesTableAnnotationComposer get categoryId {
+    final $$ServiceDescriptionFormatCategoriesTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.categoryId,
+            referencedTable: $db.serviceDescriptionFormatCategories,
+            getReferencedColumn: (t) => t.id,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ServiceDescriptionFormatCategoriesTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.serviceDescriptionFormatCategories,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return composer;
+  }
+}
+
+class $$ServiceDescriptionFormatFieldsTableTableManager
+    extends RootTableManager<
+        _$AppDatabase,
+        $ServiceDescriptionFormatFieldsTable,
+        ServiceDescriptionFormatFieldTable,
+        $$ServiceDescriptionFormatFieldsTableFilterComposer,
+        $$ServiceDescriptionFormatFieldsTableOrderingComposer,
+        $$ServiceDescriptionFormatFieldsTableAnnotationComposer,
+        $$ServiceDescriptionFormatFieldsTableCreateCompanionBuilder,
+        $$ServiceDescriptionFormatFieldsTableUpdateCompanionBuilder,
+        (
+          ServiceDescriptionFormatFieldTable,
+          $$ServiceDescriptionFormatFieldsTableReferences
+        ),
+        ServiceDescriptionFormatFieldTable,
+        PrefetchHooks Function({bool categoryId})> {
+  $$ServiceDescriptionFormatFieldsTableTableManager(
+      _$AppDatabase db, $ServiceDescriptionFormatFieldsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceDescriptionFormatFieldsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceDescriptionFormatFieldsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServiceDescriptionFormatFieldsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> categoryId = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> fieldType = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ServiceDescriptionFormatFieldsCompanion(
+            id: id,
+            categoryId: categoryId,
+            name: name,
+            fieldType: fieldType,
+            sortOrder: sortOrder,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int categoryId,
+            required String name,
+            Value<String> fieldType = const Value.absent(),
+            Value<int> sortOrder = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              ServiceDescriptionFormatFieldsCompanion.insert(
+            id: id,
+            categoryId: categoryId,
+            name: name,
+            fieldType: fieldType,
+            sortOrder: sortOrder,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$ServiceDescriptionFormatFieldsTableReferences(
+                        db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({categoryId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (categoryId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.categoryId,
+                    referencedTable:
+                        $$ServiceDescriptionFormatFieldsTableReferences
+                            ._categoryIdTable(db),
+                    referencedColumn:
+                        $$ServiceDescriptionFormatFieldsTableReferences
+                            ._categoryIdTable(db)
+                            .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ServiceDescriptionFormatFieldsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $ServiceDescriptionFormatFieldsTable,
+        ServiceDescriptionFormatFieldTable,
+        $$ServiceDescriptionFormatFieldsTableFilterComposer,
+        $$ServiceDescriptionFormatFieldsTableOrderingComposer,
+        $$ServiceDescriptionFormatFieldsTableAnnotationComposer,
+        $$ServiceDescriptionFormatFieldsTableCreateCompanionBuilder,
+        $$ServiceDescriptionFormatFieldsTableUpdateCompanionBuilder,
+        (
+          ServiceDescriptionFormatFieldTable,
+          $$ServiceDescriptionFormatFieldsTableReferences
+        ),
+        ServiceDescriptionFormatFieldTable,
+        PrefetchHooks Function({bool categoryId})>;
 typedef $$CurriculumMapTableCreateCompanionBuilder = CurriculumMapCompanion
     Function({
   Value<int> id,
@@ -35179,6 +36540,14 @@ class $AppDatabaseManager {
   $$ServiceExpenseCategoriesTableTableManager get serviceExpenseCategories =>
       $$ServiceExpenseCategoriesTableTableManager(
           _db, _db.serviceExpenseCategories);
+  $$ServiceDescriptionFormatCategoriesTableTableManager
+      get serviceDescriptionFormatCategories =>
+          $$ServiceDescriptionFormatCategoriesTableTableManager(
+              _db, _db.serviceDescriptionFormatCategories);
+  $$ServiceDescriptionFormatFieldsTableTableManager
+      get serviceDescriptionFormatFields =>
+          $$ServiceDescriptionFormatFieldsTableTableManager(
+              _db, _db.serviceDescriptionFormatFields);
   $$CurriculumMapTableTableManager get curriculumMap =>
       $$CurriculumMapTableTableManager(_db, _db.curriculumMap);
   $$LessonNotesTableTableManager get lessonNotes =>

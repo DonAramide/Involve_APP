@@ -75,5 +75,8 @@ class Settings extends Table {
   BoolColumn get showAdminSignature => boolean().withDefault(const Constant(false))();
   BoolColumn get warrantyEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get allowGiveChange => boolean().withDefault(const Constant(false))();
+  BoolColumn get servicesMaterialsEnabled => boolean().withDefault(const Constant(true))();
+  BoolColumn get servicesLaborEnabled => boolean().withDefault(const Constant(true))();
+  BoolColumn get servicesDescriptionFormatEnabled => boolean().withDefault(const Constant(true))();
 
 }

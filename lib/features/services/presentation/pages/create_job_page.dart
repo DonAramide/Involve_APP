@@ -10,6 +10,9 @@ import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
 import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
+import '../../domain/entities/service_description_format.dart';
+import '../../domain/utils/job_description_codec.dart';
+import '../../domain/repositories/services_repository.dart';
 import '../utils/create_job_draft_store.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
@@ -41,12 +44,18 @@ class _CreateJobPageState extends State<CreateJobPage> {
   String? _warrantyDuration;
 
   List<String> _jobTitlePresets = [];
-  bool _showDetailedBilling = false;
+  bool _showLaborBilling = false;
+  bool _showMaterialsBilling = false;
   bool _projectPhotoExpanded = false;
   final List<ServiceJobItem> _selectedItems = [];
   Key _titleFieldKey = UniqueKey();
   Timer? _draftSaveTimer;
   bool _draftReady = false;
+
+  List<ServiceDescriptionFormatBundle> _descriptionBundles = [];
+  final Set<int> _selectedDescriptionCategoryIds = {};
+  final Map<int, TextEditingController> _descriptionTextControllers = {};
+  final Map<int, bool> _descriptionCheckboxValues = {};
 
   @override
   void initState() {
@@ -59,6 +68,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
     _descController.addListener(_scheduleDraftSave);
     _amountController.addListener(_scheduleDraftSave);
     _laborAmountController.addListener(_scheduleDraftSave);
+    _loadDescriptionFormats();
     _restoreDraft();
   }
 
@@ -72,7 +82,45 @@ class _CreateJobPageState extends State<CreateJobPage> {
     _descController.dispose();
     _amountController.dispose();
     _laborAmountController.dispose();
+    for (final c in _descriptionTextControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _loadDescriptionFormats() async {
+    try {
+      final bundles =
+          await context.read<IServicesRepository>().getDescriptionFormatBundles();
+      if (!mounted) return;
+      setState(() {
+        _descriptionBundles = bundles;
+        final hasDraftIds = _pendingDescriptionDraft?['descriptionCategoryIds'] is List;
+        if (!hasDraftIds &&
+            _selectedDescriptionCategoryIds.isEmpty &&
+            bundles.length == 1 &&
+            bundles.first.fields.isNotEmpty) {
+          _selectedDescriptionCategoryIds.add(bundles.first.category.id);
+        }
+        _applyDescriptionDraft();
+      });
+    } catch (_) {}
+  }
+
+  void _ensureDescriptionControllers() {
+    for (final bundle in _descriptionBundles) {
+      for (final field in bundle.fields) {
+        if (field.isCheckbox) {
+          _descriptionCheckboxValues.putIfAbsent(field.id, () => false);
+        } else {
+          _descriptionTextControllers.putIfAbsent(field.id, () {
+            final c = TextEditingController();
+            c.addListener(_scheduleDraftSave);
+            return c;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -128,8 +176,12 @@ class _CreateJobPageState extends State<CreateJobPage> {
         _dueDate != null ||
         _imageBytes != null ||
         _warrantyDuration != null ||
-        _showDetailedBilling ||
-        _selectedItems.isNotEmpty;
+        _showLaborBilling ||
+        _showMaterialsBilling ||
+        _selectedItems.isNotEmpty ||
+        _selectedDescriptionCategoryIds.isNotEmpty ||
+        _descriptionCheckboxValues.values.any((v) => v) ||
+        _descriptionTextControllers.values.any((c) => c.text.trim().isNotEmpty);
   }
 
   Map<String, dynamic> _draftMap() {
@@ -146,7 +198,17 @@ class _CreateJobPageState extends State<CreateJobPage> {
       'laborAmount': _laborAmountController.text,
       'dueDate': _dueDate?.toIso8601String(),
       'warrantyDuration': _warrantyDuration,
-      'showDetailedBilling': _showDetailedBilling,
+      'showLaborBilling': _showLaborBilling,
+      'showMaterialsBilling': _showMaterialsBilling,
+      'descriptionCategoryIds': _selectedDescriptionCategoryIds.toList(),
+      'descriptionText': {
+        for (final e in _descriptionTextControllers.entries)
+          if (e.value.text.trim().isNotEmpty) e.key.toString(): e.value.text,
+      },
+      'descriptionChecks': {
+        for (final e in _descriptionCheckboxValues.entries)
+          if (e.value) e.key.toString(): true,
+      },
       'projectPhotoExpanded': _projectPhotoExpanded,
       'imageBase64': _imageBytes == null ? null : base64Encode(_imageBytes!),
       'items': _selectedItems
@@ -219,7 +281,11 @@ class _CreateJobPageState extends State<CreateJobPage> {
       _dueDate = due;
       _imageBytes = image;
       _warrantyDuration = draft['warrantyDuration'] as String?;
-      _showDetailedBilling = draft['showDetailedBilling'] == true;
+      final legacyDetailed = draft['showDetailedBilling'] == true;
+      _showLaborBilling = draft['showLaborBilling'] == true ||
+          (draft['showLaborBilling'] == null && legacyDetailed);
+      _showMaterialsBilling = draft['showMaterialsBilling'] == true ||
+          (draft['showMaterialsBilling'] == null && legacyDetailed);
       _projectPhotoExpanded = draft['projectPhotoExpanded'] == true || image != null;
       _selectedItems
         ..clear()
@@ -227,6 +293,41 @@ class _CreateJobPageState extends State<CreateJobPage> {
       _titleFieldKey = UniqueKey();
       _draftReady = true;
     });
+    _pendingDescriptionDraft = draft;
+    _applyDescriptionDraft();
+  }
+
+  Map<String, dynamic>? _pendingDescriptionDraft;
+
+  void _applyDescriptionDraft() {
+    _ensureDescriptionControllers();
+    final draft = _pendingDescriptionDraft;
+    if (draft == null) return;
+    final ids = draft['descriptionCategoryIds'];
+    if (ids is List) {
+      _selectedDescriptionCategoryIds
+        ..clear()
+        ..addAll(ids.whereType<num>().map((e) => e.toInt()));
+    }
+    final texts = draft['descriptionText'];
+    if (texts is Map) {
+      texts.forEach((k, v) {
+        final id = int.tryParse(k.toString());
+        if (id == null) return;
+        _descriptionTextControllers.putIfAbsent(id, () {
+          final c = TextEditingController();
+          c.addListener(_scheduleDraftSave);
+          return c;
+        }).text = v.toString();
+      });
+    }
+    final checks = draft['descriptionChecks'];
+    if (checks is Map) {
+      checks.forEach((k, v) {
+        final id = int.tryParse(k.toString());
+        if (id != null) _descriptionCheckboxValues[id] = v == true;
+      });
+    }
   }
 
   void _scheduleDraftSave() {
@@ -281,9 +382,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
       _dueDate = null;
       _imageBytes = null;
       _warrantyDuration = null;
-      _showDetailedBilling = false;
+      _showLaborBilling = false;
+      _showMaterialsBilling = false;
       _projectPhotoExpanded = false;
       _selectedItems.clear();
+      _selectedDescriptionCategoryIds.clear();
+      _descriptionCheckboxValues.clear();
+      for (final c in _descriptionTextControllers.values) {
+        c.clear();
+      }
+      _pendingDescriptionDraft = null;
       _titleFieldKey = UniqueKey();
       _draftReady = true;
     });
@@ -291,8 +399,13 @@ class _CreateJobPageState extends State<CreateJobPage> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.read<SettingsBloc>().state.settings;
+    final settings = context.watch<SettingsBloc>().state.settings;
     final symbol = settings?.currency ?? '₦';
+    final laborAllowed = settings?.servicesLaborEnabled ?? true;
+    final materialsAllowed = settings?.servicesMaterialsEnabled ?? true;
+    final showLabor = laborAllowed && _showLaborBilling;
+    final showMaterials = materialsAllowed && _showMaterialsBilling;
+    final useSimpleTotal = !showLabor && !showMaterials;
 
     return BlocListener<ServicesBloc, ServicesState>(
       listener: (context, state) {
@@ -468,33 +581,49 @@ class _CreateJobPageState extends State<CreateJobPage> {
                 ),
                 
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _descController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'Small Description',
-                    hintText: 'e.g. Measurements, specific fabric info...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.description_outlined),
-                  ),
+                _buildDescriptionSection(
+                  formatsAllowed: settings?.servicesDescriptionFormatEnabled ?? true,
                 ),
                 const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Detailed Billing (Materials + Labor)', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Add specific materials and workmanship fees'),
-                  value: _showDetailedBilling,
-                  activeColor: Theme.of(context).primaryColor,
-                  onChanged: (v) {
-                    setState(() {
-                      _showDetailedBilling = v;
-                      if (v) {
-                        _amountController.text = _calculateTotal().toStringAsFixed(2);
-                      }
-                    });
-                    _scheduleDraftSave();
-                  },
-                ),
-                if (!_showDetailedBilling)
+                if (laborAllowed)
+                  SwitchListTile(
+                    title: const Text('Labor', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Add a workmanship / labor fee'),
+                    value: _showLaborBilling,
+                    activeColor: Theme.of(context).primaryColor,
+                    onChanged: (v) {
+                      setState(() {
+                        _showLaborBilling = v;
+                        if (!v) {
+                          _laborAmountController.clear();
+                        }
+                        if (v || _showMaterialsBilling) {
+                          _amountController.text = _calculateTotal().toStringAsFixed(2);
+                        }
+                      });
+                      _scheduleDraftSave();
+                    },
+                  ),
+                if (materialsAllowed)
+                  SwitchListTile(
+                    title: const Text('Materials', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Add specific materials and parts'),
+                    value: _showMaterialsBilling,
+                    activeColor: Theme.of(context).primaryColor,
+                    onChanged: (v) {
+                      setState(() {
+                        _showMaterialsBilling = v;
+                        if (!v) {
+                          _selectedItems.clear();
+                        }
+                        if (v || _showLaborBilling) {
+                          _amountController.text = _calculateTotal().toStringAsFixed(2);
+                        }
+                      });
+                      _scheduleDraftSave();
+                    },
+                  ),
+                if (useSimpleTotal)
                   TextFormField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
@@ -505,8 +634,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
                       prefixText: '$symbol ',
                     ),
                     validator: (v) => (v == null || double.tryParse(v) == null) ? 'Invalid amount' : null,
-                  )
-                else
+                  ),
+                if (showLabor)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -542,6 +671,12 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         },
                       ),
                       const SizedBox(height: 16),
+                    ],
+                  ),
+                if (showMaterials)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -583,25 +718,26 @@ class _CreateJobPageState extends State<CreateJobPage> {
                           ),
                         )),
                       const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Grand Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                            Text(
-                                CurrencyFormatter.formatWithSymbol(_calculateTotal(), symbol: symbol),
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).primaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
+                  ),
+                if (!useSimpleTotal)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Grand Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(
+                            CurrencyFormatter.formatWithSymbol(_calculateTotal(), symbol: symbol),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).primaryColor),
+                        ),
+                      ],
+                    ),
                   ),
                 const SizedBox(height: 16),
                 _buildDatePicker(),
@@ -843,11 +979,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
   }
 
   double _calculateTotal() {
-    final labor = double.tryParse(_laborAmountController.text) ?? 0.0;
-    if (!_showDetailedBilling) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final showLabor = (settings?.servicesLaborEnabled ?? true) && _showLaborBilling;
+    final showMaterials = (settings?.servicesMaterialsEnabled ?? true) && _showMaterialsBilling;
+    if (!showLabor && !showMaterials) {
       return double.tryParse(_amountController.text) ?? 0.0;
     }
-    final itemsTotal = _selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final labor = showLabor ? (double.tryParse(_laborAmountController.text) ?? 0.0) : 0.0;
+    final itemsTotal = showMaterials
+        ? _selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity))
+        : 0.0;
     return labor + itemsTotal;
   }
 
@@ -866,6 +1007,263 @@ class _CreateJobPageState extends State<CreateJobPage> {
         },
       ),
     );
+  }
+
+  String? _composeJobDescription({required bool formatsAllowed}) {
+    if (!formatsAllowed || _descriptionBundles.isEmpty) {
+      final text = _descController.text.trim();
+      return text.isEmpty ? null : text;
+    }
+    final sections = <JobDescriptionSection>[];
+    for (final bundle in _descriptionBundles) {
+      if (!_selectedDescriptionCategoryIds.contains(bundle.category.id)) continue;
+      sections.add(JobDescriptionSection(
+        categoryId: bundle.category.id,
+        category: bundle.category.name,
+        items: bundle.fields
+            .map((f) => JobDescriptionItem(
+                  fieldId: f.id,
+                  label: f.name,
+                  type: f.fieldType,
+                  value: f.isCheckbox
+                      ? _descriptionCheckboxValues[f.id] == true
+                      : (_descriptionTextControllers[f.id]?.text.trim() ?? ''),
+                ))
+            .toList(),
+      ));
+    }
+    final notes = _descController.text.trim();
+    if (sections.isEmpty && notes.isEmpty) return null;
+    return JobDescriptionCodec.encode(sections: sections, notes: notes);
+  }
+
+  Widget _buildDescriptionSection({required bool formatsAllowed}) {
+    if (!formatsAllowed || _descriptionBundles.isEmpty) {
+      return TextFormField(
+        controller: _descController,
+        maxLines: 2,
+        decoration: InputDecoration(
+          labelText: 'Small Description',
+          hintText: formatsAllowed
+              ? 'Add description formats in Services Setup to use a table here.'
+              : 'Optional notes about this job',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: const Icon(Icons.description_outlined),
+        ),
+      );
+    }
+
+    final available = _descriptionBundles
+        .where((b) => !_selectedDescriptionCategoryIds.contains(b.category.id))
+        .toList();
+    final selected = _descriptionBundles
+        .where((b) => _selectedDescriptionCategoryIds.contains(b.category.id))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Description',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            if (available.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => _pickDescriptionCategory(available),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add category'),
+              ),
+          ],
+        ),
+        if (selected.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Text(
+              available.isEmpty
+                  ? 'Add fields to a Description Format category in Services Setup.'
+                  : 'Tap Add category to pick a predefined description table.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+          ),
+        ...selected.map(_buildDescriptionCategoryTable),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _descController,
+          maxLines: 2,
+          decoration: InputDecoration(
+            labelText: 'Extra notes (optional)',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.notes_outlined),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionCategoryTable(ServiceDescriptionFormatBundle bundle) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    bundle.category.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove category',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDescriptionCategoryIds.remove(bundle.category.id);
+                    });
+                    _scheduleDraftSave();
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (bundle.fields.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('This category has no fields yet.'),
+            )
+          else
+            Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.2),
+                1: FlexColumnWidth(1.4),
+              },
+              border: TableBorder(
+                horizontalInside: BorderSide(color: Colors.grey.shade200),
+              ),
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.grey.shade100),
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text('Format', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text('Value', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                ...bundle.fields.map((field) {
+                  _ensureDescriptionControllers();
+                  return TableRow(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Text(field.name, style: const TextStyle(fontSize: 13)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: field.isCheckbox
+                            ? Align(
+                                alignment: Alignment.centerLeft,
+                                child: Checkbox(
+                                  value: _descriptionCheckboxValues[field.id] ?? false,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _descriptionCheckboxValues[field.id] = val ?? false;
+                                    });
+                                    _scheduleDraftSave();
+                                  },
+                                ),
+                              )
+                            : TextField(
+                                controller: _descriptionTextControllers.putIfAbsent(
+                                  field.id,
+                                  () {
+                                    final c = TextEditingController();
+                                    c.addListener(_scheduleDraftSave);
+                                    return c;
+                                  },
+                                ),
+                                keyboardType: field.isNumber
+                                    ? const TextInputType.numberWithOptions(decimal: true)
+                                    : TextInputType.text,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDescriptionCategory(
+      List<ServiceDescriptionFormatBundle> available) async {
+    final chosen = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Pick a description category',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ...available.map(
+              (b) => ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: Text(b.category.name),
+                subtitle: Text(
+                  '${b.fields.length} field${b.fields.length == 1 ? '' : 's'}',
+                ),
+                onTap: () => Navigator.pop(ctx, b.category.id),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    setState(() {
+      _selectedDescriptionCategoryIds.add(chosen);
+      _ensureDescriptionControllers();
+    });
+    _scheduleDraftSave();
   }
 
   Widget _buildStaffSelector() {
@@ -1003,16 +1401,23 @@ class _CreateJobPageState extends State<CreateJobPage> {
         await JobStaffStore.saveLatestStaff(_selectedStaff!.id!, _selectedStaff!.name);
       }
 
-      final total = double.parse(_amountController.text);
-      final labor = double.tryParse(_laborAmountController.text) ?? 0.0;
+      final settings = context.read<SettingsBloc>().state.settings;
+      final showLabor = (settings?.servicesLaborEnabled ?? true) && _showLaborBilling;
+      final showMaterials = (settings?.servicesMaterialsEnabled ?? true) && _showMaterialsBilling;
+      final total = showLabor || showMaterials
+          ? _calculateTotal()
+          : double.parse(_amountController.text);
+      final labor = showLabor ? (double.tryParse(_laborAmountController.text) ?? 0.0) : 0.0;
 
       context.read<ServicesBloc>().add(CreateServiceJob(
             customerId: _selectedCustomerId!,
             title: _titleController.text,
-            description: _descController.text,
+            description: _composeJobDescription(
+              formatsAllowed: settings?.servicesDescriptionFormatEnabled ?? true,
+            ),
             totalAmount: total,
             laborAmount: labor,
-            items: _selectedItems,
+            items: showMaterials ? _selectedItems : [],
             dueDate: _dueDate,
             image: _imageBytes,
             warrantyDuration: _warrantyDuration,
@@ -1055,6 +1460,19 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
             widget.onSelected(state.customers.last);
           }
         }
+        if (state.successMessage == 'Walk-in customer selected') {
+          ServiceCustomer? walkIn;
+          for (final customer in state.customers) {
+            if (ServiceCustomer.isWalkInName(customer.name)) {
+              walkIn = customer;
+              break;
+            }
+          }
+          walkIn ??= state.customers.isEmpty ? null : state.customers.first;
+          if (walkIn != null) {
+            widget.onSelected(walkIn);
+          }
+        }
       },
       child: Container(
         height: MediaQuery.of(context).size.height * 0.7,
@@ -1070,6 +1488,15 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
               onChanged: (v) => context.read<ServicesBloc>().add(SearchServiceCustomers(query: v)),
             ),
             const SizedBox(height: 12),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.shade100,
+                child: const Icon(Icons.storefront, color: Colors.orange),
+              ),
+              title: const Text('Walk-in Customer', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('No name on file — use for counter jobs'),
+              onTap: () => context.read<ServicesBloc>().add(const EnsureWalkInCustomer()),
+            ),
             TextButton.icon(
               onPressed: _showAddCustomerDialog,
               icon: const Icon(Icons.add),
@@ -1089,10 +1516,15 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                     return const Center(child: Text('No customers found.'));
                   }
 
+                  final namedCustomers = customers.where((c) => !ServiceCustomer.isWalkInName(c.name)).toList();
+                  if (namedCustomers.isEmpty) {
+                    return const Center(child: Text('No named customers yet. Use Walk-in or add a new customer.'));
+                  }
+
                   return ListView.builder(
-                    itemCount: customers.length,
+                    itemCount: namedCustomers.length,
                     itemBuilder: (context, index) {
-                      final customer = customers[index];
+                      final customer = namedCustomers[index];
                       return ListTile(
                         title: Text(customer.name),
                         subtitle: Text(customer.phone ?? ''),

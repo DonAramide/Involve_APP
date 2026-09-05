@@ -304,7 +304,7 @@ class ServicesDashboardPage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
         title: Text(job.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('ID: ${job.jobId} • Balance: ${CurrencyFormatter.formatWithSymbol(job.balance, symbol: currencySymbol)}'),
+        subtitle: Text('ID: ${job.jobId} • Balance: ${CurrencyFormatter.formatWithSymbol(job.remainingBalance, symbol: currencySymbol)}'),
         trailing: _buildStatusChip(job.status),
         onTap: () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => JobDetailsPage(job: job)));

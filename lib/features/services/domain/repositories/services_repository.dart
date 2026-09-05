@@ -4,6 +4,7 @@ import '../entities/service_payment.dart';
 import '../entities/service_customer.dart';
 import '../entities/service_analytics.dart';
 import '../entities/service_material.dart';
+import '../entities/service_description_format.dart';
 import '../../../stock/data/datasources/app_database.dart';
 
 abstract class IServicesRepository {
@@ -22,6 +23,10 @@ abstract class IServicesRepository {
   });
   /// Records a job payment. Customer Wallet / Wallet methods require enough
   /// customer credit (negative [ServiceCustomer.balance]) and debit the wallet.
+  ///
+  /// Amounts above the outstanding balance are not applied to the job. They are
+  /// credited to the customer wallet and the job is closed (status `ready`)
+  /// when the cost is fully covered. Fully paid jobs reject further payments.
   Future<void> addPayment({
     required String jobId,
     required double amount,
@@ -55,6 +60,8 @@ abstract class IServicesRepository {
     String? address,
     Uint8List? image,
   });
+  /// Shared counter customer for jobs without a named client.
+  Future<ServiceCustomer> ensureWalkInCustomer();
   Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName, {String? accountName});
   Future<void> updateCustomerBasicInfo({
     required String id,
@@ -100,4 +107,23 @@ abstract class IServicesRepository {
   Future<void> addServiceExpenseCategory(String name);
   Future<void> updateServiceExpenseCategory({required int id, required String name});
   Future<void> deleteServiceExpenseCategory(int id);
+
+  // Description formats (structured Create Job description)
+  Future<List<ServiceDescriptionFormatBundle>> getDescriptionFormatBundles();
+  Future<List<ServiceDescriptionFormatCategory>> getDescriptionFormatCategories();
+  Future<ServiceDescriptionFormatCategory> addDescriptionFormatCategory(String name);
+  Future<void> updateDescriptionFormatCategory({required int id, required String name});
+  Future<void> deleteDescriptionFormatCategory(int id);
+  Future<List<ServiceDescriptionFormatField>> getDescriptionFormatFields(int categoryId);
+  Future<void> addDescriptionFormatField({
+    required int categoryId,
+    required String name,
+    required String fieldType,
+  });
+  Future<void> updateDescriptionFormatField({
+    required int id,
+    required String name,
+    required String fieldType,
+  });
+  Future<void> deleteDescriptionFormatField(int id);
 }

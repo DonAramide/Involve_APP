@@ -84,6 +84,15 @@ class ServiceJob extends Equatable {
     );
   }
 
+  /// Outstanding amount to collect. Never negative.
+  double get remainingBalance => balance > 0 ? balance : 0.0;
+
+  bool get isFullyPaid => remainingBalance <= 1e-9;
+
+  /// Amount applied to the job cost (capped at [totalAmount]).
+  double get appliedAmountPaid =>
+      amountPaid > totalAmount ? totalAmount : (amountPaid < 0 ? 0.0 : amountPaid);
+
   @override
   List<Object?> get props => [
         id,

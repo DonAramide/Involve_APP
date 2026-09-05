@@ -44,11 +44,75 @@ class _ManageJobTitlesPageState extends State<ManageJobTitlesPage> {
 
   void _addTitle([String? text]) {
     final title = (text ?? _titleController.text).trim();
-    if (title.isNotEmpty) {
-      context.read<ServicesBloc>().add(AddServicePreset(title));
-      _titleController.clear();
-      FocusScope.of(context).unfocus();
+    if (title.isEmpty) {
+      _promptForJobType();
+      return;
     }
+    context.read<ServicesBloc>().add(AddServicePreset(title));
+    _titleController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
+  Future<void> _promptForJobType() async {
+    final inputCtrl = TextEditingController();
+    String? errorText;
+
+    final entered = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Enter Job Type'),
+              content: TextField(
+                controller: inputCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: 'Service Offering / Job Type',
+                  hintText: 'e.g. Consultation, Repair, Maintenance',
+                  errorText: errorText,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.design_services_outlined),
+                ),
+                onChanged: (_) {
+                  if (errorText != null) setDialogState(() => errorText = null);
+                },
+                onSubmitted: (value) {
+                  final title = value.trim();
+                  if (title.isEmpty) {
+                    setDialogState(() => errorText = 'Please enter a job type');
+                    return;
+                  }
+                  Navigator.pop(ctx, title);
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final title = inputCtrl.text.trim();
+                    if (title.isEmpty) {
+                      setDialogState(() => errorText = 'Please enter a job type');
+                      return;
+                    }
+                    Navigator.pop(ctx, title);
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    inputCtrl.dispose();
+    if (entered == null || entered.isEmpty || !mounted) return;
+    _addTitle(entered);
   }
 
   @override

@@ -22,6 +22,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
 import '../../domain/entities/service_payment.dart';
 import '../../domain/repositories/services_repository.dart';
+import '../../domain/utils/job_description_codec.dart';
 import '../templates/service_pdf_generator.dart';
 import 'service_payment_success_page.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
@@ -45,8 +46,13 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
   bool _isLoading = false;
 
   bool get _isCancelled => _job.status.toLowerCase() == 'cancelled';
+  bool get _isPaidOff => _job.isFullyPaid;
   bool get _canCancelJob =>
       !_isCancelled && _job.amountPaid <= 1e-9 && _payments.isEmpty;
+
+  ServiceJob get _jobForReceipt => _job.copyWith(
+        staffName: _assignedStaff?.staffName ?? _job.staffName,
+      );
 
   @override
   void initState() {
@@ -65,7 +71,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           await JobStaffStore.getAssignment(_job.jobId);
       if (mounted) {
         setState(() {
-          _job = updated;
+          _job = updated.copyWith(
+            staffName: assignment?.staffName ?? updated.staffName,
+          );
           _payments = pms;
           _assignedStaff = assignment;
           _isLoading = false;
@@ -239,7 +247,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(_job.description ?? 'No description provided', style: TextStyle(color: Colors.grey[600])),
+        _JobDescriptionView(raw: _job.description),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -273,6 +281,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           staffName: staff.name,
           assignedAt: DateTime.now(),
         );
+        _job = _job.copyWith(staffName: staff.name);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -284,7 +293,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
   }
 
   Widget _buildBalanceCard(BuildContext context, String symbol) {
-    final isPaid = _job.balance <= 0;
+    final isPaid = _job.isFullyPaid;
+    final remaining = _job.remainingBalance;
 
     return Container(
       width: double.infinity,
@@ -328,7 +338,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            CurrencyFormatter.formatWithSymbol(_job.balance, symbol: symbol),
+            CurrencyFormatter.formatWithSymbol(remaining, symbol: symbol),
             style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
@@ -336,9 +346,17 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSimpleStat('Total Cost', CurrencyFormatter.formatWithSymbol(_job.totalAmount, symbol: symbol)),
-              _buildSimpleStat('Paid', CurrencyFormatter.formatWithSymbol(_job.amountPaid, symbol: symbol)),
+              _buildSimpleStat('Paid', CurrencyFormatter.formatWithSymbol(_job.appliedAmountPaid, symbol: symbol)),
             ],
           ),
+          if (isPaid) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Job closed. Extra payments go to the customer wallet.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
         ],
       ),
     );
@@ -358,11 +376,16 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: _isCancelled
+            onPressed: _isCancelled || _isPaidOff
                 ? null
                 : () => _showPaymentDialog(context, symbol),
             icon: const Icon(Icons.add_card),
-            label: Text(_isCancelled ? 'Cancelled' : 'Add Payment', style: const TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(
+              _isCancelled
+                  ? 'Cancelled'
+                  : (_isPaidOff ? 'Paid in full' : 'Add Payment'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -393,7 +416,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       OutlinedButton.icon(
                         onPressed: () {
                           context.read<ServicesBloc>().add(PrintServiceReceiptEvent(
-                                job: _job,
+                                job: _jobForReceipt,
                                 payments: _payments,
                                 settings: settingsState.settings,
                               ));
@@ -416,7 +439,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       ElevatedButton.icon(
                         onPressed: () async {
                           await ServiceJobPdfGenerator.generateAndShow(
-                            job: _job,
+                            job: _jobForReceipt,
                             payments: _payments,
                             settings: settingsState.settings,
                           );
@@ -520,7 +543,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
   }
 
   Future<void> _showPaymentDialog(BuildContext context, String symbol) async {
-    final remaining = _job.balance > 0 ? _job.balance : 0.0;
+    if (_isPaidOff || _isCancelled) return;
+    final remaining = _job.remainingBalance;
     final amountCtrl = TextEditingController(
       text: remaining > 0 ? remaining.toStringAsFixed(0) : '',
     );
@@ -641,7 +665,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       children: [
                         const Text('Outstanding Balance:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         Text(
-                          CurrencyFormatter.formatWithSymbol(_job.balance, symbol: symbol),
+                          CurrencyFormatter.formatWithSymbol(remaining, symbol: symbol),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
                         ),
                       ],
@@ -705,6 +729,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                                   staffName: s.name,
                                   assignedAt: DateTime.now(),
                                 );
+                                _job = _job.copyWith(staffName: s.name);
                               });
                               setDialogState(() {});
                             }
@@ -740,8 +765,28 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                     },
                   ),
                   const SizedBox(height: 8),
-
-                  // Quick Amount Chips
+                  Text(
+                    currentCustomer != null
+                        ? 'If you enter more than the outstanding amount, the extra is saved to ${currentCustomer!.name}’s wallet.'
+                        : 'Pay the outstanding amount. To keep extra funds, assign a customer first.',
+                    style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                  ),
+                  if (enteredAmt > remaining + 1e-9 && remaining > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      selectedMethod == 'Customer Wallet'
+                          ? 'Wallet can only pay the outstanding ${CurrencyFormatter.formatWithSymbol(remaining, symbol: symbol)}.'
+                          : '${CurrencyFormatter.formatWithSymbol(enteredAmt - remaining, symbol: symbol)} will be added to the customer wallet.',
+                      style: TextStyle(
+                        color: selectedMethod == 'Customer Wallet'
+                            ? Colors.red.shade700
+                            : Colors.teal.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
                   if (remaining > 0)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -1104,6 +1149,17 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                                 setDialogState(() => amountError = 'Please enter a valid amount');
                                 return;
                               }
+                              if (amt > remaining + 1e-9 &&
+                                  selectedMethod == 'Customer Wallet') {
+                                setDialogState(() => amountError =
+                                    'Wallet can only pay the outstanding ${CurrencyFormatter.formatWithSymbol(remaining, symbol: symbol)}');
+                                return;
+                              }
+                              if (amt > remaining + 1e-9 && _job.customerId.isEmpty) {
+                                setDialogState(() => amountError =
+                                    'Assign a customer so extra funds can go to their wallet');
+                                return;
+                              }
 
                               String? finalRef = refCtrl.text.trim().isNotEmpty ? refCtrl.text.trim() : null;
 
@@ -1219,7 +1275,10 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => ServicePaymentSuccessPage(
-                                        job: updatedJob,
+                                        job: updatedJob.copyWith(
+                                          staffName: _assignedStaff?.staffName ??
+                                              updatedJob.staffName,
+                                        ),
                                         payment: allPayments.isNotEmpty
                                             ? allPayments.first
                                             : ServicePayment(
@@ -1231,6 +1290,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                                                 createdAt: DateTime.now(),
                                               ),
                                         payments: allPayments,
+                                        excessToWallet: amt > remaining
+                                            ? amt - remaining
+                                            : 0,
                                       ),
                                     ),
                                   );
@@ -1827,6 +1889,72 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
           Text(CurrencyFormatter.formatWithSymbol(amount, symbol: symbol), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
+    );
+  }
+}
+
+class _JobDescriptionView extends StatelessWidget {
+  final String? raw;
+  const _JobDescriptionView({this.raw});
+
+  @override
+  Widget build(BuildContext context) {
+    final view = JobDescriptionCodec.decode(raw);
+    if (view.isEmpty) {
+      return Text('No description provided', style: TextStyle(color: Colors.grey[600]));
+    }
+    if (!view.structured) {
+      return Text(view.plainText ?? '', style: TextStyle(color: Colors.grey[600]));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...view.sections.map((section) {
+          final items = section.items.where((i) => i.hasContent).toList();
+          if (items.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (section.category.trim().isNotEmpty)
+                  Text(
+                    section.category,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(item.label, style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                        ),
+                        const SizedBox(width: 8),
+                        if (item.type == 'checkbox')
+                          Icon(
+                            item.hasContent ? Icons.check_box : Icons.check_box_outline_blank,
+                            size: 18,
+                            color: item.hasContent ? Colors.green : Colors.grey,
+                          )
+                        else
+                          Text(
+                            item.displayValue,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (view.notes.trim().isNotEmpty)
+          Text(view.notes, style: TextStyle(color: Colors.grey[600])),
+      ],
     );
   }
 }

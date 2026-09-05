@@ -146,6 +146,28 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 _buildSwitchTile('Merge POS Receipt into Invoice', settings.mergePosReceipt, (val) => _update(context, settings.copyWith(mergePosReceipt: val))),
                 _buildSwitchTile('Enable Tenant Receipt Copy', settings.enableTenantReceiptCopy, (val) => _update(context, settings.copyWith(enableTenantReceiptCopy: val))),
                 _buildSwitchTile('Allow Give Change', settings.allowGiveChange, (val) => _update(context, settings.copyWith(allowGiveChange: val))),
+                if (settings.isServicesMode) ...[
+                  ListTile(
+                    leading: Icon(Icons.handyman_outlined, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Create Job sections'),
+                    subtitle: Text(
+                      [
+                        if (settings.servicesMaterialsEnabled) 'Materials',
+                        if (settings.servicesLaborEnabled) 'Labor',
+                        if (settings.servicesDescriptionFormatEnabled) 'Add category',
+                      ].isEmpty
+                          ? 'Materials, Labor, and Add category hidden on Create Job'
+                          : [
+                              if (settings.servicesMaterialsEnabled) 'Materials',
+                              if (settings.servicesLaborEnabled) 'Labor',
+                              if (settings.servicesDescriptionFormatEnabled) 'Add category',
+                            ].join(', ') +
+                              ' enabled on Create Job',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showMaterialsLaborDialog(context, settings),
+                  ),
+                ],
                 const Divider(),
 
                 // 4. Account Details
@@ -235,6 +257,85 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
   void _update(BuildContext context, AppSettings settings) {
     context.read<SettingsBloc>().add(UpdateAppSettings(settings));
+  }
+
+  void _showMaterialsLaborDialog(BuildContext context, AppSettings settings) {
+    var materials = settings.servicesMaterialsEnabled;
+    var labor = settings.servicesLaborEnabled;
+    var addCategory = settings.servicesDescriptionFormatEnabled;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Create Job sections'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Choose which sections appear when creating a service job.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: materials
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Materials', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Parts and items on Create Job'),
+                value: materials,
+                onChanged: (val) => setDialogState(() => materials = val ?? false),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: labor
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Labor', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Workmanship fee on Create Job'),
+                value: labor,
+                onChanged: (val) => setDialogState(() => labor = val ?? false),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: addCategory
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Add category', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Description format tables on Create Job'),
+                value: addCategory,
+                onChanged: (val) => setDialogState(() => addCategory = val ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _update(
+                  context,
+                  settings.copyWith(
+                    servicesMaterialsEnabled: materials,
+                    servicesLaborEnabled: labor,
+                    servicesDescriptionFormatEnabled: addCategory,
+                  ),
+                );
+              },
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSectionHeader(BuildContext context, String title, {bool isPro = false}) {

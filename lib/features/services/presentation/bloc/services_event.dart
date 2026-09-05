@@ -97,6 +97,10 @@ class CreateServiceCustomer extends ServicesEvent {
   List<Object?> get props => [name, phone, email, address, image];
 }
 
+class EnsureWalkInCustomer extends ServicesEvent {
+  const EnsureWalkInCustomer();
+}
+
 class ExportServicesData extends ServicesEvent {
   const ExportServicesData();
 }

@@ -7,6 +7,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_material.dart';
 import '../../domain/entities/service_job.dart';
 import '../../data/services/services_backup_service.dart';
+import '../utils/job_staff_store.dart';
 
 class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   final GetJobs getJobs;
@@ -119,6 +120,22 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
       }
     });
 
+    on<EnsureWalkInCustomer>((event, emit) async {
+      try {
+        final customer = await getJobs.repository.ensureWalkInCustomer();
+        final customers = List<ServiceCustomer>.from(state.customers);
+        if (!customers.any((c) => c.id == customer.id)) {
+          customers.insert(0, customer);
+        }
+        emit(state.copyWith(
+          customers: customers,
+          successMessage: 'Walk-in customer selected',
+        ));
+      } catch (e) {
+        emit(state.copyWith(errorMessage: e.toString()));
+      }
+    });
+
     on<ExportServicesData>((event, emit) async {
       try {
         await backupService.exportToJson();
@@ -131,8 +148,12 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<PrintServiceReceiptEvent>((event, emit) async {
       try {
         final payments = await getJobPayments(event.job.id);
+        final assignment = await JobStaffStore.getAssignment(event.job.id) ??
+            await JobStaffStore.getAssignment(event.job.jobId);
         await printJobReceipt(
-          job: event.job,
+          job: event.job.copyWith(
+            staffName: assignment?.staffName ?? event.job.staffName,
+          ),
           settings: event.settings,
           payments: payments,
         );

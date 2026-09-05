@@ -1,5 +1,6 @@
 // src/middleware/rbac.middleware.ts
 import { Request, Response, NextFunction } from 'express';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 const parseRoles = (roleData: any): string[] => {
   if (typeof roleData === 'string') {
@@ -100,33 +101,12 @@ export const checkRole = (allowedRoles: string[]) => {
  * Tenant Admin/Staff can only access their specific tenant.
  */
 export const checkTenantAccess = (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
-  
-  if (!user) return res.status(401).json({ error: 'Unauthenticated' });
-
-  const userRoles = parseRoles(user.role);
-
-  // 1. Super Admin Bypass
-  if (userRoles.includes('super_admin')) {
+  try {
+    (req as any).effectiveTenantId = resolveAuthoritativeTenantId(req);
     return next();
+  } catch (err: any) {
+    return res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
   }
-
-  // 2. Extract TenantId from Request (Check Params first, then Query, then Body)
-  const targetTenantId = req.params.tenantId || req.query.tenantId || req.body.tenantId;
-
-  if (!targetTenantId) {
-    // If no specific tenant is targetted, default to the user's tenant context
-    (req as any).effectiveTenantId = user.tenantId;
-    return next();
-  }
-
-  // 3. Strict Comparison
-  if (user.tenantId !== targetTenantId) {
-    return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
-  }
-
-  (req as any).effectiveTenantId = user.tenantId;
-  next();
 };
 
 /**

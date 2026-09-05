@@ -1051,6 +1051,13 @@ const executeLoginPass = async () => {
         if (err.response?.status === 401) {
           errorMessage.value = 'Invalid user name or password'
         } else if (
+          err.response?.data?.error === 'UPGRADE_REQUIRED' ||
+          err.response?.data?.code === 'UPGRADE_REQUIRED'
+        ) {
+          errorMessage.value =
+            err.response?.data?.message ||
+            'You need to upgrade to Standard or Premium to have access to the web.'
+        } else if (
           err.response?.data?.code === 'WRONG_LOGIN_PORTAL' ||
           err.response?.data?.error === 'WRONG_LOGIN_PORTAL'
         ) {
@@ -1060,7 +1067,7 @@ const executeLoginPass = async () => {
               ? 'This account belongs to a tenant workspace. Use /tenant/login.'
               : 'This account belongs to platform Admin / Ops. Use /admin/login.')
         } else {
-          errorMessage.value = err.response?.data?.error || err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
+          errorMessage.value = err.response?.data?.message || err.response?.data?.error || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
         }
       }
     }

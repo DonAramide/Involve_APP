@@ -9,6 +9,7 @@ import '../../domain/entities/service_payment.dart';
 import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_analytics.dart';
 import '../../domain/entities/service_material.dart';
+import '../../domain/entities/service_description_format.dart';
 import '../../domain/repositories/services_repository.dart';
 import '../../presentation/utils/job_staff_store.dart';
 
@@ -20,6 +21,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
 
   @override
   Future<List<ServiceJob>> getJobs({String? status, String? query}) async {
+    await _normalizePaidJobs();
     final joinedQuery = db.select(db.serviceJobs).join([
       leftOuterJoin(db.customers, db.customers.id.equalsExp(db.serviceJobs.customerId)),
     ]);
@@ -49,6 +51,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
 
   @override
   Future<ServiceJob> getJobById(String id) async {
+    await _normalizePaidJobs(jobId: id);
     final row = await (db.select(db.serviceJobs).join([
       leftOuterJoin(db.customers, db.customers.id.equalsExp(db.serviceJobs.customerId)),
     ])..where(db.serviceJobs.id.equals(id))).getSingle();
@@ -139,6 +142,130 @@ class ServicesRepositoryImpl implements IServicesRepository {
   double _walletCreditFromBalance(double balance) =>
       balance < 0 ? -balance : 0.0;
 
+  double _outstandingOnJob(ServiceJobTable job) {
+    final remaining = job.totalAmount - job.amountPaid;
+    return remaining > 0 ? remaining : 0.0;
+  }
+
+  /// Close open jobs once the cost is covered. Does not reopen delivered/cancelled.
+  String? _paidOffStatus(String current) {
+    switch (current.trim().toLowerCase()) {
+      case 'cancelled':
+      case 'delivered':
+      case 'ready':
+        return null;
+      default:
+        return 'ready';
+    }
+  }
+
+  Future<Map<String, dynamic>?> _creditCustomerWalletTx({
+    required String customerId,
+    required double amount,
+    required String reference,
+    required String source,
+    String? jobId,
+  }) async {
+    if (amount <= 1e-9) return null;
+    final customer = await (db.select(db.customers)
+          ..where((t) => t.id.equals(customerId)))
+        .getSingleOrNull();
+    if (customer == null) return null;
+
+    final balanceBefore = customer.balance;
+    final balanceAfter = balanceBefore - amount;
+    await db.customUpdate(
+      'UPDATE customers SET balance = balance - ?, sync_status = ? WHERE id = ?',
+      variables: [
+        Variable.withReal(amount),
+        Variable.withString('pending'),
+        Variable.withString(customer.id),
+      ],
+      updates: {db.customers},
+    );
+
+    return {
+      'id': _uuid.v4(),
+      'customerId': customer.id,
+      'customerName': customer.name,
+      'amount': amount,
+      'type': 'CREDIT',
+      'reference': reference,
+      'status': 'SUCCESS',
+      'createdAt': DateTime.now().toIso8601String(),
+      'source': source,
+      'jobId': jobId,
+      'balanceBefore': balanceBefore,
+      'balanceAfter': balanceAfter,
+    };
+  }
+
+  bool _jobNeedsPaymentNormalize(ServiceJobTable job) {
+    if (job.status.toLowerCase() == 'cancelled') return false;
+    if (job.amountPaid > job.totalAmount + 1e-9) return true;
+    if (job.balance < -1e-9) return true;
+    final fullyPaid = job.amountPaid + 1e-9 >= job.totalAmount;
+    if (!fullyPaid) return false;
+    final status = job.status.toLowerCase();
+    return status == 'pending' || status == 'in_progress';
+  }
+
+  Future<Map<String, dynamic>?> _normalizeOnePaidJob(ServiceJobTable job) async {
+    if (!_jobNeedsPaymentNormalize(job)) return null;
+
+    final excess = job.amountPaid - job.totalAmount;
+    final cappedPaid =
+        job.amountPaid > job.totalAmount ? job.totalAmount : job.amountPaid;
+    final nextStatus = _paidOffStatus(job.status);
+
+    await (db.update(db.serviceJobs)..where((t) => t.id.equals(job.id))).write(
+      ServiceJobsCompanion(
+        amountPaid: Value(cappedPaid),
+        balance: const Value(0.0),
+        status: Value(nextStatus ?? job.status),
+        syncStatus: const Value('pending'),
+      ),
+    );
+
+    if (excess <= 1e-9 || job.customerId.isEmpty) return null;
+    return _creditCustomerWalletTx(
+      customerId: job.customerId,
+      amount: excess,
+      reference: 'JOB-OVERPAY-SETTLE-${job.id}',
+      source: 'job_overpayment',
+      jobId: job.id,
+    );
+  }
+
+  /// Caps overpaid jobs, moves excess to the customer wallet, and closes paid jobs.
+  Future<void> _normalizePaidJobs({String? jobId}) async {
+    final ledgerEntries = <Map<String, dynamic>>[];
+
+    await db.transaction(() async {
+      final jobs = jobId != null
+          ? await (db.select(db.serviceJobs)..where((t) => t.id.equals(jobId)))
+              .get()
+          : await db.select(db.serviceJobs).get();
+
+      for (final job in jobs) {
+        final entry = await _normalizeOnePaidJob(job);
+        if (entry != null) ledgerEntries.add(entry);
+      }
+    });
+
+    if (ledgerEntries.isEmpty) return;
+    final ledger = await _loadFundLedger();
+    for (final entry in ledgerEntries) {
+      final ref = entry['reference']?.toString();
+      if (ref != null &&
+          ledger.any((e) => e['reference']?.toString() == ref)) {
+        continue;
+      }
+      ledger.insert(0, entry);
+    }
+    await _saveFundLedger(ledger);
+  }
+
   @override
   Future<void> addPayment({
     required String jobId,
@@ -146,14 +273,42 @@ class ServicesRepositoryImpl implements IServicesRepository {
     required String method,
     String? reference,
   }) async {
-    Map<String, dynamic>? walletLedgerEntry;
+    if (amount <= 1e-9) {
+      throw Exception('Enter a payment amount greater than zero.');
+    }
+
+    final ledgerEntries = <Map<String, dynamic>>[];
 
     await db.transaction(() async {
-      final job = await (db.select(db.serviceJobs)..where((t) => t.id.equals(jobId))).getSingle();
+      final job =
+          await (db.select(db.serviceJobs)..where((t) => t.id.equals(jobId)))
+              .getSingle();
       if (job.status.toLowerCase() == 'cancelled') {
         throw Exception('This job was cancelled. Payment cannot be recorded.');
       }
+
+      final remaining = _outstandingOnJob(job);
+      if (remaining <= 1e-9) {
+        throw Exception(
+            'This job is already paid in full. Extra funds cannot be added to the job.');
+      }
+
+      var tendered = amount;
       final isWallet = _isWalletPaymentMethod(method);
+      if (isWallet && tendered > remaining + 1e-9) {
+        throw Exception(
+            'Customer Wallet can only cover the outstanding ₦${remaining.toStringAsFixed(2)}. '
+            'Use cash, POS, or transfer so extra funds can go to the customer wallet.');
+      }
+
+      final appliedToJob = tendered < remaining ? tendered : remaining;
+      final excess = tendered - appliedToJob;
+
+      if (excess > 1e-9 && job.customerId.isEmpty) {
+        throw Exception(
+            'This payment is more than the outstanding ₦${remaining.toStringAsFixed(2)}. '
+            'Assign a customer so the extra can go to their wallet, or enter the outstanding amount.');
+      }
 
       if (isWallet) {
         if (job.customerId.isEmpty) {
@@ -167,29 +322,29 @@ class ServicesRepositoryImpl implements IServicesRepository {
           throw Exception('Selected customer was not found.');
         }
         final availableCredit = _walletCreditFromBalance(customer.balance);
-        if (availableCredit + 1e-9 < amount) {
+        if (availableCredit + 1e-9 < appliedToJob) {
           throw Exception(
               'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
-              'Payment: ₦${amount.toStringAsFixed(2)}.');
+              'Payment: ₦${appliedToJob.toStringAsFixed(2)}.');
         }
 
         final balanceBefore = customer.balance;
-        final balanceAfter = balanceBefore + amount;
+        final balanceAfter = balanceBefore + appliedToJob;
         await db.customUpdate(
           'UPDATE customers SET balance = balance + ?, sync_status = ? WHERE id = ?',
           variables: [
-            Variable.withReal(amount),
+            Variable.withReal(appliedToJob),
             Variable.withString('pending'),
             Variable.withString(customer.id),
           ],
           updates: {db.customers},
         );
 
-        walletLedgerEntry = {
+        ledgerEntries.add({
           'id': _uuid.v4(),
           'customerId': customer.id,
           'customerName': customer.name,
-          'amount': amount,
+          'amount': appliedToJob,
           'type': 'DEBIT',
           'reference': reference ?? 'JOB-$jobId',
           'status': 'SUCCESS',
@@ -198,35 +353,53 @@ class ServicesRepositoryImpl implements IServicesRepository {
           'jobId': jobId,
           'balanceBefore': balanceBefore,
           'balanceAfter': balanceAfter,
-        };
+        });
       }
 
       await db.into(db.servicePayments).insert(ServicePaymentsCompanion.insert(
         id: _uuid.v4(),
         jobId: jobId,
-        amount: amount,
+        amount: tendered,
         method: method,
         reference: Value(reference),
         createdAt: Value(DateTime.now()),
       ));
 
-      final newPaid = job.amountPaid + amount;
+      final newPaid = job.amountPaid + appliedToJob;
       final newBalance = job.totalAmount - newPaid;
+      final closedStatus = newBalance <= 1e-9 ? _paidOffStatus(job.status) : null;
 
       await (db.update(db.serviceJobs)..where((t) => t.id.equals(jobId))).write(
         ServiceJobsCompanion(
           amountPaid: Value(newPaid),
-          balance: Value(newBalance),
+          balance: Value(newBalance < 0 ? 0.0 : newBalance),
+          status: closedStatus != null ? Value(closedStatus) : const Value.absent(),
+          syncStatus: const Value('pending'),
         ),
       );
+
+      if (excess > 1e-9) {
+        final credit = await _creditCustomerWalletTx(
+          customerId: job.customerId,
+          amount: excess,
+          reference: reference ?? 'JOB-OVERPAY-$jobId-${DateTime.now().millisecondsSinceEpoch}',
+          source: 'job_overpayment',
+          jobId: jobId,
+        );
+        if (credit == null) {
+          throw Exception(
+              'Could not credit the extra ₦${excess.toStringAsFixed(2)} to the customer wallet.');
+        }
+        ledgerEntries.add(credit);
+      }
     });
 
-    final debitEntry = walletLedgerEntry;
-    if (debitEntry != null) {
-      final ledger = await _loadFundLedger();
-      ledger.insert(0, debitEntry);
-      await _saveFundLedger(ledger);
+    if (ledgerEntries.isEmpty) return;
+    final ledger = await _loadFundLedger();
+    for (final entry in ledgerEntries) {
+      ledger.insert(0, entry);
     }
+    await _saveFundLedger(ledger);
   }
 
   @override
@@ -459,6 +632,17 @@ class ServicesRepositoryImpl implements IServicesRepository {
   }
 
   @override
+  Future<ServiceCustomer> ensureWalkInCustomer() async {
+    final rows = await db.select(db.customers).get();
+    for (final row in rows) {
+      if (ServiceCustomer.isWalkInName(row.name)) {
+        return _mapCustomer(row);
+      }
+    }
+    return createCustomer(name: ServiceCustomer.walkInName);
+  }
+
+  @override
   Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName, {String? accountName}) async {
     await (db.update(db.customers)..where((t) => t.id.equals(customerId))).write(
       CustomersCompanion(
@@ -661,6 +845,143 @@ class ServicesRepositoryImpl implements IServicesRepository {
   @override
   Future<void> deleteServiceExpenseCategory(int id) async {
     await (db.delete(db.serviceExpenseCategories)..where((t) => t.id.equals(id))).go();
+  }
+
+  ServiceDescriptionFormatCategory _mapDescriptionCategory(
+      ServiceDescriptionFormatCategoryTable row) {
+    return ServiceDescriptionFormatCategory(id: row.id, name: row.name);
+  }
+
+  ServiceDescriptionFormatField _mapDescriptionField(
+      ServiceDescriptionFormatFieldTable row) {
+    return ServiceDescriptionFormatField(
+      id: row.id,
+      categoryId: row.categoryId,
+      name: row.name,
+      fieldType: row.fieldType,
+      sortOrder: row.sortOrder,
+    );
+  }
+
+  @override
+  Future<List<ServiceDescriptionFormatBundle>> getDescriptionFormatBundles() async {
+    final categories = await (db.select(db.serviceDescriptionFormatCategories)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+    final fields = await (db.select(db.serviceDescriptionFormatFields)
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+    return categories
+        .map((c) => ServiceDescriptionFormatBundle(
+              category: _mapDescriptionCategory(c),
+              fields: fields
+                  .where((f) => f.categoryId == c.id)
+                  .map(_mapDescriptionField)
+                  .toList(),
+            ))
+        .toList();
+  }
+
+  @override
+  Future<List<ServiceDescriptionFormatCategory>> getDescriptionFormatCategories() async {
+    final rows = await (db.select(db.serviceDescriptionFormatCategories)
+          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+        .get();
+    return rows.map(_mapDescriptionCategory).toList();
+  }
+
+  @override
+  Future<ServiceDescriptionFormatCategory> addDescriptionFormatCategory(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('Please enter a category name.');
+    }
+    final id = await db.into(db.serviceDescriptionFormatCategories).insert(
+          ServiceDescriptionFormatCategoriesCompanion.insert(name: trimmed),
+        );
+    return ServiceDescriptionFormatCategory(id: id, name: trimmed);
+  }
+
+  @override
+  Future<void> updateDescriptionFormatCategory({required int id, required String name}) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('Please enter a category name.');
+    }
+    await (db.update(db.serviceDescriptionFormatCategories)..where((t) => t.id.equals(id)))
+        .write(ServiceDescriptionFormatCategoriesCompanion(name: Value(trimmed)));
+  }
+
+  @override
+  Future<void> deleteDescriptionFormatCategory(int id) async {
+    await (db.delete(db.serviceDescriptionFormatFields)
+          ..where((t) => t.categoryId.equals(id)))
+        .go();
+    await (db.delete(db.serviceDescriptionFormatCategories)..where((t) => t.id.equals(id)))
+        .go();
+  }
+
+  @override
+  Future<List<ServiceDescriptionFormatField>> getDescriptionFormatFields(int categoryId) async {
+    final rows = await (db.select(db.serviceDescriptionFormatFields)
+          ..where((t) => t.categoryId.equals(categoryId))
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+    return rows.map(_mapDescriptionField).toList();
+  }
+
+  @override
+  Future<void> addDescriptionFormatField({
+    required int categoryId,
+    required String name,
+    required String fieldType,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('Please enter a format name.');
+    }
+    final type = DescriptionFieldType.isValid(fieldType)
+        ? fieldType
+        : DescriptionFieldType.text;
+    final existing = await (db.select(db.serviceDescriptionFormatFields)
+          ..where((t) => t.categoryId.equals(categoryId)))
+        .get();
+    final nextOrder = existing.isEmpty
+        ? 0
+        : existing.map((e) => e.sortOrder).reduce((a, b) => a > b ? a : b) + 1;
+    await db.into(db.serviceDescriptionFormatFields).insert(
+          ServiceDescriptionFormatFieldsCompanion.insert(
+            categoryId: categoryId,
+            name: trimmed,
+            fieldType: Value(type),
+            sortOrder: Value(nextOrder),
+          ),
+        );
+  }
+
+  @override
+  Future<void> updateDescriptionFormatField({
+    required int id,
+    required String name,
+    required String fieldType,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('Please enter a format name.');
+    }
+    final type = DescriptionFieldType.isValid(fieldType)
+        ? fieldType
+        : DescriptionFieldType.text;
+    await (db.update(db.serviceDescriptionFormatFields)..where((t) => t.id.equals(id)))
+        .write(ServiceDescriptionFormatFieldsCompanion(
+          name: Value(trimmed),
+          fieldType: Value(type),
+        ));
+  }
+
+  @override
+  Future<void> deleteDescriptionFormatField(int id) async {
+    await (db.delete(db.serviceDescriptionFormatFields)..where((t) => t.id.equals(id))).go();
   }
 
   @override

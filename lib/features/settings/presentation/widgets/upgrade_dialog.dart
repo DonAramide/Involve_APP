@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
+import '../../domain/entities/user_plan.dart';
 
 class UpgradeDialog extends StatelessWidget {
   final String? title;
@@ -20,15 +21,16 @@ class UpgradeDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(message ?? 'This feature is available on all plans except Basic and Free Tier.'),
+          Text(
+            message ??
+                'Choose a plan to unlock online features and multi-device sync.',
+          ),
           const SizedBox(height: 16),
-          const Text('Unlock these benefits:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('Plans:', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const _BenefitItem('Unlimited Staff & Staff Bank/VA Accounts'),
-          const _BenefitItem('Daily & Hourly Billing'),
-          const _BenefitItem('Hospitality & Event Support'),
-          const _BenefitItem('Advanced Receipt Formats'),
-          const _BenefitItem('Priority Support'),
+          const _BenefitItem(UserPlan.basicSummary),
+          const _BenefitItem(UserPlan.standardSummary),
+          const _BenefitItem(UserPlan.premiumSummary),
         ],
       ),
       actions: [
@@ -42,7 +44,7 @@ class UpgradeDialog extends StatelessWidget {
             foregroundColor: Colors.black,
           ),
           onPressed: () {
-            Navigator.pop(context); // Close dialog
+            Navigator.pop(context);
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ActivationPage()),
@@ -64,10 +66,11 @@ class _BenefitItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.check_circle, color: Colors.green, size: 20),
           const SizedBox(width: 8),
-          Text(text),
+          Expanded(child: Text(text)),
         ],
       ),
     );

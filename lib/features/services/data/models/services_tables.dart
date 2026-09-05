@@ -115,3 +115,21 @@ class ServiceExpenseCategories extends Table {
   TextColumn get name => text().unique()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
+
+@DataClassName('ServiceDescriptionFormatCategoryTable')
+class ServiceDescriptionFormatCategories extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text().unique()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+@DataClassName('ServiceDescriptionFormatFieldTable')
+class ServiceDescriptionFormatFields extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get categoryId =>
+      integer().references(ServiceDescriptionFormatCategories, #id)();
+  TextColumn get name => text()();
+  TextColumn get fieldType => text().withDefault(const Constant('text'))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}

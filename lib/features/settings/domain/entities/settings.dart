@@ -72,6 +72,12 @@ class AppSettings extends Equatable {
   final bool warrantyEnabled;
   final bool allowGiveChange;
   final bool showNetworkIndicator;
+  /// When true, Create Job can include a materials / parts breakdown.
+  final bool servicesMaterialsEnabled;
+  /// When true, Create Job can include a workmanship / labor fee.
+  final bool servicesLaborEnabled;
+  /// When true, Create Job shows Add category / description format tables.
+  final bool servicesDescriptionFormatEnabled;
 
   /// Seed/demo values that must never be shown as a real business address.
   static bool isPlaceholderAddress(String? value) {
@@ -143,6 +149,9 @@ class AppSettings extends Equatable {
     this.warrantyEnabled = false,
     this.allowGiveChange = false,
     this.showNetworkIndicator = true,
+    this.servicesMaterialsEnabled = true,
+    this.servicesLaborEnabled = true,
+    this.servicesDescriptionFormatEnabled = true,
   });
 
   AppSettings copyWith({
@@ -207,6 +216,9 @@ class AppSettings extends Equatable {
     bool? warrantyEnabled,
     bool? allowGiveChange,
     bool? showNetworkIndicator,
+    bool? servicesMaterialsEnabled,
+    bool? servicesLaborEnabled,
+    bool? servicesDescriptionFormatEnabled,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -270,6 +282,11 @@ class AppSettings extends Equatable {
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
       allowGiveChange: allowGiveChange ?? this.allowGiveChange,
       showNetworkIndicator: showNetworkIndicator ?? this.showNetworkIndicator,
+      servicesMaterialsEnabled:
+          servicesMaterialsEnabled ?? this.servicesMaterialsEnabled,
+      servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
+          this.servicesDescriptionFormatEnabled,
     );
   }
 
@@ -345,5 +362,8 @@ class AppSettings extends Equatable {
         warrantyEnabled,
         allowGiveChange,
         showNetworkIndicator,
+        servicesMaterialsEnabled,
+        servicesLaborEnabled,
+        servicesDescriptionFormatEnabled,
       ];
 }

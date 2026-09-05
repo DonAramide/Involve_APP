@@ -228,37 +228,47 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                                         ),
                                       ],
                                     ),
-                                    children: catMaterials.isEmpty
-                                        ? [
-                                            ListTile(
-                                              title: Text('No items in $cat', style: TextStyle(color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
-                                              trailing: TextButton.icon(
-                                                onPressed: () => _showMaterialDialog(context, initialCategory: cat),
-                                                icon: const Icon(Icons.add, size: 16),
-                                                label: const Text('Add Item'),
+                                    children: [
+                                      if (catMaterials.isEmpty)
+                                        ListTile(
+                                          title: Text(
+                                            'No items in $cat',
+                                            style: TextStyle(color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                                          ),
+                                        )
+                                      else
+                                        ...catMaterials.map((m) => ListTile(
+                                              leading: _materialAvatar(context, m),
+                                              title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                              subtitle: Text('Default: ${CurrencyFormatter.formatWithSymbol(m.defaultPrice)}'),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+                                                    tooltip: 'Edit',
+                                                    onPressed: () => _showMaterialDialog(context, material: m),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                                    tooltip: 'Delete',
+                                                    onPressed: () => _confirmDelete(context, m),
+                                                  ),
+                                                ],
                                               ),
-                                            )
-                                          ]
-                                        : catMaterials.map((m) => ListTile(
-                                            leading: _materialAvatar(context, m),
-                                            title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                            subtitle: Text('Default: ${CurrencyFormatter.formatWithSymbol(m.defaultPrice)}'),
-                                            trailing: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit_outlined, color: Colors.blue),
-                                                  tooltip: 'Edit',
-                                                  onPressed: () => _showMaterialDialog(context, material: m),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                                  tooltip: 'Delete',
-                                                  onPressed: () => _confirmDelete(context, m),
-                                                ),
-                                              ],
-                                            ),
-                                          )).toList(),
+                                            )),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                          child: TextButton.icon(
+                                            onPressed: () => _showMaterialDialog(context, initialCategory: cat),
+                                            icon: const Icon(Icons.add, size: 16),
+                                            label: const Text('Add Item'),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 );
                               },
@@ -272,29 +282,53 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
     );
   }
 
-  void _showMaterialDialog(BuildContext context, {ServiceMaterial? material, String? initialCategory}) {
-    final state = context.read<ServicesBloc>().state;
+  void _showMaterialDialog(
+    BuildContext pageContext, {
+    ServiceMaterial? material,
+    String? initialCategory,
+    _MaterialDraft? draft,
+  }) {
+    final state = pageContext.read<ServicesBloc>().state;
     final isEdit = material != null;
 
-    final nameCtrl = TextEditingController(text: material?.name ?? '');
+    final nameCtrl = TextEditingController(text: draft?.name ?? material?.name ?? '');
     final priceCtrl = TextEditingController(
-      text: material != null ? (material.defaultPrice == 0.0 ? '' : material.defaultPrice.toStringAsFixed(0)) : '',
+      text: draft?.priceText ??
+          (material != null
+              ? (material.defaultPrice == 0.0 ? '' : material.defaultPrice.toStringAsFixed(0))
+              : ''),
     );
-    final customCatCtrl = TextEditingController();
+    final customCatCtrl = TextEditingController(text: draft?.customCategory ?? '');
 
-    // Determine starting category
     final availableCategories = state.categories.where((c) => c.trim().isNotEmpty).toList();
     if (!availableCategories.contains('General')) {
       availableCategories.add('General');
     }
 
-    String selectedCategory = material?.category ?? initialCategory ?? (availableCategories.isNotEmpty ? availableCategories.first : 'General');
-    bool isAddingNewCategory = false;
+    String selectedCategory = draft?.selectedCategory ??
+        material?.category ??
+        initialCategory ??
+        (availableCategories.isNotEmpty ? availableCategories.first : 'General');
+    bool isAddingNewCategory = draft?.isAddingNewCategory ?? false;
     String? nameError;
     String? priceError;
-    Uint8List? imageBytes = material?.image;
+    Uint8List? imageBytes = draft?.imageBytes ?? material?.image;
 
-    Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
+    _MaterialDraft captureDraft() => _MaterialDraft(
+          name: nameCtrl.text,
+          priceText: priceCtrl.text,
+          selectedCategory: selectedCategory,
+          isAddingNewCategory: isAddingNewCategory,
+          customCategory: customCatCtrl.text,
+          imageBytes: imageBytes,
+        );
+
+    Future<void> pickImage(BuildContext dialogCtx, ImageSource source) async {
+      final captured = captureDraft();
+      Navigator.of(dialogCtx).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
+
       try {
         final picker = ImagePicker();
         final file = await picker.pickImage(
@@ -302,31 +336,49 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
           maxWidth: 800,
           imageQuality: 80,
         );
-        if (file == null) return;
-        final compressed = LogoCompressor.compress(
-          await file.readAsBytes(),
-          maxDimension: 512,
-          quality: 80,
+        if (!mounted) return;
+
+        var nextImage = captured.imageBytes;
+        if (file != null) {
+          nextImage = LogoCompressor.compress(
+            await file.readAsBytes(),
+            maxDimension: 512,
+            quality: 80,
+          ) ??
+              nextImage;
+        }
+
+        if (!mounted) return;
+        _showMaterialDialog(
+          this.context,
+          material: material,
+          initialCategory: initialCategory,
+          draft: captured.copyWith(imageBytes: nextImage),
         );
-        setDialogState(() => imageBytes = compressed);
       } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(
             content: Text(
               'Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}. $e',
             ),
           ),
         );
+        _showMaterialDialog(
+          this.context,
+          material: material,
+          initialCategory: initialCategory,
+          draft: captured,
+        );
       }
     }
 
-    Widget photoSourceButtons(void Function(void Function()) setDialogState) {
+    Widget photoSourceButtons(BuildContext dialogCtx) {
       return Row(
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => pickImage(ImageSource.camera, setDialogState),
+              onPressed: () => pickImage(dialogCtx, ImageSource.camera),
               icon: const Icon(Icons.camera_alt_outlined),
               label: const Text('Take photo'),
             ),
@@ -334,7 +386,7 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
           const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => pickImage(ImageSource.gallery, setDialogState),
+              onPressed: () => pickImage(dialogCtx, ImageSource.gallery),
               icon: const Icon(Icons.photo_library_outlined),
               label: const Text('Gallery'),
             ),
@@ -344,9 +396,9 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
     }
 
     showDialog(
-      context: context,
+      context: pageContext,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) {
+        builder: (dialogInnerCtx, setDialogState) {
           return AlertDialog(
             title: Text(isEdit ? 'Edit Material / Part' : 'Add Material / Part'),
             content: SingleChildScrollView(
@@ -370,15 +422,19 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                   const SizedBox(height: 14),
                   if (!isAddingNewCategory) ...[
                     DropdownButtonFormField<String>(
-                      value: availableCategories.contains(selectedCategory) ? selectedCategory : (availableCategories.isNotEmpty ? availableCategories.first : null),
+                      value: availableCategories.contains(selectedCategory)
+                          ? selectedCategory
+                          : (availableCategories.isNotEmpty ? availableCategories.first : null),
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
                       ),
-                      items: availableCategories.map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c),
-                      )).toList(),
+                      items: availableCategories
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c),
+                              ))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) {
                           setDialogState(() => selectedCategory = v);
@@ -426,11 +482,20 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            imageBytes!,
+                          child: SizedBox(
                             height: 140,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
+                            width: 280,
+                            child: Image.memory(
+                              imageBytes!,
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) => ColoredBox(
+                                color: Theme.of(dialogInnerCtx).colorScheme.surfaceContainerHighest,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         IconButton(
@@ -445,10 +510,10 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                       ],
                     )
                   else
-                    photoSourceButtons(setDialogState),
+                    photoSourceButtons(dialogCtx),
                   if (imageBytes != null) ...[
                     const SizedBox(height: 8),
-                    photoSourceButtons(setDialogState),
+                    photoSourceButtons(dialogCtx),
                   ],
                   const SizedBox(height: 10),
                   TextField(
@@ -477,7 +542,7 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                   final name = nameCtrl.text.trim();
                   final rawPrice = priceCtrl.text.trim();
                   final price = double.tryParse(rawPrice) ?? 0.0;
-                  
+
                   final category = isAddingNewCategory
                       ? (customCatCtrl.text.trim().isNotEmpty ? customCatCtrl.text.trim() : 'General')
                       : selectedCategory.trim();
@@ -488,20 +553,20 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
                   }
 
                   if (isEdit) {
-                    context.read<ServicesBloc>().add(UpdateServiceMaterial(
-                      id: material.id,
-                      name: name,
-                      category: category,
-                      price: price,
-                      image: imageBytes,
-                    ));
+                    pageContext.read<ServicesBloc>().add(UpdateServiceMaterial(
+                          id: material.id,
+                          name: name,
+                          category: category,
+                          price: price,
+                          image: imageBytes,
+                        ));
                   } else {
-                    context.read<ServicesBloc>().add(AddServiceMaterial(
-                      name: name,
-                      category: category,
-                      price: price,
-                      image: imageBytes,
-                    ));
+                    pageContext.read<ServicesBloc>().add(AddServiceMaterial(
+                          name: name,
+                          category: category,
+                          price: price,
+                          image: imageBytes,
+                        ));
                   }
 
                   Navigator.pop(dialogCtx);
@@ -577,6 +642,35 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MaterialDraft {
+  const _MaterialDraft({
+    required this.name,
+    required this.priceText,
+    required this.selectedCategory,
+    required this.isAddingNewCategory,
+    required this.customCategory,
+    required this.imageBytes,
+  });
+
+  final String name;
+  final String priceText;
+  final String selectedCategory;
+  final bool isAddingNewCategory;
+  final String customCategory;
+  final Uint8List? imageBytes;
+
+  _MaterialDraft copyWith({Uint8List? imageBytes}) {
+    return _MaterialDraft(
+      name: name,
+      priceText: priceText,
+      selectedCategory: selectedCategory,
+      isAddingNewCategory: isAddingNewCategory,
+      customCategory: customCategory,
+      imageBytes: imageBytes,
     );
   }
 }

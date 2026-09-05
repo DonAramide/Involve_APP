@@ -322,13 +322,26 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildActivationBanner(BuildContext context, SettingsState state) {
     final isLocked = state.isBusinessLocked;
     final plan = state.userPlan;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final bannerBg = isLocked
+        ? (isDark ? Colors.blue.shade900.withValues(alpha: 0.45) : Colors.blue[50])
+        : (isDark ? Colors.orange.shade900.withValues(alpha: 0.45) : Colors.orange[50]);
+    final bannerBorder = isLocked
+        ? (isDark ? Colors.blue.shade300 : Colors.blue[200]!)
+        : (isDark ? Colors.orange.shade300 : Colors.orange[200]!);
+    final titleColor = isLocked
+        ? (isDark ? Colors.lightBlueAccent : Colors.blue[900])
+        : (isDark ? Colors.orangeAccent : Colors.orange[900]);
+    final bodyColor = isDark ? scheme.onSurface : Colors.black87;
+    final mutedColor = isDark ? scheme.onSurfaceVariant : Colors.blueGrey[800];
     
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isLocked ? Colors.blue[50] : Colors.orange[50],
+        color: bannerBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isLocked ? Colors.blue[200]! : Colors.orange[200]!),
+        border: Border.all(color: bannerBorder),
       ),
       child: Column(
         children: [
@@ -336,7 +349,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               Icon(
                 isLocked ? Icons.verified_user : Icons.info_outline,
-                color: isLocked ? Colors.blue : Colors.orange,
+                color: titleColor,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -347,14 +360,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       isLocked ? 'Identity Verified' : 'Initial Setup',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isLocked ? Colors.blue[900] : Colors.orange[900],
+                        color: titleColor,
                       ),
                     ),
                     Text(
                       isLocked 
                           ? 'Business identity and operation mode are permanently locked.' 
                           : 'You can edit your business name and mode once. They will be locked after saving.',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12, color: bodyColor),
                     ),
                   ],
                 ),
@@ -362,35 +375,73 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           if (plan != null) ...[
-            const Divider(height: 24),
+            Divider(height: 24, color: isDark ? scheme.outline : null),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.stars, color: Colors.blueGrey, size: 20),
+                Icon(Icons.stars, color: mutedColor, size: 20),
                 const SizedBox(width: 12),
-                Text(
-                  'Current Plan: ',
-                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blueGrey[800]),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: plan.isBasic ? Colors.grey[200] : Colors.blueGrey[800],
-                    borderRadius: BorderRadius.circular(4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Current Plan: ',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: mutedColor),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: plan.isPremium
+                                  ? (isDark ? scheme.surfaceContainerHighest : Colors.grey[200])
+                                  : Colors.blueGrey[800],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              plan.displayName,
+                              style: TextStyle(
+                                color: plan.isPremium
+                                    ? (isDark ? scheme.onSurface : Colors.grey[800])
+                                    : Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (plan.expiryDate != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Expires: ${DateFormat('yyyy-MM-dd').format(plan.expiryDate!)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? scheme.onSurfaceVariant : Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  child: Text(
-                    plan.planType.toUpperCase(),
-                    style: TextStyle(
-                      color: plan.isBasic ? Colors.grey[800] : Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
-                if (plan.expiryDate != null) ...[
+                if (!plan.isPremium) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    'Expires: ${DateFormat('yyyy-MM-dd').format(plan.expiryDate!)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ElevatedButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const UpgradeDialog(),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ],
@@ -1818,7 +1869,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
     final plan = state.userPlan;
-    final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isLifetime);
+    final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isPremium);
     final isLocked = !isProOrLifetime; 
 
     return ListTile(
@@ -1839,7 +1890,15 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       subtitle: isProOrLifetime
           ? const Text('Standard feature on your plan', style: TextStyle(color: Colors.green, fontSize: 12))
-          : const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange, fontSize: 12)),
+          : Text(
+              'Available on Standard & Premium plans',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.orangeAccent
+                    : Colors.orange.shade800,
+                fontSize: 12,
+              ),
+            ),
       trailing: Switch(
         value: settings.serviceBillingEnabled,
         onChanged: isLocked 

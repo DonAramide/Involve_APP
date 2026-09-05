@@ -110,6 +110,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showAdminSignature: Value(settings.showAdminSignature),
       warrantyEnabled: Value(settings.warrantyEnabled),
       allowGiveChange: Value(settings.allowGiveChange),
+      servicesMaterialsEnabled: Value(settings.servicesMaterialsEnabled),
+      servicesLaborEnabled: Value(settings.servicesLaborEnabled),
+      servicesDescriptionFormatEnabled: Value(settings.servicesDescriptionFormatEnabled),
     );
 
     if (existing == null) {
@@ -212,6 +215,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showAdminSignature: row.showAdminSignature,
       warrantyEnabled: row.warrantyEnabled,
       allowGiveChange: row.allowGiveChange,
+      servicesMaterialsEnabled: row.servicesMaterialsEnabled,
+      servicesLaborEnabled: row.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled: row.servicesDescriptionFormatEnabled,
     );
   }
 }

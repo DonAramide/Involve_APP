@@ -864,18 +864,19 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
 
   Widget _buildSummaryCard(double totalSpent, String currency) {
     final totalReceived = _totalFundsReceived;
-    final walletBalance = _currentCustomer.balance;
-    final walletAbs = walletBalance.abs();
-    final walletTitle = walletBalance > 0
-        ? 'CURRENT OWING'
-        : walletBalance < 0
-            ? 'WALLET CREDIT'
-            : 'WALLET BALANCE';
-    final walletHint = walletBalance > 0
-        ? 'Customer still owes this amount'
-        : walletBalance < 0
-            ? 'Available credit after auto-debit'
-            : 'Fully settled';
+    // Net position from this card's totals: received − spent.
+    final creditBalance = totalReceived - totalSpent;
+    final displayAmount = creditBalance.abs();
+    final walletTitle = creditBalance > 0
+        ? 'WALLET CREDIT BALANCE'
+        : creditBalance < 0
+            ? 'CURRENT OWING'
+            : 'WALLET CREDIT BALANCE';
+    final walletHint = creditBalance > 0
+        ? 'Total received minus total spent'
+        : creditBalance < 0
+            ? 'Spent exceeds amount received'
+            : 'Received equals spent';
 
     return Container(
       width: double.infinity,
@@ -933,11 +934,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
           ),
           const SizedBox(height: 6),
           Text(
-            CurrencyFormatter.formatWithSymbol(walletAbs, symbol: currency),
+            CurrencyFormatter.formatWithSymbol(displayAmount, symbol: currency),
             style: TextStyle(
-              color: walletBalance > 0
+              color: creditBalance < 0
                   ? Colors.redAccent.shade100
-                  : walletBalance < 0
+                  : creditBalance > 0
                       ? Colors.lightGreenAccent.shade100
                       : Colors.white,
               fontSize: 28,

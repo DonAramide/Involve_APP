@@ -53,6 +53,8 @@ part 'app_database.g.dart';
   ServiceMaterialCategories,
   ServiceLaborPresets,
   ServiceExpenseCategories,
+  ServiceDescriptionFormatCategories,
+  ServiceDescriptionFormatFields,
   CurriculumMap,
   LessonNotes,
   OutboxTable
@@ -62,7 +64,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 88;
+  int get schemaVersion => 91;
 
   @override
   MigrationStrategy get migration {
@@ -449,6 +451,17 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 88) {
           await _safeAddColumn(m, serviceMaterials, serviceMaterials.image);
+        }
+        if (from < 89) {
+          await _safeAddColumn(m, settings, settings.servicesMaterialsEnabled);
+          await _safeAddColumn(m, settings, settings.servicesLaborEnabled);
+        }
+        if (from < 90) {
+          await _safeCreateTable(m, serviceDescriptionFormatCategories);
+          await _safeCreateTable(m, serviceDescriptionFormatFields);
+        }
+        if (from < 91) {
+          await _safeAddColumn(m, settings, settings.servicesDescriptionFormatEnabled);
         }
       },
       beforeOpen: (details) async {

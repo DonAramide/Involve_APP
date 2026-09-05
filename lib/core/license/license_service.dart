@@ -53,14 +53,15 @@ class LicenseService {
 
   static String normalizePlanName(String? raw, {int? planIndex}) {
     if (planIndex != null) {
-      const names = ['basic', 'standard', 'premium', 'enterprise'];
+      // Legacy index 3 was enterprise — treat as premium.
+      const names = ['basic', 'standard', 'premium', 'premium'];
       if (planIndex >= 0 && planIndex < names.length) return names[planIndex];
     }
     final n = (raw ?? 'basic').toLowerCase().trim();
-    if (n.contains('enterprise')) return 'enterprise';
+    if (n.contains('enterprise') || n.contains('lifetime')) return 'premium';
     if (n.contains('premium')) return 'premium';
     if (n.contains('standard') || n == 'pro') return 'standard';
-    if (n.contains('trial')) return 'basic';
+    if (n.contains('trial') || n == 'free') return 'basic';
     return n.contains('basic') ? 'basic' : (n.isEmpty ? 'basic' : n);
   }
 

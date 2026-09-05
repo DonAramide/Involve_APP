@@ -718,11 +718,11 @@ app.post('/api/reconciliation/:id/retry', authenticate, checkTenantPermission('r
 app.post('/api/reconciliation/:id/lock', authenticate, checkTenantPermission('reconciliation.lock'), ReconciliationController.lock);
 app.post('/api/reconciliation/:id/unlock', authenticate, checkTenantPermission('reconciliation.unlock'), ReconciliationController.unlock);
 // Payout Configuration
-app.get('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getSettings);
+app.get('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff', 'staff']), checkTenantAccess, PayoutController.getSettings);
 app.post('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.saveSettings);
 app.post('/api/payout/withdraw', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_treasury']), checkTenantAccess, PayoutController.withdraw);
 app.get('/api/payout/history', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PayoutController.getHistory);
-app.get('/api/payout/banks', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getBanks);
+app.get('/api/payout/banks', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff', 'staff']), checkTenantAccess, PayoutController.getBanks);
 app.post('/api/payout/resolve-account', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.resolveAccount);
 
 // Executive Dashboard

@@ -577,19 +577,31 @@ export class AuthController {
       }
 
       // Check tenant plan restriction for Web Dashboard access
+      // Basic / free trial cannot use the web portal — Standard or Premium required.
       if (profile.tenant_id && profile.tenant_id !== SYSTEM_TENANT_UUID) {
         const { data: tenant } = await supabaseAdmin
           .from('tenants')
-          .select('plan')
+          .select('plan, subscription_plan')
           .eq('id', profile.tenant_id)
           .single();
 
         if (tenant) {
-          const plan = (tenant.plan || '').toLowerCase();
-          if (['basic', 'free', 'trial'].includes(plan)) {
+          const plan = String(
+            (tenant as any).plan || (tenant as any).subscription_plan || '',
+          )
+            .toLowerCase()
+            .trim();
+          const blockedPlans = ['basic', 'free', 'trial', 'free_trial'];
+          if (blockedPlans.includes(plan)) {
+            try {
+              await supabase.auth.signOut();
+            } catch (_) {
+              /* ignore */
+            }
             return res.status(403).json({
               error: 'UPGRADE_REQUIRED',
-              message: 'You have to be a Pro user to login. Please upgrade to Pro user on your device to grant access to login.'
+              message:
+                'You need to upgrade to Standard or Premium to have access to the web. Please upgrade on your device, then try again.',
             });
           }
         }

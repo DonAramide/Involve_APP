@@ -177,7 +177,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
         // 2. Plan check
         if (workingSettings.serviceBillingEnabled && !plan.isValid) {
-          if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
+          if (!plan.isPremium && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
              debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
              workingSettings = workingSettings.copyWith(serviceBillingEnabled: false);
           }
@@ -201,44 +201,44 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<UserPlan> _loadUserPlan() async {
-    // 1. Check for Lifetime status (Super Admin / Device Authorized)
+    // 1. Device authorized → Premium (full + multi-device)
     final isLifetime = await securityService.isDeviceAuthorized();
     if (isLifetime) {
-      return const UserPlan(planType: 'lifetime');
+      return const UserPlan(planType: 'premium');
     }
     
-    // 2. Check for Manual/Direct Pro status
+    // 2. Manual/Direct Pro status → Standard
     final proExpiry = await StorageService.getProExpiryDate();
     if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
-      return UserPlan(planType: 'pro', expiryDate: proExpiry);
+      return UserPlan(planType: 'standard', expiryDate: proExpiry);
     }
 
-    // 3. Check for Activation Code License
+    // 3. Activation Code License
     final settings = await repository.getSettings();
     final license = await LicenseService.getActiveLicense(settings.organizationName);
     if (license != null && DateTime.now().isBefore(license.expiryDate)) {
       return UserPlan(
-        planType: license.planType.name,
+        planType: LicenseService.normalizePlanName(license.planType.name),
         expiryDate: license.expiryDate,
       );
     }
 
-    // 3b. Server-redeemed admin activation (Basic QR is not an HMAC license)
+    // 3b. Server-redeemed admin activation
     final serverPlan = await StorageService.getServerActivatedPlan();
     if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
       return UserPlan(
-        planType: serverPlan.planType,
+        planType: LicenseService.normalizePlanName(serverPlan.planType),
         expiryDate: serverPlan.expiryDate,
       );
     }
 
-    // 3c. If device access was granted from portal or isActivated is true
+    // 3c. Portal / activated without explicit tier → Standard
     final isActivated = await LicenseService.isActivated(settings.organizationName);
     if (isActivated) {
-      return const UserPlan(planType: 'pro');
+      return const UserPlan(planType: 'standard');
     }
 
-    // 4. Check for Trial validity
+    // 4. Trial
     final isTrialValid = await LicenseService.isTrialValid();
     if (isTrialValid) {
       final trialStart = await StorageService.getTrialStartDate();
@@ -270,11 +270,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (event.settings.serviceBillingEnabled && !(state.settings?.serviceBillingEnabled ?? false)) {
       // User is trying to ENABLE service billing
       final plan = state.userPlan;
-      if (plan == null || !plan.isValid || plan.isBasic) {
+      if (plan == null || !plan.isValid || plan.isBasicTier) {
          // Double check fresh plan to be safe
          final freshPlan = await _loadUserPlan();
-         if (!freshPlan.isValid || freshPlan.isBasic) {
-            emit(state.copyWith(error: 'Service Billing is available on Pro & Lifetime plans'));
+         if (!freshPlan.isValid || freshPlan.isBasicTier) {
+            emit(state.copyWith(error: 'Service Billing is available on Standard & Premium plans'));
             return;
          }
       }
@@ -284,16 +284,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
     // Pro validation for Custom Receipt Pricing
     if (event.settings.customReceiptPricingEnabled && !(state.settings?.customReceiptPricingEnabled ?? false)) {
-      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
-        emit(state.copyWith(error: 'Custom Receipt Pricing is a Pro Version feature.'));
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasicTier) {
+        emit(state.copyWith(error: 'Custom Receipt Pricing is available on Standard & Premium plans.'));
         return;
       }
     }
 
     // Pro validation for Admin Signature
     if (event.settings.showAdminSignature && !(state.settings?.showAdminSignature ?? false)) {
-      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
-        emit(state.copyWith(error: 'Digital Admin Signature is a Pro Version feature.'));
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasicTier) {
+        emit(state.copyWith(error: 'Digital Admin Signature is available on Standard & Premium plans.'));
         return;
       }
     }

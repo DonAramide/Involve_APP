@@ -15,6 +15,7 @@ class ServicePaymentSuccessPage extends StatefulWidget {
   final ServicePayment payment;
   final List<ServicePayment> payments;
   final bool autoPrint;
+  final double excessToWallet;
 
   const ServicePaymentSuccessPage({
     super.key,
@@ -22,6 +23,7 @@ class ServicePaymentSuccessPage extends StatefulWidget {
     required this.payment,
     required this.payments,
     this.autoPrint = false,
+    this.excessToWallet = 0,
   });
 
   @override
@@ -118,7 +120,7 @@ class _ServicePaymentSuccessPageState extends State<ServicePaymentSuccessPage>
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsBloc>().state.settings;
     final symbol = settings?.currency ?? '₦';
-    final isFullyPaid = widget.job.balance <= 0;
+    final isFullyPaid = widget.job.isFullyPaid;
 
     return Scaffold(
       appBar: AppBar(
@@ -159,6 +161,27 @@ class _ServicePaymentSuccessPageState extends State<ServicePaymentSuccessPage>
               'Recorded on ${DateFormat('dd MMM yyyy, hh:mm a').format(widget.payment.createdAt)}',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
+            if (widget.excessToWallet > 1e-9) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: Text(
+                  '${CurrencyFormatter.formatWithSymbol(widget.excessToWallet, symbol: symbol)} extra was added to the customer wallet. This job is closed.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.teal.shade800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
 
             // Main Receipt Card
@@ -241,6 +264,8 @@ class _ServicePaymentSuccessPageState extends State<ServicePaymentSuccessPage>
                   _buildDetailRow('Job Title', widget.job.title),
                   if (widget.job.customerName != null && widget.job.customerName!.isNotEmpty)
                     _buildDetailRow('Customer', widget.job.customerName!),
+                  if (widget.job.staffName != null && widget.job.staffName!.trim().isNotEmpty)
+                    _buildDetailRow('Staff', widget.job.staffName!.trim()),
                   if (widget.payment.reference != null && widget.payment.reference!.isNotEmpty)
                     _buildDetailRow('Reference / Note', widget.payment.reference!),
 
@@ -250,7 +275,13 @@ class _ServicePaymentSuccessPageState extends State<ServicePaymentSuccessPage>
 
                   // Financial Breakdown
                   _buildDetailRow('Total Job Cost', CurrencyFormatter.formatWithSymbol(widget.job.totalAmount, symbol: symbol)),
-                  _buildDetailRow('Total Paid So Far', CurrencyFormatter.formatWithSymbol(widget.job.amountPaid, symbol: symbol), color: Colors.green),
+                  _buildDetailRow('Total Paid So Far', CurrencyFormatter.formatWithSymbol(widget.job.appliedAmountPaid, symbol: symbol), color: Colors.green),
+                  if (widget.excessToWallet > 1e-9)
+                    _buildDetailRow(
+                      'Added to Wallet',
+                      CurrencyFormatter.formatWithSymbol(widget.excessToWallet, symbol: symbol),
+                      color: Colors.teal,
+                    ),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -262,7 +293,7 @@ class _ServicePaymentSuccessPageState extends State<ServicePaymentSuccessPage>
                       Row(
                         children: [
                           Text(
-                            CurrencyFormatter.formatWithSymbol(widget.job.balance, symbol: symbol),
+                            CurrencyFormatter.formatWithSymbol(widget.job.remainingBalance, symbol: symbol),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
