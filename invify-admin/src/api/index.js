@@ -80,6 +80,16 @@ api.interceptors.request.use((config) => {
   if (tenantId) {
     config.headers['X-Tenant-ID'] = tenantId;
   }
+  // Let the browser set multipart boundary. A bare Content-Type: multipart/form-data
+  // makes multer fail to parse the APK and often surfaces as an HTML 500.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (typeof config.headers?.delete === 'function') {
+      config.headers.delete('Content-Type');
+    } else if (config.headers) {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+  }
   return config;
 });
 

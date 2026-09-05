@@ -1,12 +1,58 @@
-import { Request, Response } from 'express';
+import fs from 'fs';
+import os from 'os';
+import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
 import { resolveApkObjectKey } from '../utils/apk-object-key';
 import { createContaboS3Client, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
-export const apkUploadMiddleware = upload.single('file');
+const APK_MAX_BYTES = 500 * 1024 * 1024;
+
+const diskUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const safe = String(file.originalname || 'app.apk').replace(/[^\w.\-]+/g, '_');
+      cb(null, `invify-apk-${Date.now()}-${safe}`);
+    },
+  }),
+  limits: { fileSize: APK_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const name = String(file.originalname || '').toLowerCase();
+    const type = String(file.mimetype || '').toLowerCase();
+    if (
+      name.endsWith('.apk') ||
+      type === 'application/vnd.android.package-archive' ||
+      type === 'application/octet-stream'
+    ) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Only .apk files are allowed'));
+  },
+});
+
+export const apkUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  diskUpload.single('file')(req, res, (err: any) => {
+    if (!err) return next();
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({
+      error: err.code === 'LIMIT_FILE_SIZE'
+        ? 'APK exceeds the 500 MB upload limit'
+        : (err.message || 'APK upload failed'),
+    });
+  });
+};
+
+function removeTempApk(filePath?: string) {
+  if (!filePath) return;
+  fs.unlink(filePath, (cleanupErr) => {
+    if (cleanupErr && (cleanupErr as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn('[ApkController] temp APK cleanup failed:', cleanupErr.message);
+    }
+  });
+}
 
 const APK_TRANSFER_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -32,11 +78,12 @@ export class ApkController {
   static async uploadApk(req: Request, res: Response) {
     req.setTimeout(APK_TRANSFER_TIMEOUT_MS);
     res.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    const file = req.file;
+    const tempPath = file?.path;
     try {
-      const file = req.file;
       const { name, packageName, version, targetSlotId } = req.body;
 
-      if (!file) {
+      if (!file || !tempPath) {
         return res.status(400).json({ error: 'No APK file provided' });
       }
 
@@ -56,7 +103,8 @@ export class ApkController {
       await s3Client.send(new PutObjectCommand({
         Bucket: bucket,
         Key: objectKey,
-        Body: file.buffer,
+        Body: fs.createReadStream(tempPath),
+        ContentLength: file.size,
         ContentType: 'application/vnd.android.package-archive',
         ACL: process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true' ? 'public-read' : 'private'
       }));
@@ -110,6 +158,8 @@ export class ApkController {
           ? `${req.body?.packageName || 'This package'} is already in the vault. Use Upload New Version on that slot.`
           : (error.message || 'APK upload failed'),
       });
+    } finally {
+      removeTempApk(tempPath);
     }
   }
 

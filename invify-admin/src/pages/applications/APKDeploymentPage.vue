@@ -508,6 +508,25 @@ const openUpdateDialog = (index) => {
 
 const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
 
+function apkUploadErrorMessage(error) {
+  const status = error?.response?.status
+  const data = error?.response?.data
+  if (typeof data === 'string' && /^\s*</.test(data)) {
+    if (status === 413) {
+      return 'Upload rejected: nginx client_max_body_size is too small for this APK. Set it to 200m on staging and reload nginx.'
+    }
+    return `Upload failed (${status || 'gateway'}). The proxy returned an HTML error page instead of JSON. Staging nginx needs client_max_body_size 200m for ~110MB APKs, and the API must stay up during the Contabo PUT.`
+  }
+  if (data && typeof data === 'object') {
+    return data.error || data.message || error.message || 'Upload failed'
+  }
+  const msg = String(error?.message || '')
+  if (msg.includes("char '!'") || /deserialization/i.test(msg)) {
+    return 'Upload failed: the server returned an HTML error page (usually nginx body-size or a 500/502) instead of JSON. Set client_max_body_size 200m and retry.'
+  }
+  return error?.message || 'Upload failed'
+}
+
 const copyDownloadLink = async (apk) => {
   const origin = publicApiOrigin()
   const url = apk?.id
@@ -646,8 +665,9 @@ const commitApkToVault = async () => {
 
   try {
     const { data } = await api.post('/api/admin/apk/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: APK_UPLOAD_TIMEOUT_MS,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
       onUploadProgress: (progressEvent) => {
         const total = progressEvent.total || newApk.value.fileRef?.size || 0
         const percentCompleted = total ? Math.round((progressEvent.loaded * 100) / total) : 0
@@ -671,7 +691,7 @@ const commitApkToVault = async () => {
     uploadDialogOpen.value = false
     Notify.create({ type: 'positive', message: `APK [${data.name}] committed to vault successfully`, position: 'bottom-right' })
   } catch (error) {
-    Notify.create({ type: 'negative', message: `Upload failed: ${error.response?.data?.error || error.message}`, position: 'bottom-right' })
+    Notify.create({ type: 'negative', message: apkUploadErrorMessage(error), position: 'bottom-right' })
     try {
       const { data } = await api.get('/api/admin/apk')
       apkVault.value = data.vault || []

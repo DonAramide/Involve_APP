@@ -1090,6 +1090,17 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (status === 422) code = 'ERR_UNPROCESSABLE_ENTITY';
   if (status === 429) code = 'ERR_TOO_MANY_REQUESTS';
 
+  if (err?.name === 'MulterError' || err?.code === 'LIMIT_FILE_SIZE') {
+    const uploadStatus = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(uploadStatus).json({
+      success: false,
+      code: uploadStatus === 413 ? 'ERR_PAYLOAD_TOO_LARGE' : 'ERR_BAD_REQUEST',
+      error: err.message || 'Upload failed',
+      message: err.message || 'Upload failed',
+      correlationId: (req as any).correlationId,
+    });
+  }
+
   res.status(status).json({
     success: false,
     code,
