@@ -31,6 +31,29 @@ export function resolveContaboBucket(): string {
   return (process.env.CONTABO_BUCKET || DEFAULT_CONTABO_BUCKET).trim();
 }
 
+function firstNonEmpty(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    const trimmed = String(value || '').trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+}
+
+export function resolveContaboCredentials(): { accessKeyId: string; secretAccessKey: string } {
+  return {
+    accessKeyId: firstNonEmpty(
+      process.env.CONTABO_ACCESS_KEY,
+      process.env.CONTABO_ACCESS_KEY_ID,
+      process.env.AWS_ACCESS_KEY_ID,
+    ),
+    secretAccessKey: firstNonEmpty(
+      process.env.CONTABO_SECRET_KEY,
+      process.env.CONTABO_SECRET_ACCESS_KEY,
+      process.env.AWS_SECRET_ACCESS_KEY,
+    ),
+  };
+}
+
 function sha256Hex(data: Buffer | string): string {
   return createHash('sha256').update(data).digest('hex');
 }
@@ -71,8 +94,7 @@ export async function putContaboObject(params: {
   body: Buffer;
   contentType: string;
 }): Promise<void> {
-  const accessKeyId = process.env.CONTABO_ACCESS_KEY || '';
-  const secretAccessKey = process.env.CONTABO_SECRET_KEY || '';
+  const { accessKeyId, secretAccessKey } = resolveContaboCredentials();
   if (!accessKeyId || !secretAccessKey) {
     throw new Error('Contabo S3 credentials are missing (CONTABO_ACCESS_KEY / CONTABO_SECRET_KEY).');
   }
@@ -163,12 +185,13 @@ export function createContaboS3Client(): S3Client {
   process.env.AWS_REQUEST_CHECKSUM_CALCULATION ||= 'WHEN_REQUIRED';
   process.env.AWS_RESPONSE_CHECKSUM_VALIDATION ||= 'WHEN_REQUIRED';
 
+  const { accessKeyId, secretAccessKey } = resolveContaboCredentials();
   const client = new S3Client({
     endpoint: resolveContaboEndpoint(),
     region: (process.env.CONTABO_REGION || DEFAULT_CONTABO_REGION).trim() || DEFAULT_CONTABO_REGION,
     credentials: {
-      accessKeyId: process.env.CONTABO_ACCESS_KEY || '',
-      secretAccessKey: process.env.CONTABO_SECRET_KEY || '',
+      accessKeyId,
+      secretAccessKey,
     },
     forcePathStyle: true,
     tls: true,
