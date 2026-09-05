@@ -109,11 +109,11 @@ export class ApkController {
         });
       }
       const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
-      const body = await fs.promises.readFile(tempPath);
+      const stat = await fs.promises.stat(tempPath);
       await putContaboObject({
         bucket,
         key: objectKey,
-        body,
+        filePath: tempPath,
         contentType: 'application/vnd.android.package-archive',
       });
 
@@ -135,8 +135,8 @@ export class ApkController {
         name,
         packageName,
         version,
-        size: body.byteLength,
-        sizeFormatted: `${(body.byteLength / 1024 / 1024).toFixed(1)} MB`,
+        size: stat.size,
+        sizeFormatted: `${(stat.size / 1024 / 1024).toFixed(1)} MB`,
         s3Url
       };
 

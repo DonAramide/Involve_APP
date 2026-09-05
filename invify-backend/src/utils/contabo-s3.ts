@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'crypto';
+import fs from 'fs';
 import https from 'https';
 import { S3Client } from '@aws-sdk/client-s3';
 
@@ -58,6 +59,16 @@ function sha256Hex(data: Buffer | string): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
+function sha256File(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
 function hmac(key: Buffer | string, data: string): Buffer {
   return createHmac('sha256', key).update(data).digest();
 }
@@ -91,12 +102,16 @@ export function formatContaboPutError(status: number, text: string): string {
 export async function putContaboObject(params: {
   bucket: string;
   key: string;
-  body: Buffer;
+  body?: Buffer;
+  filePath?: string;
   contentType: string;
 }): Promise<void> {
   const { accessKeyId, secretAccessKey } = resolveContaboCredentials();
   if (!accessKeyId || !secretAccessKey) {
     throw new Error('Contabo S3 credentials are missing (CONTABO_ACCESS_KEY / CONTABO_SECRET_KEY).');
+  }
+  if (!params.filePath && !params.body) {
+    throw new Error('Contabo PUT requires a file path or a buffer');
   }
 
   const origin = resolveContaboEndpoint();
@@ -108,10 +123,15 @@ export async function putContaboObject(params: {
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
   const dateStamp = amzDate.slice(0, 8);
   const region = (process.env.CONTABO_REGION || DEFAULT_CONTABO_REGION).trim() || DEFAULT_CONTABO_REGION;
-  const payloadHash = sha256Hex(params.body);
   const contentType = params.contentType || 'application/octet-stream';
+  const contentLength = params.filePath
+    ? (await fs.promises.stat(params.filePath)).size
+    : params.body!.byteLength;
+  const payloadHash = params.filePath
+    ? await sha256File(params.filePath)
+    : sha256Hex(params.body!);
   const canonicalHeaders =
-    `content-length:${params.body.byteLength}\n` +
+    `content-length:${contentLength}\n` +
     `content-type:${contentType}\n` +
     `host:${hostname}\n` +
     `x-amz-content-sha256:${payloadHash}\n` +
@@ -141,22 +161,33 @@ export async function putContaboObject(params: {
     `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, ` +
     `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
+  const started = Date.now();
+  console.log(`[contabo] PUT ${hostname}${path} (${contentLength} bytes)`);
+
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (error) reject(error);
+      else resolve();
+    };
+
     const req = https.request(
       {
         hostname,
         port,
         method: 'PUT',
         path,
+        family: 4,
         headers: {
           host: hostname,
           'content-type': contentType,
-          'content-length': params.body.byteLength,
+          'content-length': contentLength,
           'x-amz-content-sha256': payloadHash,
           'x-amz-date': amzDate,
           authorization,
         },
-        timeout: 15 * 60 * 1000,
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -164,20 +195,36 @@ export async function putContaboObject(params: {
         res.on('end', () => {
           const status = res.statusCode || 0;
           const text = Buffer.concat(chunks).toString('utf8');
+          const elapsed = Date.now() - started;
           if (status >= 200 && status < 300) {
-            resolve();
+            console.log(`[contabo] PUT ${status} in ${elapsed}ms`);
+            finish();
             return;
           }
-          reject(new Error(formatContaboPutError(status, text)));
+          console.error(`[contabo] PUT ${status} in ${elapsed}ms: ${text.slice(0, 300)}`);
+          finish(new Error(formatContaboPutError(status, text)));
         });
       },
     );
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Contabo Object Storage upload timed out'));
+    req.on('error', (error) => finish(error));
+    req.on('socket', (socket) => {
+      socket.setNoDelay(true);
+      socket.setTimeout(120000);
+      socket.on('timeout', () => {
+        req.destroy();
+        finish(new Error('Contabo Object Storage upload stalled'));
+      });
     });
-    req.end(params.body);
+    if (params.filePath) {
+      const stream = fs.createReadStream(params.filePath);
+      stream.on('error', (error) => {
+        req.destroy();
+        finish(error);
+      });
+      stream.pipe(req);
+    } else {
+      req.end(params.body);
+    }
   });
 }
 

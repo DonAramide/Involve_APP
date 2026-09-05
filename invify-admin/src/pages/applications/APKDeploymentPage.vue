@@ -688,8 +688,8 @@ const commitApkToVault = async () => {
         const loadedMb = (progressEvent.loaded / 1024 / 1024).toFixed(1)
         const totalMb = total ? (total / 1024 / 1024).toFixed(1) : '?'
         uploadStatusText.value = cappedPercent < 99
-          ? `Streaming APK binary to Contabo Object Storage... (${loadedMb} MB / ${totalMb} MB · ${cappedPercent}%)`
-          : 'Upload stream completed. Committing metadata to APK Vault registry...'
+          ? `Streaming APK binary to the staging server... (${loadedMb} MB / ${totalMb} MB · ${cappedPercent}%)`
+          : 'Browser upload finished. Server is storing the APK in Contabo Object Storage...'
         if (apkVault.value[finalIndex]) {
           apkVault.value[finalIndex].uploadProgress = cappedPercent
         }
