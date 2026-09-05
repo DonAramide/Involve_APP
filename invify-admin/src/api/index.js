@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Notify } from 'quasar';
 import { loginPathForContext } from '../utils/authLoginPaths';
 import { resolveApiBaseUrl } from '../config/env';
+import { attachIdleHoldInterceptors } from '../auth/idleLogout';
 import { attachSessionInterceptors, readAccessToken } from '../auth/session';
 
 const api = axios.create({
@@ -93,6 +94,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+attachIdleHoldInterceptors(api);
 attachSessionInterceptors(api, { Notify, loginPathForContext });
 
 export const onboardingApi = {

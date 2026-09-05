@@ -39,5 +39,9 @@ export function createContaboS3Client(): S3Client {
     },
     forcePathStyle: true,
     tls: true,
+    // AWS SDK v3.729+ sends CRC32 checksums by default. Contabo returns JSON
+    // errors for those headers; the SDK then fails with "char '{' is not expected".
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 }

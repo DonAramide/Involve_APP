@@ -45,6 +45,28 @@ export const apkUploadMiddleware = (req: Request, res: Response, next: NextFunct
   });
 };
 
+function storageUploadErrorMessage(error: any): string {
+  const raw = String(error?.message || '');
+  if (/char ['"][{!]['"] is not expected|deserialization error/i.test(raw)) {
+    return 'Contabo Object Storage rejected the upload (S3-compatible APIs do not accept AWS default checksums).';
+  }
+  return raw || 'APK upload failed';
+}
+
+function apkPutObjectInput(bucket: string, objectKey: string, tempPath: string, size: number) {
+  const input: Record<string, unknown> = {
+    Bucket: bucket,
+    Key: objectKey,
+    Body: fs.createReadStream(tempPath),
+    ContentLength: size,
+    ContentType: 'application/vnd.android.package-archive',
+  };
+  if (process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true') {
+    input.ACL = 'public-read';
+  }
+  return input;
+}
+
 function removeTempApk(filePath?: string) {
   if (!filePath) return;
   fs.unlink(filePath, (cleanupErr) => {
@@ -100,14 +122,7 @@ export class ApkController {
       const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
 
       const s3Client = createContaboS3Client();
-      await s3Client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: objectKey,
-        Body: fs.createReadStream(tempPath),
-        ContentLength: file.size,
-        ContentType: 'application/vnd.android.package-archive',
-        ACL: process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true' ? 'public-read' : 'private'
-      }));
+      await s3Client.send(new PutObjectCommand(apkPutObjectInput(bucket, objectKey, tempPath, file.size) as any));
 
       // Construct public URL with Contabo tenant ID format: https://<endpoint>/<tenantId>:<bucket>/<key>
       let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
@@ -156,7 +171,7 @@ export class ApkController {
       return res.status(isDuplicate ? 409 : 500).json({
         error: isDuplicate
           ? `${req.body?.packageName || 'This package'} is already in the vault. Use Upload New Version on that slot.`
-          : (error.message || 'APK upload failed'),
+          : (storageUploadErrorMessage(error)),
       });
     } finally {
       removeTempApk(tempPath);

@@ -2,11 +2,16 @@ import {
   IDLE_TIMEOUT_MS,
   consumeIdleLogoutNotice,
   hasAnyAuthenticatedSession,
+  holdIdleLogout,
   isIdleExemptPath,
   isIdleExpired,
+  isIdleLogoutHeld,
   markIdleLogoutNotice,
   readLastActivityAt,
+  releaseIdleLogout,
+  shouldHoldIdleForRequest,
   shouldIdleLogout,
+  _resetIdleHoldForTests,
 } from '../src/auth/idleLogout';
 
 const store: Record<string, string> = {};
@@ -49,6 +54,7 @@ describe('idle auto-logout', () => {
   beforeEach(() => {
     Object.keys(store).forEach((key) => delete store[key]);
     Object.keys(sessionStore).forEach((key) => delete sessionStore[key]);
+    _resetIdleHoldForTests();
   });
 
   test('expires after 6 minutes of inactivity', () => {
@@ -99,5 +105,52 @@ describe('idle auto-logout', () => {
     markIdleLogoutNotice();
     expect(consumeIdleLogoutNotice()).toBe(true);
     expect(consumeIdleLogoutNotice()).toBe(false);
+  });
+
+  test('skips idle logout while an in-flight request hold is active', () => {
+    expect(isIdleLogoutHeld()).toBe(false);
+    holdIdleLogout(1);
+    expect(isIdleLogoutHeld()).toBe(true);
+    expect(
+      shouldIdleLogout({
+        pathname: '/apps/apk-deployment',
+        hasSession: true,
+        mfaPending: false,
+        busyHold: true,
+        lastActivityAt: 1,
+        now: IDLE_TIMEOUT_MS + 50,
+      } as any),
+    ).toBe(false);
+    releaseIdleLogout(1);
+    expect(isIdleLogoutHeld()).toBe(false);
+  });
+
+  test('holds APK uploads and mutating requests, not background GETs', () => {
+    expect(
+      shouldHoldIdleForRequest({
+        method: 'post',
+        url: '/api/admin/apk/upload',
+        timeout: 15 * 60 * 1000,
+      }),
+    ).toBe(true);
+    expect(
+      shouldHoldIdleForRequest({
+        method: 'get',
+        url: '/api/admin/tenants',
+      }),
+    ).toBe(true);
+    expect(
+      shouldHoldIdleForRequest({
+        method: 'get',
+        url: '/api/notifications',
+      }),
+    ).toBe(false);
+    expect(
+      shouldHoldIdleForRequest({
+        method: 'post',
+        url: '/api/auth/refresh',
+        idleHold: false,
+      }),
+    ).toBe(false);
   });
 });

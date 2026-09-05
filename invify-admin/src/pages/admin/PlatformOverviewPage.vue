@@ -23,7 +23,7 @@
             Env: <q-badge :color="envBadge.color" text-color="white" :label="envBadge.label" class="text-weight-bold" />
           </div>
           <div class="text-caption text-secondary q-mt-xs" style="font-size: 11px;">
-            Version: <span :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'">v1.0.0</span> | Sync: <span :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'">{{ syncTimer }}s ago</span>
+            Version: <span :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'">v{{ webAppVersion }}</span> | Sync: <span :class="prefs.isDarkMode ? 'text-cyan-3' : 'text-primary'">{{ syncTimer }}s ago</span>
           </div>
         </div>
 
@@ -491,7 +491,9 @@ import type {
 import { useRuntimeStore } from '../../stores/runtime.store'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { getBuildVariant, BuildVariant } from '../../config/buildVariant'
+import { WEB_APP_VERSION } from '../../config/appVersion'
 
+const webAppVersion = WEB_APP_VERSION
 const { prefs } = useOperatorPreferences()
 const router = useRouter()
 const $q = useQuasar()

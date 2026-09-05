@@ -4,7 +4,9 @@
  */
 
 import {
+  isAuthSessionUrl,
   isMfaChallengePending,
+  isSoftSessionFailureUrl,
   logoutAuthenticatedSession,
   readAccessToken,
 } from './session';
@@ -17,6 +19,87 @@ export const IDLE_LOGOUT_NOTICE_KEY = 'invify_idle_logout';
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
 const TICK_MS = 10000;
 const TOUCH_THROTTLE_MS = 1000;
+
+let idleHoldCount = 0;
+
+export function isIdleLogoutHeld() {
+  return idleHoldCount > 0;
+}
+
+export function holdIdleLogout(now = Date.now()) {
+  idleHoldCount += 1;
+  stampIdleActivity(now);
+}
+
+export function releaseIdleLogout(now = Date.now()) {
+  idleHoldCount = Math.max(0, idleHoldCount - 1);
+  stampIdleActivity(now);
+}
+
+export function _resetIdleHoldForTests() {
+  idleHoldCount = 0;
+}
+
+/** In-flight API work counts as activity so long uploads are not idle-logged-out. */
+export function shouldHoldIdleForRequest(config = {}) {
+  if (config.idleHold === false) return false;
+  if (config.idleHold === true) return true;
+  const url = String(config.url || '');
+  if (isAuthSessionUrl(url)) return false;
+  const method = String(config.method || 'get').toLowerCase();
+  if (method === 'get' && isSoftSessionFailureUrl(url)) return false;
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) return true;
+  if (Number(config.timeout) > IDLE_TIMEOUT_MS) return true;
+  return ['post', 'put', 'patch', 'delete'].includes(method) || method === 'get';
+}
+
+function hasVisibleLoadingUi() {
+  if (typeof document === 'undefined') return false;
+  try {
+    return Boolean(
+      document.querySelector('.q-loading') ||
+        document.querySelector('.q-inner-loading') ||
+        document.querySelector('[data-idle-hold="true"]'),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function attachIdleHoldInterceptors(api) {
+  if (!api?.interceptors) return;
+  api.interceptors.request.use((config) => {
+    if (!shouldHoldIdleForRequest(config)) return config;
+    holdIdleLogout();
+    config._idleHold = true;
+    const prevUp = config.onUploadProgress;
+    const prevDown = config.onDownloadProgress;
+    config.onUploadProgress = (event) => {
+      stampIdleActivity();
+      if (typeof prevUp === 'function') prevUp(event);
+    };
+    config.onDownloadProgress = (event) => {
+      stampIdleActivity();
+      if (typeof prevDown === 'function') prevDown(event);
+    };
+    return config;
+  });
+  const releaseHeld = (config) => {
+    if (!config?._idleHold) return;
+    config._idleHold = false;
+    releaseIdleLogout();
+  };
+  api.interceptors.response.use(
+    (response) => {
+      releaseHeld(response?.config);
+      return response;
+    },
+    (error) => {
+      releaseHeld(error?.config);
+      return Promise.reject(error);
+    },
+  );
+}
 
 const IDLE_EXEMPT_PREFIXES = [
   '/admin/login',
@@ -85,11 +168,13 @@ export function shouldIdleLogout({
   pathname,
   hasSession,
   mfaPending,
+  busyHold,
   lastActivityAt,
   now = Date.now(),
   timeoutMs = IDLE_TIMEOUT_MS,
 } = {}) {
   if (mfaPending) return false;
+  if (busyHold) return false;
   if (!hasSession) return false;
   if (isIdleExemptPath(pathname)) return false;
   return isIdleExpired(lastActivityAt, now, timeoutMs);
@@ -133,6 +218,7 @@ export function startIdleLogoutWatchdog({
   Notify,
   nowFn = Date.now,
   timeoutMs = IDLE_TIMEOUT_MS,
+  isBusy,
 } = {}) {
   if (typeof window === 'undefined') return () => {};
 
@@ -170,11 +256,20 @@ export function startIdleLogoutWatchdog({
     if (ticking || loggingOut) return;
     ticking = true;
     try {
+      const busy =
+        isIdleLogoutHeld() ||
+        hasVisibleLoadingUi() ||
+        (typeof isBusy === 'function' && Boolean(isBusy()));
+      if (busy) {
+        stampIdleActivity(nowFn());
+        return;
+      }
       if (
         shouldIdleLogout({
           pathname: window.location.pathname,
           hasSession: hasAnyAuthenticatedSession(),
           mfaPending: isMfaChallengePending(),
+          busyHold: busy,
           lastActivityAt: readLastActivityAt(nowFn()),
           now: nowFn(),
           timeoutMs,

@@ -25,7 +25,11 @@ onMounted(() => {
       timeout: 6000,
     })
   }
-  stopIdleWatchdog = startIdleLogoutWatchdog({ api, Notify })
+  stopIdleWatchdog = startIdleLogoutWatchdog({
+    api,
+    Notify,
+    isBusy: () => Boolean($q.loading?.isActive),
+  })
 })
 
 onUnmounted(() => {

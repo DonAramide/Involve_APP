@@ -27,7 +27,11 @@
     </div>
 
     <!-- Live Contabo Upload Banner -->
-    <div v-if="isUploading" class="bg-panel border-cyan rounded-borders q-pa-sm row items-center justify-between no-wrap op-gap-16 shadow-2">
+    <div
+      v-if="isUploading"
+      data-idle-hold="true"
+      class="bg-panel border-cyan rounded-borders q-pa-sm row items-center justify-between no-wrap op-gap-16 shadow-2"
+    >
       <div class="row items-center op-gap-12 no-wrap">
         <q-spinner-orbit color="cyan-3" size="md" />
         <div>
@@ -515,14 +519,22 @@ function apkUploadErrorMessage(error) {
     if (status === 413) {
       return 'Upload rejected: nginx client_max_body_size is too small for this APK. Set it to 200m on staging and reload nginx.'
     }
-    return `Upload failed (${status || 'gateway'}). The proxy returned an HTML error page instead of JSON. Staging nginx needs client_max_body_size 200m for ~110MB APKs, and the API must stay up during the Contabo PUT.`
+    return `Upload failed (${status || 'gateway'}). The proxy returned an HTML error page instead of JSON.`
+  }
+  if (typeof data === 'string' && /^\s*\{/.test(data)) {
+    try {
+      const parsed = JSON.parse(data)
+      return parsed.error || parsed.message || data
+    } catch {
+      /* fall through */
+    }
   }
   if (data && typeof data === 'object') {
     return data.error || data.message || error.message || 'Upload failed'
   }
   const msg = String(error?.message || '')
-  if (msg.includes("char '!'") || /deserialization/i.test(msg)) {
-    return 'Upload failed: the server returned an HTML error page (usually nginx body-size or a 500/502) instead of JSON. Set client_max_body_size 200m and retry.'
+  if (msg.includes("char '{'") || msg.includes("char '!'") || /deserialization/i.test(msg)) {
+    return 'Upload failed: Contabo Object Storage rejected the APK (AWS checksum headers). Redeploy the backend S3 client fix and retry.'
   }
   return error?.message || 'Upload failed'
 }

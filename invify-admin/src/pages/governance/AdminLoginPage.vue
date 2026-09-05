@@ -570,7 +570,7 @@
     <!-- Footer -->
     <footer class="sac__footer">
       <div class="sac__footer-left">
-        © {{ currentYear }} {{ t.copyright }} <span class="q-ml-sm text-grey-6 text-weight-medium">version 1.0.0</span>
+        © {{ currentYear }} {{ t.copyright }} <span class="q-ml-sm text-grey-6 text-weight-medium">version {{ webAppVersion }}</span>
       </div>
       <div class="sac__footer-right">
         <span class="sac__footer-link" role="button" tabindex="0">{{ t.privacy }}</span>
@@ -611,6 +611,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { joinApiUrl } from '../../config/env'
+import { WEB_APP_VERSION } from '../../config/appVersion'
 import { useQuasar, copyToClipboard } from 'quasar'
 import logoImg from '../../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
@@ -625,6 +626,7 @@ const $q = useQuasar()
 const { prefs, toggleTheme } = useOperatorPreferences()
 
 const currentYear = new Date().getFullYear()
+const webAppVersion = WEB_APP_VERSION
 
 // Language Selector & Multi-Language Dictionary (English, Yorùbá, Igbo, Hausa)
 const availableLanguages = [
