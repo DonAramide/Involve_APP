@@ -641,8 +641,10 @@ registerCollisionAdmin('post', '/tenants/:id/provision-va', authenticate, checkT
 registerCollisionAdmin('post', '/tenants/:id/provision-virtual-account', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
 registerCollisionAdmin('post', '/tenants/:id/students/:studentId/provision-va', authenticate, checkTenantAccess, AdminController.provisionStudentVirtualAccount);
 registerCollisionAdmin('post', '/tenants/:id/customers/:customerId/provision-va', authenticate, checkTenantAccess, AdminController.provisionCustomerVirtualAccount);
-app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLedger);
-app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
+app.get('/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listLedger);
+app.get('/api/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listLedger);
+app.get('/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
+app.get('/api/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
 
 // Wallet Endpoints (Internal Ledger)
 app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getBalance);

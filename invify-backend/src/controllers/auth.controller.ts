@@ -578,11 +578,31 @@ export class AuthController {
 
       // Check tenant plan restriction for Web Dashboard access
       // Basic / free trial cannot use the web portal — Standard or Premium required.
-      if (profile.tenant_id && profile.tenant_id !== SYSTEM_TENANT_UUID) {
+      // Platform operators (super_admin / system scope) are never plan-gated.
+      const roleNorm = String(profile.role || '')
+        .toLowerCase()
+        .split(',')
+        .map((r: string) => r.trim())
+        .filter(Boolean);
+      const isPlatformOperator =
+        roleNorm.includes('super_admin') ||
+        roleNorm.includes('internal_staff') ||
+        roleNorm.some((r: string) => r.startsWith('admin_'));
+      const tenantIdRaw = String(profile.tenant_id || '').trim();
+      const isSystemTenant =
+        !tenantIdRaw ||
+        tenantIdRaw === SYSTEM_TENANT_UUID ||
+        tenantIdRaw.toLowerCase() === 'global' ||
+        tenantIdRaw.toLowerCase() === 'system' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          tenantIdRaw,
+        );
+
+      if (!isPlatformOperator && !isSystemTenant) {
         const { data: tenant, error: tenantPlanError } = await supabaseAdmin
           .from('tenants')
           .select('plan')
-          .eq('id', profile.tenant_id)
+          .eq('id', tenantIdRaw)
           .single();
 
         if (tenantPlanError) {

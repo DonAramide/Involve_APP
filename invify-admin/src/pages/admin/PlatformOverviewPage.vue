@@ -123,7 +123,7 @@
           <div class="row justify-between items-center q-mb-xs">
             <div>
               <div class="text-subtitle2 text-weight-bold text-main font-sans">Tenant Activity Map</div>
-              <div class="text-caption text-secondary">Live global tenant distribution and status</div>
+              <div class="text-caption text-secondary">Real tenants (approx. location) · activity = txs in last 24h</div>
             </div>
             <q-badge color="purple-10" :text-color="prefs.isDarkMode ? 'purple-3' : 'purple-1'" class="font-mono text-weight-bold">MAP ({{ mapNodes.length }})</q-badge>
           </div>
@@ -163,7 +163,7 @@
                 <div class="text-weight-bold">{{ node.tenant }}</div>
                 <div>Location: {{ node.location }}</div>
                 <div>Status: <span :style="{ color: node.color }">{{ node.status.toUpperCase() }}</span></div>
-                <div>Activity: {{ node.activity }} TX/s</div>
+                <div>Activity: {{ node.activity }} tx / 24h</div>
               </q-tooltip>
             </div>
           </div>
@@ -356,7 +356,7 @@
           <div class="row justify-between items-center q-mb-md">
             <div>
               <div class="text-subtitle2 text-weight-bold text-main font-sans">Tenant Intelligence Center</div>
-              <div class="text-caption text-secondary">Tenant performance matrix, volume and safety stats</div>
+              <div class="text-caption text-secondary">Live tenant roster from database · volume from last 24h</div>
             </div>
             <q-btn flat dense :color="prefs.isDarkMode ? 'cyan-3' : 'primary'" label="Manage All" size="sm" to="/admin/tenants" />
           </div>
@@ -368,10 +368,16 @@
             flat
             :dark="prefs.isDarkMode"
             dense
-            class="bg-transparent border-none font-mono text-caption col"
-            :pagination="{ rowsPerPage: 5 }"
+            class="bg-transparent border-none font-mono text-caption col cursor-pointer"
+            :pagination="{ rowsPerPage: 8 }"
             hide-bottom
+            @row-click="(_evt, row) => navigateToTenant(row.id)"
           >
+            <template v-slot:no-data>
+              <div class="full-width text-center q-pa-lg text-secondary">
+                No tenant intelligence yet — confirm `/api/dashboard/analytics` is reachable.
+              </div>
+            </template>
             <template v-slot:body-cell-score="props">
               <q-td :props="props">
                 <q-chip 

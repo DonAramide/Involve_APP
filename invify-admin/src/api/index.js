@@ -113,7 +113,9 @@ export const adminApi = {
   changeFinancialPlatformVertical: (tenantId, data) =>
     api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data),
 
-  getLedger: (params) => api.get('/admin/ledger', { params }),
+  getLedger: (params) => api.get('/api/admin/ledger', { params }),
+  // Legacy alias kept for older builds
+  getLedgerLegacy: (params) => api.get('/admin/ledger', { params }),
   getAuditLedger: (params) => api.get('/api/admin/audit/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),

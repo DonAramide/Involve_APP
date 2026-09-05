@@ -50,32 +50,17 @@ export class ProdDashboardProvider implements DashboardDataProvider {
           console.warn('[ProdDashboardProvider] fetchAnalytics warning:', err);
           this.fetchAnalyticsPromise = null;
           return {
-            tenantMatrix: [
-              { name: 'Zenith Retail Network', revenue: '₦18,450,000', score: 98, risk: 'Low', growth: '+24%' },
-              { name: 'Apex Logistics Terminal', revenue: '₦12,800,000', score: 95, risk: 'Low', growth: '+18%' },
-              { name: 'Prime Mart Enterprise', revenue: '₦9,250,000', score: 91, risk: 'Low', growth: '+12%' },
-              { name: 'Metro Foods Chain', revenue: '₦7,690,000', score: 88, risk: 'Medium', growth: '+8%' }
-            ],
-            tenantIntelligence: [
-              { id: '1', x: 22, y: 35, tenant: 'Lagos Hub Alpha', location: 'Nigeria', status: 'active', activity: 1420, color: '#00E676' },
-              { id: '2', x: 48, y: 28, tenant: 'London Gateway', location: 'United Kingdom', status: 'active', activity: 980, color: '#00B8FF' },
-              { id: '3', x: 55, y: 52, tenant: 'Nairobi Enterprise', location: 'Kenya', status: 'active', activity: 640, color: '#8B5CF6' },
-              { id: '4', x: 75, y: 40, tenant: 'Singapore Terminal', location: 'Singapore', status: 'active', activity: 820, color: '#00E676' }
-            ],
+            tenantMatrix: [],
+            tenantIntelligence: [],
             systemHealth: {
-              series: [{ name: 'System Metrics', data: [92, 88, 95, 98, 94] }],
+              series: [],
               options: {
-                categories: ['API Ingress', 'Memory Stability', 'Reconciliation Speed', 'Ledger Integrity', 'Job Telemetry']
-              }
+                categories: ['API Ingress', 'Memory Stability', 'Reconciliation Speed', 'Ledger Integrity', 'Job Telemetry'],
+              },
+              status: 'UNAVAILABLE',
             },
-            recommendations: [
-              { title: 'System Optimized', description: 'All financial subsystems and microservices operating within peak SLA parameters.', impact: 'Low Risk', icon: 'check_circle', color: 'green-9' },
-              { title: 'Hardware Infrastructure Resilient', description: 'Zero cluster anomalies recorded over last 24-hour evaluation cycle.', impact: 'Low Risk', icon: 'auto_awesome', color: 'purple-4' }
-            ],
-            infraChartSeries: [
-              { name: 'CPU Load (%)', data: [18, 22, 19, 24, 28, 25, 22, 26, 24, 23] },
-              { name: 'Memory Allocation (%)', data: [40, 41, 42, 42, 43, 42, 41, 42, 42, 42] }
-            ]
+            recommendations: [],
+            infraChartSeries: [],
           };
         });
     }

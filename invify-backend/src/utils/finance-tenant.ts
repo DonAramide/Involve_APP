@@ -63,10 +63,18 @@ export function resolveAuthoritativeTenantId(req: Request): string {
     throw err;
   }
 
+  // Tenant admin routes use /tenants/:id/..., not :tenantId — treat :id as
+  // the tenant when the path is under /tenants/ so platform ops don't 400.
+  const pathForTenantParam = String(req.originalUrl || req.path || '');
+  const paramIdAsTenant = /\/tenants\//i.test(pathForTenantParam)
+    ? usableTenantId((req.params as any)?.id)
+    : undefined;
+
   const chosenClient =
     usableTenantId(req.body?.tenantId) ||
     usableTenantId(req.query?.tenantId) ||
     usableTenantId((req.params as any)?.tenantId) ||
+    paramIdAsTenant ||
     usableTenantId(firstHeader(req.headers['x-tenant-id']));
 
   if (isPlatformFinanceOperator(user)) {

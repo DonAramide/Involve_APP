@@ -1,7 +1,14 @@
 export interface HardwareResource { label: string; value: number; color: string; }
 export interface InfraChartSeries { name: string; data: number[]; }
 export interface ActiveModule { name: string; icon: string; usage: number; }
-export interface TenantMatrixRow { name: string; revenue: string; score: number; risk: string; growth: string; }
+export interface TenantMatrixRow {
+  id?: string;
+  name: string;
+  revenue: string;
+  score: number;
+  risk: string;
+  growth: string;
+}
 export interface KpiData {
   label: string;
   value: string | number;

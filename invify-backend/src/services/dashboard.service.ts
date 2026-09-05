@@ -1,26 +1,53 @@
-import { supabase } from '../db/supabase';
+import { supabase, supabaseAdmin } from '../db/supabase';
 import * as os from 'os';
 
 // Cache for infra history
 const infraHistory: { cpu: number[], memory: number[] } = { cpu: [], memory: [] };
 
+const NGN = new Intl.NumberFormat('en-NG', {
+  style: 'currency',
+  currency: 'NGN',
+  maximumFractionDigits: 0,
+});
+
+function formatNgn(amount: number): string {
+  try {
+    return NGN.format(amount || 0);
+  } catch {
+    return `₦${Math.round(amount || 0).toLocaleString()}`;
+  }
+}
+
 export class DashboardService {
   static async getOverviewKPIs() {
     let data: any = null;
     try {
-      const res = await supabase.from('v_dashboard_kpis').select('*').single();
+      const res = await supabaseAdmin.from('v_dashboard_kpis').select('*').single();
       data = res.data;
     } catch (e) {
       console.warn('[DashboardService] v_dashboard_kpis fetch warning:', e);
+    }
+
+    let activeTenantsFallback: string | null = null;
+    if (!data?.active_tenants) {
+      try {
+        const { count } = await supabaseAdmin
+          .from('tenants')
+          .select('*', { count: 'exact', head: true })
+          .ilike('status', 'active');
+        if (typeof count === 'number') activeTenantsFallback = String(count);
+      } catch {
+        /* ignore */
+      }
     }
     
     // Override system uptime from DB with actual Node process uptime
     const uptimePercent = (100 - (100 / (os.uptime() + 1))).toFixed(2);
 
     return [
-      { label: 'Platform Health Score', action: '', value: data?.platform_health_score ? `${data.platform_health_score}%` : '99.8%', status: 'Live', statusBg: 'green-10', statusColor: 'green-2', icon: 'monitor_heart', colorName: 'green-4', color: '#00E676', sparkline: 'M0 25 Q15 5, 30 20 T60 5 T100 15', trendUp: true, trendColor: 'green-4', comparison: '+0.2% vs 24h' },
-      { label: 'Active Tenants', action: '/admin/tenants', value: data?.active_tenants?.toString() || '14', status: 'Live', statusBg: 'purple-10', statusColor: 'purple-2', icon: 'storefront', colorName: 'purple-4', color: '#8B5CF6', sparkline: 'M0 25 L15 15 L35 25 L55 10 L75 22 L100 5', trendUp: true, trendColor: 'purple-4', comparison: 'Active' },
-      { label: 'Total Transactions', action: '/finance/ledger', value: data?.total_transactions ? `₦${data.total_transactions}` : '₦1.2M', status: 'Live', statusBg: 'cyan-10', statusColor: 'cyan-2', icon: 'account_balance_wallet', colorName: 'cyan-4', color: '#00B8FF', sparkline: 'M0 25 Q20 25, 40 10 T80 20 T100 5', trendUp: true, trendColor: 'green-4', comparison: 'Live Synced' },
+      { label: 'Platform Health Score', action: '', value: data?.platform_health_score ? `${data.platform_health_score}%` : '—', status: data ? 'Live' : 'Partial', statusBg: 'green-10', statusColor: 'green-2', icon: 'monitor_heart', colorName: 'green-4', color: '#00E676', sparkline: 'M0 25 Q15 5, 30 20 T60 5 T100 15', trendUp: true, trendColor: 'green-4', comparison: data ? 'From KPI view' : 'Unavailable' },
+      { label: 'Active Tenants', action: '/admin/tenants', value: data?.active_tenants?.toString() || activeTenantsFallback || '0', status: 'Live', statusBg: 'purple-10', statusColor: 'purple-2', icon: 'storefront', colorName: 'purple-4', color: '#8B5CF6', sparkline: 'M0 25 L15 15 L35 25 L55 10 L75 22 L100 5', trendUp: true, trendColor: 'purple-4', comparison: 'Active' },
+      { label: 'Total Transactions', action: '/finance/ledger', value: data?.total_transactions ? `₦${data.total_transactions}` : '—', status: data?.total_transactions ? 'Live' : 'Partial', statusBg: 'cyan-10', statusColor: 'cyan-2', icon: 'account_balance_wallet', colorName: 'cyan-4', color: '#00B8FF', sparkline: 'M0 25 Q20 25, 40 10 T80 20 T100 5', trendUp: true, trendColor: 'green-4', comparison: data?.total_transactions ? 'Live Synced' : 'Unavailable' },
       { label: 'System Uptime', action: '', value: `${uptimePercent}%`, status: 'Live', statusBg: 'green-10', statusColor: 'green-2', icon: 'schedule', colorName: 'green-4', color: '#00E676', sparkline: 'M0 10 L25 10 L50 8 L75 10 L100 10', trendUp: true, trendColor: 'green-4', comparison: 'Live Node Uptime' },
       { label: 'Security Posture', action: '/governance/audit', value: data?.security_posture || 'A+', status: 'Live', statusBg: 'amber-10', statusColor: 'amber-2', icon: 'security', colorName: 'amber-4', color: '#FFC107', sparkline: 'M0 15 L20 15 L40 18 L60 12 L80 15 L100 15', trendUp: true, trendColor: 'grey-5', comparison: 'Encrypted' },
       { label: 'Open Incidents', action: '/finance/reconciliation', value: data?.open_incidents?.toString() || '0', status: 'Live', statusBg: 'green-10', statusColor: 'green-2', icon: 'check_circle', colorName: 'green-4', color: '#00E676', sparkline: 'M0 10 L20 25 L40 15 L60 28 L80 10 L100 20', trendUp: false, trendColor: 'green-4', comparison: 'All Clear' }
@@ -121,22 +148,141 @@ export class DashboardService {
 
   static async getTenantIntelligence() {
     try {
-      const { data, error } = await supabase.from('v_dashboard_tenant_intelligence').select('*');
-      if (error || !data || data.length === 0) {
-        return [
-          { name: 'Zenith Retail Network', revenue: '₦18,450,000', score: 98, risk: 'Low', growth: '+24%' },
-          { name: 'Apex Logistics Terminal', revenue: '₦12,800,000', score: 95, risk: 'Low', growth: '+18%' },
-          { name: 'Prime Mart Enterprise', revenue: '₦9,250,000', score: 91, risk: 'Low', growth: '+12%' },
-          { name: 'Metro Foods Chain', revenue: '₦7,690,000', score: 88, risk: 'Medium', growth: '+8%' }
-        ];
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      // Prefer the analytics view when present; otherwise build from operational tables.
+      let viewRows: any[] | null = null;
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('v_dashboard_tenant_intelligence')
+          .select('*');
+        if (!error && data && data.length > 0) {
+          viewRows = data;
+        }
+      } catch (viewErr: any) {
+        console.warn(
+          '[DashboardService] v_dashboard_tenant_intelligence unavailable:',
+          viewErr?.message || viewErr,
+        );
       }
-      return data;
-    } catch {
-      return [
-        { name: 'Zenith Retail Network', revenue: '₦18,450,000', score: 98, risk: 'Low', growth: '+24%' },
-        { name: 'Apex Logistics Terminal', revenue: '₦12,800,000', score: 95, risk: 'Low', growth: '+18%' },
-        { name: 'Prime Mart Enterprise', revenue: '₦9,250,000', score: 91, risk: 'Low', growth: '+12%' }
-      ];
+
+      const { data: tenants, error: tenantsErr } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, status, plan, country, state, location, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (tenantsErr) {
+        console.error('[DashboardService] tenants fetch failed:', tenantsErr.message);
+      }
+
+      const tenantList = tenants || [];
+      if (tenantList.length === 0 && (!viewRows || viewRows.length === 0)) {
+        return [];
+      }
+
+      const tenantIds = tenantList.map((t) => t.id).filter(Boolean);
+
+      const [txRes, ledgerRes] = await Promise.all([
+        tenantIds.length
+          ? supabaseAdmin
+              .from('transactions_log')
+              .select('tenant_id, amount, status, created_at')
+              .in('tenant_id', tenantIds)
+              .gte('created_at', since)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        tenantIds.length
+          ? supabaseAdmin
+              .from('ledger_entries')
+              .select('tenant_id, amount, created_at')
+              .in('tenant_id', tenantIds)
+              .gte('created_at', since)
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]);
+
+      if (txRes.error) {
+        console.warn('[DashboardService] transactions_log 24h warn:', txRes.error.message);
+      }
+      if (ledgerRes.error) {
+        console.warn('[DashboardService] ledger_entries 24h warn:', ledgerRes.error.message);
+      }
+
+      const txByTenant = new Map<string, { count: number; volume: number }>();
+      for (const row of txRes.data || []) {
+        const id = String(row.tenant_id || '');
+        if (!id) continue;
+        const status = String(row.status || '').toUpperCase();
+        if (status && !['SUCCESS', 'COMPLETED', 'PAID', 'SETTLED'].includes(status)) continue;
+        const prev = txByTenant.get(id) || { count: 0, volume: 0 };
+        prev.count += 1;
+        prev.volume += Math.abs(Number(row.amount || 0));
+        txByTenant.set(id, prev);
+      }
+      for (const row of ledgerRes.data || []) {
+        const id = String(row.tenant_id || '');
+        if (!id || txByTenant.has(id)) continue; // prefer transactions_log when present
+        const prev = txByTenant.get(id) || { count: 0, volume: 0 };
+        prev.count += 1;
+        prev.volume += Math.abs(Number(row.amount || 0));
+        txByTenant.set(id, prev);
+      }
+
+      if (viewRows && viewRows.length > 0) {
+        // Merge real tenant ids / locations onto view rows when names match.
+        const byName = new Map(tenantList.map((t) => [String(t.name || '').toLowerCase(), t]));
+        return viewRows.map((row: any) => {
+          const match = byName.get(String(row.name || '').toLowerCase());
+          const id = row.id || row.tenant_id || match?.id;
+          const stats = id ? txByTenant.get(String(id)) : undefined;
+          return {
+            id,
+            name: row.name,
+            revenue: row.revenue || formatNgn(stats?.volume || 0),
+            score: Number(row.score ?? Math.min(99, 60 + (stats?.count || 0))),
+            risk: row.risk || (String(match?.status || '').toLowerCase() === 'active' ? 'Low' : 'Medium'),
+            growth: row.growth || `${stats?.count || 0} tx/24h`,
+            status: match?.status || row.status || 'active',
+            country: match?.country || row.country || null,
+            state: match?.state || row.state || null,
+            city: match?.city || row.city || null,
+            location: match?.location || row.location || null,
+            activity24h: stats?.count ?? Number(row.activity24h || 0),
+          };
+        });
+      }
+
+      return tenantList.map((t) => {
+        const stats = txByTenant.get(String(t.id)) || { count: 0, volume: 0 };
+        const status = String(t.status || 'active').toLowerCase();
+        const risk =
+          status === 'suspended' || status === 'locked' || status === 'inactive'
+            ? 'High'
+            : status === 'pending' || status === 'trial'
+              ? 'Medium'
+              : 'Low';
+        const score = Math.min(
+          99,
+          Math.max(40, 70 + Math.round(Math.log10(stats.count + 1) * 12) - (risk === 'High' ? 25 : 0)),
+        );
+        return {
+          id: t.id,
+          name: t.name || 'Unnamed Tenant',
+          revenue: formatNgn(stats.volume),
+          score,
+          risk,
+          growth: `${stats.count} tx/24h`,
+          status,
+          plan: t.plan || null,
+          country: t.country || null,
+          state: t.state || null,
+          city: null,
+          location: t.location || null,
+          activity24h: stats.count,
+        };
+      });
+    } catch (err: any) {
+      console.error('[DashboardService] getTenantIntelligence error:', err?.message || err);
+      return [];
     }
   }
 

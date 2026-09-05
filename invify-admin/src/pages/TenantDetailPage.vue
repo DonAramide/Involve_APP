@@ -1,6 +1,14 @@
 <template>
   <q-page class="q-pa-lg bg-dark text-white">
-    <div v-if="tenant">
+    <div v-if="loadError && !tenant" class="q-pa-xl text-center">
+      <q-icon name="error_outline" size="64px" color="red-5" class="q-mb-md" />
+      <div class="text-h6 q-mb-sm">Could not load tenant</div>
+      <div class="text-grey-5 q-mb-lg" style="max-width: 480px; margin: 0 auto;">{{ loadError }}</div>
+      <q-btn color="indigo-5" icon="refresh" label="Retry" unelevated @click="fetchDetails" />
+      <q-btn flat color="grey-5" label="Back to Tenants" class="q-ml-sm" to="/tenants" />
+    </div>
+
+    <div v-else-if="tenant">
       <!-- Breadcrumbs & Header -->
       <div class="q-mb-md">
         <q-breadcrumbs class="text-grey-6" gutter="sm">
@@ -1149,6 +1157,7 @@ const $route = useRoute()
 
 const tab = ref('overview')
 const loading = ref(true)
+const loadError = ref('')
 const tenant = ref(null)
 const users = ref([])
 const wallet = ref({ 
@@ -1646,6 +1655,7 @@ const copyTempPassword = () => {
 
 const fetchDetails = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const { data } = await adminApi.getTenantDetails($route.params.id)
     tenant.value = data.tenant
@@ -1697,6 +1707,14 @@ const fetchDetails = async () => {
       financialAudit.value = []
     }
 
+  } catch (e) {
+    console.error('Failed to fetch tenant details:', e)
+    tenant.value = null
+    loadError.value =
+      e?.response?.data?.error ||
+      e?.message ||
+      `Failed to load tenant (${e?.response?.status || 'error'})`
+    $q.notify({ type: 'negative', message: loadError.value })
   } finally {
     loading.value = false
   }
@@ -1805,6 +1823,7 @@ watch(
     if (newId && newId !== oldId) {
       // Reset state before fetching new tenant
       tenant.value = null
+      loadError.value = ''
       users.value = []
       wallet.value = { balance: 0, subAccount: null, virtualAccounts: [], transactions: [], allWallets: [] }
       recentUsage.value = []

@@ -81,6 +81,19 @@ describe('Phase 4 tenant isolation regressions', () => {
     expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
   });
 
+  test('super_admin may select tenant via /tenants/:id path param', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: null },
+      headers: {},
+      body: {},
+      query: {},
+      params: { id: 'tenant-b' },
+      originalUrl: '/api/admin/tenants/tenant-b/details',
+      path: '/api/admin/tenants/tenant-b/details',
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
   test('super_admin still requires a real tenant when only sentinels are present', () => {
     const req = mockReq({
       user: { id: 'sa', role: 'super_admin', tenantId: 'system' },
