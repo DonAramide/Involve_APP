@@ -244,7 +244,7 @@ export class DashboardService {
             status: match?.status || row.status || 'active',
             country: match?.country || row.country || null,
             state: match?.state || row.state || null,
-            city: match?.city || row.city || null,
+            city: row.city || null,
             location: match?.location || row.location || null,
             activity24h: stats?.count ?? Number(row.activity24h || 0),
           };
