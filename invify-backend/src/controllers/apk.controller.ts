@@ -53,12 +53,12 @@ function storageUploadErrorMessage(error: any): string {
   return raw || 'APK upload failed';
 }
 
-function apkPutObjectInput(bucket: string, objectKey: string, tempPath: string, size: number) {
+function apkPutObjectInput(bucket: string, objectKey: string, body: Buffer) {
   const input: Record<string, unknown> = {
     Bucket: bucket,
     Key: objectKey,
-    Body: fs.createReadStream(tempPath),
-    ContentLength: size,
+    Body: body,
+    ContentLength: body.byteLength,
     ContentType: 'application/vnd.android.package-archive',
   };
   if (process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true') {
@@ -83,7 +83,10 @@ function publicApkDownloadUrl(apkId: string): string {
   return base ? `${base}/api/apk/${apkId}/download` : `/api/apk/${apkId}/download`;
 }
 
-import { io } from '../app';
+function getIo() {
+  // Lazy import avoids a circular load with app.ts that can 500 APK routes.
+  return require('../app').io;
+}
 
 export class ApkController {
 
@@ -120,9 +123,10 @@ export class ApkController {
         });
       }
       const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
+      const body = await fs.promises.readFile(tempPath);
 
       const s3Client = createContaboS3Client();
-      await s3Client.send(new PutObjectCommand(apkPutObjectInput(bucket, objectKey, tempPath, file.size) as any));
+      await s3Client.send(new PutObjectCommand(apkPutObjectInput(bucket, objectKey, body) as any));
 
       // Construct public URL with Contabo tenant ID format: https://<endpoint>/<tenantId>:<bucket>/<key>
       let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
@@ -142,8 +146,8 @@ export class ApkController {
         name,
         packageName,
         version,
-        size: file.size,
-        sizeFormatted: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        size: body.byteLength,
+        sizeFormatted: `${(body.byteLength / 1024 / 1024).toFixed(1)} MB`,
         s3Url
       };
 
@@ -291,7 +295,7 @@ export class ApkController {
       // Broadcast OTA push to targeted devices
       if (targetDevices && targetDevices.length > 0) {
         targetDevices.forEach((deviceId: string) => {
-          io.to(`device:${deviceId}`).emit('ota_push_event', {
+          getIo().to(`device:${deviceId}`).emit('ota_push_event', {
             action: 'INSTALL',
             apkId: apk.id,
             packageName: apk.packageName,
@@ -302,7 +306,7 @@ export class ApkController {
         });
       } else {
         // Fallback to all if no target devices specified
-        io.emit('ota_push_event', {
+        getIo().emit('ota_push_event', {
           action: 'INSTALL',
           apkId: apk.id,
           packageName: apk.packageName,

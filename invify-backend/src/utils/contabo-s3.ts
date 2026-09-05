@@ -30,7 +30,10 @@ export function resolveContaboBucket(): string {
 }
 
 export function createContaboS3Client(): S3Client {
-  return new S3Client({
+  process.env.AWS_REQUEST_CHECKSUM_CALCULATION ||= 'WHEN_REQUIRED';
+  process.env.AWS_RESPONSE_CHECKSUM_VALIDATION ||= 'WHEN_REQUIRED';
+
+  const client = new S3Client({
     endpoint: resolveContaboEndpoint(),
     region: (process.env.CONTABO_REGION || DEFAULT_CONTABO_REGION).trim() || DEFAULT_CONTABO_REGION,
     credentials: {
@@ -39,9 +42,43 @@ export function createContaboS3Client(): S3Client {
     },
     forcePathStyle: true,
     tls: true,
-    // AWS SDK v3.729+ sends CRC32 checksums by default. Contabo returns JSON
-    // errors for those headers; the SDK then fails with "char '{' is not expected".
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   });
+
+  const stripAwsChecksumHeaders = (next: (args: any) => Promise<any>) => async (args: any) => {
+    const headers = args?.request?.headers;
+    if (headers && typeof headers === 'object') {
+      for (const key of Object.keys(headers)) {
+        const lower = key.toLowerCase();
+        if (
+          lower.startsWith('x-amz-checksum-') ||
+          lower === 'x-amz-sdk-checksum-algorithm' ||
+          lower === 'x-amz-trailer' ||
+          lower === 'x-amz-decoded-content-length'
+        ) {
+          delete headers[key];
+        }
+      }
+      const encoding = String(headers['content-encoding'] || headers['Content-Encoding'] || '');
+      if (encoding.toLowerCase().includes('aws-chunked')) {
+        delete headers['content-encoding'];
+        delete headers['Content-Encoding'];
+      }
+    }
+    return next(args);
+  };
+
+  client.middlewareStack.add(stripAwsChecksumHeaders, {
+    step: 'build',
+    name: 'contaboStripAwsChecksums',
+    priority: 'low',
+  });
+  client.middlewareStack.add(stripAwsChecksumHeaders, {
+    step: 'finalizeRequest',
+    name: 'contaboStripAwsChecksumsFinalize',
+    priority: 'low',
+  });
+
+  return client;
 }

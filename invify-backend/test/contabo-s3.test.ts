@@ -1,4 +1,4 @@
-import { resolveContaboEndpoint } from '../src/utils/contabo-s3';
+import { createContaboS3Client, resolveContaboEndpoint } from '../src/utils/contabo-s3';
 
 describe('resolveContaboEndpoint', () => {
   const originalEndpoint = process.env.CONTABO_ENDPOINT;
@@ -23,5 +23,11 @@ describe('resolveContaboEndpoint', () => {
     process.env.CONTABO_ENDPOINT = 'https://contabostorage.com';
     process.env.CONTABO_REGION = 'usc1';
     expect(resolveContaboEndpoint()).toBe('https://usc1.contabostorage.com');
+  });
+
+  test('installs Contabo checksum-stripping middleware', () => {
+    const identified = createContaboS3Client().middlewareStack.identify();
+    expect(identified.some((entry) => entry.includes('contaboStripAwsChecksums'))).toBe(true);
+    expect(identified.some((entry) => entry.includes('contaboStripAwsChecksumsFinalize'))).toBe(true);
   });
 });
