@@ -88,7 +88,15 @@
               :disable="isMaker(props.row) && props.row.status !== 'APPROVED_EXECUTING'"
               @click="approveCase(props.row)"
             >
-              <q-tooltip>{{ isMaker(props.row) ? 'You created this case — another operator must approve' : 'Approve (checker)' }}</q-tooltip>
+              <q-tooltip>
+                {{
+                  props.row.status === 'APPROVED_EXECUTING'
+                    ? 'Retry finalize (Quasar / ledger)'
+                    : isMaker(props.row)
+                      ? 'You created this case — another operator must approve'
+                      : 'Approve (checker)'
+                }}
+              </q-tooltip>
             </q-btn>
             <q-btn
               v-if="props.row.status === 'PENDING_CHECKER'"
@@ -352,18 +360,42 @@ async function submitCreate() {
 }
 
 async function approveCase(row) {
+  const isRetry = row.status === 'APPROVED_EXECUTING' || row.status === 'FAILED'
   $q.dialog({
-    title: 'Approve debit',
-    message: `Debit ₦${naira(row.amount_kobo).toLocaleString()} from ${row.tenant_name || 'tenant'} via Quasar? This cannot be the same operator who created the case.`,
+    title: isRetry ? 'Retry finalize' : 'Approve debit',
+    message: isRetry
+      ? `Retry Quasar debit / local ledger for ₦${naira(row.amount_kobo).toLocaleString()} (${row.tenant_name || 'tenant'})?`
+      : `Debit ₦${naira(row.amount_kobo).toLocaleString()} from ${row.tenant_name || 'tenant'} via Quasar? This cannot be the same operator who created the case.`,
     cancel: true,
     persistent: true,
   }).onOk(async () => {
     try {
-      await adminApi.approveFinancialDispute(row.id, { comment: 'Approved from Refunds & Chargebacks' })
-      $q.notify({ type: 'positive', message: 'Approved. Quasar debit posted.' })
+      const res = await adminApi.approveFinancialDispute(row.id, {
+        comment: isRetry ? 'Retry finalize from Refunds & Chargebacks' : 'Approved from Refunds & Chargebacks',
+      })
+      const data = res?.data || res
+      if (data?.waitingQuasar) {
+        $q.notify({
+          type: 'warning',
+          message: data.message || 'Waiting on Quasar confirmation. Case stays Executing until webhook or retry.',
+          timeout: 8000,
+        })
+      } else if (String(data?.status || '').toUpperCase() === 'POSTED') {
+        $q.notify({ type: 'positive', message: 'Posted. Quasar debit and local ledger recorded.' })
+      } else {
+        $q.notify({
+          type: 'info',
+          message: data?.message || `Case status: ${data?.status || 'updated'}`,
+          timeout: 6000,
+        })
+      }
       await fetchCases()
     } catch (err) {
-      $q.notify({ type: 'negative', message: userFacingApiError(err, 'Approval failed. No local ledger was posted.') })
+      $q.notify({
+        type: 'negative',
+        message: userFacingApiError(err, 'Approval failed. No local ledger was posted.'),
+        timeout: 10000,
+      })
       await fetchCases()
     }
   })

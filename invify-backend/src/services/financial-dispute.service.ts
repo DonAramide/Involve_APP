@@ -369,12 +369,63 @@ export class FinancialDisputeService {
       });
     }
 
-    return this.completePosted(row, actor, {
-      quasarDebitId: providerResult?.id || providerResult?.debitId || providerResult?.reference || null,
-      quasarStatus: providerResult?.status || 'POSTED',
-      providerPayload: providerResult,
-      source: 'sync',
-    });
+    const quasarDebitId =
+      providerResult?.id || providerResult?.debitId || providerResult?.reference || null;
+    const quasarStatus = providerResult?.status || 'ACCEPTED';
+
+    // Persist Quasar ids before ledger so a ledger failure can still be finalized later.
+    if (quasarDebitId) {
+      const { data: saved } = await supabaseAdmin
+        .from('financial_disputes')
+        .update({
+          quasar_debit_id: quasarDebitId,
+          quasar_status: quasarStatus,
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...(row.metadata || {}),
+            provider: providerResult || null,
+          },
+        })
+        .eq('id', row.id)
+        .eq('status', 'APPROVED_EXECUTING')
+        .select()
+        .maybeSingle();
+      if (saved) row = saved;
+    }
+
+    try {
+      return await this.completePosted(row, actor, {
+        quasarDebitId,
+        quasarStatus,
+        providerPayload: providerResult,
+        source: 'sync',
+      });
+    } catch (ledgerErr: any) {
+      console.error('[FinancialDispute] ledger post after Quasar failed:', ledgerErr?.message || ledgerErr);
+      await this.recordEvent({
+        caseId: row.id,
+        eventType: 'LEDGER_POST_FAILED',
+        actor,
+        fromStatus: 'APPROVED_EXECUTING',
+        toStatus: 'APPROVED_EXECUTING',
+        payload: { error: ledgerErr?.message || String(ledgerErr), quasarDebitId },
+        auditStatus: 'pending',
+      });
+      await supabaseAdmin
+        .from('financial_disputes')
+        .update({
+          failure_message: `Quasar accepted debit; local ledger pending: ${ledgerErr?.message || 'unknown'}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id)
+        .eq('status', 'APPROVED_EXECUTING');
+      const err: any = new DisputePolicyError(
+        `Quasar debit accepted but local ledger was not posted: ${ledgerErr?.message || 'ledger failure'}. Retry approve to finalize.`,
+        502,
+      );
+      err.case = { ...row, quasar_debit_id: quasarDebitId, waitingLedger: true };
+      throw err;
+    }
   }
 
   private static async finalizeFromQuasar(row: any, actor: DisputeActor) {

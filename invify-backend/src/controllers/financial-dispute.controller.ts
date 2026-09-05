@@ -21,6 +21,7 @@ function sendError(res: Response, error: any) {
   console.error('[FinancialDisputeController]', error.message);
   return res.status(status).json({
     error: error.message,
+    message: error.message,
     case: error.case || undefined,
   });
 }
