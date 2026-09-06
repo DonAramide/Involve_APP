@@ -457,6 +457,7 @@ app.use(activationRoutes);
 app.use('/auth', authRoutes);
 app.use('/v1/ecs', ecsRoutes);
 app.use('/vault', vaultRoutes);
+app.use('/api/vault', vaultRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/api/v1/finance', authenticate, financeRoutes);
 app.use('/api/v1/services', authenticate, servicesRoutes);

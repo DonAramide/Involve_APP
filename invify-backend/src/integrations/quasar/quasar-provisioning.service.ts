@@ -15,6 +15,7 @@
 import { quasarPlatformClient, InvifyVertical, QuasarPlatformClient } from './quasar-platform.client';
 import { QuasarPaymentsClient } from './quasar-payments.client';
 import { QuasarIntegrationStore } from './quasar-integration.store';
+import { IntegrationVaultService } from '../../services/integration-vault.service';
 import * as crypto from 'crypto';
 
 export interface ProvisionMerchantParams {
@@ -175,8 +176,9 @@ export class QuasarProvisioningService {
    * Retrieve a QuasarPaymentsClient for financial / sandbox calls.
    *
    * Resolution order:
-   *   1. Per-tenant sk from quasar_integrations (preferred for multi-merchant)
-   *   2. Global QUASAR_API_KEY (Invify general sk_test_* issued by Quasar)
+   *   1. Per-tenant sk from quasar_integrations
+   *   2. Integration Vault (GLOBAL quasar, STAGING then PRODUCTION then SANDBOX)
+   *   3. process.env QUASAR_API_KEY
    */
   static async getPaymentsClient(invifyTenantId: string): Promise<QuasarPaymentsClient> {
     const integration = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
@@ -185,30 +187,49 @@ export class QuasarProvisioningService {
       return new QuasarPaymentsClient(sk);
     }
 
-    const generalKey =
-      process.env.QUASAR_API_KEY?.trim() ||
-      process.env.QUASER_API_KEY?.trim();
-
-    if (generalKey && !generalKey.includes('your-quaser')) {
+    const generalKey = await this.resolveGeneralApiKey();
+    if (generalKey) {
       console.warn(
         `[QuasarProvisioning] No per-tenant Quasar integration for ${invifyTenantId}. ` +
-          `Using general QUASAR_API_KEY.`,
+          `Using vault/env QUASAR_API_KEY.`,
       );
       return new QuasarPaymentsClient(generalKey);
     }
 
     throw new Error(
       `[QuasarProvisioning] No Quasar integration for tenant ${invifyTenantId} ` +
-        `and QUASAR_API_KEY is missing/invalid. Provision the merchant or set QUASAR_API_KEY=sk_test_…`,
+        `and QUASAR_API_KEY is missing/invalid. Store sk_test_… in Integration Vault or env.`,
     );
   }
 
-  /** True when Invify has a usable general Quasar sk_test_* in env. */
+  static cleanApiKey(value?: string): string {
+    return String(value || '').trim().replace(/^["']|["']$/g, '');
+  }
+
+  static async resolveGeneralApiKey(): Promise<string | null> {
+    const looksLikeKey = (value: string) => value.startsWith('sk_test_') || value.startsWith('sk_live_');
+    const vaultEnvs = ['STAGING', 'PRODUCTION', 'SANDBOX'];
+    const keyNames = ['QUASAR_API_KEY', 'API_KEY', undefined];
+    for (const environment of vaultEnvs) {
+      for (const keyName of keyNames) {
+        try {
+          const vaultKey = this.cleanApiKey(
+            (await IntegrationVaultService.getDecryptedCredential('quasar', environment, undefined, keyName)) || '',
+          );
+          if (looksLikeKey(vaultKey)) return vaultKey;
+        } catch {
+          /* try next */
+        }
+      }
+    }
+    const envKey = this.cleanApiKey(process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY);
+    if (envKey && !envKey.includes('your-quaser')) return envKey;
+    return null;
+  }
+
+  /** True when Invify has a usable general Quasar sk_test_* in env or vault. */
   static hasGeneralApiKey(): boolean {
-    const key =
-      process.env.QUASAR_API_KEY?.trim() ||
-      process.env.QUASER_API_KEY?.trim() ||
-      '';
+    const key = this.cleanApiKey(process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY);
     return key.length > 0 && !key.includes('your-quaser');
   }
 }

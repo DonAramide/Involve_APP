@@ -6,4 +6,4 @@
 export const WEB_APP_VERSION =
   typeof __WEB_APP_VERSION__ !== 'undefined' && __WEB_APP_VERSION__
     ? String(__WEB_APP_VERSION__)
-    : '1.0.3'
+    : '1.0.4'

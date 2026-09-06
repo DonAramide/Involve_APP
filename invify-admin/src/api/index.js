@@ -396,13 +396,13 @@ export const commissionApi = {
 };
 
 export const vaultApi = {
-  listIntegrations: (scope, tenantId) => api.get('/vault/integrations', { params: { scope, tenantId } }),
-  registerIntegration: (data) => api.post('/vault/integrations', data),
-  addCredential: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/credentials`, data),
-  activateCredential: (vaultId, credentialId) => api.patch(`/vault/integrations/${vaultId}/credentials/${credentialId}/activate`),
-  deleteCredential: (vaultId, credentialId) => api.delete(`/vault/integrations/${vaultId}/credentials/${credentialId}`),
-  testConnection: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/test`, data),
-  saveQipConfig: (environment, data) => api.put('/vault/qip-config', { environment, ...data }),
+  listIntegrations: (scope, tenantId) => api.get('/api/vault/integrations', { params: { scope, tenantId } }),
+  registerIntegration: (data) => api.post('/api/vault/integrations', data),
+  addCredential: (vaultId, data) => api.post(`/api/vault/integrations/${vaultId}/credentials`, data),
+  activateCredential: (vaultId, credentialId) => api.patch(`/api/vault/integrations/${vaultId}/credentials/${credentialId}/activate`),
+  deleteCredential: (vaultId, credentialId) => api.delete(`/api/vault/integrations/${vaultId}/credentials/${credentialId}`),
+  testConnection: (vaultId, data) => api.post(`/api/vault/integrations/${vaultId}/test`, data),
+  saveQipConfig: (environment, data) => api.put('/api/vault/qip-config', { environment, ...data }),
   getQuasarWebhookSecretStatus: (environment = 'PRODUCTION') =>
     api.get('/api/admin/quasar/webhook-secret/status', { params: { environment } }),
   saveQuasarWebhookSigningSecret: (data) =>
@@ -414,9 +414,9 @@ export const vaultApi = {
   testQuasarAdminCredentials: (data = {}) =>
     api.post('/api/admin/quasar/admin-credentials/test', data),
   getMetaWhatsAppStatus: (environment = 'PRODUCTION') =>
-    api.get('/vault/meta-whatsapp/status', { params: { environment } }),
+    api.get('/api/vault/meta-whatsapp/status', { params: { environment } }),
   saveMetaWhatsAppCredentials: (data) =>
-    api.put('/vault/meta-whatsapp', data),
+    api.put('/api/vault/meta-whatsapp', data),
 };
 
 export const ecsApi = {

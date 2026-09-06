@@ -1,6 +1,6 @@
 {
   "name": "invify-admin",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "IIPS Admin Panel with Engine Unit Tests",
   "private": true,
   "scripts": {

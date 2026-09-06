@@ -4,8 +4,7 @@ import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// In production, require authenticate middleware:
-// router.use(authenticate);
+router.use(authenticate);
 
 router.get('/integrations', VaultController.listIntegrations);
 router.post('/integrations', VaultController.registerIntegration);

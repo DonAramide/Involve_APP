@@ -215,7 +215,11 @@ async function fetchVault() {
       return;
     }
     const res = await vaultApi.listIntegrations(activeScope.value, tenantId);
-    integrations.value = res.data?.data || [];
+    const payload = res.data?.data;
+    if (!Array.isArray(payload)) {
+      throw new Error('Vault API returned HTML or a non-JSON list. Use /api/vault/integrations.');
+    }
+    integrations.value = payload;
     if (activeScope.value === 'GLOBAL') {
       try {
         const statusRes = await vaultApi.getQuasarWebhookSecretStatus('PRODUCTION');
