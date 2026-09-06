@@ -2,6 +2,7 @@ import {
   contaboObjectPath,
   createContaboS3Client,
   formatContaboPutError,
+  formatContaboNetworkError,
   putContaboObject,
   resolveContaboCredentials,
   resolveContaboEndpoint,
@@ -53,6 +54,12 @@ describe('Contabo SigV4 PUT helpers', () => {
   test('surfaces Contabo XML Message elements', () => {
     expect(formatContaboPutError(403, '<Error><Message>Access Denied</Message></Error>'))
       .toBe('Access Denied');
+  });
+
+  test('maps Airtel TLS interception to an actionable upload error', () => {
+    expect(formatContaboNetworkError({
+      message: "Hostname/IP does not match certificate's altnames: Host: usc1.contabostorage.com. is not in the cert's altnames: DNS:*.airtel.ng, DNS:airtel.ng",
+    })).toMatch(/ISP intercepted Contabo Object Storage/);
   });
 
   test('rejects missing Contabo credentials before opening a socket', async () => {

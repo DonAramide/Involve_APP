@@ -20,7 +20,7 @@ export function resolveContaboEndpoint(): string {
     if (host === 'contabostorage.com') {
       host = `${region}.contabostorage.com`;
     }
-    url.hostname = host;
+    url.hostname = host.replace(/\.$/, '');
     url.protocol = 'https:';
     return url.origin;
   } catch {
@@ -80,6 +80,17 @@ export function contaboObjectPath(bucket: string, key: string): string {
     .map(encodeURIComponent)
     .join('/');
   return `/${bucket}/${keyPath}`;
+}
+
+export function formatContaboNetworkError(error: unknown): string {
+  const raw = String((error as any)?.message || error || '');
+  if (/altnames|CERT_ALTNAME|unable to verify the first certificate/i.test(raw)) {
+    if (/airtel/i.test(raw)) {
+      return 'Your ISP intercepted Contabo Object Storage (TLS certificate was Airtel, not Contabo). Retry on a different network/DNS (1.1.1.1), or upload from https://staging.invify.org instead of localhost.';
+    }
+    return 'TLS to Contabo Object Storage failed (certificate hostname mismatch). This is usually ISP HTTPS interception. Upload from https://staging.invify.org instead of localhost.';
+  }
+  return raw || 'Contabo Object Storage upload failed';
 }
 
 export function formatContaboPutError(status: number, text: string): string {
@@ -169,7 +180,7 @@ export async function putContaboObject(params: {
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
-      if (error) reject(error);
+      if (error) reject(new Error(formatContaboNetworkError(error)));
       else resolve();
     };
 
@@ -180,6 +191,7 @@ export async function putContaboObject(params: {
         method: 'PUT',
         path,
         family: 4,
+        servername: hostname,
         headers: {
           host: hostname,
           'content-type': contentType,

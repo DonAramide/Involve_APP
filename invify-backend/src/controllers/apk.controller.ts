@@ -5,7 +5,7 @@ import multer from 'multer';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
 import { resolveApkObjectKey } from '../utils/apk-object-key';
-import { createContaboS3Client, putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
+import { createContaboS3Client, formatContaboNetworkError, putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 
 const APK_MAX_BYTES = 500 * 1024 * 1024;
 
@@ -50,7 +50,7 @@ function storageUploadErrorMessage(error: any): string {
   if (/char ['"][{!]['"] is not expected|deserialization error/i.test(raw)) {
     return 'Contabo Object Storage rejected the upload (S3-compatible APIs do not accept AWS default checksums).';
   }
-  return raw || 'APK upload failed';
+  return formatContaboNetworkError(error) || raw || 'APK upload failed';
 }
 
 function removeTempApk(filePath?: string) {
