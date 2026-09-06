@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'crypto';
+import { lookup as dnsLookup } from 'dns/promises';
 import fs from 'fs';
 import https from 'https';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -71,6 +72,15 @@ function sha256File(filePath: string): Promise<string> {
 
 function hmac(key: Buffer | string, data: string): Buffer {
   return createHmac('sha256', key).update(data).digest();
+}
+
+async function resolveContaboIPv4(hostname: string): Promise<string> {
+  const lookup = dnsLookup(hostname, { family: 4 });
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`DNS lookup timed out for ${hostname}`)), 8000);
+  });
+  const { address } = await Promise.race([lookup, timeout]);
+  return address;
 }
 
 export function contaboObjectPath(bucket: string, key: string): string {
@@ -173,25 +183,35 @@ export async function putContaboObject(params: {
     `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   const started = Date.now();
-  console.log(`[contabo] PUT ${hostname}${path} (${contentLength} bytes)`);
+  const address = await resolveContaboIPv4(hostname);
+  console.log(`[contabo] PUT ${hostname}${path} (${contentLength} bytes) via ${address}`);
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    let bodyStarted = false;
+    const agent = new https.Agent({ keepAlive: false });
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
+      clearTimeout(watchdog);
+      clearInterval(progress);
+      agent.destroy();
       if (error) reject(new Error(formatContaboNetworkError(error)));
       else resolve();
     };
+    const watchdog = setTimeout(() => {
+      req.destroy();
+      finish(new Error('Contabo Object Storage upload timed out'));
+    }, 3 * 60 * 1000);
 
     const req = https.request(
       {
-        hostname,
+        host: address,
         port,
         method: 'PUT',
         path,
-        family: 4,
         servername: hostname,
+        agent,
         headers: {
           host: hostname,
           'content-type': contentType,
@@ -218,25 +238,37 @@ export async function putContaboObject(params: {
         });
       },
     );
+    const progress = setInterval(() => {
+      const written = Number((req.socket as any)?.bytesWritten || 0);
+      console.log(`[contabo] PUT progress ${written}/${contentLength} bytes`);
+    }, 5000);
+
+    const startBody = () => {
+      if (bodyStarted) return;
+      bodyStarted = true;
+      console.log(`[contabo] tls ready, sending body`);
+      if (params.filePath) {
+        const stream = fs.createReadStream(params.filePath);
+        stream.on('error', (error) => {
+          req.destroy();
+          finish(error);
+        });
+        stream.pipe(req);
+      } else {
+        req.end(params.body);
+      }
+    };
+
     req.on('error', (error) => finish(error));
     req.on('socket', (socket) => {
+      console.log(`[contabo] socket ${(socket as any).remoteAddress || 'connecting'}`);
       socket.setNoDelay(true);
-      socket.setTimeout(120000);
-      socket.on('timeout', () => {
-        req.destroy();
-        finish(new Error('Contabo Object Storage upload stalled'));
-      });
+      if ((socket as any).encrypted) {
+        socket.once('secureConnect', startBody);
+      } else {
+        socket.once('connect', startBody);
+      }
     });
-    if (params.filePath) {
-      const stream = fs.createReadStream(params.filePath);
-      stream.on('error', (error) => {
-        req.destroy();
-        finish(error);
-      });
-      stream.pipe(req);
-    } else {
-      req.end(params.body);
-    }
   });
 }
 
