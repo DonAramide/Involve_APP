@@ -824,12 +824,12 @@ app.post('/api/pos/transactionFromMpos', authenticate, PosController.processTran
 app.post('/api/v1/pos/transactionFromMpos', authenticate, PosController.processTransaction);
 app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
 app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
-app.get('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getRoutingConfig);
-app.post('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.updateRoutingConfig);
-app.get('/admin/pos/routing/affected-devices', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getAffectedDevices);
-app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.refreshKimonoParams);
-app.get('/admin/pos/observability', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getObservabilityMetrics);
-app.post('/admin/pos/simulate', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.simulateRoute);
+registerCollisionAdmin('get', '/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getRoutingConfig);
+registerCollisionAdmin('post', '/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.updateRoutingConfig);
+registerCollisionAdmin('get', '/pos/routing/affected-devices', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getAffectedDevices);
+registerCollisionAdmin('post', '/pos/kimono-params/refresh', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.refreshKimonoParams);
+registerCollisionAdmin('get', '/pos/observability', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getObservabilityMetrics);
+registerCollisionAdmin('post', '/pos/simulate', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.simulateRoute);
 
 // Terminal & Inventory Management Operations (dual-register: nginx staging strips `/api`)
 registerCollisionAdmin('get', '/inventory/stats', authenticate, TerminalController.getStats);

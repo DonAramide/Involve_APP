@@ -1573,7 +1573,11 @@ const loadAll = async () => {
     let cfgOk = false
     try {
       const cfgRes = await posApi.getRoutingConfig()
-      config.value = cfgRes.data || {}
+      const cfg = cfgRes.data
+      if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg) || typeof cfg === 'string') {
+        throw new Error('Routing config API returned HTML or a non-JSON body. Check that /api/admin/pos/routing is proxied to the backend.')
+      }
+      config.value = cfg
       if (!Array.isArray(config.value.tenantRoutingProfiles)) {
         config.value.tenantRoutingProfiles = []
       }

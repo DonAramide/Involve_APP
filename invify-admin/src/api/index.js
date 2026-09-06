@@ -331,20 +331,20 @@ export const reconciliationApi = {
 
 export const posApi = {
   // Routing configuration (super_admin only)
-  getRoutingConfig:    ()     => api.get('/admin/pos/routing'),
-  updateRoutingConfig: (data) => api.post('/admin/pos/routing', data),
-  getAffectedDevices: (params) => api.get('/admin/pos/routing/affected-devices', { params }),
+  getRoutingConfig:    ()     => api.get('/api/admin/pos/routing'),
+  updateRoutingConfig: (data) => api.post('/api/admin/pos/routing', data),
+  getAffectedDevices: (params) => api.get('/api/admin/pos/routing/affected-devices', { params }),
 
   // Transaction history
   getHistory: () => api.get('/api/pos/history'),
 
   // Kimono terminal key refresh (super_admin only)
   refreshKimonoParams: (terminalId) =>
-    api.post('/admin/pos/kimono-params/refresh', { terminalId }),
+    api.post('/api/admin/pos/kimono-params/refresh', { terminalId }),
 
   // Observability & Simulation
-  getObservabilityMetrics: () => api.get('/admin/pos/observability'),
-  simulateRoute: (data) => api.post('/admin/pos/simulate', data),
+  getObservabilityMetrics: () => api.get('/api/admin/pos/observability'),
+  simulateRoute: (data) => api.post('/api/admin/pos/simulate', data),
 };
 
 export const cardSettlementApi = {

@@ -126,6 +126,7 @@ export async function putContaboObject(params: {
   body?: Buffer;
   filePath?: string;
   contentType: string;
+  onProgress?: (written: number, total: number) => void;
 }): Promise<void> {
   const { accessKeyId, secretAccessKey } = resolveContaboCredentials();
   if (!accessKeyId || !secretAccessKey) {
@@ -189,7 +190,9 @@ export async function putContaboObject(params: {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
     let bodyStarted = false;
-    const agent = new https.Agent({ keepAlive: false });
+    let lastWritten = 0;
+    let lastProgressAt = Date.now();
+    const agent = new https.Agent({ keepAlive: false, maxSockets: 1 });
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
@@ -202,14 +205,15 @@ export async function putContaboObject(params: {
     const watchdog = setTimeout(() => {
       req.destroy();
       finish(new Error('Contabo Object Storage upload timed out'));
-    }, 3 * 60 * 1000);
+    }, 30 * 60 * 1000);
 
     const req = https.request(
       {
-        host: address,
+        hostname,
         port,
         method: 'PUT',
         path,
+        family: 4,
         servername: hostname,
         agent,
         headers: {
@@ -241,14 +245,23 @@ export async function putContaboObject(params: {
     const progress = setInterval(() => {
       const written = Number((req.socket as any)?.bytesWritten || 0);
       console.log(`[contabo] PUT progress ${written}/${contentLength} bytes`);
+      params.onProgress?.(written, contentLength);
+      if (written > lastWritten) {
+        lastWritten = written;
+        lastProgressAt = Date.now();
+      } else if (Date.now() - lastProgressAt > 90 * 1000) {
+        req.destroy();
+        finish(new Error('Contabo Object Storage upload stalled'));
+      }
     }, 5000);
 
     const startBody = () => {
       if (bodyStarted) return;
       bodyStarted = true;
+      lastProgressAt = Date.now();
       console.log(`[contabo] tls ready, sending body`);
       if (params.filePath) {
-        const stream = fs.createReadStream(params.filePath);
+        const stream = fs.createReadStream(params.filePath, { highWaterMark: 1024 * 1024 });
         stream.on('error', (error) => {
           req.destroy();
           finish(error);

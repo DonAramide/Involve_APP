@@ -510,7 +510,7 @@ const openUpdateDialog = (index) => {
   uploadDialogOpen.value = true
 }
 
-const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
+const APK_UPLOAD_TIMEOUT_MS = 30 * 60 * 1000
 
 function apkUploadErrorMessage(error) {
   const status = error?.response?.status
@@ -689,7 +689,7 @@ const commitApkToVault = async () => {
         const totalMb = total ? (total / 1024 / 1024).toFixed(1) : '?'
         uploadStatusText.value = cappedPercent < 99
           ? `Streaming APK binary to the staging server... (${loadedMb} MB / ${totalMb} MB · ${cappedPercent}%)`
-          : 'Browser upload finished. Server is storing the APK in Contabo Object Storage...'
+          : 'Browser upload finished. Server is storing the APK in Contabo Object Storage (this can take several minutes for a 100+ MB file)...'
         if (apkVault.value[finalIndex]) {
           apkVault.value[finalIndex].uploadProgress = cappedPercent
         }

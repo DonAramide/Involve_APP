@@ -62,7 +62,7 @@ function removeTempApk(filePath?: string) {
   });
 }
 
-const APK_TRANSFER_TIMEOUT_MS = 15 * 60 * 1000;
+const APK_TRANSFER_TIMEOUT_MS = 30 * 60 * 1000;
 
 function publicApkDownloadUrl(apkId: string): string {
   const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || '').replace(/\/+$/, '');
