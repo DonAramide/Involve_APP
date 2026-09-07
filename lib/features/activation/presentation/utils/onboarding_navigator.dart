@@ -39,11 +39,11 @@ class OnboardingNavigator {
         switch (nextChannel) {
           case 'EMAIL':
             payload['email'] = (payload['email']?.toString() ?? '').trim().toLowerCase();
-            await _sendOtp(dio, payload['email'], 'email');
+            await _sendOtp(dio, payload['email'], 'email', deviceId: payload['deviceId']?.toString());
             nextScreen = VerifyEmailPage(payload: payload, requiredChannels: requiredChannels);
             break;
           case 'WHATSAPP':
-            await _sendOtp(dio, payload['phone'], 'whatsapp');
+            await _sendOtp(dio, payload['whatsapp'] ?? payload['phone'], 'whatsapp');
             nextScreen = VerifyWhatsappPage(payload: payload, requiredChannels: requiredChannels);
             break;
           default:
@@ -198,7 +198,7 @@ class OnboardingNavigator {
     }
   }
 
-  static Future<void> _sendOtp(Dio dio, String identifier, String type) async {
+  static Future<void> _sendOtp(Dio dio, String identifier, String type, {String? deviceId}) async {
     // Email OTP is registered on /api/auth/*; WhatsApp OTP remains on /auth/*.
     final otpPath = type == 'email'
         ? '/api/auth/send-email-otp'
@@ -216,6 +216,7 @@ class OnboardingNavigator {
           data: {
             type == 'email' ? 'email' : 'phone': identifier,
             'purpose': 'SIGNUP',
+            if (type == 'email' && deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
           },
         );
         otpSent = true;

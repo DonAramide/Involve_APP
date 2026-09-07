@@ -7,6 +7,12 @@ import jwt from 'jsonwebtoken';
 import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
 import { resolveOnboardingVerification } from '../services/onboarding-settings.service';
+import {
+  deviceIdsMatch,
+  emptyEmailDeviceResolution,
+  EmailDeviceResolution,
+  normalizeDeviceId,
+} from '../utils/device-identity';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -270,36 +276,64 @@ export class OnboardingController {
    * Helper to check if an email already exists in users, tenants (owner_email), or local users_db.json
    */
   public static async isEmailExisting(email: string): Promise<boolean> {
-    if (!email) return false;
-    const normalized = email.trim().toLowerCase();
+    const resolution = await OnboardingController.resolveEmailAgainstDevice(email);
+    return resolution.exists;
+  }
 
-    // 1. Check users table
+  /**
+   * Resolve whether an email is already taken, and whether this physical device
+   * is already the device linked to that account (reinstall / re-onboarding).
+   */
+  public static async resolveEmailAgainstDevice(
+    email: string,
+    deviceId?: string | null,
+  ): Promise<EmailDeviceResolution> {
+    const result = emptyEmailDeviceResolution();
+    if (!email) return result;
+    const normalized = email.trim().toLowerCase();
+    const wantedDevice = normalizeDeviceId(deviceId);
+    const tenantIds = new Set<string>();
+    const candidates: Array<{ device_id?: string; tenant_id?: string; owner_email?: string }> = [];
+
     try {
       const { data: userData } = await supabaseAdmin
         .from('users')
-        .select('id, email')
+        .select('id, email, tenant_id, role')
         .ilike('email', normalized)
-        .limit(1);
+        .limit(5);
 
-      if (userData && userData.length > 0) return true;
+      if (userData && userData.length > 0) {
+        result.exists = true;
+        const owner =
+          userData.find((u: any) => String(u.role || '').toLowerCase() === 'owner') || userData[0];
+        result.userId = owner?.id || null;
+        userData.forEach((u: any) => {
+          if (u.tenant_id) tenantIds.add(u.tenant_id);
+        });
+        if (owner?.tenant_id) result.tenantId = owner.tenant_id;
+      }
     } catch (err: any) {
       console.warn('[OnboardingController] Error checking users table for email:', err.message);
     }
 
-    // 2. Check tenants table (owner_email)
     try {
       const { data: tenantData } = await supabaseAdmin
         .from('tenants')
         .select('id, owner_email')
         .ilike('owner_email', normalized)
-        .limit(1);
+        .limit(5);
 
-      if (tenantData && tenantData.length > 0) return true;
+      if (tenantData && tenantData.length > 0) {
+        result.exists = true;
+        if (!result.tenantId) result.tenantId = tenantData[0].id;
+        tenantData.forEach((t: any) => {
+          if (t.id) tenantIds.add(t.id);
+        });
+      }
     } catch (err: any) {
       console.warn('[OnboardingController] Error checking tenants table for email:', err.message);
     }
 
-    // 3. Check local users_db.json if available
     try {
       const fs = require('fs');
       const path = require('path');
@@ -307,12 +341,61 @@ export class OnboardingController {
       if (fs.existsSync(dbPath)) {
         const users = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
         if (Array.isArray(users) && users.some((u: any) => (u.email || '').toLowerCase() === normalized)) {
-          return true;
+          result.exists = true;
         }
       }
     } catch (_) {}
 
-    return false;
+    if (!result.exists || !wantedDevice) return result;
+
+    try {
+      const { data: byEmail } = await supabaseAdmin
+        .from('device_registrations')
+        .select('device_id, tenant_id, owner_email')
+        .ilike('owner_email', normalized);
+      if (byEmail) candidates.push(...byEmail);
+    } catch (err: any) {
+      console.warn('[OnboardingController] device_registrations email lookup failed:', err.message);
+    }
+
+    if (tenantIds.size > 0) {
+      const ids = Array.from(tenantIds);
+      try {
+        const { data: byTenant } = await supabaseAdmin
+          .from('device_registrations')
+          .select('device_id, tenant_id, owner_email')
+          .in('tenant_id', ids);
+        if (byTenant) candidates.push(...byTenant);
+      } catch (err: any) {
+        console.warn('[OnboardingController] device_registrations tenant lookup failed:', err.message);
+      }
+
+      try {
+        const { data: fleet } = await supabaseAdmin
+          .from('devices')
+          .select('device_id, tenant_id')
+          .in('tenant_id', ids);
+        if (fleet) candidates.push(...fleet);
+      } catch (err: any) {
+        console.warn('[OnboardingController] devices tenant lookup failed:', err.message);
+      }
+    }
+
+    const matched = candidates.find((row) => {
+      if (!deviceIdsMatch(row.device_id, wantedDevice)) return false;
+      const rowEmail = String(row.owner_email || '').trim().toLowerCase();
+      return rowEmail === normalized || (!!row.tenant_id && tenantIds.has(row.tenant_id));
+    });
+
+    if (matched?.tenant_id) {
+      result.sameDevice = true;
+      result.tenantId = matched.tenant_id;
+      console.log(
+        `[OnboardingController] Device ${wantedDevice} already belongs to ${normalized} (tenant ${matched.tenant_id}).`,
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -321,17 +404,25 @@ export class OnboardingController {
   public static async checkEmail(req: Request, res: Response): Promise<void> {
     try {
       const emailRaw = req.method === 'GET' ? req.query.email : req.body?.email;
+      const deviceIdRaw = req.method === 'GET'
+        ? req.query.deviceId || req.query.device_id
+        : req.body?.deviceId || req.body?.device_id;
       if (!emailRaw || typeof emailRaw !== 'string') {
         res.status(400).json({ error: 'Valid email is required.' });
         return;
       }
       const normalized = emailRaw.trim().toLowerCase();
-      const exists = await OnboardingController.isEmailExisting(normalized);
+      const deviceId = typeof deviceIdRaw === 'string' ? deviceIdRaw : null;
+      const resolution = await OnboardingController.resolveEmailAgainstDevice(normalized, deviceId);
+      const conflict = resolution.exists && !resolution.sameDevice;
       res.status(200).json({
-        exists,
-        message: exists
-          ? 'An account with this email already exists.'
-          : 'Email is available.'
+        exists: resolution.exists,
+        sameDevice: resolution.sameDevice,
+        message: resolution.sameDevice
+          ? 'This device is already linked to this account.'
+          : conflict
+            ? 'An account with this email already exists.'
+            : 'Email is available.'
       });
     } catch (error: any) {
       console.error('[OnboardingController] checkEmail error:', error.message);
@@ -344,7 +435,7 @@ export class OnboardingController {
    */
   public static async sendEmailOtp(req: Request, res: Response): Promise<void> {
     try {
-      const { email, purpose = 'SIGNUP' } = req.body;
+      const { email, purpose = 'SIGNUP', deviceId, device_id } = req.body;
       if (!email || typeof email !== 'string') {
         res.status(400).json({ error: 'Valid email is required.' });
         return;
@@ -352,10 +443,14 @@ export class OnboardingController {
       const normalized = email.trim().toLowerCase();
 
       // For registration / signup, prevent sending OTP if email already exists
+      // on a different device. Same-device reinstall may continue.
       const isSignup = !purpose || purpose.toUpperCase() === 'SIGNUP' || purpose.toUpperCase() === 'ONBOARDING';
       if (isSignup) {
-        const exists = await OnboardingController.isEmailExisting(normalized);
-        if (exists) {
+        const resolution = await OnboardingController.resolveEmailAgainstDevice(
+          normalized,
+          deviceId || device_id,
+        );
+        if (resolution.exists && !resolution.sameDevice) {
           res.status(409).json({
             success: false,
             code: 'EMAIL_ALREADY_EXISTS',
@@ -393,7 +488,11 @@ export class OnboardingController {
       if (result.ok) {
         res.status(200).json({ success: true, message: 'Email verified successfully.' });
       } else {
-        res.status(400).json({ success: false, error: result.error || 'Invalid or expired verification code.' });
+        res.status(400).json({
+          success: false,
+          error: 'Invalid or expired OTP',
+          message: 'Invalid or expired OTP',
+        });
       }
     } catch (error: any) {
       console.error('[OnboardingController] verifyEmailOtp error:', error.message);
@@ -464,10 +563,12 @@ export class OnboardingController {
         return;
       }
 
-      // Restrict using existing email
       const normalizedEmail = (email || '').trim().toLowerCase();
-      const emailExists = await OnboardingController.isEmailExisting(normalizedEmail);
-      if (emailExists) {
+      const emailDevice = await OnboardingController.resolveEmailAgainstDevice(
+        normalizedEmail,
+        deviceId || null,
+      );
+      if (emailDevice.exists && !emailDevice.sameDevice) {
         res.status(409).json({
           success: false,
           code: 'EMAIL_ALREADY_EXISTS',
@@ -519,13 +620,40 @@ export class OnboardingController {
       let deviceNumber = 1;
       let skipDeviceInsert = false;
 
-      const { data: existingTenants } = await supabaseAdmin
-        .from('tenants')
-        .select('id, name, type, phone, device_count')
-        .ilike('name', tenantName.trim())
-        .eq('type', normalizedType);
+      if (emailDevice.sameDevice && emailDevice.tenantId) {
+        existingTenantId = emailDevice.tenantId;
+        skipDeviceInsert = true;
+        const { data: existingDevs } = await supabaseAdmin
+          .from('device_registrations')
+          .select('device_id, device_number')
+          .eq('tenant_id', emailDevice.tenantId);
+        const matchedDev = (existingDevs || []).find((d: any) =>
+          deviceIdsMatch(d.device_id, effectiveDeviceId),
+        );
+        if (matchedDev?.device_number) deviceNumber = matchedDev.device_number;
+        await supabaseAdmin.from('tenants').update({
+          ...(country && { country }),
+          ...(state && { state }),
+          ...(lga && { lga }),
+          ...(streetAddress && { street_address: streetAddress }),
+          ...(effectiveLocation && { location: effectiveLocation }),
+          ...(email && { owner_email: String(email).trim().toLowerCase() }),
+          ...(`${firstName || ''} ${lastName || ''}`.trim() && { owner_name: `${firstName} ${lastName}`.trim() }),
+        }).eq('id', emailDevice.tenantId);
+        console.log(
+          `[OnboardingController] Same-device re-enrollment for ${normalizedEmail} on ${effectiveDeviceId} → tenant ${emailDevice.tenantId}.`,
+        );
+      }
 
-      if (existingTenants && existingTenants.length > 0) {
+      const { data: existingTenants } = existingTenantId
+        ? { data: [] as any[] }
+        : await supabaseAdmin
+            .from('tenants')
+            .select('id, name, type, phone, device_count')
+            .ilike('name', tenantName.trim())
+            .eq('type', normalizedType);
+
+      if (!existingTenantId && existingTenants && existingTenants.length > 0) {
         // Match by phone (if provided) + name + type
         const match = existingTenants.find((t: any) => {
           const tPhone = (t.phone || '').replace(/\D/g, '');
@@ -734,6 +862,16 @@ export class OnboardingController {
         }, { onConflict: 'device_id' }).then(({ error: fleetErr }) => {
           if (fleetErr) console.warn('[OnboardingController] devices fleet upsert failed (non-fatal):', fleetErr.message);
         });
+      } else if (effectiveDeviceId && skipDeviceInsert) {
+        await supabaseAdmin.from('devices').upsert({
+          device_id: effectiveDeviceId,
+          tenant_id: finalTenantId,
+          status: 'ACTIVE',
+          is_active: true,
+          last_seen: new Date().toISOString(),
+        }, { onConflict: 'device_id' }).then(({ error: fleetErr }) => {
+          if (fleetErr) console.warn('[OnboardingController] devices last_seen refresh failed (non-fatal):', fleetErr.message);
+        });
       }
 
       try {
@@ -751,7 +889,7 @@ export class OnboardingController {
         });
         return;
       }
-      const deviceSubject = finalUserId || require('crypto').randomUUID();
+      const deviceSubject = finalUserId || emailDevice.userId || require('crypto').randomUUID();
       const offlineToken = jwt.sign(
         {
           sub: deviceSubject,
@@ -767,14 +905,17 @@ export class OnboardingController {
 
       res.status(201).json({
         success: true,
-        message: isNewTenant
-          ? 'Account created successfully.'
-          : `Device #${deviceNumber} linked to your existing business account.`,
+        message: emailDevice.sameDevice
+          ? 'Welcome back. This device is already linked to your account.'
+          : isNewTenant
+            ? 'Account created successfully.'
+            : `Device #${deviceNumber} linked to your existing business account.`,
         tenantId: finalTenantId,
         businessName: tenantName,
         phone: phone || null,
         deviceNumber,
         isAdditionalDevice: !isNewTenant,
+        sameDevice: emailDevice.sameDevice,
         offlineToken,
       });
     } catch (error: any) {

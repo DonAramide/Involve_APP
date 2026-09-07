@@ -47,6 +47,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   // Existing Fields
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _whatsappController = TextEditingController();
+  bool _whatsappSameAsMobile = true;
   final _agentCodeController = TextEditingController();
   WestAfricanCountry _selectedCountryCode = westAfricanCountries.first;
   
@@ -73,7 +75,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final List<Map<String, String>> _stepsInfo = [
     {
       'title': 'Welcome to Invify',
-      'desc': ' fin-tech grade enterprise system orchestrator. Let\'s configure your device profile for lightning-fast speeds.',
+      'desc': 'Fintech grade enterprise system orchestrator. Let\'s configure your device profile for lightning-fast speeds.',
       'icon': 'rocket_launch',
     },
     {
@@ -98,8 +100,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     super.initState();
     _emailController.addListener(_onEmailChanged);
     _emailFocusNode.addListener(_onEmailFocusChanged);
+    _phoneController.addListener(_syncWhatsAppFromMobile);
     _pingServer();
-    _restoreDraft();
+    _restoreDraft().then((_) {
+      if (mounted) _primeDeviceId();
+    });
   }
 
   void _onEmailChanged() {
@@ -135,6 +140,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       'confirmPassword': _confirmPasswordController.text,
       'businessName': _businessNameController.text,
       'phone': _phoneController.text,
+      'whatsapp': _whatsappController.text,
+      'whatsappSameAsMobile': _whatsappSameAsMobile,
       'agentCode': _agentCodeController.text,
       'countryDial': _selectedCountryCode.dialCode,
       'streetAddress': _streetController.text,
@@ -186,6 +193,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       _businessNameController.text =
           draft['businessName']?.toString() ?? _businessNameController.text;
       _phoneController.text = draft['phone']?.toString() ?? _phoneController.text;
+      _whatsappController.text = draft['whatsapp']?.toString() ?? _whatsappController.text;
+      _whatsappSameAsMobile = draft['whatsappSameAsMobile'] != false;
+      if (_whatsappSameAsMobile && _whatsappController.text.isEmpty) {
+        _whatsappController.text = _phoneController.text;
+      }
       _agentCodeController.text = draft['agentCode']?.toString() ?? _agentCodeController.text;
       _streetController.text = draft['streetAddress']?.toString() ?? _streetController.text;
       _selectedCountry = draft['country']?.toString() ?? _selectedCountry;
@@ -215,6 +227,22 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         _currentStep = savedStep.toInt().clamp(0, 3);
       }
     });
+  }
+
+  void _syncWhatsAppFromMobile() {
+    if (!_whatsappSameAsMobile) return;
+    if (_whatsappController.text == _phoneController.text) return;
+    _whatsappController.text = _phoneController.text;
+  }
+
+  int get _nationalPhoneMaxDigits => _selectedCountryCode.maxLength.clamp(1, 11);
+
+  String _formatFullPhone(String raw) {
+    var national = raw.trim().replaceAll(RegExp(r'\D'), '');
+    if (national.startsWith('0')) {
+      national = national.replaceFirst(RegExp(r'^0+'), '');
+    }
+    return '${_selectedCountryCode.dialCode}$national';
   }
 
   void _goToStep(int step) {
@@ -392,9 +420,24 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     return ok ? (_capturedGpsLocation ?? 'Unknown Location') : 'Unknown Location';
   }
 
+  Future<void> _primeDeviceId() async {
+    if (_isValidDeviceId(_capturedDeviceId)) return;
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (!mounted || !_isValidDeviceId(deviceId)) return;
+      setState(() => _capturedDeviceId = deviceId);
+      await _persistDraft();
+    } catch (e) {
+      debugPrint('[Onboarding] Could not prime device ID: $e');
+    }
+  }
+
   Future<bool> _checkEmailExists(String email) async {
     final normalized = email.trim().toLowerCase();
     if (normalized.isEmpty) return false;
+
+    await _primeDeviceId();
+    final deviceId = _isValidDeviceId(_capturedDeviceId) ? _capturedDeviceId!.trim() : null;
 
     setState(() => _isCheckingEmail = true);
 
@@ -423,8 +466,15 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     try {
       for (final url in urls) {
         try {
-          final res = await dio.post(url, data: {'email': normalized});
+          final res = await dio.post(url, data: {
+            'email': normalized,
+            if (deviceId != null) 'deviceId': deviceId,
+          });
           if (res.statusCode == 200 && res.data != null && res.data is Map) {
+            if (res.data['sameDevice'] == true) {
+              found = false;
+              return false;
+            }
             if (res.data['exists'] == true) {
               found = true;
               return true;
@@ -436,6 +486,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           }
           if (res.statusCode == 409 ||
               (res.data is Map &&
+                  res.data['sameDevice'] != true &&
                   (res.data['exists'] == true || res.data['code'] == 'EMAIL_ALREADY_EXISTS'))) {
             found = true;
             return true;
@@ -447,9 +498,36 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       if (!found) {
         try {
           final escaped = normalized.replaceAll("'", "''");
-          final query = "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists";
+          final escapedDevice = (deviceId ?? '')
+              .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+              .toUpperCase()
+              .replaceAll("'", "''");
+          final sameDeviceClause = escapedDevice.isEmpty
+              ? 'false'
+              : """EXISTS (
+                   SELECT 1 FROM public.device_registrations dr
+                   WHERE upper(regexp_replace(coalesce(dr.device_id, ''), '[^a-zA-Z0-9]', '', 'g')) IN ('$escapedDevice')
+                     AND (
+                       lower(coalesce(dr.owner_email, '')) = '$escaped'
+                       OR dr.tenant_id IN (SELECT id FROM public.tenants WHERE lower(owner_email) = '$escaped')
+                       OR dr.tenant_id IN (SELECT tenant_id FROM public.users WHERE lower(email) = '$escaped')
+                     )
+                 ) OR EXISTS (
+                   SELECT 1 FROM public.devices d
+                   WHERE upper(regexp_replace(coalesce(d.device_id, ''), '[^a-zA-Z0-9]', '', 'g')) IN ('$escapedDevice')
+                     AND d.tenant_id IN (
+                       SELECT id FROM public.tenants WHERE lower(owner_email) = '$escaped'
+                       UNION
+                       SELECT tenant_id FROM public.users WHERE lower(email) = '$escaped'
+                     )
+                 )""";
+          final query = "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists, ($sameDeviceClause) as same_device";
           final rpcRes = await Supabase.instance.client.rpc('execute_sql', params: {'sql_query': query});
           if (rpcRes is List && rpcRes.isNotEmpty && rpcRes.first is Map) {
+            if (rpcRes.first['same_device'] == true) {
+              found = false;
+              return false;
+            }
             if (rpcRes.first['exists'] == true) {
               found = true;
               return true;
@@ -586,12 +664,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       final deviceId = _capturedDeviceId!;
       final gpsLocation = _capturedGpsLocation!;
 
-      // Format phone number with country dial code
-      String nationalPhone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
-      if (nationalPhone.startsWith('0')) {
-        nationalPhone = nationalPhone.replaceFirst(RegExp(r'^0+'), '');
-      }
-      final formattedFullPhone = '${_selectedCountryCode.dialCode}$nationalPhone';
+      final formattedMobile = _formatFullPhone(_phoneController.text);
+      final formattedWhatsapp = _formatFullPhone(_whatsappController.text);
 
       // Keep buttons locked until OTP is sent and the verify page opens.
       final payload = {
@@ -599,7 +673,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'lastName': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
         'password': _passwordController.text,
-        'phone': formattedFullPhone,
+        'phone': formattedMobile,
+        'whatsapp': formattedWhatsapp,
         'businessName': _businessNameController.text.trim(),
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
@@ -920,7 +995,38 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           const SizedBox(height: 20),
           _buildTextField(_businessNameController, 'Business / Tenant Name', Icons.business),
           const SizedBox(height: 20),
-          _buildPhoneFieldWithCountrySelector(),
+          _buildPhoneFieldWithCountrySelector(
+            controller: _phoneController,
+            label: 'Mobile number',
+            requiredLabel: 'Mobile number is required',
+            allowCountryPicker: true,
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _whatsappSameAsMobile,
+            activeColor: const Color(0xFF6366F1),
+            title: const Text(
+              'Mobile number same as WhatsApp number',
+              style: TextStyle(color: Colors.white, fontSize: 13),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _whatsappSameAsMobile = value;
+                if (value) {
+                  _whatsappController.text = _phoneController.text;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          _buildPhoneFieldWithCountrySelector(
+            controller: _whatsappController,
+            label: 'WhatsApp number',
+            requiredLabel: 'WhatsApp number is required',
+            allowCountryPicker: false,
+            enabled: !_whatsappSameAsMobile,
+          ),
           const SizedBox(height: 20),
           _buildTextField(_agentCodeController, 'Agent Code (Optional)', Icons.badge, isRequired: false),
           const SizedBox(height: 24),
@@ -1179,20 +1285,30 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     );
   }
 
-  Widget _buildPhoneFieldWithCountrySelector() {
+  Widget _buildPhoneFieldWithCountrySelector({
+    required TextEditingController controller,
+    required String label,
+    required String requiredLabel,
+    bool allowCountryPicker = true,
+    bool enabled = true,
+  }) {
+    final maxDigits = _nationalPhoneMaxDigits;
     return TextFormField(
-      controller: _phoneController,
+      controller: controller,
+      enabled: enabled,
       style: const TextStyle(color: Colors.white),
       keyboardType: TextInputType.phone,
-      inputFormatters: PhoneNumberInput.formatters,
-      maxLength: PhoneNumberInput.maxDigits,
+      inputFormatters: PhoneNumberInput.formattersFor(maxDigits),
+      maxLength: maxDigits,
       decoration: InputDecoration(
-        labelText: 'WhatsApp Contact',
+        labelText: label,
+        hintText: '70xxxxxxxx',
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
-        helperText: 'Max ${PhoneNumberInput.maxDigits} digits',
+        helperText: 'Max $maxDigits digits (country code is separate)',
         helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
         prefixIcon: InkWell(
-          onTap: _showCountryPickerBottomSheet,
+          onTap: allowCountryPicker ? _showCountryPickerBottomSheet : null,
           borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1218,8 +1334,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                     fontSize: 13,
                   ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down, color: Color(0xFF818CF8), size: 18),
+                if (allowCountryPicker) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, color: Color(0xFF818CF8), size: 18),
+                ],
               ],
             ),
           ),
@@ -1234,23 +1352,25 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF6366F1)),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        ),
       ),
       validator: (value) {
-        if (value == null || value.trim().isEmpty) return 'WhatsApp contact is required';
+        if (value == null || value.trim().isEmpty) return requiredLabel;
         final clean = value.trim().replaceAll(RegExp(r'\D'), '');
-        if (clean.length > PhoneNumberInput.maxDigits) {
-          return 'Phone number cannot exceed ${PhoneNumberInput.maxDigits} digits';
+        if (clean.length > maxDigits) {
+          return 'Phone number cannot exceed $maxDigits digits';
         }
         if (clean.length < _selectedCountryCode.minLength) {
           return 'Enter a valid ${_selectedCountryCode.name} number (min ${_selectedCountryCode.minLength} digits)';
         }
 
-        // 2. Dummy / repetitive digits check (00000000000, 1111111111, etc.)
         if (RegExp(r'^(.)\1+$').hasMatch(clean)) {
           return 'Invalid phone number (cannot be repetitive digits like 000000... or 111111...)';
         }
 
-        // 3. Sequential digits check (123456789, 987654321, 0123456789)
         const sequential = ['0123456789', '1234567890', '9876543210', '0987654321'];
         for (final seq in sequential) {
           if (seq.contains(clean) && clean.length >= 6) {
@@ -1258,7 +1378,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           }
         }
 
-        // 4. Nigerian specific format check
         if (_selectedCountryCode.code == 'NG') {
           String normalized = clean.startsWith('0') ? clean.substring(1) : clean;
           if (normalized.length == 10 && !RegExp(r'^[789]').hasMatch(normalized)) {
@@ -1599,7 +1718,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _businessNameController.dispose();
+    _phoneController.removeListener(_syncWhatsAppFromMobile);
     _phoneController.dispose();
+    _whatsappController.dispose();
     _agentCodeController.dispose();
     _streetController.dispose();
     _stateController.dispose();

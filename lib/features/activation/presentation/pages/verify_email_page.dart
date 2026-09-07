@@ -121,7 +121,11 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
       String? lastError;
       for (final url in urls) {
         try {
-          await dio.post(url, data: {'email': _email, 'purpose': 'SIGNUP'});
+          await dio.post(url, data: {
+            'email': _email,
+            'purpose': 'SIGNUP',
+            if (widget.payload['deviceId'] != null) 'deviceId': widget.payload['deviceId'],
+          });
           sent = true;
           break;
         } on DioException catch (dioErr) {
