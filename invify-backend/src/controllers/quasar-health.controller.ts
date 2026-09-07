@@ -64,12 +64,19 @@ export class QuasarHealthController {
   static async listIntegrations(req: Request, res: Response) {
     try {
       const integrations = await QuasarIntegrationStore.listAll();
+      const mapped = (integrations || []).map((r: any) => ({
+        invifyTenantId: r.invify_tenant_id,
+        quasarTenantId: r.quasar_tenant_id,
+        vertical: r.quasar_vertical,
+        environment: r.quasar_environment,
+        status: r.status,
+      }));
       return res.status(200).json({
         responseCode: '00',
         responseMessage: 'Success',
         data: {
-          count: integrations.length,
-          integrations,
+          count: mapped.length,
+          integrations: mapped,
         },
       });
     } catch (err: any) {

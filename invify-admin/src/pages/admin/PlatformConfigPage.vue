@@ -1,5 +1,5 @@
 <template>
-  <q-page padding class="q-pa-lg text-main">
+  <q-page padding class="q-pa-lg text-main relative-position" style="z-index: 1;">
     <div class="row items-center q-mb-xl justify-between">
       <div>
         <h4 class="text-h4 text-weight-bold q-my-none">Platform Configuration</h4>
@@ -30,7 +30,7 @@
 
     <q-separator dark class="q-mb-md opacity-20" />
 
-    <q-tab-panels v-model="activeTab" animated class="bg-transparent">
+    <q-tab-panels v-model="activeTab" keep-alive class="bg-transparent platform-config-panels">
       
       <!-- GENERAL TAB -->
       <q-tab-panel name="general" class="q-pa-none">
@@ -531,7 +531,7 @@
               <div class="col-12 col-md-6 row items-center justify-center">
                 <div class="column items-center bg-subpanel q-pa-xl rounded-borders border-main" style="width: 100%;">
                   <q-icon name="dashboard" size="xl" :style="{ color: mockSettings.primaryColor }" />
-                  <div class="q-mt-sm text-weight-bold" style="letter-spacing: 2px;">{{ mockSettings.platformName.toUpperCase() }}</div>
+                  <div class="q-mt-sm text-weight-bold" style="letter-spacing: 2px;">{{ String(mockSettings.platformName || '').toUpperCase() }}</div>
                   <div class="text-caption text-muted q-mt-md" v-if="!mockSettings.hideInvifyWatermark">Powered by Invify OPS Core</div>
                 </div>
               </div>
@@ -611,7 +611,7 @@
                       <q-icon name="today" color="green-4" size="sm" />
                       <div class="col">
                         <div class="text-caption text-weight-bold text-white">Automated Daily Sweep</div>
-                        <div class="text-caption text-grey-5 font-mono">Triggers every day at <span class="text-green-4">{{ payoutSettings.dailyPayoutTime || '23:59' }} WAT</span></div>
+                        <div class="text-caption text-grey-5 font-mono">Triggers every day at <span class="text-green-4">{{ payoutStore.dailyPayoutTime || '23:59' }} WAT</span></div>
                       </div>
                       <q-badge color="green-10" text-color="green-3">ACTIVE</q-badge>
                     </div>
@@ -627,7 +627,7 @@
                       <q-icon name="touch_app" color="orange-4" size="sm" />
                       <div class="col">
                         <div class="text-caption text-weight-bold text-white">Manual On-Demand Dispatch</div>
-                        <div class="text-caption text-grey-5 font-mono">Extra fee applies: <span class="text-orange-4">{{ payoutSettings.manualDispatchFeeType === 'Percentage (%)' ? payoutSettings.manualDispatchFee + '%' : (currentCurrency.symbol + (payoutSettings.manualDispatchFee || 0).toLocaleString()) }}</span></div>
+                        <div class="text-caption text-grey-5 font-mono">Extra fee applies: <span class="text-orange-4">{{ payoutStore.manualDispatchFeeType === 'Percentage (%)' ? payoutStore.manualDispatchFee + '%' : ((currentCurrency?.symbol || '₦') + Number(payoutStore.manualDispatchFee || 0).toLocaleString()) }}</span></div>
                       </div>
                       <q-badge color="orange-10" text-color="orange-3">FEE APPLIES</q-badge>
                     </div>
@@ -661,11 +661,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-
-    <!-- Debug section at the bottom -->
-    <div class="q-mt-xl q-pa-sm bg-dark text-grey-5 rounded-borders font-mono text-caption text-center border-main">
-      [LOCALSTORAGE DEBUG] Active Key: platform_payout_settings | Raw Value: {{ localStorageDebug }}
-    </div>
 
   </q-page>
 </template>
@@ -803,9 +798,28 @@ const posKeyForm = ref({
   applyAsPlatformDefault: true,
 });
 
+function extractQuasarIntegrationRows(res) {
+  const body = res?.data;
+  const payload = body?.data ?? body;
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.integrations)
+      ? payload.integrations
+      : [];
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => ({
+      invifyTenantId: row.invifyTenantId || row.invify_tenant_id || '',
+      quasarTenantId: row.quasarTenantId || row.quasar_tenant_id || '',
+      vertical: row.vertical || row.quasar_vertical || 'n/a',
+      status: row.status || 'n/a',
+    }))
+    .filter((row) => row.invifyTenantId);
+}
+
 const quasarIntegrationOptions = computed(() =>
-  (quasarIntegrations.value || []).map((row) => ({
-    label: `${row.invifyTenantId?.slice(0, 8)}… → ${row.quasarTenantId?.slice(0, 8)}… (${row.vertical || 'n/a'} / ${row.status})`,
+  (Array.isArray(quasarIntegrations.value) ? quasarIntegrations.value : []).map((row) => ({
+    label: `${String(row.invifyTenantId).slice(0, 8)}… → ${String(row.quasarTenantId || '').slice(0, 8)}… (${row.vertical || 'n/a'} / ${row.status})`,
     value: row.invifyTenantId,
     quasarTenantId: row.quasarTenantId,
   })),
@@ -824,13 +838,14 @@ async function loadQuasarIntegrations() {
   loadingQuasarIntegrations.value = true;
   try {
     const res = await adminApi.listQuasarIntegrations();
-    quasarIntegrations.value = res.data?.data || res.data || [];
+    quasarIntegrations.value = extractQuasarIntegrationRows(res);
     if (!posKeyForm.value.selectedIntegration && quasarIntegrations.value.length === 1) {
       posKeyForm.value.selectedIntegration = quasarIntegrations.value[0].invifyTenantId;
       posKeyForm.value.quasarTenantId = quasarIntegrations.value[0].quasarTenantId || '';
     }
   } catch (e) {
     console.warn('Failed to load Quasar integrations', e);
+    quasarIntegrations.value = [];
   } finally {
     loadingQuasarIntegrations.value = false;
   }
@@ -999,15 +1014,6 @@ watch(
   },
 );
 
-// Payout settings — thin alias to the shared Pinia store.
-// The store auto-hydrates from localStorage and is reactive:
-// tenant page reacts instantly when admin saves.
-const payoutSettings = {
-  get dailyPayoutTime()      { return payoutStore.dailyPayoutTime },
-  get manualDispatchFee()    { return payoutStore.manualDispatchFee },
-  get manualDispatchFeeType(){ return payoutStore.manualDispatchFeeType },
-};
-
 const currencyColumns = [
   { name: 'name', label: 'Currency Name', align: 'left', field: 'name', sortable: true },
   { name: 'code', label: 'Code', align: 'left', field: 'code', sortable: true },
@@ -1017,7 +1023,7 @@ const currencyColumns = [
 ];
 
 const defaultCurrencies = [
-  { name: 'Naira', code: 'NGN', symbol: currentCurrency.symbol },
+  { name: 'Naira', code: 'NGN', symbol: currentCurrency.value?.symbol || '₦' },
   { name: 'US Dollar', code: 'USD', symbol: '$' },
   { name: 'Euro', code: 'EUR', symbol: '€' },
   { name: 'British Pound', code: 'GBP', symbol: '£' },
@@ -1025,32 +1031,29 @@ const defaultCurrencies = [
 
 const currencyList = ref([]);
 
-const localStorageDebug = ref('NOT_LOADED');
-
-function updateDebug() {
-  localStorageDebug.value = localStorage.getItem('platform_payout_settings') || 'NOT_FOUND';
-}
-
 onMounted(async () => {
-  updateDebug();
-  setInterval(updateDebug, 1000);
   await fetchSettings();
   await loadQuasarIntegrations();
   await refreshPosKeyStatus();
   await refreshApiKeyStatus();
-  const savedList = localStorage.getItem('platform_currencies_list');
-  if (savedList) {
-    currencyList.value = JSON.parse(savedList);
-  } else {
+  try {
+    const savedList = localStorage.getItem('platform_currencies_list');
+    const parsed = savedList ? JSON.parse(savedList) : null;
+    if (Array.isArray(parsed) && parsed.length) {
+      currencyList.value = parsed;
+    } else {
+      currencyList.value = [...defaultCurrencies];
+      localStorage.setItem('platform_currencies_list', JSON.stringify(currencyList.value));
+    }
+  } catch {
     currencyList.value = [...defaultCurrencies];
-    localStorage.setItem('platform_currencies_list', JSON.stringify(currencyList.value));
   }
 });
 
 async function fetchSettings() {
   try {
     const res = await adminApi.getGlobalSettings();
-    if (res.data) {
+    if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
       const data = res.data;
       mockSettings.value.platformName = data.platform_name || data.platformName || mockSettings.value.platformName;
       mockSettings.value.supportEmail = data.support_email || data.supportEmail || mockSettings.value.supportEmail;
@@ -1185,3 +1188,14 @@ watch(showAddCurrencyDialog, (val) => {
   }
 });
 </script>
+
+<style scoped>
+.platform-config-panels {
+  min-height: 280px;
+}
+.platform-config-panels :deep(.q-panel),
+.platform-config-panels :deep(.q-tab-panel) {
+  height: auto !important;
+  overflow: visible;
+}
+</style>

@@ -49,7 +49,19 @@ export default defineConfig({
         target: 'http://127.0.0.1:3004',
         changeOrigin: true
       },
+      // Backend also mounts /admin/* APIs, but the SPA owns routes like
+      // /admin/login and /admin/settings. Only proxy non-document requests.
       '/admin': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true,
+        bypass(req) {
+          const accept = String(req.headers.accept || '')
+          if (accept.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/vault': {
         target: 'http://127.0.0.1:3004',
         changeOrigin: true
       },

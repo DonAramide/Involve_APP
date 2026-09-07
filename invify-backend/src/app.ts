@@ -544,12 +544,13 @@ registerCollisionAdmin('patch', '/settings/commissions', authenticate, checkRole
 registerCollisionAdmin('post', '/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
 // Quasar POS encryption key (card switch ICC crypto)
+// /admin/* stays for local Vite proxy; /api/admin/* is required on staging nginx.
 app.get('/admin/quasar/integrations', authenticate, checkRole(['super_admin']), AdminController.listQuasarIntegrations);
-app.get('/admin/quasar/pos-encryption-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarPosEncryptionKeyStatus);
-app.post('/admin/quasar/pos-encryption-key/rotate', authenticate, checkRole(['super_admin']), AdminController.rotateQuasarPosEncryptionKey);
-app.post('/admin/quasar/pos-encryption-key/store', authenticate, checkRole(['super_admin']), AdminController.storeQuasarPosEncryptionKey);
-app.get('/admin/quasar/api-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarApiKeyStatus);
-app.post('/admin/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
+registerCollisionAdmin('get', '/quasar/pos-encryption-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarPosEncryptionKeyStatus);
+registerCollisionAdmin('post', '/quasar/pos-encryption-key/rotate', authenticate, checkRole(['super_admin']), AdminController.rotateQuasarPosEncryptionKey);
+registerCollisionAdmin('post', '/quasar/pos-encryption-key/store', authenticate, checkRole(['super_admin']), AdminController.storeQuasarPosEncryptionKey);
+registerCollisionAdmin('get', '/quasar/api-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarApiKeyStatus);
+registerCollisionAdmin('post', '/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
 
 // Commission Command Center
 app.get('/admin/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);

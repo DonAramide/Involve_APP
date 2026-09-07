@@ -1118,6 +1118,11 @@ onUnmounted(() => {
   height: 100%;
 }
 
+.q-page-container > *:not(.watermark-bg) {
+  position: relative;
+  z-index: 1;
+}
+
 .watermark-bg {
   position: absolute;
   top: 50%;

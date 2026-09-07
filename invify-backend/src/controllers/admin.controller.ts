@@ -9,6 +9,24 @@ import { IntegrationVaultService } from '../services/integration-vault.service';
 import { NotificationService } from '../services/notification.service';
 import { hydrateTenantOwnerContact } from '../utils/owner-contact';
 
+/** Keys stored in global_settings.json. DB upserts must not override or block these. */
+const FILE_BACKED_CONFIG_KEYS = [
+  'daily_payout_time',
+  'manual_dispatch_fee',
+  'manual_dispatch_fee_type',
+  'quasar_base_url',
+  'quasar_pos_encryption_key_base64',
+];
+
+function isFileBackedConfigKey(key: string): boolean {
+  return FILE_BACKED_CONFIG_KEYS.includes(key);
+}
+
+function isBrokenConfigAuditError(message: string | undefined): boolean {
+  const msg = String(message || '').toLowerCase();
+  return msg.includes('commission_events') || msg.includes('event_type');
+}
+
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
   if (envKey) return envKey;
@@ -132,17 +150,11 @@ export class AdminController {
         return res.status(200).json(settingsObj);
       }
       
-      const { data, error } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
+      const { data } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
       
       if (data && data.length > 0) {
         for (const row of data) {
-           // Skip payout settings keys to let the local file cache (global_settings.json) be the source of truth
-           if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(row.config_key)) {
-             continue;
-           }
-           // Never send plaintext POS encryption key to the browser
-           if (row.config_key === 'quasar_pos_encryption_key_base64') {
-             settingsObj.quasar_pos_encryption_key_configured = Boolean(row.config_value);
+           if (isFileBackedConfigKey(row.config_key)) {
              continue;
            }
            settingsObj[row.config_key] = row.config_value;
@@ -283,25 +295,22 @@ export class AdminController {
         }
         const updated = { ...currentSettings, ...updates };
         if (Object.prototype.hasOwnProperty.call(updates, 'quasar_base_url')) {
-          try {
-            const {
-              normalizeQuasarBaseUrl,
-              setQuasarBaseUrlOverride,
-            } = require('../integrations/quasar/quasar-base-url');
-            const normalized = normalizeQuasarBaseUrl(updates.quasar_base_url as string);
-            updated.quasar_base_url = normalized;
-            (updates as any).quasar_base_url = normalized;
-            setQuasarBaseUrlOverride(normalized || null);
-            console.log(
-              `[AdminController] Quasar base URL → ${normalized || '(env/default fallback)'}`,
-            );
-          } catch (e: any) {
-            console.warn('[AdminController] Failed to apply Quasar base URL override:', e.message);
-          }
+          const {
+            normalizeQuasarBaseUrl,
+            setQuasarBaseUrlOverride,
+          } = require('../integrations/quasar/quasar-base-url');
+          const normalized = normalizeQuasarBaseUrl(updates.quasar_base_url as string);
+          updated.quasar_base_url = normalized;
+          (updates as any).quasar_base_url = normalized;
+          setQuasarBaseUrlOverride(normalized || null);
+          console.log(
+            `[AdminController] Quasar base URL → ${normalized || '(env/default fallback)'}`,
+          );
         }
         fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf8');
-      } catch (fileErr) {
+      } catch (fileErr: any) {
         console.error('[AdminController] Failed to write to global_settings.json:', fileErr);
+        throw new Error(`Failed to write platform settings file: ${fileErr.message}`);
       }
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
@@ -310,12 +319,7 @@ export class AdminController {
       
       // Update each key-value pair in system_configurations database table
       for (const [key, value] of Object.entries(updates)) {
-        // Skip payout settings keys that are not supported by the DB schema/triggers
-        if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(key)) {
-          continue;
-        }
-        // POS encryption key is managed only via /admin/quasar/pos-encryption-key/*
-        if (key === 'quasar_pos_encryption_key_base64') {
+        if (isFileBackedConfigKey(key)) {
           continue;
         }
 
@@ -323,6 +327,12 @@ export class AdminController {
           .upsert({ config_key: key, config_value: value, updated_by: operatorId });
           
         if (error) {
+          if (isBrokenConfigAuditError(error.message)) {
+            console.warn(
+              `[AdminController] DB persist skipped for ${key} (config audit trigger): ${error.message}`,
+            );
+            continue;
+          }
           throw new Error(`Failed to update ${key}: ${error.message}`);
         }
       }

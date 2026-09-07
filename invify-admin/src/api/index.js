@@ -143,19 +143,19 @@ export const adminApi = {
   changePassword: (data) => api.post('/api/auth/change-password', data),
   getGlobalSettings: () => api.get('/api/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/api/admin/settings', data),
-  listQuasarIntegrations: () => api.get('/admin/quasar/integrations'),
+  listQuasarIntegrations: () => api.get('/api/admin/quasar/integrations'),
   getQuasarHealth: () => api.get('/api/admin/quasar/health'),
   pingQuasar: () => api.get('/api/admin/quasar/health/live'),
   getQuasarPosEncryptionKeyStatus: (params) =>
-    api.get('/admin/quasar/pos-encryption-key/status', { params }),
+    api.get('/api/admin/quasar/pos-encryption-key/status', { params }),
   rotateQuasarPosEncryptionKey: (data) =>
-    api.post('/admin/quasar/pos-encryption-key/rotate', data),
+    api.post('/api/admin/quasar/pos-encryption-key/rotate', data),
   storeQuasarPosEncryptionKey: (data) =>
-    api.post('/admin/quasar/pos-encryption-key/store', data),
+    api.post('/api/admin/quasar/pos-encryption-key/store', data),
   getQuasarApiKeyStatus: (params) =>
-    api.get('/admin/quasar/api-key/status', { params }),
+    api.get('/api/admin/quasar/api-key/status', { params }),
   issueQuasarLiveApiKey: (data) =>
-    api.post('/admin/quasar/api-key/issue-live', data),
+    api.post('/api/admin/quasar/api-key/issue-live', data),
   getPlatformPayoutSettings: () => api.get('/api/payout/platform-settings'),
   getTenantPayoutSettings: () =>
     api.get('/api/payout/settings', { params: withClientTenantId() }),
