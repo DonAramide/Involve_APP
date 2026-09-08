@@ -8,6 +8,11 @@ import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
 import { NotificationService } from '../services/notification.service';
 import { hydrateTenantOwnerContact } from '../utils/owner-contact';
+import {
+  normalizeTenantType,
+  sanitizeTenantUpdates,
+  withoutOptionalTenantColumns,
+} from '../utils/sanitize-tenant-updates';
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -588,9 +593,23 @@ export class AdminController {
         attempt++;
       }
 
+      const insertRow: Record<string, unknown> = {
+        id: finalTenantId,
+        name,
+        type: normalizeTenantType(type) || type,
+        plan: plan || 'free',
+        status: 'active',
+      };
+      if (req.body.plan_expires_at !== undefined) {
+        insertRow.plan_expires_at = req.body.plan_expires_at || null;
+      }
+      if (req.body.support_phone !== undefined) insertRow.support_phone = req.body.support_phone || null;
+      if (req.body.support_email !== undefined) insertRow.support_email = req.body.support_email || null;
+      if (req.body.support_whatsapp !== undefined) insertRow.support_whatsapp = req.body.support_whatsapp || null;
+
       const { data, error } = await supabaseAdmin
         .from('tenants')
-        .insert({ id: finalTenantId, name, type, plan: plan || 'free', status: 'active' })
+        .insert(insertRow)
         .select()
         .single();
 
@@ -647,18 +666,41 @@ export class AdminController {
   static async updateTenant(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updates = { ...req.body };
-      delete updates.tenant_code;
-      delete updates.agent_code;
+      let updates = sanitizeTenantUpdates(req.body);
 
-      const { data, error } = await supabaseAdmin
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No valid tenant fields to update' });
+      }
+
+      let { data, error } = await supabaseAdmin
         .from('tenants')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      const retried = withoutOptionalTenantColumns(updates, error);
+      if (error && retried) {
+        console.warn('[AdminController] updateTenant retrying without missing optional columns');
+        updates = retried;
+        ({ data, error } = await supabaseAdmin
+          .from('tenants')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single());
+      }
+
+      if (error) {
+        const msg = String(error.message || '');
+        if (error.code === 'PGRST116' || msg.toLowerCase().includes('0 rows')) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+        if (error.code === '23514' || msg.toLowerCase().includes('check constraint')) {
+          return res.status(400).json({ error: msg });
+        }
+        throw error;
+      }
 
       try {
         const { GovAuditService } = require('../services/gov-audit.service');

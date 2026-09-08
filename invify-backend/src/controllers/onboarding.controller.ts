@@ -12,7 +12,9 @@ import {
   emptyEmailDeviceResolution,
   EmailDeviceResolution,
   normalizeDeviceId,
+  uniqueDeviceIds,
 } from '../utils/device-identity';
+import { newSelfServeTenantPlan } from '../utils/new-tenant-plan';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -346,7 +348,7 @@ export class OnboardingController {
       }
     } catch (_) {}
 
-    if (!result.exists || !wantedDevice) return result;
+    if (!result.exists) return result;
 
     try {
       const { data: byEmail } = await supabaseAdmin
@@ -380,6 +382,10 @@ export class OnboardingController {
         console.warn('[OnboardingController] devices tenant lookup failed:', err.message);
       }
     }
+
+    result.registeredDevices = uniqueDeviceIds(candidates);
+
+    if (!wantedDevice) return result;
 
     const matched = candidates.find((row) => {
       if (!deviceIdsMatch(row.device_id, wantedDevice)) return false;
@@ -418,6 +424,8 @@ export class OnboardingController {
       res.status(200).json({
         exists: resolution.exists,
         sameDevice: resolution.sameDevice,
+        thisDeviceId: deviceId ? normalizeDeviceId(deviceId) || deviceId : null,
+        registeredDevices: resolution.registeredDevices,
         message: resolution.sameDevice
           ? 'This device is already linked to this account.'
           : conflict
@@ -553,7 +561,7 @@ export class OnboardingController {
     try {
       const {
         firstName, lastName, email, phone, password,
-        businessName, industry, isTrial, emailVerified, phoneVerified,
+        businessName, industry, emailVerified, phoneVerified,
         deviceId, agentCode, location,
         country, state, lga, streetAddress
       } = req.body;
@@ -602,7 +610,9 @@ export class OnboardingController {
       }
 
       const tenantName = businessName || `${firstName} ${lastName}'s Business`;
-      const plan = isTrial ? 'trial' : 'standard';
+      // New self-serve profiles always start on a 3-day trial. The tablet
+      // cannot opt into standard/permanent — that is a later license upgrade.
+      const { plan, plan_expires_at } = newSelfServeTenantPlan();
       const tenantCode = generateTenantCode(phone);
       const normalizedPhone = (phone || '').replace(/\D/g, '');
       const normalizedType = (industry || 'retail').toLowerCase();
@@ -736,6 +746,7 @@ export class OnboardingController {
             name: tenantName,
             type: normalizedType,
             plan,
+            plan_expires_at,
             status: 'active',
             phone: phone || null,
             tenant_code: currentTenantCode,
@@ -832,6 +843,8 @@ export class OnboardingController {
           owner_email: email,
           owner_name: `${firstName} ${lastName}`,
           status: 'active',
+          is_trial: true,
+          trial_ends_at: plan_expires_at,
         }).then(async ({ error: devErr }) => {
           if (!devErr) return;
           console.warn('[OnboardingController] device_registrations insert failed, rebinding existing row:', devErr.message);
@@ -844,6 +857,8 @@ export class OnboardingController {
               owner_email: email,
               owner_name: `${firstName} ${lastName}`,
               status: 'active',
+              is_trial: true,
+              trial_ends_at: plan_expires_at,
             })
             .eq('device_id', effectiveDeviceId);
           if (updErr) {

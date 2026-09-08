@@ -20,7 +20,7 @@
 
           <q-select
             v-model="form.type"
-            :options="['school', 'retail', 'service']"
+            :options="typeOptions"
             label="Business Type"
             dark filled
             emit-value
@@ -30,11 +30,19 @@
 
           <q-select
             v-model="form.plan"
-            :options="['free', 'basic', 'premium', 'enterprise']"
+            :options="planOptions"
             label="Subscription Plan"
             dark filled
             emit-value
             map-options
+          />
+
+          <q-input
+            v-model="form.plan_expires_at"
+            label="Plan expiry (leave empty for Permanent)"
+            dark filled
+            type="date"
+            hint="New self-serve signups should be trial with a 3-day expiry."
           />
 
           <q-toggle
@@ -131,19 +139,66 @@ const loading = ref(false)
 const agentOptions = ref([])
 const selectedAgent = ref(null)
 
+const typeOptions = [
+  { label: 'School', value: 'school' },
+  { label: 'Retail', value: 'retail' },
+  { label: 'Services', value: 'services' },
+]
+
+const planOptions = [
+  { label: 'Trial (3-day)', value: 'trial' },
+  { label: 'Free trial', value: 'free_trial' },
+  { label: 'Free', value: 'free' },
+  { label: 'Basic', value: 'basic' },
+  { label: 'Standard', value: 'standard' },
+  { label: 'Premium', value: 'premium' },
+  { label: 'Enterprise', value: 'enterprise' },
+]
+
+function normalizeType(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'service' || raw === 'invify_services' || raw === 'hospitality') return 'services'
+  if (raw === 'education' || raw === 'invify_school') return 'school'
+  if (raw === 'invify_retail') return 'retail'
+  return raw || 'school'
+}
+
 const form = ref({
   name: '',
   type: 'school',
-  plan: 'free',
+  plan: 'trial',
+  plan_expires_at: defaultTrialExpiry(),
   status: 'active',
   support_phone: '',
   support_email: '',
   support_whatsapp: ''
 })
 
+function defaultTrialExpiry() {
+  const d = new Date()
+  d.setDate(d.getDate() + 3)
+  return d.toISOString().slice(0, 10)
+}
+
+function toDateInput(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
 onMounted(async () => {
   if (props.isEdit && props.tenant) {
-    form.value = { ...props.tenant }
+    form.value = {
+      name: props.tenant.name || '',
+      type: normalizeType(props.tenant.type),
+      plan: props.tenant.plan || 'trial',
+      plan_expires_at: toDateInput(props.tenant.plan_expires_at),
+      status: props.tenant.status || 'active',
+      support_phone: props.tenant.support_phone || '',
+      support_email: props.tenant.support_email || '',
+      support_whatsapp: props.tenant.support_whatsapp || ''
+    }
   }
 
   try {
@@ -168,7 +223,18 @@ const onAgentSelected = (opt) => {
 
 const onSubmit = () => {
   loading.value = true
-  // Emit the form data back to the parent to handle the API call
-  onDialogOK(form.value)
+  const payload = {
+    name: form.value.name,
+    type: normalizeType(form.value.type),
+    plan: form.value.plan,
+    status: form.value.status,
+    support_phone: form.value.support_phone,
+    support_email: form.value.support_email,
+    support_whatsapp: form.value.support_whatsapp,
+    plan_expires_at: form.value.plan_expires_at
+      ? new Date(`${form.value.plan_expires_at}T23:59:59.000Z`).toISOString()
+      : null,
+  }
+  onDialogOK(payload)
 }
 </script>

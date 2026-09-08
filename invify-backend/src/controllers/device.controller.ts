@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { LicenseGenerator } from '../utils/license.util';
+import { applyPaidLicenseToTenant, paidLicenseFromActivation } from '../utils/paid-license';
 import { GovAuditService } from '../services/gov-audit.service';
 import { authenticator } from 'otplib';
 
@@ -532,10 +533,17 @@ export class DeviceController {
 
         if (upsertError) throw upsertError;
 
+        const paid = paidLicenseFromActivation(updatedActivation);
+
         try {
           await supabaseAdmin
             .from('device_registrations')
-            .update({ tenant_id: updatedActivation.tenant_id, status: 'active' })
+            .update({
+              tenant_id: updatedActivation.tenant_id,
+              status: 'active',
+              is_trial: false,
+              trial_ends_at: paid.plan_expires_at,
+            })
             .eq('device_id', deviceId);
         } catch (regErr: any) {
           console.warn('[DeviceController] device_registrations rebind failed (non-fatal):', regErr?.message || regErr);
@@ -543,24 +551,32 @@ export class DeviceController {
 
         let tenantData = null;
         try {
-          const { data: tenant } = await supabaseAdmin
-            .from('tenants')
-            .select('*')
-            .eq('id', updatedActivation.tenant_id)
-            .single();
-          tenantData = tenant;
-        } catch (e) {
-          console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
+          tenantData = await applyPaidLicenseToTenant(updatedActivation.tenant_id, paid);
+        } catch (upgradeErr: any) {
+          console.warn('[DeviceController] tenant paid-plan upgrade failed (non-fatal):', upgradeErr?.message || upgradeErr);
+        }
+        if (!tenantData) {
+          try {
+            const { data: tenant } = await supabaseAdmin
+              .from('tenants')
+              .select('*')
+              .eq('id', updatedActivation.tenant_id)
+              .single();
+            tenantData = tenant;
+          } catch (e) {
+            console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
+          }
         }
 
         const planIndex = Number(updatedActivation.plan_index || 0);
-        const planName = ['basic', 'standard', 'premium', 'enterprise'][planIndex] || 'basic';
+        const planName = paid.plan;
         return res.status(200).json({
           valid: true,
           activation_code: updatedActivation.activation_code,
           duration_days: updatedActivation.duration_days,
           plan_index: planIndex,
           plan: planName,
+          plan_expires_at: paid.plan_expires_at,
           tenant_id: updatedActivation.tenant_id,
           tenant: tenantData,
           device_id: deviceId,

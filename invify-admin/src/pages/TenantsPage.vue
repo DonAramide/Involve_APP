@@ -43,7 +43,7 @@
         <div class="col-12 col-md-3">
           <q-select 
             v-model="filter.type" 
-            :options="['all', 'school', 'retail', 'service']" 
+            :options="['all', 'school', 'retail', 'services']" 
             label="Type" 
             :dark="prefs.isDarkMode" filled dense 
             emit-value
@@ -226,9 +226,13 @@ const openCreateModal = () => {
     component: TenantModal,
     componentProps: { isEdit: false }
   }).onOk(async (formData) => {
-    await adminApi.createTenant(formData)
-    $q.notify({ type: 'positive', message: 'Tenant registered successfully' })
-    fetchTenants()
+    try {
+      await adminApi.createTenant(formData)
+      $q.notify({ type: 'positive', message: 'Tenant registered successfully' })
+      fetchTenants()
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to create tenant' })
+    }
   })
 }
 
@@ -237,17 +241,25 @@ const openEditModal = (row) => {
     component: TenantModal,
     componentProps: { isEdit: true, tenant: row }
   }).onOk(async (formData) => {
-    await adminApi.updateTenant(row.id, formData)
-    $q.notify({ type: 'positive', message: 'Tenant updated successfully' })
-    fetchTenants()
+    try {
+      await adminApi.updateTenant(row.id, formData)
+      $q.notify({ type: 'positive', message: 'Tenant updated successfully' })
+      fetchTenants()
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to update tenant' })
+    }
   })
 }
 
 const toggleStatus = async (row) => {
   const newStatus = row.status === 'active' ? 'suspended' : 'active'
-  await adminApi.updateTenant(row.id, { status: newStatus })
-  $q.notify({ type: 'positive', message: `Tenant ${newStatus}` })
-  fetchTenants()
+  try {
+    await adminApi.updateTenant(row.id, { status: newStatus })
+    $q.notify({ type: 'positive', message: `Tenant ${newStatus}` })
+    fetchTenants()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || `Failed to ${newStatus === 'suspended' ? 'suspend' : 'activate'} tenant` })
+  }
 }
 
 const viewDetails = (id) => {

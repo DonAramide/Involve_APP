@@ -449,6 +449,143 @@ describe('P0-2 Device Activations Integration/Unit Tests', () => {
       expect(capturedDeviceRecord.device_role).toBe('PRINTER');
     });
 
+    test('Redeeming a Standard license upgrades the tenant off trial so web login is allowed', async () => {
+      setupAuth('owner', 'tenant-123');
+
+      const pendingActivation = {
+        activation_code: 'NLDQ-D3QB-6X63-YVZ5-YQNE-R5XE',
+        tenant_id: 'tenant-123',
+        is_used: false,
+        status: 'pending',
+        plan_index: 1,
+        duration_days: 30,
+        device_suffix: '0',
+        expires_at: '2026-10-08T01:00:00.000Z',
+      };
+
+      let capturedTenantUpdate: any = null;
+
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'users') {
+          return { select: () => ({ eq: () => ({ single: jest.fn().mockResolvedValue({ data: { id: '1', role: 'owner', tenant_id: 'tenant-123', is_active: true }, error: null }) }) }) };
+        }
+        if (table === 'device_activations') {
+          return {
+            select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: pendingActivation, error: null }) }) }),
+            update: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ gt: () => ({ select: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: pendingActivation, error: null }) }) }) }) }) }) }),
+          };
+        }
+        if (table === 'terminal_inventory') {
+          return { select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }) }) }) };
+        }
+        if (table === 'devices') {
+          return {
+            upsert: () => ({ select: () => ({ single: jest.fn().mockResolvedValue({ data: { device_id: 'R52M413KTQK' }, error: null }) }) }),
+          };
+        }
+        if (table === 'device_registrations') {
+          return { update: () => ({ eq: () => Promise.resolve({ error: null }) }) };
+        }
+        if (table === 'tenants') {
+          return {
+            update: (row: any) => {
+              capturedTenantUpdate = row;
+              return {
+                eq: () => ({
+                  select: () => ({
+                    maybeSingle: jest.fn().mockResolvedValue({
+                      data: { id: 'tenant-123', name: 'DON PARISH', plan: row.plan, plan_expires_at: row.plan_expires_at },
+                      error: null,
+                    }),
+                  }),
+                }),
+              };
+            },
+          };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      const res = await request(app)
+        .post('/devices/validate')
+        .set('Authorization', 'Bearer token')
+        .send({ code: pendingActivation.activation_code, deviceId: 'R52M413KTQK' });
+
+      expect(res.status).toBe(200);
+      expect(capturedTenantUpdate).toEqual({
+        plan: 'standard',
+        plan_expires_at: '2026-10-08T01:00:00.000Z',
+      });
+      expect(res.body.plan).toBe('standard');
+      expect(res.body.tenant.plan).toBe('standard');
+    });
+
+    test('Re-validating a used code on the same device still upgrades a tenant stuck on trial', async () => {
+      setupAuth('owner', 'tenant-123');
+
+      const usedHere = {
+        activation_code: 'USED-HERE',
+        tenant_id: 'tenant-123',
+        is_used: true,
+        status: 'used',
+        device_id: 'R52M413KTQK',
+        plan_index: 1,
+        duration_days: 30,
+        expires_at: '2026-10-08T01:00:00.000Z',
+      };
+
+      let capturedTenantUpdate: any = null;
+
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'users') {
+          return { select: () => ({ eq: () => ({ single: jest.fn().mockResolvedValue({ data: { id: '1', role: 'owner', tenant_id: 'tenant-123', is_active: true }, error: null }) }) }) };
+        }
+        if (table === 'device_activations') {
+          return {
+            select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: usedHere, error: null }) }) }),
+          };
+        }
+        if (table === 'terminal_inventory') {
+          return { select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }) }) }) };
+        }
+        if (table === 'devices') {
+          return {
+            upsert: () => ({ select: () => ({ single: jest.fn().mockResolvedValue({ data: { device_id: 'R52M413KTQK' }, error: null }) }) }),
+          };
+        }
+        if (table === 'device_registrations') {
+          return { update: () => ({ eq: () => Promise.resolve({ error: null }) }) };
+        }
+        if (table === 'tenants') {
+          return {
+            update: (row: any) => {
+              capturedTenantUpdate = row;
+              return {
+                eq: () => ({
+                  select: () => ({
+                    maybeSingle: jest.fn().mockResolvedValue({
+                      data: { id: 'tenant-123', plan: row.plan, plan_expires_at: row.plan_expires_at },
+                      error: null,
+                    }),
+                  }),
+                }),
+              };
+            },
+          };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      const res = await request(app)
+        .post('/devices/validate')
+        .set('Authorization', 'Bearer token')
+        .send({ code: 'USED-HERE', deviceId: 'R52M413KTQK' });
+
+      expect(res.status).toBe(200);
+      expect(capturedTenantUpdate.plan).toBe('standard');
+      expect(res.body.plan).toBe('standard');
+    });
+
     test('Should reject activation if code belongs to Tenant A but user JWT belongs to Tenant B', async () => {
       // User JWT has tenant-B
       setupAuth('owner', 'tenant-B');
