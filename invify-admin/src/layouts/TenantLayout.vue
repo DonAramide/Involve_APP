@@ -78,9 +78,9 @@
               </q-item>
               
               <!-- Quick access triggers -->
-              <q-item v-if="['retail', 'hospitality', 'healthcare', 'services', 'service', 'invify_services'].includes(activeIndustry.toLowerCase())" clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
-                <q-item-section avatar><q-icon name="vpn_key" size="xs" color="amber-4" /></q-item-section>
-                <q-item-section class="text-white text-weight-bold">Device Activation</q-item-section>
+              <q-item clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
+                <q-item-section avatar><q-icon name="qr_code_2" size="xs" color="amber-4" /></q-item-section>
+                <q-item-section class="text-white text-weight-bold">Devices</q-item-section>
               </q-item>
 
               <q-separator dark class="q-my-xs opacity-10" />
@@ -276,6 +276,7 @@ const coreNavigationTree = [
   { label: 'Wallet & Treasury', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'green-4' },
   { label: 'Reconciliation Center', path: '/tenant/reconciliation', icon: 'account_tree', color: 'amber-4' },
   { label: 'Staff Management', path: '/tenant/staff', icon: 'people_outline', color: 'cyan-4' },
+  { label: 'Devices', path: '/tenant/devices', icon: 'qr_code_2', color: 'amber-4' },
   { label: 'BI Reports & Exports', path: '/tenant/reports', icon: 'insert_chart_outlined', color: 'purple-3' },
   { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' },
   { label: 'Financial Platform', path: '/tenant/settings/financial-platform', icon: 'account_balance', color: 'amber-4' },
@@ -298,6 +299,7 @@ const industryNavigationTree = computed(() => {
       { label: 'Library', path: '/tenant/curriculum', icon: 'library_books', color: 'brown-4', mode: 'SCHOOL' },
       { label: 'Transport', path: '/tenant/logistics/fleet', icon: 'directions_bus', color: 'blue-grey-4', mode: 'SCHOOL' },
       { label: 'Staff', path: '/tenant/users?role=TEACHER', icon: 'people', color: 'grey-4', mode: 'SCHOOL' },
+      { label: 'Devices', path: '/tenant/devices', icon: 'qr_code_2', color: 'amber-4', mode: 'SCHOOL' },
       { label: 'Communication', path: '/tenant/settings', icon: 'campaign', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Reports', path: '/tenant/analytics', icon: 'insert_chart', color: 'teal-4', mode: 'SCHOOL' }
     ]

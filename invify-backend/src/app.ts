@@ -433,6 +433,18 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
 app.get('/api/tenant/:id/kyc', authenticate, TenantKycController.getKycDocuments);
 
+const deviceLinkQrLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many device-link requests. Please try again later.' },
+});
+app.post(
+  '/api/tenant/devices/link-qr',
+  authenticate,
+  deviceLinkQrLimiter,
+  OnboardingController.generateAuthenticatedDeviceLinkQr,
+);
+
 // Agent Portal Routes
 app.post('/api/agent/register', AgentController.register);
 app.post('/api/agent/login', AgentController.login);

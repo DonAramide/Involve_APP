@@ -15,6 +15,8 @@ import {
   uniqueDeviceIds,
 } from '../utils/device-identity';
 import { newSelfServeTenantPlan } from '../utils/new-tenant-plan';
+import { issueDeviceLinkQr, WEB_ISSUER_DEVICE_ID } from '../utils/device-link-qr';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -948,60 +950,49 @@ export class OnboardingController {
   public static async generateDeviceLinkQr(req: Request, res: Response): Promise<void> {
     try {
       const { tenantId, deviceId, agentCode } = req.body;
-      if (!tenantId) {
-        res.status(400).json({ success: false, error: 'tenantId is required' });
+      const result = await issueDeviceLinkQr({
+        tenantId,
+        issuerDeviceId: deviceId || null,
+        agentCode,
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ success: false, error: result.error });
         return;
       }
-
-      // Verify tenant exists
-      const { data: tenant, error: tenantErr } = await supabaseAdmin
-        .from('tenants')
-        .select('id, name, type, phone, plan')
-        .eq('id', tenantId)
-        .single();
-
-      if (tenantErr || !tenant) {
-        res.status(404).json({ success: false, error: 'Tenant not found' });
-        return;
-      }
-
-      // Create a short-lived link token (expires in 3 minutes)
-      const token = require('crypto').randomBytes(16).toString('hex');
-      const expiresAt = new Date(Date.now() + 3 * 60 * 1000).toISOString(); // 3 min
-
-      // Store in device_link_tokens table (non-fatal if table doesn't exist)
-      try {
-        await supabaseAdmin.from('device_link_tokens').insert({
-          token,
-          tenant_id: tenantId,
-          issuer_device_id: deviceId || null,
-          issuer_agent_code: agentCode || 'AAA000',
-          expires_at: expiresAt,
-          used: false,
-        });
-      } catch (storeErr: any) {
-        console.warn('[OnboardingController] device_link_tokens insert failed:', storeErr.message);
-      }
-
-      // The QR payload contains everything needed for the new device to self-register
-      const qrPayload = JSON.stringify({
-        action: 'LINK_DEVICE',
-        token,
-        tenantId: tenant.id,
-        businessName: tenant.name,
-        industry: tenant.type,
-        expiresAt,
-      });
-
-      res.status(200).json({
-        success: true,
-        token,
-        expiresAt,
-        qrPayload, // Frontend renders this as a QR code
-        tenant: { id: tenant.id, name: tenant.name, type: tenant.type, plan: tenant.plan },
-      });
+      res.status(200).json({ success: true, ...result.data });
     } catch (error: any) {
       console.error('[OnboardingController] generateDeviceLinkQr error:', error.message);
+      res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * POST /api/tenant/devices/link-qr
+   * Tenant web portal: generate the same LINK_DEVICE QR without the old tablet.
+   * Tenant id comes from the session, not the request body.
+   */
+  public static async generateAuthenticatedDeviceLinkQr(req: Request, res: Response): Promise<void> {
+    try {
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        res.status(err.status || 401).json({ success: false, error: err.message || 'Unauthenticated' });
+        return;
+      }
+
+      const result = await issueDeviceLinkQr({
+        tenantId,
+        issuerDeviceId: WEB_ISSUER_DEVICE_ID,
+        agentCode: 'AAA000',
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ success: false, error: result.error });
+        return;
+      }
+      res.status(200).json({ success: true, ...result.data });
+    } catch (error: any) {
+      console.error('[OnboardingController] generateAuthenticatedDeviceLinkQr error:', error.message);
       res.status(500).json({ success: false, error: 'Internal server error' });
     }
   }

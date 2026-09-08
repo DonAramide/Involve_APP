@@ -228,6 +228,7 @@ export const aiApi = {
 };
 
 export const deviceApi = {
+  generateTenantLinkQr: () => api.post('/api/tenant/devices/link-qr'),
   getDevices: () => api.get('/api/devices'),
   getConnectedPresence: () => api.get('/api/devices/connected'),
   getActivations: () => api.get('/devices/activations'),
