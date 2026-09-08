@@ -1,13 +1,10 @@
 <template>
   <div class="workspace-resolver">
-    <div v-if="runtimeStore.isLoading" class="workspace-loading">
-      Initializing Enterprise Workspace...
-    </div>
+    <InvifyLoadingState v-if="runtimeStore.isLoading || (!runtimeStore.isReady && !runtimeStore.error)" message="LOADING YOUR DASHBOARD..." />
     <div v-else-if="runtimeStore.error" class="workspace-error">
       Failed to load workspace configuration.
     </div>
     <div v-else-if="runtimeStore.isReady">
-      <!-- In a real implementation, we would dynamically load a specific workspace based on businessMode -->
       <slot></slot>
     </div>
   </div>
@@ -16,6 +13,7 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useRuntimeStore } from '../../stores/runtime.store';
+import InvifyLoadingState from '../InvifyLoadingState.vue';
 
 const runtimeStore = useRuntimeStore();
 

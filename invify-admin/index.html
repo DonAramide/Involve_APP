@@ -7,6 +7,49 @@
     <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet" type="text/css">
     <title>Invify - Enterprise Business & Financial Operations Platform</title>
     <meta name="description" content="Invify brings invoicing, payments, financial operations, inventory, reconciliation and business intelligence into one connected platform.">
+    <style>
+      html, body, #app { margin: 0; min-height: 100%; background: #05070d; }
+      .invify-boot {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        color: rgba(255,255,255,0.72);
+        font-family: Roboto, system-ui, sans-serif;
+      }
+      .invify-boot__mark {
+        width: 90px;
+        height: 90px;
+        position: relative;
+        display: grid;
+        place-items: center;
+        animation: invify-pulse 1.2s ease-in-out infinite alternate;
+        filter: drop-shadow(0 0 18px rgba(99, 102, 241, 0.35));
+      }
+      .invify-boot__ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 3px solid rgba(99, 102, 241, 0.15);
+        border-top-color: #6366f1;
+        animation: invify-spin 1s linear infinite;
+      }
+      .invify-boot__badge {
+        width: 65px;
+        height: 65px;
+        border-radius: 50%;
+        background: #fff;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .invify-boot__logo { width: 49px; height: 49px; object-fit: contain; }
+      .invify-boot__message { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; }
+      @keyframes invify-pulse { from { transform: scale(0.85); } to { transform: scale(1.05); } }
+      @keyframes invify-spin { to { transform: rotate(360deg); } }
+    </style>
     
     <!-- Open Graph -->
     <meta property="og:title" content="Invify - Enterprise Platform">
@@ -20,7 +63,17 @@
     <meta name="twitter:description" content="The enterprise business and financial operations platform.">
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="invify-boot" role="status" aria-live="polite">
+        <div class="invify-boot__mark">
+          <div class="invify-boot__ring"></div>
+          <div class="invify-boot__badge">
+            <img src="/brand/invify-logo.png" alt="Invify" class="invify-boot__logo" />
+          </div>
+        </div>
+        <div class="invify-boot__message">LOADING INVIFY...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

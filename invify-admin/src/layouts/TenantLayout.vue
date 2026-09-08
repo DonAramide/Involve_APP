@@ -181,7 +181,12 @@
 
       <router-view v-slot="{ Component }">
         <transition appear enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-          <component :is="Component" :key="$route.fullPath" />
+          <Suspense timeout="0">
+            <component :is="Component" :key="$route.fullPath" />
+            <template #fallback>
+              <InvifyLoadingState message="LOADING YOUR DASHBOARD..." />
+            </template>
+          </Suspense>
         </transition>
       </router-view>
     </q-page-container>
@@ -194,6 +199,7 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { adminApi, api } from '../api'
 import { logoutAuthenticatedSession } from '../auth/session'
+import InvifyLoadingState from '../components/InvifyLoadingState.vue'
 
 const router = useRouter()
 const $q = useQuasar()

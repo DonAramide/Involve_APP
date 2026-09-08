@@ -1,14 +1,24 @@
 <template>
-  <router-view />
+  <router-view v-slot="{ Component, route }">
+    <template v-if="Component">
+      <Suspense timeout="0">
+        <component :is="Component" :key="route.fullPath" />
+        <template #fallback>
+          <InvifyBootSplash />
+        </template>
+      </Suspense>
+    </template>
+    <InvifyBootSplash v-else />
+  </router-view>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { Notify, useQuasar } from 'quasar'
-import { watch } from 'vue'
 import { api } from './api'
 import { consumeIdleLogoutNotice, startIdleLogoutWatchdog } from './auth/idleLogout'
 import { useOperatorPreferences } from './composables/useOperatorPreferences'
+import InvifyBootSplash from './components/InvifyBootSplash.vue'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
