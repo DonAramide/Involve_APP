@@ -10,6 +10,7 @@ import '../../../../core/services/backup_service.dart';
 import '../../../../core/license/storage_service.dart';
 import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
+import '../../domain/entities/settings.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -180,6 +181,24 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           if (!plan.isPremium && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
              debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
              workingSettings = workingSettings.copyWith(serviceBillingEnabled: false);
+          }
+        }
+
+        // 3. Apply onboarding industry + brand color if they were chosen
+        //    and have not been locked / overwritten yet.
+        final storedModeRaw = await StorageService.getOnboardingIndustry();
+        final storedColor = await StorageService.getOnboardingThemeColor();
+        final modeLocked = await StorageService.isBusinessModeLocked();
+        if (storedModeRaw != null && storedModeRaw.isNotEmpty && !modeLocked) {
+          final desiredMode = AppSettings.modeFromOnboarding(storedModeRaw);
+          if (workingSettings.normalizedBusinessMode != desiredMode) {
+            workingSettings = workingSettings.copyWith(businessMode: desiredMode);
+          }
+        }
+        if (storedColor != null && storedColor != workingSettings.primaryColor) {
+          const factoryBlue = 0xFF2196F3;
+          if (workingSettings.primaryColor == factoryBlue) {
+            workingSettings = workingSettings.copyWith(primaryColor: storedColor);
           }
         }
 

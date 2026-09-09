@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <link rel="icon" type="image/svg+xml" href="/vite.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet" type="text/css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet" type="text/css" media="print" onload="this.media='all'">
     <title>Invify - Enterprise Business & Financial Operations Platform</title>
     <meta name="description" content="Invify brings invoicing, payments, financial operations, inventory, reconciliation and business intelligence into one connected platform.">
     <style>
@@ -74,6 +76,25 @@
         <div class="invify-boot__message">LOADING INVIFY...</div>
       </div>
     </div>
+    <script>
+      window.setTimeout(function () {
+        var root = document.getElementById('app')
+        if (!root) return
+        var boot = root.querySelector('.invify-boot')
+        if (!boot || root.childElementCount !== 1) return
+        var msg = boot.querySelector('.invify-boot__message')
+        if (msg) {
+          msg.textContent = 'Still loading. Check your connection, then refresh.'
+        }
+        if (boot.querySelector('button')) return
+        var btn = document.createElement('button')
+        btn.type = 'button'
+        btn.textContent = 'Refresh'
+        btn.style.cssText = 'margin-top:4px;padding:10px 18px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700;cursor:pointer;'
+        btn.onclick = function () { window.location.reload() }
+        boot.appendChild(btn)
+      }, 12000)
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

@@ -10,6 +10,7 @@ import {
   consumeMfaChallenge,
   issueMfaChallenge,
   MfaChallengeError,
+  MfaUserSnapshot,
   validateMfaChallenge,
 } from '../services/mfa-challenge.service';
 import {
@@ -23,6 +24,19 @@ import { evaluatePasswordPolicy } from '../utils/password-policy';
 /** Love School (device / JWT from live tablet sessions). */
 const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
 const LOVE_SCHOOL_OWNER_ID = 'eb9f0b3c-c874-4d96-b624-5d4d63a60e4e';
+
+function mfaSnapshotFromProfile(profile: any, overrides: Partial<MfaUserSnapshot> = {}): MfaUserSnapshot {
+  return {
+    id: profile.id,
+    email: profile.email,
+    role: profile.role,
+    tenantId: profile.tenant_id,
+    name: profile.name,
+    mfaSecret: profile.mfa_secret,
+    mfaEnabled: !!profile.mfa_enabled,
+    ...overrides,
+  };
+}
 
 function isAuthConnectivityFailure(err: any): boolean {
   const msg = String(err?.message || err || '');
@@ -365,6 +379,55 @@ function mfaErrorResponse(res: Response, error: unknown): Response {
   return res.status(500).json({ error: 'MFA_OPERATION_FAILED', message: 'MFA operation failed' });
 }
 
+function respondWithWebMfaGate(
+  req: Request,
+  res: Response,
+  profile: any,
+  pendingSession: { token: string; refreshToken: string },
+): Response {
+  if (!profile.mfa_enabled) {
+    let setupToken: string;
+    try {
+      setupToken = issueMfaChallenge(
+        profile.id,
+        'setup',
+        pendingSession,
+        mfaSnapshotFromProfile(profile),
+      ).token;
+    } catch (error) {
+      return mfaErrorResponse(res, error);
+    }
+    setMfaChallengeCookie(res, setupToken, req);
+    return res.status(200).json({
+      requiresMfaSetup: true,
+      setupToken,
+      challengeToken: setupToken,
+      userId: profile.id,
+      role: profile.role,
+    });
+  }
+
+  let challengeToken: string;
+  try {
+    challengeToken = issueMfaChallenge(
+      profile.id,
+      'verify',
+      pendingSession,
+      mfaSnapshotFromProfile(profile),
+    ).token;
+  } catch (error) {
+    return mfaErrorResponse(res, error);
+  }
+  setMfaChallengeCookie(res, challengeToken, req);
+  return res.status(200).json({
+    requires2FA: true,
+    challengeToken,
+    userId: profile.id,
+    role: profile.role,
+    message: 'MFA challenge required',
+  });
+}
+
 export class AuthController {
   /**
    * POST /api/auth/login
@@ -659,80 +722,19 @@ export class AuthController {
         });
       }
 
-      // 4. Return complete JWT Session (if MFA not required)
+      // 4. Issue a session only after MFA setup or TOTP challenge.
       const check = await validateDeviceOrBlock(profile.id, profile.email, req);
       if (!check.allowed) {
         return res.status(403).json(check.errorResponse);
       }
 
-      const isPlatformRole = [
-        'super_admin',
-        'admin_finance',
-        'admin_treasury',
-        'admin_risk',
-        'admin_ops',
-        'admin_executive',
-        'admin_deploy',
-        'internal_staff'
-      ].includes(profile.role);
-
-      if (isPlatformRole) {
-        const pendingSession = {
-          token: authData.session.access_token,
-          refreshToken: authData.session.refresh_token,
-        };
-
-        // Enforce setup if not enabled
-        if (!profile.mfa_enabled) {
-          let setupToken: string;
-          try {
-            setupToken = issueMfaChallenge(profile.id, 'setup', pendingSession).token;
-          } catch (error) {
-            return mfaErrorResponse(res, error);
-          }
-          setMfaChallengeCookie(res, setupToken, req);
-          return res.status(200).json({
-            requiresMfaSetup: true,
-            setupToken,
-            challengeToken: setupToken,
-            userId: profile.id,
-            role: profile.role
-          });
-        } else {
-          // Enforce 2FA challenge if enabled
-          let challengeToken: string;
-          try {
-            challengeToken = issueMfaChallenge(profile.id, 'verify', pendingSession).token;
-          } catch (error) {
-            return mfaErrorResponse(res, error);
-          }
-          setMfaChallengeCookie(res, challengeToken, req);
-          return res.status(200).json({
-            requires2FA: true,
-            challengeToken,
-            userId: profile.id,
-            role: profile.role,
-            message: 'MFA challenge required'
-          });
-        }
-      }
-
-      dispatchLoginSecurityAlert(req, {
-        name: profile.name,
-        email: profile.email,
-        role: profile.role
-      });
-
-      return res.status(200).json({
+      const pendingSession = {
         token: authData.session.access_token,
         refreshToken: authData.session.refresh_token,
-        user: {
-          id: profile.id,
-          email: profile.email,
-          role: profile.role || 'tenant_admin',
-          tenantId: profile.tenant_id
-        }
-      });
+      };
+
+      // Web portals (admin + tenant) must enroll or pass TOTP before a session is issued.
+      return respondWithWebMfaGate(req, res, profile, pendingSession);
 
     } catch (error: any) {
       console.error('[AuthController] Login Error:', error.message);
@@ -1153,7 +1155,12 @@ export class AuthController {
 
       const otpAuthUrl = authenticator.keyuri(profile.email, 'Invify Admin', secret);
       const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl);
-      const verificationChallenge = issueMfaChallenge(userId, 'verify', pendingSession);
+      const verificationChallenge = issueMfaChallenge(
+        userId,
+        'verify',
+        pendingSession,
+        mfaSnapshotFromProfile(profile, { mfaSecret: secret, mfaEnabled: false }),
+      );
       setMfaChallengeCookie(res, verificationChallenge.token, req);
 
       // Raw secret is returned only in this password-authenticated, single-user enrollment flow.
@@ -1187,15 +1194,30 @@ export class AuthController {
         requestedUserId,
       );
       const userId = verificationChallenge.userId;
+      const snapshot = verificationChallenge.snapshot;
 
-      const { data: profile, error: profileErr } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      let profile: any = snapshot
+        ? {
+            id: snapshot.id,
+            email: snapshot.email,
+            role: snapshot.role,
+            tenant_id: snapshot.tenantId,
+            name: snapshot.name,
+            mfa_secret: snapshot.mfaSecret,
+            mfa_enabled: snapshot.mfaEnabled,
+          }
+        : null;
 
-      if (profileErr || !profile) {
-        return res.status(404).json({ error: 'User not found' });
+      if (!profile?.mfa_secret) {
+        const { data, error: profileErr } = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        if (profileErr || !data) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        profile = data;
       }
 
       const secret = profile.mfa_secret;
@@ -1205,7 +1227,10 @@ export class AuthController {
 
       const cleanToken = String(tokenCode).trim();
       if (!authenticator.verify({ token: cleanToken, secret })) {
-        return res.status(400).json({ message: 'Invalid or expired 2FA code' });
+        return res.status(400).json({
+          message: 'Invalid or expired OTP',
+          error: 'Invalid or expired OTP',
+        });
       }
 
       if (!profile.mfa_enabled) {

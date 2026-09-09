@@ -4,6 +4,7 @@ import { CustomerCreatedHandler } from './sync-handlers/customer.handler';
 
 // Register known handlers
 syncRegistry.register('invoice.created', new InvoiceCreatedHandler());
+syncRegistry.register('invoice.updated', new InvoiceCreatedHandler());
 syncRegistry.register('customer.created', new CustomerCreatedHandler());
 // We can add PaymentRecordedHandler, ProductCreatedHandler, etc., here later.
 

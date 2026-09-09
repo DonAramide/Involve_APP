@@ -57,6 +57,13 @@ class _StudentListPageState extends State<StudentListPage> {
       listener: (context, state) {
         if (state.error != null) {
           String message = friendlyApiError(state.error);
+          final lower = '${state.error} $message'.toLowerCase();
+          if (lower.contains('virtual account') ||
+              lower.contains('payment account') ||
+              lower.contains('free trial') ||
+              lower.contains('api key')) {
+            return;
+          }
           if (state.error!.contains('UNIQUE constraint failed') &&
               state.error!.contains('admission_number')) {
             message = 'Admission number already exists. Please try a different one.';

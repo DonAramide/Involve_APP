@@ -61,8 +61,8 @@
         <q-card-section class="q-pt-md" v-if="selectedInvoice">
           <div class="row items-center justify-between q-mb-md">
             <div class="text-grey-5">Status</div>
-            <q-badge :color="getStatusColor(selectedInvoice.status)" class="text-weight-bold font-mono">
-              {{ selectedInvoice.status ? selectedInvoice.status.toUpperCase() : '' }}
+            <q-badge :color="getStatusColor(invoiceStatus(selectedInvoice))" class="text-weight-bold font-mono">
+              {{ invoiceStatus(selectedInvoice) ? invoiceStatus(selectedInvoice).toUpperCase() : '' }}
             </q-badge>
           </div>
           <div class="row items-center justify-between q-mb-md">
@@ -75,7 +75,7 @@
           </div>
           <div class="row items-center justify-between q-mb-lg">
             <div class="text-grey-5">Customer</div>
-            <div class="text-subtitle1">{{ selectedInvoice.metadata?.customer_name || 'Walk-in' }}</div>
+            <div class="text-subtitle1">{{ invoiceCustomer(selectedInvoice) }}</div>
           </div>
           
           <q-separator dark class="border-grey-9 q-mb-md" />
@@ -226,11 +226,11 @@ const downloadInvoice = () => {
         <div class="details">
           <div>
             <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Billed To</h3>
-            <strong>${inv.metadata?.customer_name || 'Walk-in Customer'}</strong>
+            <strong>${invoiceCustomer(inv)}</strong>
           </div>
           <div style="text-align: right;">
             <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Payment Details</h3>
-            <strong>Status:</strong> ${inv.status || 'UNPAID'}<br>
+            <strong>Status:</strong> ${invoiceStatus(inv) || 'UNPAID'}<br>
             <strong>Method:</strong> ${inv.payment_method || 'N/A'}
           </div>
         </div>
@@ -285,9 +285,9 @@ const downloadInvoice = () => {
 const columns = [
   { name: 'date', label: 'DATE', field: row => new Date(row.created_at).toLocaleString(), align: 'left', sortable: true },
   { name: 'invoice_number', label: 'INVOICE NO', field: 'invoice_number', align: 'left' },
-  { name: 'customer', label: 'CUSTOMER', field: row => row.metadata?.customer_name || 'Walk-in', align: 'left' },
+  { name: 'customer', label: 'CUSTOMER', field: row => invoiceCustomer(row), align: 'left' },
   { name: 'amount', label: 'AMOUNT', field: 'total_amount', align: 'right', sortable: true },
-  { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
+  { name: 'status', label: 'STATUS', field: row => invoiceStatus(row), align: 'center' }
 ];
 
 const loadInvoices = async () => {
@@ -353,12 +353,18 @@ onMounted(() => {
   loadInvoices();
 });
 
+const invoiceStatus = (inv) => inv?.payment_status || inv?.status || '';
+const invoiceCustomer = (inv) =>
+  inv?.metadata?.customer_name || inv?.customer?.name || inv?.customer_name || 'Walk-in';
+
 const getStatusColor = (status) => {
   if (!status) return 'grey-9';
   switch (status.toUpperCase()) {
     case 'PAID': return 'green-10';
     case 'PENDING': return 'amber-10';
+    case 'PARTIAL': return 'orange-10';
     case 'CANCELLED': return 'red-10';
+    case 'UNPAID': return 'grey-8';
     default: return 'grey-9';
   }
 };

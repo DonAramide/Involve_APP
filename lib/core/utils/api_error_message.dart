@@ -14,7 +14,7 @@ String friendlyApiError(
     try {
       final msg = (error as dynamic).message;
       if (msg is String && msg.trim().isNotEmpty) {
-        final mapped = _mapNetworkish(msg.trim());
+        final mapped = _mapNetworkish(msg.trim()) ?? _mapSensitive(msg.trim());
         if (mapped != null) return mapped;
         if (!_looksTechnical(msg)) {
           return _sanitize(msg.trim(), fallback);
@@ -30,15 +30,15 @@ String friendlyApiError(
   if (error is Exception || error is Error || error is String) {
     final raw = error.toString();
     final stripped = raw
-        .replaceFirst(RegExp(r'^Exception:\s*'), '')
+        .replaceAll(RegExp(r'(Exception|Error):\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'Generation failed:\s*', caseSensitive: false), '')
         .replaceFirst(RegExp(r'^FinanceApiException:\s*'), '')
         .replaceFirst(RegExp(r'^ServerException:\s*'), '')
         .replaceFirst(RegExp(r'^NetworkException:\s*'), '')
         .replaceFirst(RegExp(r'^UnauthorizedException:\s*'), '')
-        .replaceFirst(RegExp(r'^Error:\s*'), '')
         .trim();
 
-    final mapped = _mapNetworkish(stripped);
+    final mapped = _mapNetworkish(stripped) ?? _mapSensitive(stripped);
     if (mapped != null) return mapped;
 
     if (_looksTechnical(stripped)) {
@@ -49,7 +49,7 @@ String friendlyApiError(
 
   final asString = error.toString().trim();
   if (asString.isEmpty || _looksTechnical(asString)) return fallback;
-  final mapped = _mapNetworkish(asString);
+  final mapped = _mapNetworkish(asString) ?? _mapSensitive(asString);
   if (mapped != null) return mapped;
   return _sanitize(asString, fallback);
 }
@@ -89,13 +89,37 @@ String? _mapNetworkish(String text) {
   return null;
 }
 
+/// Auth / payment-gateway internals that must never appear on device screens.
+String? _mapSensitive(String text) {
+  final t = text.toLowerCase();
+  if (t.contains('authorization header') ||
+      t.contains('malformed authorization') ||
+      t.contains('missing or malformed authorization') ||
+      t.contains('invalid token') ||
+      t.contains('token expired') ||
+      t.contains('jwt') ||
+      t.contains('bearer') ||
+      t.contains('unauthenticated') ||
+      t.contains('access token')) {
+    return 'Your session expired. Please sign in again.';
+  }
+  if (t.contains('invalid api key') ||
+      t.contains('api key') ||
+      t.contains('apikey') ||
+      t.contains('va_credentials') ||
+      t.contains('invalid key')) {
+    return 'Payment accounts are not set up yet. Open the Invify admin portal, activate virtual-account credentials, then try again.';
+  }
+  return null;
+}
+
 String _fromDio(DioException e, String fallback) {
   // Prefer structured error attached by FinanceApiClient interceptor
   if (e.error != null && e.error is! String) {
     try {
       final msg = (e.error as dynamic).message;
       if (msg is String && msg.trim().isNotEmpty) {
-        final mapped = _mapNetworkish(msg.trim());
+        final mapped = _mapNetworkish(msg.trim()) ?? _mapSensitive(msg.trim());
         if (mapped != null) return mapped;
         if (!_looksTechnical(msg)) {
           return _sanitize(msg.trim(), fallback);
@@ -108,7 +132,7 @@ String _fromDio(DioException e, String fallback) {
 
   // Dio often puts "connect ECONNREFUSED ..." in message / error string
   final dioMsg = e.message ?? e.error?.toString() ?? '';
-  final mapped = _mapNetworkish(dioMsg);
+  final mapped = _mapNetworkish(dioMsg) ?? _mapSensitive(dioMsg);
   if (mapped != null) return mapped;
 
   switch (e.type) {
@@ -135,7 +159,7 @@ String _fromDio(DioException e, String fallback) {
         return _sanitize(fromBody, fallback);
       }
       if (e.message != null) {
-        final m = _mapNetworkish(e.message!);
+        final m = _mapNetworkish(e.message!) ?? _mapSensitive(e.message!);
         if (m != null) return m;
         if (!_looksTechnical(e.message!)) {
           return _sanitize(e.message!, fallback);
@@ -152,7 +176,7 @@ String? extractApiErrorBody(dynamic data) {
   if (data is String) {
     final t = data.trim();
     if (t.isEmpty) return null;
-    final mapped = _mapNetworkish(t);
+    final mapped = _mapNetworkish(t) ?? _mapSensitive(t);
     if (mapped != null) return mapped;
     if (_looksTechnical(t)) return null;
     // Avoid dumping HTML error pages
@@ -168,7 +192,7 @@ String? extractApiErrorBody(dynamic data) {
     for (final key in ['error', 'message', 'detail', 'msg', 'title', 'responseMessage']) {
       final v = map[key];
       if (v is String && v.trim().isNotEmpty) {
-        final mapped = _mapNetworkish(v);
+        final mapped = _mapNetworkish(v) ?? _mapSensitive(v);
         if (mapped != null) return mapped;
         if (!_looksTechnical(v)) return v.trim();
       }
@@ -228,6 +252,9 @@ String _messageForStatus(int? status, String fallback) {
 bool _looksTechnical(String text) {
   final t = text.toLowerCase();
   return t.contains('dioexception') ||
+      t.contains('authorization header') ||
+      t.contains('invalid api key') ||
+      t.contains('api key') ||
       t.contains('bad response') ||
       t.contains('xmlhttprequest') ||
       t.contains('socketexception') ||
@@ -255,7 +282,7 @@ bool _looksTechnical(String text) {
 String _sanitize(String message, String fallback) {
   var m = message.trim();
   if (m.isEmpty) return fallback;
-  final mapped = _mapNetworkish(m);
+  final mapped = _mapNetworkish(m) ?? _mapSensitive(m);
   if (mapped != null) return mapped;
   if (_looksTechnical(m)) return fallback;
 

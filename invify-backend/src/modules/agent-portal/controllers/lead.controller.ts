@@ -4,6 +4,7 @@ import { supabase } from '../../../db/supabase';
 import { integrationEngine } from '../../../services/integration-engine.service';
 import { BuildVariantService } from '../../../config/build-variant';
 import { IntegrationVaultService } from '../../../services/integration-vault.service';
+import { newSelfServeTenantPlan } from '../../../utils/new-tenant-plan';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -99,7 +100,7 @@ export class LeadController {
         .insert({
           name: lead.business_name,
           type: 'merchant',
-          plan: 'standard',
+          ...newSelfServeTenantPlan(),
           status: 'active'
         })
         .select()

@@ -39,18 +39,24 @@
         </div>
       </div>
 
-      <!-- Metrics Row: Total Invoiced vs Total Collected -->
+      <!-- Metrics Row: Invoiced | Collected | Pending -->
       <div class="row q-col-gutter-lg justify-center q-py-sm">
-        <div class="col-12 col-sm-6 text-center border-right-grey-9">
+        <div class="col-12 col-sm-4 text-center border-right-grey-9">
           <div class="text-overline text-grey-5 font-mono">Total Invoiced</div>
-          <div class="text-h3 text-weight-bolder text-indigo-3 text-metric-mono q-my-xs">
+          <div class="text-h4 text-weight-bolder text-indigo-3 text-metric-mono q-my-xs">
             ₦{{ Number(financeStore.summary.salesSummary.totalInvoiced).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
           </div>
         </div>
-        <div class="col-12 col-sm-6 text-center">
+        <div class="col-12 col-sm-4 text-center border-right-grey-9">
           <div class="text-overline text-grey-5 font-mono">Total Collected</div>
-          <div class="text-h3 text-weight-bolder text-green-4 text-metric-mono q-my-xs">
+          <div class="text-h4 text-weight-bolder text-green-4 text-metric-mono q-my-xs">
             ₦{{ Number(financeStore.summary.salesSummary.totalCollected).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+          </div>
+        </div>
+        <div class="col-12 col-sm-4 text-center">
+          <div class="text-overline text-grey-5 font-mono">Total Pending</div>
+          <div class="text-h4 text-weight-bolder text-amber-5 text-metric-mono q-my-xs">
+            ₦{{ Number(financeStore.summary.salesSummary.totalPending || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
           </div>
         </div>
       </div>

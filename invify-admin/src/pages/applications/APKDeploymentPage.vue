@@ -227,7 +227,8 @@
             </div>
 
             <div class="text-muted text-center border-top q-pt-xs" style="font-size: 9px;">
-              System enforces a maximum of 3 concurrent APK vault entries. Remove an existing entry to upload a new one.
+              Upload New APK fills the next empty slot and never replaces an existing slot.
+              Use the upgrade icon on a slot to replace that slot only.
             </div>
           </div>
         </div>
@@ -379,7 +380,7 @@
           <q-icon name="upload_file" color="cyan-4" size="sm" />
           <div>
             <div class="text-main text-weight-bold text-caption">{{ targetSlotIndex !== null ? 'Upload New Version' : 'Upload APK to Vault' }}</div>
-            <div class="text-muted text-metric-mono" style="font-size: 10px;">{{ targetSlotIndex !== null ? `Updating Slot ${targetSlotIndex + 1}` : `Slot ${apkVault.length + 1} of 3 — Max 3 packages enforced` }}</div>
+            <div class="text-muted text-metric-mono" style="font-size: 10px;">{{ targetSlotIndex !== null ? `Replaces Slot ${targetSlotIndex + 1} only` : `Occupies empty Slot ${apkVault.length + 1} of 3 — existing slots stay unchanged` }}</div>
           </div>
         </q-card-section>
 
@@ -636,15 +637,6 @@ const commitApkToVault = async () => {
   
   if (targetSlotIndex.value !== null) {
     formData.append('targetSlotId', apkVault.value[targetSlotIndex.value].id)
-  } else {
-    const pkg = String(newApk.value.packageName || '').trim().toLowerCase()
-    const existingIndex = apkVault.value.findIndex(
-      (apk) => String(apk.packageName || '').toLowerCase() === pkg,
-    )
-    if (existingIndex >= 0) {
-      targetSlotIndex.value = existingIndex
-      formData.append('targetSlotId', apkVault.value[existingIndex].id)
-    }
   }
 
   isUploading.value = true

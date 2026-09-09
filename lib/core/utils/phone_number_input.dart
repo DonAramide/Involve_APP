@@ -8,11 +8,16 @@ class PhoneNumberInput {
     _PhoneDigitLimitFormatter(),
   ];
 
+  static List<TextInputFormatter> formattersFor(int maxDigits) => [
+        _PhoneDigitLimitFormatter(maxDigits),
+      ];
+
   static int digitCount(String? value) =>
       (value ?? '').replaceAll(RegExp(r'\D'), '').length;
 
   /// Trims an existing value down to [maxDigits] digits (keeps a leading +).
-  static String clamp(String? value) {
+  static String clamp(String? value, {int? maxDigits}) {
+    final cap = maxDigits ?? PhoneNumberInput.maxDigits;
     final text = value ?? '';
     final buf = StringBuffer();
     var digits = 0;
@@ -23,7 +28,7 @@ class PhoneNumberInput {
         continue;
       }
       if (RegExp(r'\d').hasMatch(c)) {
-        if (digits >= maxDigits) continue;
+        if (digits >= cap) continue;
         buf.write(c);
         digits++;
       }
@@ -51,12 +56,16 @@ class PhoneNumberInput {
 }
 
 class _PhoneDigitLimitFormatter extends TextInputFormatter {
+  _PhoneDigitLimitFormatter([this.maxDigits = PhoneNumberInput.maxDigits]);
+
+  final int maxDigits;
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final formatted = PhoneNumberInput.clamp(newValue.text);
+    final formatted = PhoneNumberInput.clamp(newValue.text, maxDigits: maxDigits);
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),

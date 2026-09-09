@@ -17,6 +17,8 @@ class StorageService {
   static const _serverPlanKey = 'server_activated_plan';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
+  static const _onboardingIndustryKey = 'onboarding_industry';
+  static const _onboardingThemeColorKey = 'onboarding_theme_color';
   static const _licenseFileName = 'license.dat';
   static const _mposTerminalIdKey = 'mpos_terminal_id';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
@@ -299,6 +301,53 @@ class StorageService {
       }
     }
     return value == 'true';
+  }
+
+  static Future<void> setOnboardingIndustry(String industry) async {
+    final value = industry.trim().toLowerCase();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onboardingIndustryKey, value: value);
+    } else {
+      final file = await _getDesktopFile('onboarding_industry.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<String?> getOnboardingIndustry() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onboardingIndustryKey);
+    } else {
+      final file = await _getDesktopFile('onboarding_industry.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    final clean = (value ?? '').trim();
+    return clean.isEmpty ? null : clean;
+  }
+
+  static Future<void> setOnboardingThemeColor(int color) async {
+    final value = color.toString();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onboardingThemeColorKey, value: value);
+    } else {
+      final file = await _getDesktopFile('onboarding_theme_color.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<int?> getOnboardingThemeColor() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onboardingThemeColorKey);
+    } else {
+      final file = await _getDesktopFile('onboarding_theme_color.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return int.tryParse((value ?? '').trim());
   }
 
   static Future<void> setOnlineSyncEnabled(bool enabled) async {

@@ -17,7 +17,7 @@ export const IDLE_ACTIVITY_STORAGE_KEY = 'invify_last_activity_at';
 export const IDLE_LOGOUT_NOTICE_KEY = 'invify_idle_logout';
 
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
-const TICK_MS = 10000;
+const TICK_MS = 1000;
 const TOUCH_THROTTLE_MS = 1000;
 
 let idleHoldCount = 0;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
@@ -66,6 +67,53 @@ class SchoolSetupPage extends StatelessWidget {
   }
 }
 
+final _academicSessionPattern = RegExp(r'^(\d{4})/(\d{4})$');
+
+String? _validateAcademicSession(String? value) {
+  final text = (value ?? '').trim();
+  if (text.isEmpty) return 'Enter a session like 2026/2027';
+  final match = _academicSessionPattern.firstMatch(text);
+  if (match == null) return 'Use session format YYYY/YYYY, e.g. 2026/2027';
+  final start = int.parse(match.group(1)!);
+  final end = int.parse(match.group(2)!);
+  if (end != start + 1) return 'Second year must be ${start + 1}';
+  if (start < 1990 || start > 2100) return 'Enter a valid session year';
+  return null;
+}
+
+({int start, int end})? _parseAcademicSession(String value) {
+  final match = _academicSessionPattern.firstMatch(value.trim());
+  if (match == null) return null;
+  final start = int.parse(match.group(1)!);
+  final end = int.parse(match.group(2)!);
+  if (end != start + 1) return null;
+  return (start: start, end: end);
+}
+
+class _AcademicSessionFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 8) digits = digits.substring(0, 8);
+
+    final oldDigits = oldValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    String formatted;
+    if (digits.length == 4 && oldDigits.length < 4) {
+      final year = int.tryParse(digits);
+      formatted = year == null ? digits : '$digits/${year + 1}';
+    } else if (digits.length <= 4) {
+      formatted = digits;
+    } else {
+      formatted = '${digits.substring(0, 4)}/${digits.substring(4)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class _YearsTab extends StatelessWidget {
   final SchoolState state;
   const _YearsTab({required this.state});
@@ -116,6 +164,7 @@ class _YearsTab extends StatelessWidget {
   void _showYearDialog(BuildContext context, {AcademicYear? year}) {
     final isEdit = year != null;
     final controller = TextEditingController(text: year?.name);
+    final formKey = GlobalKey<FormState>();
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -129,26 +178,42 @@ class _YearsTab extends StatelessWidget {
         },
         child: AlertDialog(
           title: Text(isEdit ? 'Edit Academic Year' : 'Add Academic Year'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'e.g. 2023/2024'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+                _AcademicSessionFormatter(),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Academic session',
+                hintText: '2026/2027',
+                helperText: 'Use standard session format YYYY/YYYY',
+              ),
+              validator: _validateAcademicSession,
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  if (isEdit) {
-                    context.read<SchoolBloc>().add(UpdateAcademicYearEvent(
-                      year!.copyWith(name: controller.text),
-                    ));
-                  } else {
-                    context.read<SchoolBloc>().add(AddAcademicYearEvent(
-                      name: controller.text,
-                      startDate: DateTime.now(),
-                      endDate: DateTime.now().add(const Duration(days: 365)),
-                    ));
-                  }
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                final session = controller.text.trim();
+                final years = _parseAcademicSession(session);
+                if (years == null) return;
+                if (isEdit) {
+                  context.read<SchoolBloc>().add(UpdateAcademicYearEvent(
+                    year!.copyWith(name: session),
+                  ));
+                } else {
+                  context.read<SchoolBloc>().add(AddAcademicYearEvent(
+                    name: session,
+                    startDate: DateTime(years.start, 9, 1),
+                    endDate: DateTime(years.end, 8, 31),
+                  ));
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(

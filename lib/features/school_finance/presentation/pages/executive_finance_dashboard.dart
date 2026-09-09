@@ -260,18 +260,20 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       },
       child: BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, state) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
         final settings = state.settings;
         final isRetail = settings?.businessMode == 'retail';
         final customerLabelPlural = settings?.customersLabel ?? 'Customers';
         final collectedLabel = settings?.collectedLabel ?? 'Total Collected';
         
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
           appBar: AppBar(
             title: const Text('Executive Dashboard', style: TextStyle(fontWeight: FontWeight.w900)),
             elevation: 0,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+            foregroundColor: isDark ? Colors.white : Colors.black,
             actions: [
               IconButton(
                 icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -339,7 +341,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            decoration: BoxDecoration(
+                              color: isDark ? theme.cardColor : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -351,9 +356,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: isDark ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.5) : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade100),
+                                      border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade100),
                                     ),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.end,
@@ -455,14 +460,16 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildAlertPanel() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final alerts = _summary?['alerts'];
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: isDark ? Colors.red.withOpacity(0.15) : Colors.red.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade100),
+        border: Border.all(color: isDark ? Colors.red.withOpacity(0.3) : Colors.red.shade100),
       ),
       child: Column(
         children: [
@@ -476,6 +483,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _alertItem(String title, String sub, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -488,14 +496,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.red.shade700),
+            Icon(icon, size: 20, color: isDark ? Colors.red.shade300 : Colors.red.shade700),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900, fontSize: 13)),
-                  Text(sub, style: TextStyle(color: Colors.red.shade700, fontSize: 11)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.red.shade200 : Colors.red.shade900, fontSize: 13)),
+                  Text(sub, style: TextStyle(color: isDark ? Colors.red.shade300 : Colors.red.shade700, fontSize: 11)),
                 ],
               ),
             ),
@@ -507,13 +515,21 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildKpiCard(String label, dynamic value, IconData icon, Color color) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final amount = (value is num) ? value.toDouble() : double.tryParse('$value') ?? 0.0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,10 +539,22 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               Text(
                 CurrencyFormatter.formatWithSymbol(amount),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
             ],
           ),
@@ -567,6 +595,8 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildActivityTile(Map<String, dynamic> item, bool isRetail) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final date = DateTime.parse(item['created_at']);
     final typeLabel = item['type'] == 'payout' 
         ? 'Fund Sweep' 
@@ -575,12 +605,18 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: isDark ? theme.cardColor : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.grey.shade50, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade50,
+              shape: BoxShape.circle,
+            ),
             child: const Icon(Icons.swap_horiz_rounded, color: Colors.blue),
           ),
           const SizedBox(width: 16),
@@ -589,7 +625,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(DateFormat('MMM dd, hh:mm a').format(date), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(DateFormat('MMM dd, hh:mm a').format(date), style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey)),
               ],
             ),
           ),
@@ -599,7 +635,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                   ? (item['amount'] as num).toDouble()
                   : double.tryParse('${item['amount']}') ?? 0.0,
             ),
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
         ],
       ),
@@ -634,8 +673,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   void _showFilterOptions(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),

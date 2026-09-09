@@ -23,6 +23,9 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
 
   static const _accent = Color(0xFF10B981);
 
+  String get _whatsappPhone =>
+      (widget.payload['whatsapp'] ?? widget.payload['phone'] ?? '').toString();
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +54,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
         connectTimeout: const Duration(seconds: 10),
         validateStatus: (status) => status != null && status < 500,
       ));
-      final phone = widget.payload['phone'];
+      final phone = _whatsappPhone;
 
       final verifyUrls = [
         '${AppConfig.baseUrl}/auth/verify-whatsapp-otp',
@@ -109,7 +112,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
     setState(() => _isResending = true);
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
-      final phone = widget.payload['phone'];
+      final phone = _whatsappPhone;
       final urls = [
         '${AppConfig.baseUrl}/auth/send-whatsapp-otp',
       ];
@@ -182,7 +185,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
               ),
               const SizedBox(height: 8),
               Text(
-                'We sent a 6-digit code to your WhatsApp ${widget.payload['phone']}.',
+                'We sent a 6-digit code to your WhatsApp $_whatsappPhone.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[400], fontSize: 14),
               ),

@@ -2,7 +2,8 @@ import { useRuntimeStore } from '../stores/runtime.store';
 import { RouteRegistry } from '../registries/RouteRegistry';
 
 export function registerRuntimeGuards(router) {
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach((to, from, next) => {
+    try {
     // 1. Authentication Check (Handled by AuthBootstrapGuard)
 
     // If it's a public route or a utility/error route, just proceed
@@ -21,18 +22,18 @@ export function registerRuntimeGuards(router) {
       return next();
     }
 
-    // 2. Hydrate Runtime Config
     const runtimeStore = useRuntimeStore();
-    if (!runtimeStore.isReady) {
-      await runtimeStore.hydrate();
+    // Hydrate in the background. Awaiting this after OTP/login blocked the
+    // dashboard for ~8–10s while JWT/JWKS + users lookup ran.
+    if (!runtimeStore.isReady && !runtimeStore.isLoading) {
+      runtimeStore.hydrate();
     }
 
     const config = runtimeStore.config;
     if (!config) {
-      // Runtime config unavailable (network timeout, auth 401, etc.).
-      // Degrade gracefully — allow navigation without capability/subscription gating.
-      // Individual pages will handle missing config with their own fallback UI.
-      console.warn('[RuntimeGuard] Runtime config unavailable — proceeding in degraded mode.');
+      if (runtimeStore.error) {
+        console.warn('[RuntimeGuard] Runtime config unavailable — proceeding in degraded mode.');
+      }
       return next();
     }
 
@@ -72,6 +73,10 @@ export function registerRuntimeGuards(router) {
     }
 
     // All guards passed
-    next();
+    return next();
+    } catch (err) {
+      console.warn('[RuntimeGuard] Guard failed — continuing navigation.', err);
+      return next();
+    }
   });
 }

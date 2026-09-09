@@ -142,17 +142,13 @@ export class ApkController {
 
       let result;
       const operatorEmail = (req as any).user?.email || 'system_operator';
-      const vault = await ApkVaultService.getVault();
-      const existingForPackage = vault.find(
-        (a: any) => String(a.packageName || '').toLowerCase() === String(packageName).toLowerCase(),
-      );
-      const slotId =
+      const explicitSlotId =
         targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined'
-          ? targetSlotId
-          : existingForPackage?.id;
+          ? String(targetSlotId)
+          : '';
 
-      if (slotId) {
-        result = await ApkVaultService.updateApkSlot(slotId, apkData, operatorEmail);
+      if (explicitSlotId) {
+        result = await ApkVaultService.updateApkSlot(explicitSlotId, apkData, operatorEmail);
       } else {
         result = await ApkVaultService.addApk(apkData, operatorEmail);
       }
@@ -163,7 +159,7 @@ export class ApkController {
       const isDuplicate = error?.code === '23505' || /already exists|already in the vault/i.test(String(error?.message || ''));
       return res.status(isDuplicate ? 409 : 500).json({
         error: isDuplicate
-          ? `${req.body?.packageName || 'This package'} is already in the vault. Use Upload New Version on that slot.`
+          ? `${req.body?.packageName || 'This package'} could not occupy a new slot. Apply the 20260909 vault-slots migration, then retry Upload New APK.`
           : (storageUploadErrorMessage(error)),
       });
     } finally {

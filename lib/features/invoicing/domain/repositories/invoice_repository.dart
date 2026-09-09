@@ -27,6 +27,9 @@ abstract class InvoiceRepository {
   /// Returns true if any bill row was updated.
   Future<bool> reconcileStudentCarryForwardSettlements(int studentId);
 
+  /// Mark Partial invoices as Paid when paid already covers the total at 2dp.
+  Future<bool> healSettledPartialInvoices();
+
   // Stock Returns & Replacements
   Future<void> returnItems({
     required int invoiceId,

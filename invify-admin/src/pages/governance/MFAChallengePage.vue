@@ -150,7 +150,7 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { persistAuthenticatedSession } from '../../auth/session'
-import { loginPathForContext, resolvePostAuthRedirect, homePathForRole } from '../../utils/authLoginPaths'
+import { loginPathForContext, navigateAfterAuth } from '../../utils/authLoginPaths'
 import { joinApiUrl } from '../../config/env'
 
 const router = useRouter()
@@ -181,7 +181,7 @@ onMounted(() => {
   } else if (cachedChallenge && cachedChallengeUser) {
     targetUserId.value = cachedChallengeUser
   } else {
-    errorMessage.value = 'MFA challenge is required. Sign in again at /admin/login, then enter the authenticator code on that page.'
+    errorMessage.value = `MFA challenge is required. Sign in again at ${loginPathForContext({ role: sessionStorage.getItem('operator_role') })}, then enter the authenticator code.`
   }
 })
 
@@ -204,7 +204,7 @@ const triggerRemoteSetupGeneration = async (uId) => {
   } catch (err) {
     errorMessage.value =
       err.response?.data?.message ||
-      'MFA setup failed. Sign in again at /admin/login so a new QR code can be issued.'
+      `MFA setup failed. Sign in again at ${loginPathForContext({ role: sessionStorage.getItem('operator_role') })} so a new QR code can be issued.`
     setupSecretString.value = ''
   }
 }
@@ -222,16 +222,18 @@ const executeMfaSetupVerification = async () => {
         tokenCode: totpInput.value,
         challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
         pendingSetup: true,
-        role: sessionStorage.getItem('operator_role') || 'SUPER_ADMIN'
+        role: sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'tenant_admin'
       },
       { withCredentials: true },
     )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)
+    } else {
+      errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Verification validation token rejected. Enforce clock offsets.'
+    errorMessage.value = err.response?.data?.message || err.response?.data?.error || 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
@@ -249,16 +251,18 @@ const executeStandardVerification = async () => {
         userId: targetUserId.value,
         tokenCode: totpInput.value,
         challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
-        role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+        role: sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'tenant_admin'
       },
       { withCredentials: true },
     )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)
+    } else {
+      errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Unauthorized single-use code pass envelope.'
+    errorMessage.value = err.response?.data?.message || err.response?.data?.error || 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
@@ -266,17 +270,14 @@ const executeStandardVerification = async () => {
 
 const finalizeValidatedToken = (tokenObj) => {
   persistAuthenticatedSession(tokenObj)
-  const cleanRole = (tokenObj.user?.role || localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
+  const cleanRole = (tokenObj.user?.role || sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'TENANT_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
   if (tokenObj.user?.email) {
     localStorage.setItem('operator_email', tokenObj.user.email)
   }
 
   successMessage.value = 'Signed in successfully. Opening your dashboard…'
-  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
-  router.replace(dest).catch(() => {
-    router.replace(homePathForRole(cleanRole)).catch(() => {})
-  })
+  navigateAfterAuth(router, cleanRole, route.query?.redirect)
 }
 
 const returnToRootAuth = () => {

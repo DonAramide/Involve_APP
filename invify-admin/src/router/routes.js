@@ -45,7 +45,7 @@ const routes = [
   {
     path: '/mfa/challenge',
     component: () => import('pages/governance/MFAChallengePage.vue'),
-    meta: { requiresAuth: true, isMfaPendingAllowed: true, title: 'Multi-Factor Gateway' }
+    meta: { isMfaPendingAllowed: true, title: 'Multi-Factor Gateway' }
   },
   {
     path: '/onboarding',
@@ -454,7 +454,7 @@ const routes = [
     component: () => import('layouts/TenantLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true, permission: 'tenant.dashboard.view' } },
+      { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true } },
       { path: 'services/jobs', component: () => import('src/domains/tenant/services/pages/TenantServiceJobsPage.vue'), meta: { title: 'Service Jobs', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'transactions', component: () => import('src/domains/tenant/transactions/pages/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'retail/inventory', component: () => import('src/domains/tenant/inventory/pages/TenantInventoryPage.vue'), meta: { title: 'Inventory Stock Matrix', requiresAuth: true, permission: 'tenant.inventory.view' } },

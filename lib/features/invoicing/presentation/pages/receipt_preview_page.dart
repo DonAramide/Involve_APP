@@ -15,8 +15,9 @@ import '../../../printer/presentation/bloc/printer_bloc.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import '../../../settings/domain/entities/settings.dart';
 import '../../domain/templates/template_registry.dart';
+import '../../../school/domain/repositories/school_repository.dart';
 
-class ReceiptPreviewPage extends StatelessWidget {
+class ReceiptPreviewPage extends StatefulWidget {
   final Invoice invoice;
   final bool? useCustomPrices;
   final String? receiptTitle;
@@ -24,11 +25,70 @@ class ReceiptPreviewPage extends StatelessWidget {
   const ReceiptPreviewPage({super.key, required this.invoice, this.useCustomPrices, this.receiptTitle});
 
   @override
+  State<ReceiptPreviewPage> createState() => _ReceiptPreviewPageState();
+}
+
+class _ReceiptPreviewPageState extends State<ReceiptPreviewPage> {
+  late Invoice invoice;
+
+  @override
+  void initState() {
+    super.initState();
+    invoice = widget.invoice;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hydrateStudentId());
+  }
+
+  Future<void> _hydrateStudentId() async {
+    final hasId = (invoice.admissionNumber ?? '').trim().isNotEmpty;
+    final hasClass = (invoice.className ?? '').trim().isNotEmpty;
+    if (hasId && hasClass) return;
+    if (!mounted) return;
+    try {
+      final repo = context.read<SchoolRepository>();
+      var student = invoice.studentId != null
+          ? await repo.getStudentById(invoice.studentId!)
+          : null;
+      if (student == null && hasId) {
+        student = await repo.getStudentByAdmissionNumber(invoice.admissionNumber!.trim());
+      }
+      if (student == null) {
+        final name = (invoice.customerName ?? '').trim().toLowerCase();
+        if (name.isNotEmpty) {
+          final matches = (await repo.getStudentSummaries())
+              .where((s) => s.fullName.trim().toLowerCase() == name)
+              .toList();
+          if (matches.length == 1) student = matches.first;
+        }
+      }
+      if (!mounted || student == null) return;
+
+      String? className = invoice.className;
+      if ((className ?? '').trim().isEmpty) {
+        final classes = await repo.getClasses();
+        for (final c in classes) {
+          if (c.id == student.classId) {
+            className = c.name;
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        invoice = invoice.copyWith(
+          admissionNumber: student!.admissionNumber,
+          className: className,
+          studentId: student.id,
+        );
+      });
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     final settings = context.read<SettingsBloc>().state.settings;
     if (settings == null) return const Scaffold(body: Center(child: Text('Settings not loaded')));
 
-    final bool actualUseCustom = useCustomPrices ?? settings.customReceiptPricingEnabled;
+    final bool actualUseCustom = widget.useCustomPrices ?? settings.customReceiptPricingEnabled;
 
     return Scaffold(
       appBar: AppBar(
@@ -63,7 +123,7 @@ class ReceiptPreviewPage extends StatelessWidget {
             invoice, 
             settings,
             useCustomPricesOverride: actualUseCustom,
-            receiptTitle: receiptTitle ?? derivedTitle,
+            receiptTitle: widget.receiptTitle ?? derivedTitle,
             userPlan: context.read<SettingsBloc>().state.userPlan,
           );
         },

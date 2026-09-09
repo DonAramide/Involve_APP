@@ -28,9 +28,18 @@ export class InvoiceApplicationService {
         if (error) throw new Error(`Customer upsert failed: ${error.message}`);
       }
 
+      const invoiceId = payload.syncId;
+      const { data: existingRow } = await supabaseAdmin
+        .from('invoices')
+        .select('id')
+        .eq('id', invoiceId)
+        .eq('tenant_id', context.tenantId)
+        .maybeSingle();
+      const alreadyExists = !!existingRow;
+
       // 2. Upsert Invoice
-      const { error: invErr } = await supabaseAdmin.from('invoices').upsert({
-        id: payload.syncId,
+      const invoiceRow: Record<string, unknown> = {
+        id: invoiceId,
         tenant_id: context.tenantId,
         invoice_number: payload.invoiceNumber,
         customer_id: payload.customerId || null,
@@ -44,7 +53,17 @@ export class InvoiceApplicationService {
         payment_method: payload.paymentMethod || null,
         created_at: payload.dateCreated,
         updated_at: new Date().toISOString()
-      });
+      };
+      if (payload.customerName) invoiceRow.customer_name = payload.customerName;
+      if (payload.staffName) invoiceRow.staff_name = payload.staffName;
+
+      let { error: invErr } = await supabaseAdmin.from('invoices').upsert(invoiceRow);
+      if (invErr && /customer_name|staff_name/.test(invErr.message || '')) {
+        delete invoiceRow.customer_name;
+        delete invoiceRow.staff_name;
+        const retry = await supabaseAdmin.from('invoices').upsert(invoiceRow);
+        invErr = retry.error;
+      }
       if (invErr) throw new Error(`Invoice upsert failed: ${invErr.message}`);
 
       // 3. Upsert Invoice Items
@@ -67,33 +86,35 @@ export class InvoiceApplicationService {
         if (itemsErr) throw new Error(`Invoice items upsert failed: ${itemsErr.message}`);
       }
 
-      // 4. Double-Entry Accounting (best-effort — invoice sync must not be blocked by ledger issues)
-      const entries: LedgerEntry[] = [
-        { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount },
-        { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
-      ];
+      // 4. Double-Entry Accounting (create only — updates must not double-post)
+      if (!alreadyExists) {
+        const entries: LedgerEntry[] = [
+          { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount },
+          { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
+        ];
 
-      if (payload.amountPaid && payload.amountPaid > 0) {
-        entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid });
-        entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid });
-      }
+        if (payload.amountPaid && payload.amountPaid > 0) {
+          entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid });
+          entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid });
+        }
 
-      try {
-        await LedgerService.createDoubleEntry({
-          idempotencyKey: idempotencyKey,
-          tenantId: context.tenantId,
-          reference: payload.syncId,
-          entries,
-          correlationId: correlationId,
-          metadata: {
-            source: 'flutter_outbox',
-            eventName: 'invoice.created',
-            invoiceNumber: payload.invoiceNumber
-          }
-        });
-      } catch (ledgerErr: any) {
-        // Non-fatal: invoice data is already saved. Ledger reconciliation can be re-run.
-        console.warn('[InvoiceApplicationService] Ledger recording skipped (non-critical):', ledgerErr.message);
+        try {
+          await LedgerService.createDoubleEntry({
+            idempotencyKey: idempotencyKey,
+            tenantId: context.tenantId,
+            reference: payload.syncId,
+            entries,
+            correlationId: correlationId,
+            metadata: {
+              source: 'flutter_outbox',
+              eventName: 'invoice.created',
+              invoiceNumber: payload.invoiceNumber
+            }
+          });
+        } catch (ledgerErr: any) {
+          // Non-fatal: invoice data is already saved. Ledger reconciliation can be re-run.
+          console.warn('[InvoiceApplicationService] Ledger recording skipped (non-critical):', ledgerErr.message);
+        }
       }
       return;
     }
@@ -113,6 +134,12 @@ export class InvoiceApplicationService {
           createdAt: payload.dateCreated
         });
       }
+
+      const existingPg = await client.query(
+        'SELECT 1 FROM invoices WHERE id = $1 AND tenant_id = $2 LIMIT 1',
+        [payload.syncId, context.tenantId]
+      );
+      const alreadyExists = (existingPg.rowCount || 0) > 0;
 
       // 2. Upsert Invoice
       await InvoiceRepository.upsert(client, {
@@ -150,29 +177,31 @@ export class InvoiceApplicationService {
         await InvoiceItemRepository.bulkUpsert(client, itemsToInsert);
       }
 
-      // 4. Double-Entry Accounting
-      const entries: LedgerEntry[] = [
-        { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount }, // Receivables
-        { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
-      ];
+      // 4. Double-Entry Accounting (create only — updates must not double-post)
+      if (!alreadyExists) {
+        const entries: LedgerEntry[] = [
+          { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount }, // Receivables
+          { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
+        ];
 
-      if (payload.amountPaid && payload.amountPaid > 0) {
-        entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid }); // Cash/Bank
-        entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid }); // Receivables reduced
-      }
-
-      await LedgerService.createDoubleEntry({
-        idempotencyKey: idempotencyKey,
-        tenantId: context.tenantId,
-        reference: payload.syncId, // Use Invoice UUID as reference
-        entries,
-        correlationId: correlationId,
-        metadata: {
-          source: 'flutter_outbox',
-          eventName: 'invoice.created',
-          invoiceNumber: payload.invoiceNumber
+        if (payload.amountPaid && payload.amountPaid > 0) {
+          entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid }); // Cash/Bank
+          entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid }); // Receivables reduced
         }
-      }, { pgClient: client });
+
+        await LedgerService.createDoubleEntry({
+          idempotencyKey: idempotencyKey,
+          tenantId: context.tenantId,
+          reference: payload.syncId, // Use Invoice UUID as reference
+          entries,
+          correlationId: correlationId,
+          metadata: {
+            source: 'flutter_outbox',
+            eventName: 'invoice.created',
+            invoiceNumber: payload.invoiceNumber
+          }
+        }, { pgClient: client });
+      }
 
       await client.query('COMMIT');
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { isMissingRelationError, serviceJobStatusBucket } from '../utils/service-job-status';
 
 function n(value: unknown): number {
@@ -33,7 +34,12 @@ export class ServicesDashboardController {
 
       for (const job of jobs) {
         billed += n(job.totalAmount);
-        collected += n(job.amountPaid);
+        collected += job.source === 'invoices'
+          ? collectedInvoiceAmount({
+              amount_paid: job.amountPaid,
+              payment_status: job.status,
+            })
+          : n(job.amountPaid);
         const bucket = serviceJobStatusBucket(job.status);
         if (bucket === 'active') activeJobs += 1;
         if (bucket === 'ready') readyJobs += 1;

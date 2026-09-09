@@ -52,6 +52,14 @@ export function resolvePostAuthRedirect(roleStr, redirect) {
   return redirect
 }
 
+/** Leave login/MFA immediately. Vue router.replace can hang forever if a guard never calls next(). */
+export function navigateAfterAuth(_router, roleStr, redirect) {
+  const dest = resolvePostAuthRedirect(roleStr, redirect)
+  if (typeof window !== 'undefined' && window.location) {
+    window.location.replace(dest)
+  }
+}
+
 export function loginPathForContext({ pathname, role } = {}) {
   const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '')
   if (String(path || '').toLowerCase().startsWith('/agent')) return '/agent/login'

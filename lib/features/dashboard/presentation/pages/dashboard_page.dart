@@ -445,7 +445,7 @@ class _DashboardPageState extends State<DashboardPage> {
             right: 0,
             child: Center(
               child: Text(
-                'v1.0.0',
+                'v1.0.1',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),

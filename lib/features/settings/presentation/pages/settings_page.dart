@@ -577,9 +577,17 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             leading: const Icon(Icons.cloud_sync_rounded, color: Colors.teal),
             title: const Text('Web Sync (Full Cloud Sync)'),
-            subtitle: const Text('Instantly replicate all local data and products to the web dashboard'),
+            subtitle: Text(
+              state.userPlan?.hasOnlineAccess == true
+                  ? 'Instantly replicate all local data and products to the web dashboard'
+                  : 'Available on Standard and Premium',
+            ),
             onTap: () async {
               Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
               _triggerWebCloudSync();
             },
           ),
@@ -589,6 +597,10 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: const Text('Online Sync and automatic invoice upload'),
             onTap: () {
               Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
               showSyncConfigurationDialog(context);
             },
           ),
@@ -784,6 +796,49 @@ class _SettingsPageState extends State<SettingsPage> {
             } catch (invErr) {
               debugPrint('Bulk invoice sync error: $invErr');
             }
+          }
+
+          // 4b. Service jobs + payments → tenant admin
+          try {
+            final jobs = await db.select(db.serviceJobs).get();
+            if (jobs.isNotEmpty) {
+              final jobPayloads = jobs.map((j) => {
+                    'id': j.id,
+                    'jobId': j.jobId,
+                    'customerId': j.customerId,
+                    'title': j.title,
+                    'description': j.description,
+                    'totalAmount': j.totalAmount,
+                    'amountPaid': j.amountPaid,
+                    'laborAmount': j.laborAmount,
+                    'balance': j.balance,
+                    'status': j.status,
+                    'dueDate': j.dueDate?.toIso8601String(),
+                    'createdAt': j.createdAt.toIso8601String(),
+                    'warrantyDuration': j.warrantyDuration,
+                  }).toList();
+              await client.post(
+                '/api/v1/services/sync/jobs',
+                data: {'jobs': jobPayloads},
+              );
+            }
+            final payments = await db.select(db.servicePayments).get();
+            if (payments.isNotEmpty) {
+              final payPayloads = payments.map((p) => {
+                    'id': p.id,
+                    'jobId': p.jobId,
+                    'amount': p.amount,
+                    'method': p.method,
+                    'reference': p.reference,
+                    'createdAt': p.createdAt.toIso8601String(),
+                  }).toList();
+              await client.post(
+                '/api/v1/services/sync/payments',
+                data: {'payments': payPayloads},
+              );
+            }
+          } catch (svcErr) {
+            debugPrint('Bulk services sync error: $svcErr');
           }
 
           // 5. School-mode roster + academics → web portal

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../../stock/domain/entities/item.dart';
+import '../../../../core/utils/currency_formatter.dart';
 
 enum DiscountType { amount, percentage }
 
@@ -80,6 +81,7 @@ class Invoice extends Equatable {
   final String? customerPhone;
   final String? customerAddress;
   final String? paymentMethod; // 'Cash', 'POS', 'Transfer'
+  final String? paymentReference; // Company bank transfer proof
   final int? staffId;
   final String? staffName;
   final String? syncId;
@@ -117,6 +119,7 @@ class Invoice extends Equatable {
     this.customerPhone,
     this.customerAddress,
     this.paymentMethod,
+    this.paymentReference,
     this.staffId,
     this.staffName,
     this.syncId,
@@ -134,6 +137,39 @@ class Invoice extends Equatable {
     this.warrantyDuration,
     this.changeGiven = 0.0,
   });
+
+  bool get isPendingPayment => paymentStatus.toLowerCase() == 'pending';
+
+  /// True when paid covers the billed total at 2 decimal places (ignores tax float dust).
+  bool get isFullySettled {
+    if (isPendingPayment) return false;
+    final paid = CurrencyFormatter.roundMoney(amountPaid);
+    final total = CurrencyFormatter.roundMoney(totalAmount);
+    final balance = CurrencyFormatter.roundMoney(balanceAmount);
+    return paid >= total || balance <= 0;
+  }
+
+  String get displayPaymentStatus {
+    if (isPendingPayment) return paymentStatus;
+    if (isFullySettled) return 'Paid';
+    if (CurrencyFormatter.roundMoney(amountPaid) > 0) return 'Partial';
+    return paymentStatus.isEmpty ? 'Unpaid' : paymentStatus;
+  }
+
+  double get displayBalance =>
+      isFullySettled ? 0.0 : CurrencyFormatter.roundMoney((totalAmount - amountPaid).clamp(0.0, double.infinity));
+
+  /// Money actually received. Pending checkout (awaiting transfer/VA confirm) is 0.
+  double get collectedAmount {
+    if (isPendingPayment) return 0;
+    return CurrencyFormatter.roundMoney(amountPaid);
+  }
+
+  /// Still owed, including the full total of pending invoices.
+  double get outstandingAmount {
+    if (isPendingPayment) return CurrencyFormatter.roundMoney(totalAmount);
+    return displayBalance;
+  }
 
   @override
   List<Object?> get props => [
@@ -153,6 +189,7 @@ class Invoice extends Equatable {
         customerPhone,
         customerAddress,
         paymentMethod,
+        paymentReference,
         staffId,
         staffName,
         syncId,
@@ -189,6 +226,7 @@ class Invoice extends Equatable {
     String? customerPhone,
     String? customerAddress,
     String? paymentMethod,
+    String? paymentReference,
     int? staffId,
     String? staffName,
     String? syncId,
@@ -224,6 +262,7 @@ class Invoice extends Equatable {
       customerPhone: customerPhone ?? this.customerPhone,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentReference: paymentReference ?? this.paymentReference,
       staffId: staffId ?? this.staffId,
       staffName: staffName ?? this.staffName,
       syncId: syncId ?? this.syncId,

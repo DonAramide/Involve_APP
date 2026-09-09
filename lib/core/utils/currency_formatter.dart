@@ -3,6 +3,11 @@ import 'package:intl/intl.dart';
 class CurrencyFormatter {
   static final _formatter = NumberFormat("#,##0.00", "en_US");
 
+  /// Round to the displayed unit (kobo / cents) so tax dust cannot keep a bill "Partial".
+  static double roundMoney(double amount) {
+    return (amount * 100).round() / 100.0;
+  }
+
   /// Formats a double amount into a string with thousands separators 
   /// and exactly two decimal places (e.g., 1,234.56).
   static String format(double amount) {

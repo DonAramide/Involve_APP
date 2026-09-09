@@ -9,6 +9,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 class GenerateLessonWizardPage extends StatefulWidget {
   const GenerateLessonWizardPage({super.key});
@@ -81,8 +82,10 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
             ),
           );
         } else if (state is LessonError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+          showFriendlyErrorSnackBar(
+            context,
+            state.message,
+            fallback: 'Could not generate the lesson note. Please try again.',
           );
         }
       },

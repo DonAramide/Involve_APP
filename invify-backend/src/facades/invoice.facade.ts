@@ -6,8 +6,11 @@ import { randomUUID } from 'crypto';
 import { getClient } from '../db/pg';
 import { LedgerService } from '../services/ledger.service';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
+import { presentInvoice } from '../utils/present-invoice';
 
 export class InvoiceFacade {
+  static presentInvoice = presentInvoice;
+
   /**
    * The canonical entry point for creating an invoice, shared by REST and Sync.
    * Delegates the actual ACID transaction to InvoiceApplicationService.
@@ -49,8 +52,8 @@ export class InvoiceFacade {
     
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
-    
-    return data;
+
+    return (data || []).map((row: any) => InvoiceFacade.presentInvoice(row));
   }
 
   static async getInvoice(tenantId: string, id: string) {
@@ -92,7 +95,7 @@ export class InvoiceFacade {
       total: Number(i.quantity || 0) * Number(i.unit_price || 0)
     }));
     
-    return { ...invoice, items: enrichedItems };
+    return InvoiceFacade.presentInvoice({ ...invoice, items: enrichedItems });
   }
 
   static async recordPayment(tenantId: string, id: string, payload: any) {

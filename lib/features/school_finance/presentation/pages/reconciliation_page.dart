@@ -44,17 +44,26 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F9),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF4F7F9),
       appBar: AppBar(
-        title: const Text('Reconciliation Hub', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
+        title: Text(
+          'Reconciliation Hub',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
         centerTitle: false,
         actions: [
           IconButton(
             onPressed: () => context.read<ReconciliationBloc>().add(RefreshReconciliation()),
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF1A1C1E)),
+            icon: Icon(Icons.refresh_rounded, color: isDark ? Colors.white : const Color(0xFF1A1C1E)),
           ),
           const SizedBox(width: 8),
         ],
@@ -82,11 +91,13 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
 
   Widget _buildSummaryBar(ReconciliationState state) {
     if (state is! ReconciliationLoaded) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final summary = state.summary;
     final activeStatus = state.currentStatus ?? 'all';
     
     return Container(
-      color: Colors.white,
+      color: isDark ? theme.colorScheme.surface : Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -95,7 +106,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
             _buildSummaryCard(
               'Total', 
               summary['totalPayments'].toString(), 
-              const Color(0xFF1A1C1E),
+              isDark ? Colors.indigo.shade300 : const Color(0xFF1A1C1E),
               activeStatus == 'all',
               () {
                 _tabController.animateTo(0);
@@ -181,16 +192,18 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
   }
 
   Widget _buildTabHeader() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(12),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: const Color(0xFF1A1C1E),
+          color: isDark ? theme.colorScheme.primary : const Color(0xFF1A1C1E),
           borderRadius: BorderRadius.circular(10),
         ),
         labelColor: Colors.white,
@@ -261,6 +274,8 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
   }
 
   Widget _buildPaymentCard(Map<String, dynamic> item, dynamic settings) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final date = DateTime.parse(item['createdAt']);
     final isIssue = item['issueType'] == 'duplicate_payment' || item['issueType'] == 'provider_mismatch';
@@ -276,11 +291,15 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border(left: BorderSide(color: statusColor, width: 4)), // Clear highlight
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Padding(
@@ -298,25 +317,38 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                       style: TextStyle(
                         fontWeight: FontWeight.w800, 
                         fontSize: 15,
-                        color: isUnmatched ? const Color(0xFFFF9900) : const Color(0xFF1A1C1E)
+                        color: isUnmatched
+                            ? const Color(0xFFFF9900)
+                            : (isDark ? Colors.white : const Color(0xFF1A1C1E)),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       item['reference'],
-                      style: const TextStyle(fontSize: 11, color: Colors.grey, fontFamily: 'monospace'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ],
                 ),
                 Text(
                   currencyFormat.format(item['amount']),
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF1A1C1E)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                    color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+                  ),
                 ),
               ],
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, color: Color(0xFFF1F3F5)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Divider(
+                height: 1,
+                color: isDark ? theme.dividerColor : const Color(0xFFF1F3F5),
+              ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

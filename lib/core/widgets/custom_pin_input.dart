@@ -95,7 +95,12 @@ class _CustomPinInputState extends State<CustomPinInput> {
               textAlign: TextAlign.center,
               maxLength: 1,
               obscureText: widget.obscureText,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF6366F1),
+              ),
+              cursorColor: const Color(0xFF6366F1),
               decoration: InputDecoration(
                 counterText: '',
                 contentPadding: EdgeInsets.zero,

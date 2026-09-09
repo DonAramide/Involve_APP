@@ -96,6 +96,8 @@ import 'package:involve_app/features/school_billing/domain/repositories/billing_
 import 'package:involve_app/features/school_billing/data/repositories/billing_repository_impl.dart';
 import 'package:involve_app/features/school_billing/presentation/bloc/billing_bloc.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/services/data/datasources/background_sync_service.dart';
+import 'package:involve_app/features/services/data/datasources/services_remote_data_source.dart';
 import 'package:involve_app/features/services/data/repositories/services_repository_impl.dart';
 import 'package:involve_app/features/services/data/services/services_backup_service.dart';
 import 'package:involve_app/features/services/domain/usecases/service_usecases.dart';
@@ -590,6 +592,7 @@ class _InvolveAppState extends State<InvolveApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   Timer? _outboxTimer;
+  BackgroundSyncService? _servicesSync;
 
   @override
   void initState() {
@@ -608,6 +611,26 @@ class _InvolveAppState extends State<InvolveApp> {
     _outboxTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       widget.dependencies.outboxWorker.triggerSync();
     });
+    _startServicesSync();
+  }
+
+  Future<void> _startServicesSync() async {
+    try {
+      final settings = await widget.dependencies.settingsRepository.getSettings();
+      final mode = settings.businessMode.toLowerCase().trim();
+      if (mode != 'services' && mode != 'service') return;
+
+      final sl = GetIt.instance;
+      if (sl.isRegistered<FinanceApiClient>()) {
+        _servicesSync = BackgroundSyncService(
+          db: widget.dependencies.database,
+          remoteDataSource: ServicesRemoteDataSource(sl<FinanceApiClient>()),
+        );
+        _servicesSync!.start();
+      }
+    } catch (e) {
+      debugPrint('[Services Sync] Failed to start: $e');
+    }
   }
   
   Future<void> _checkEmergencyLock() async {
@@ -666,6 +689,7 @@ class _InvolveAppState extends State<InvolveApp> {
   @override
   void dispose() {
     _outboxTimer?.cancel();
+    _servicesSync?.stop();
     import_socket_service.SocketService().dispose();
     super.dispose();
   }

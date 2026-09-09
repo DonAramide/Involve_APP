@@ -566,6 +566,23 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
 }
 
 abstract class SchoolBaseTemplate extends InvoiceTemplate {
+  String _schoolPaymentLabel(String? method) {
+    switch ((method ?? '').trim()) {
+      case 'VirtualAccount':
+        return 'VA Transfer (Quasar)';
+      case 'POS':
+        return 'Card (POS Terminal)';
+      case 'Transfer':
+        return 'Company Bank Transfer';
+      case 'Cash':
+        return 'Cash';
+      case '':
+        return 'N/A';
+      default:
+        return method!.trim();
+    }
+  }
+
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
@@ -582,13 +599,12 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
         if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
       TextCommand('No: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)}'),
-      if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
+      TextCommand('Payment Method: ${_schoolPaymentLabel(invoice.paymentMethod)}'),
       TextCommand('-' * width),
       
       // Student Info Section
       TextCommand('STUDENT: ${invoice.customerName?.toUpperCase() ?? "N/A"}', isBold: true),
-      if (invoice.admissionNumber != null && invoice.admissionNumber!.isNotEmpty) 
-        TextCommand('ADM NO: ${invoice.admissionNumber}'),
+      TextCommand('STUDENT ID: ${(invoice.admissionNumber ?? '').trim().isEmpty ? "—" : invoice.admissionNumber}'),
       if (invoice.className != null && invoice.className!.isNotEmpty) 
         TextCommand('CLASS: ${invoice.className}'),
       if (invoice.termName != null || invoice.academicYearName != null) 

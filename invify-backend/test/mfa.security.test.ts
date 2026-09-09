@@ -325,4 +325,36 @@ describe('MFA security remediation', () => {
     expect(response.body.requires2FA).toBe(true);
     expect(response.body.challengeToken).toBeTruthy();
   });
+
+  test('tenant portal login also requires MFA setup before issuing a session', async () => {
+    profile.role = 'tenant_admin';
+    profile.tenant_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    profile.mfa_secret = null;
+    profile.mfa_enabled = false;
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: {
+        user: { id: USER_A },
+        session: { access_token: SESSION.token, refresh_token: SESSION.refreshToken },
+      },
+      error: null,
+    });
+    const response = responseMock();
+    await AuthController.login(
+      {
+        body: {
+          email: profile.email,
+          password: 'valid-password',
+          portal: 'tenant',
+        },
+        headers: {},
+        ip: '127.0.0.1',
+        socket: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response,
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.body.requiresMfaSetup).toBe(true);
+    expect(response.body.token).toBeUndefined();
+    expect(response.body.setupToken).toBeTruthy();
+  });
 });

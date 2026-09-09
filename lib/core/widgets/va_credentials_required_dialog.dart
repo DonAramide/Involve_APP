@@ -5,6 +5,7 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 /// Shared Free Trial lock for VA generation (school / retail / services / staff).
 /// Returns `true` when blocked (dialog shown); caller should return early.
@@ -222,7 +223,10 @@ _VaFailureInfo _parseVaFailure(Object error) {
       lower.contains('failed to provision');
 
   return _VaFailureInfo(
-    message: message,
+    message: friendlyApiError(
+      message,
+      fallback: 'Could not generate a virtual account. Please try again.',
+    ),
     action: action,
     needsWebActivation: needsWebActivation,
   );

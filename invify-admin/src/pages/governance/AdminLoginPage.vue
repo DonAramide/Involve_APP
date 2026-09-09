@@ -616,7 +616,7 @@ import { useQuasar, copyToClipboard } from 'quasar'
 import logoImg from '../../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { persistAuthenticatedSession } from '../../auth/session'
-import { resolvePostAuthRedirect } from '../../utils/authLoginPaths'
+import { navigateAfterAuth } from '../../utils/authLoginPaths'
 import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
 import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
@@ -967,12 +967,25 @@ function startResendCooldown(seconds = RESEND_OTP_COOLDOWN_SEC) {
   }, 1000)
 }
 
-function mapAuthError(err) {
+function authPost(path, data, extra = {}) {
+  return axios.post(joinApiUrl(path), data, extra)
+}
+
+function mapAuthError(err, { otp = false } = {}) {
   const status = err?.response?.status
   const data = err?.response?.data || {}
   const code = String(data.code || data.error || '')
   const raw = String(data.message || data.error || err?.message || '')
+  const combined = `${code} ${raw}`.toLowerCase()
+  const otpFailure =
+    otp ||
+    /otp|2fa|totp|verification code|recovery code|incorrect code|invalid code|expired code|invalid or expired/.test(
+      combined,
+    )
 
+  if (otpFailure && (status === 400 || status === 401 || status === 403 || !err?.response)) {
+    return 'Invalid or expired OTP'
+  }
   if (!err?.response) {
     return 'Unable to connect to Invify. Check your connection and try again.'
   }
@@ -1083,7 +1096,7 @@ async function requestOtpCode() {
   successMessage.value = ''
   otpForm.value.email = email
   try {
-    await axios.post(joinApiUrl('/api/auth/send-email-otp'), {
+    await authPost('/api/auth/send-email-otp', {
       email,
       purpose: 'PASSWORD_RESET'
     })
@@ -1109,19 +1122,23 @@ async function verifyRecoveryOtp() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/verify-email-otp'), {
+    const res = await authPost('/api/auth/verify-email-otp', {
       email,
       code,
       otp: code,
       purpose: 'PASSWORD_RESET'
     })
-    if (res.data?.success === false) throw new Error(res.data?.error || 'Invalid code')
+    if (res.data?.success === false) {
+      errorMessage.value = 'Invalid or expired OTP'
+      otpVerified.value = false
+      return
+    }
     otpVerified.value = true
     recoveryStep.value = 'password'
     successMessage.value = 'Recovery email verified. Set your new password.'
   } catch (err) {
     otpVerified.value = false
-    errorMessage.value = mapAuthError(err)
+    errorMessage.value = mapAuthError(err, { otp: true })
   } finally {
     loading.value = false
   }
@@ -1148,7 +1165,7 @@ async function executeOtpResetPassword() {
   successMessage.value = ''
   try {
     const email = String(otpForm.value.email || '').trim().toLowerCase()
-    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
+    const res = await authPost('/api/auth/reset-password', {
       email,
       recoveryVerified: true,
       newPassword: otpForm.value.newPassword
@@ -1194,7 +1211,7 @@ async function executeLoginPass() {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/login'), {
+    const res = await authPost('/api/auth/login', {
       email: String(form.value.email || '').trim().toLowerCase(),
       password: form.value.password,
       portal: 'admin',
@@ -1276,8 +1293,8 @@ async function executeMfaVerification() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await axios.post(
-      joinApiUrl('/api/auth/mfa/verify'),
+    const res = await authPost(
+      '/api/auth/mfa/verify',
       {
         userId: activeUserId.value,
         tokenCode: form.value.totpCode,
@@ -1292,7 +1309,7 @@ async function executeMfaVerification() {
       errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = mapAuthError(err)
+    errorMessage.value = mapAuthError(err, { otp: true })
   } finally {
     loading.value = false
   }
@@ -1315,7 +1332,7 @@ async function executeResetPassword() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
+    const res = await authPost('/api/auth/reset-password', {
       userId: activeUserId.value,
       newPassword: resetForm.value.newPassword
     })
@@ -1357,10 +1374,7 @@ function finalizeAuthenticatedSession(tokenData) {
 
   pendingChallengeState.value = false
   successMessage.value = 'Signed in successfully. Opening your dashboard…'
-  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
-  router.replace(dest).catch(() => {
-    router.replace('/fleet/overview').catch(() => {})
-  })
+  navigateAfterAuth(router, cleanRole, route.query?.redirect)
 }
 
 onMounted(() => {

@@ -55,17 +55,33 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text(
+          'Notifications',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
         actions: [
           TextButton(
             onPressed: _markAllRead,
-            child: const Text('Mark all as read', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Mark all as read',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.blue.shade300 : null,
+              ),
+            ),
           ),
         ],
       ),
@@ -85,6 +101,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Widget _buildNotificationCard(Map<String, dynamic> item) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final date = DateTime.parse(item['created_at']);
     final isRead = item['is_read'] as bool;
     final type = item['type'] as String;
@@ -109,9 +127,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead ? Colors.white.withOpacity(0.6) : Colors.white,
+          color: isRead
+              ? (isDark ? theme.cardColor.withOpacity(0.6) : Colors.white.withOpacity(0.6))
+              : (isDark ? theme.cardColor : Colors.white),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
           border: isRead ? null : Border.all(color: color.withOpacity(0.2), width: 1.5),
         ),
         child: Row(
@@ -119,7 +145,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withOpacity(isDark ? 0.2 : 0.1), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 16),
@@ -136,7 +162,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       ),
                       Text(
                         DateFormat('hh:mm a').format(date),
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
                       ),
                     ],
                   ),
@@ -146,7 +172,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                      color: isRead ? Colors.grey.shade600 : Colors.black87,
+                      color: isRead
+                          ? (isDark ? Colors.grey.shade400 : Colors.grey.shade600)
+                          : (isDark ? Colors.white : Colors.black87),
                     ),
                   ),
                 ],

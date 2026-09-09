@@ -1,4 +1,4 @@
-import { deviceIdsMatch, normalizeDeviceId } from '../src/utils/device-identity';
+import { deviceIdsMatch, isUsableDeviceId, normalizeDeviceId, uniqueDeviceIds } from '../src/utils/device-identity';
 
 describe('device identity matching', () => {
   test('normalizes punctuation and case', () => {
@@ -20,5 +20,22 @@ describe('device identity matching', () => {
   test('rejects empty or unknown ids', () => {
     expect(deviceIdsMatch('', 'ABC123')).toBe(false);
     expect(deviceIdsMatch('UNKNOWN', 'UNKNOWN')).toBe(false);
+  });
+
+  test('treats placeholder serials as unusable', () => {
+    expect(isUsableDeviceId('R52M413KTQK')).toBe(true);
+    expect(isUsableDeviceId('unknown')).toBe(false);
+    expect(isUsableDeviceId('null')).toBe(false);
+    expect(isUsableDeviceId('')).toBe(false);
+    expect(isUsableDeviceId('0')).toBe(false);
+  });
+
+  test('lists unique registered device ids', () => {
+    expect(uniqueDeviceIds([
+      { device_id: 'abc-123' },
+      { device_id: 'ABC123' },
+      { device_id: 'XYZ999' },
+      { device_id: '' },
+    ])).toEqual(['abc-123', 'XYZ999']);
   });
 });

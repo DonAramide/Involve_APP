@@ -316,8 +316,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                     _amountReceivedController.text) ??
                                 0.0;
                             final balanceAmount =
-                                (invoiceState.total - amountReceived)
-                                    .clamp(0.0, double.infinity);
+                                CurrencyFormatter.roundMoney(
+                                    (invoiceState.total - amountReceived)
+                                        .clamp(0.0, double.infinity));
                             final isFullPayment = balanceAmount <= 0;
                             final showAccount = (settings?.showAccountDetails ==
                                         true ||
@@ -949,7 +950,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       final status = (invoiceState.paymentMethod == 'Transfer' ||
               invoiceState.paymentMethod == 'VirtualAccount')
           ? 'Pending'
-          : (amountReceived >= invoiceState.total
+          : (CurrencyFormatter.roundMoney(amountReceived) >=
+                  CurrencyFormatter.roundMoney(invoiceState.total)
               ? 'Paid'
               : (amountReceived <= 0 ? 'Unpaid' : 'Partial'));
 
@@ -972,7 +974,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         paymentStatus: status,
         amountPaid: finalAmountPaid,
         balanceAmount:
-            (invoiceState.total - finalAmountPaid).clamp(0, double.infinity),
+            CurrencyFormatter.roundMoney(
+                (invoiceState.total - finalAmountPaid).clamp(0, double.infinity)),
         customerName: invoiceState.customerName,
         customerPhone: invoiceState.customerPhone,
         customerAddress: invoiceState.customerAddress,

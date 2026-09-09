@@ -221,18 +221,17 @@ export async function logoutAuthenticatedSession(api, { redirect = true } = {}) 
   refreshInFlight = null;
 
   if (api && (refreshToken || accessToken)) {
-    try {
-      await api.post(
+    void api
+      .post(
         '/api/auth/logout',
         refreshToken ? { refreshToken } : {},
         {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           _invifySkipRefresh: true,
+          timeout: 2000,
         },
-      );
-    } catch {
-      /* local clear still proceeds */
-    }
+      )
+      .catch(() => {});
   }
 
   clearAuthenticatedSession();

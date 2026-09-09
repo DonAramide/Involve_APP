@@ -73,7 +73,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<SchoolBloc, SchoolState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (_awaitingPaymentSuccess &&
             state.status == SchoolStatus.success &&
             state.lastPaymentReceipt != null) {
@@ -119,36 +119,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
         if (state.error != null && state.status == SchoolStatus.failure) {
           setState(() => _awaitingVaProvision = false);
-          final message = friendlyApiError(
-            state.error,
-            fallback: 'Could not generate virtual account. Please try again.',
-          );
-          final isTrialLock = message.toLowerCase().contains('free trial');
-          showDialog(
-            context: context,
-            builder: (c) => AlertDialog(
-              title: Text(isTrialLock ? 'Free Trial' : 'Virtual Account'),
-              content: Text(message),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(c),
-                  child: const Text('OK'),
-                ),
-                if (isTrialLock)
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ActivationPage(isExpired: false),
-                        ),
-                      );
-                    },
-                    child: const Text('Activate'),
-                  ),
-              ],
-            ),
+          await showVirtualAccountFailureDialog(
+            context,
+            state.error!,
+            subject: 'student virtual account',
           );
           return;
         }

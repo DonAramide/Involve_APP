@@ -223,6 +223,8 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
   }
 
   Future<void> _showHistory(Map<String, dynamic> account) async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -232,9 +234,9 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
         maxChildSize: 0.9,
         minChildSize: 0.4,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -243,7 +245,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -316,9 +318,9 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                         return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
+                            border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade200),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -336,7 +338,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                     tx['reference'] ?? '',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey.shade600,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                       fontFamily: 'monospace',
                                     ),
                                   ),
@@ -346,7 +348,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                         .format(parsedDate),
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey.shade500,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
                                     ),
                                   ),
                                 ],
@@ -485,16 +487,22 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Virtual Accounts Sweep',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: isDark ? Colors.white : Colors.black,
         actions: [
           if (_isSyncing)
             const Padding(
@@ -519,7 +527,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
               children: [
                 if (_statusBanner != null)
                   Material(
-                    color: Colors.amber.shade50,
+                    color: isDark ? Colors.amber.withOpacity(0.15) : Colors.amber.shade50,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
@@ -527,14 +535,14 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.cloud_off_outlined,
-                              size: 18, color: Colors.amber.shade900),
+                              size: 18, color: isDark ? Colors.amber.shade300 : Colors.amber.shade900),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _statusBanner!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.amber.shade900,
+                                color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
                               ),
                             ),
                           ),
@@ -566,7 +574,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   side:
-                                      BorderSide(color: Colors.grey.shade200),
+                                      BorderSide(color: isDark ? theme.dividerColor : Colors.grey.shade200),
                                 ),
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(16),
@@ -596,10 +604,10 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                       vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: isStaff
-                                                    ? Colors.purple.shade50
+                                                    ? (isDark ? Colors.purple.withOpacity(0.25) : Colors.purple.shade50)
                                                     : isStudent
-                                                        ? Colors.teal.shade50
-                                                        : Colors.blue.shade50,
+                                                        ? (isDark ? Colors.teal.withOpacity(0.25) : Colors.teal.shade50)
+                                                        : (isDark ? Colors.blue.withOpacity(0.25) : Colors.blue.shade50),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                               ),
@@ -607,12 +615,10 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                 holder,
                                                 style: TextStyle(
                                                   color: isStaff
-                                                      ? Colors.purple.shade700
+                                                      ? (isDark ? Colors.purple.shade200 : Colors.purple.shade700)
                                                       : isStudent
-                                                          ? Colors
-                                                              .teal.shade700
-                                                          : Colors
-                                                              .blue.shade700,
+                                                          ? (isDark ? Colors.teal.shade200 : Colors.teal.shade700)
+                                                          : (isDark ? Colors.blue.shade200 : Colors.blue.shade700),
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 11,
                                                 ),
@@ -624,7 +630,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                         Text(
                                           acc['bankName'] ?? '',
                                           style: TextStyle(
-                                            color: Colors.grey.shade600,
+                                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                             fontSize: 13,
                                           ),
                                         ),
@@ -651,7 +657,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     color:
-                                                        Colors.grey.shade500,
+                                                        isDark ? Colors.grey.shade400 : Colors.grey.shade500,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 2),
@@ -661,9 +667,8 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.bold,
                                                     color: balance > 0
-                                                        ? Colors
-                                                            .green.shade700
-                                                        : Colors.grey.shade700,
+                                                        ? (isDark ? Colors.greenAccent : Colors.green.shade700)
+                                                        : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
                                                   ),
                                                 ),
                                               ],
@@ -691,8 +696,9 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                   label: const Text('Sweep'),
                                                   style: ElevatedButton
                                                       .styleFrom(
-                                                    backgroundColor: Colors
-                                                        .green.shade700,
+                                                    backgroundColor: isDark
+                                                        ? Colors.green.shade800
+                                                        : Colors.green.shade700,
                                                     foregroundColor:
                                                         Colors.white,
                                                     elevation: 0,

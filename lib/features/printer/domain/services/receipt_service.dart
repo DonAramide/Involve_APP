@@ -70,6 +70,51 @@ class ReceiptService {
     return await PdfGoogleFonts.notoSansBold();
   }
 
+  String _paymentMethodLabel(String? method) {
+    switch ((method ?? '').trim()) {
+      case 'VirtualAccount':
+        return 'VA Transfer (Quasar)';
+      case 'POS':
+        return 'Card (POS Terminal)';
+      case 'Transfer':
+        return 'Company Bank Transfer';
+      case 'Cash':
+        return 'Cash';
+      case 'Wallet':
+        return 'Customer Wallet';
+      case '':
+        return 'N/A';
+      default:
+        return method!.trim();
+    }
+  }
+
+  String _studentIdLabel(Invoice invoice) {
+    final id = (invoice.admissionNumber ?? '').trim();
+    return id.isEmpty ? '—' : id;
+  }
+
+  List<pw.Widget> _schoolStudentInfoBlock(
+    Invoice invoice, {
+    required PdfColor nameColor,
+    double nameSize = 16,
+    double detailSize = 12,
+  }) {
+    final className = (invoice.className ?? '').trim();
+    return [
+      pw.Text(
+        invoice.customerName ?? 'STUDENT NAME',
+        style: pw.TextStyle(fontSize: nameSize, fontWeight: pw.FontWeight.bold, color: nameColor),
+      ),
+      pw.SizedBox(height: 3),
+      pw.Text('Student ID: ${_studentIdLabel(invoice)}', style: pw.TextStyle(fontSize: detailSize, fontWeight: pw.FontWeight.bold)),
+      if (className.isNotEmpty)
+        pw.Text('Class: $className', style: pw.TextStyle(fontSize: detailSize)),
+      if (invoice.customerPhone != null && invoice.customerPhone!.trim().isNotEmpty)
+        pw.Text('Phone: ${invoice.customerPhone}', style: pw.TextStyle(fontSize: detailSize - 1)),
+    ];
+  }
+
   /// Display total for PDF — payment slips / overpays should not show a lower TOTAL than PAID.
   double _pdfDisplayTotal(Invoice invoice, bool useCustomPrices) {
     if (useCustomPrices && invoice.totalPrintAmount != null) {
@@ -174,6 +219,11 @@ class ReceiptService {
                     children: [
                       pw.Text(settings.businessMode == 'school' ? 'STUDENT INFO:' : 'BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
                       pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'N/A' : 'Valued Customer')),
+                      if (settings.businessMode == 'school') ...[
+                        pw.Text('Student ID: ${_studentIdLabel(invoice)}'),
+                        if ((invoice.className ?? '').trim().isNotEmpty)
+                          pw.Text('Class: ${invoice.className}'),
+                      ],
                       if (invoice.customerPhone != null) pw.Text('Tel: ${invoice.customerPhone}'),
                     ],
                   ),
@@ -188,8 +238,7 @@ class ReceiptService {
                   pw.Text(dateFormat.format(invoice.dateCreated)),
                 ],
               ),
-              if (invoice.paymentMethod != null)
-                pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Payment Method: ${invoice.paymentMethod}')),
+              pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}')),
               if (invoice.staffName != null && (template == 'classic' || template == 'professional'))
                 pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Sold By: ${invoice.staffName!.toUpperCase()}')),
               pw.Divider(),
@@ -389,8 +438,7 @@ class ReceiptService {
                       pw.SizedBox(height: 20),
                       pw.Text('INVOICE No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('DATE: ${dateFormat.format(invoice.dateCreated)}'),
-                      if (invoice.paymentMethod != null)
-                        pw.Text('Payment Method: ${invoice.paymentMethod}'),
+                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}'),
                       if (logoImage != null)
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(top: 10),
@@ -409,6 +457,11 @@ class ReceiptService {
                   pw.Text(settings.businessMode == 'school' ? 'STUDENT:' : 'BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
                   pw.SizedBox(height: 4),
                   pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'N/A' : 'Valued Customer'), style: pw.TextStyle(fontSize: 14)),
+                  if (settings.businessMode == 'school') ...[
+                    pw.Text('Student ID: ${_studentIdLabel(invoice)}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                    if ((invoice.className ?? '').trim().isNotEmpty)
+                      pw.Text('Class: ${invoice.className}', style: const pw.TextStyle(fontSize: 12)),
+                  ],
                   if (invoice.customerAddress != null)
                     pw.Text(invoice.customerAddress!, style: pw.TextStyle(fontSize: 12)),
                 ],
@@ -651,9 +704,12 @@ class ReceiptService {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(settings.businessMode == 'school' ? 'Student Info' : 'Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-                      pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'STUDENT NAME' : 'VALUED CUSTOMER'), style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                      pw.Text(invoice.className ?? 'CLASS NAME', style: const pw.TextStyle(fontSize: 12)),
-                      if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}', style: const pw.TextStyle(fontSize: 11)),
+                      if (settings.businessMode == 'school')
+                        ..._schoolStudentInfoBlock(invoice, nameColor: primaryColor)
+                      else ...[
+                        pw.Text(invoice.customerName ?? 'VALUED CUSTOMER', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                        if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}', style: const pw.TextStyle(fontSize: 11)),
+                      ],
                     ],
                   ),
                   pw.Column(
@@ -663,6 +719,7 @@ class ReceiptService {
                       pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}'),
                       if (invoice.termName != null) pw.Text('Term: ${invoice.termName}'),
                       if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}'),
+                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -731,8 +788,8 @@ class ReceiptService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Payments Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                      pw.Text(invoice.paymentMethod ?? 'N/A'),
+                      pw.Text('Payment Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                      pw.Text(_paymentMethodLabel(invoice.paymentMethod)),
                        if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                          pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                          pw.Text('Bank: ${settings.bankName}'),
@@ -943,9 +1000,12 @@ class ReceiptService {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(settings.businessMode == 'school' ? 'Student Info' : 'Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-                        pw.Text(invoice.customerName ?? 'STUDENT NAME', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                        pw.Text(invoice.className ?? 'CLASS NAME', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-                        if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}'),
+                        if (settings.businessMode == 'school')
+                          ..._schoolStudentInfoBlock(invoice, nameColor: primaryColor, nameSize: 18, detailSize: 13)
+                        else ...[
+                          pw.Text(invoice.customerName ?? 'VALUED CUSTOMER', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                          if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}'),
+                        ],
                       ],
                     ),
                     pw.Column(
@@ -955,6 +1015,7 @@ class ReceiptService {
                         pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: pw.TextStyle(fontSize: 11)),
                         if (invoice.termName != null) pw.Text('Term: ${invoice.termName}', style: pw.TextStyle(fontSize: 11)),
                         if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}', style: pw.TextStyle(fontSize: 11)),
+                        pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                       ],
                     ),
                  ],
@@ -1024,8 +1085,8 @@ class ReceiptService {
                    pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Payments Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                      pw.Text(invoice.paymentMethod ?? 'N/A'),
+                      pw.Text('Payment Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                      pw.Text(_paymentMethodLabel(invoice.paymentMethod)),
                       pw.SizedBox(height: 10),
                        if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                          pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
@@ -1200,10 +1261,11 @@ class ReceiptService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        _academicInfoRow('ADM NO:', invoice.admissionNumber ?? 'N/A'),
+                        _academicInfoRow('STUDENT ID:', _studentIdLabel(invoice)),
                         _academicInfoRow('NAME:', invoice.customerName?.toUpperCase() ?? 'N/A'),
                         _academicInfoRow('CLASS:', invoice.className?.toUpperCase() ?? 'N/A'),
                         if (invoice.termName != null) _academicInfoRow('TERM:', invoice.termName!.toUpperCase()),
+                        _academicInfoRow('PAYMENT:', _paymentMethodLabel(invoice.paymentMethod).toUpperCase()),
                       ],
                     ),
                   ),
@@ -1486,6 +1548,8 @@ class ReceiptService {
                       pw.SizedBox(height: 30),
                       
                       _voucherRow('Received from', invoice.customerName?.toUpperCase() ?? 'N/A'),
+                      _voucherRow('Student ID', _studentIdLabel(invoice)),
+                      _voucherRow('Payment Method', _paymentMethodLabel(invoice.paymentMethod)),
                        _voucherRow('The sum of', NumberToWords.convert(
                         _pdfDisplayTotal(invoice, useCustomPrices),
                         currency: settings.currencyName,

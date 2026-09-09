@@ -33,17 +33,24 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final settings = context.read<SettingsBloc>().state.settings;
     final membersLabel = settings?.customersLabel ?? 'Customers';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Finance Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
         elevation: 0,
         centerTitle: false,
         actions: [
@@ -55,7 +62,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
             icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
             label: const Text('Virtual Accounts'),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.indigo.shade700,
+              foregroundColor: isDark ? Colors.indigo.shade200 : Colors.indigo.shade700,
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
           ),
@@ -64,7 +71,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
             icon: const Icon(Icons.account_balance_rounded, size: 18),
             label: const Text('Withdraw'),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.blue.shade700,
+              foregroundColor: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
           ),
@@ -176,7 +183,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                       margin: const EdgeInsets.symmetric(horizontal: 16),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? theme.cardColor : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -249,11 +256,13 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
   }
 
   Widget _buildChartFilter() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -267,6 +276,8 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
   }
 
   Widget _filterButton(String label, int days) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isSelected = _chartFilterDays == days;
     return GestureDetector(
       onTap: () {
@@ -276,12 +287,12 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color: isSelected ? (isDark ? theme.cardColor : Colors.white) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: isDark ? Colors.black26 : Colors.black.withOpacity(0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
@@ -294,7 +305,9 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Colors.black : Colors.grey.shade600,
+              color: isSelected
+                  ? (isDark ? Colors.white : Colors.black)
+                  : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
           ),
         ),
@@ -326,15 +339,17 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       final amountController = TextEditingController();
 
       if (mounted) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (context) => Container(
             padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            decoration: BoxDecoration(
+              color: isDark ? theme.colorScheme.surface : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -344,24 +359,24 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                 children: [
                   const Text('Initiate Withdrawal', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
                   const SizedBox(height: 8),
-                  Text('Funds will be sent to ${settings['bank_name']}', style: const TextStyle(color: Colors.grey)),
+                  Text('Funds will be sent to ${settings['bank_name']}', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
                   const SizedBox(height: 24),
                   
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.account_balance, color: Colors.blue),
+                        Icon(Icons.account_balance, color: isDark ? Colors.blue.shade300 : Colors.blue),
                         const SizedBox(width: 16),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(settings['account_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text('${settings['account_number']} • ${settings['bank_name']}', style: const TextStyle(fontSize: 12)),
+                            Text('${settings['account_number']} • ${settings['bank_name']}', style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
                           ],
                         ),
                       ],
@@ -371,7 +386,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
 
                   Text(
                     'Available: ${CurrencyFormatter.formatWithSymbol(summary.totalRevenue)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.greenAccent : Colors.green),
                   ),
                   const SizedBox(height: 12),
                   
@@ -383,7 +398,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                       hintText: '0.00',
                       prefixText: '₦ ',
                       filled: true,
-                      fillColor: const Color(0xFFF1F3F5),
+                      fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFF1F3F5),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     ),
                   ),

@@ -10,20 +10,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
-import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/required_location.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
+import 'package:involve_app/core/utils/validators.dart';
 import '../utils/onboarding_navigator.dart';
+import '../utils/link_device_qr.dart';
 import '../utils/onboarding_draft_store.dart';
 import '../../data/nigeria_states_lgas.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
+
+class _EmailAccountCheck {
+  const _EmailAccountCheck({
+    required this.exists,
+    required this.sameDevice,
+    this.thisDeviceId,
+    this.registeredDevices = const [],
+  });
+
+  final bool exists;
+  final bool sameDevice;
+  final String? thisDeviceId;
+  final List<String> registeredDevices;
+
+  bool get isConflict => exists && !sameDevice;
+}
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
@@ -118,13 +136,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       final email = _emailController.text.trim();
       final emailRegex = RegExp(r'^[\w\.-]+@[\w-]+\.[a-zA-Z]{2,}$');
       if (email.isNotEmpty && emailRegex.hasMatch(email)) {
-        final exists = await _checkEmailExists(email);
-        if (exists && mounted) {
+        final check = await _inspectEmailAccount(email);
+        if (check.isConflict && mounted) {
           setState(() {
             _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
           });
           _formKey.currentState?.validate();
-          await _showExistingEmailDialog(email);
+          await _showExistingEmailDialog(email, check);
         }
       }
     }
@@ -153,6 +171,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       'deviceId': _capturedDeviceId,
       'gpsLocation': _capturedGpsLocation,
     });
+    await OnboardingNavigator.persistOnboardingPreferences(
+      industry: _selectedIndustry,
+      themeColor: _primaryColorHex,
+    );
   }
 
   Future<void> _restoreDraft() async {
@@ -227,6 +249,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         _currentStep = savedStep.toInt().clamp(0, 3);
       }
     });
+    await OnboardingNavigator.persistOnboardingPreferences(
+      industry: _selectedIndustry,
+      themeColor: _primaryColorHex,
+    );
   }
 
   void _syncWhatsAppFromMobile() {
@@ -310,16 +336,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
-  bool _isValidDeviceId(String? id) {
-    final clean = (id ?? '').trim().toUpperCase();
-    if (clean.isEmpty || clean == 'UNKNOWN') return false;
-    return clean.length >= 4;
-  }
+  bool _isValidDeviceId(String? id) => DeviceInfoService.isUsableDeviceId(id);
 
-  bool _isValidGps(String? location) {
-    final value = (location ?? '').trim();
-    return RegExp(r'Lat:\s*-?\d+(\.\d+)?,\s*Lng:\s*-?\d+(\.\d+)?').hasMatch(value);
-  }
+  bool _isValidGps(String? location) => RequiredLocation.isValid(location);
 
   void _showTelemetryError(String message) {
     if (!mounted) return;
@@ -333,75 +352,36 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     );
   }
 
-  /// Blocks until this tablet has a real device ID and a live GPS fix.
-  Future<bool> _ensureDeviceTelemetry({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _isValidDeviceId(_capturedDeviceId) &&
-        _isValidGps(_capturedGpsLocation)) {
-      return true;
-    }
+  /// Always requests location. Cached GPS is never enough to skip the prompt.
+  Future<bool> _ensureDeviceTelemetry({bool forceRefresh = true}) async {
     if (_isCapturingTelemetry) return false;
 
     setState(() => _isCapturingTelemetry = true);
     try {
-      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      var deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (!_isValidDeviceId(deviceId)) {
+        deviceId = await DeviceInfoService.getDeviceSuffix();
+      }
       if (!_isValidDeviceId(deviceId)) {
         _showTelemetryError(
-          'Could not read this device ID. Close other apps and try again.',
+          'Could not read this device serial number. Enable phone permission and try again.',
         );
         return false;
       }
 
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
+      final location = await RequiredLocation.capture();
+      if (!location.ok) {
         _showTelemetryError(
-          'Turn on GPS / location services, then tap Next again.',
+          location.error ?? 'Location permission is required before you can continue.',
         );
-        await Geolocator.openLocationSettings();
-        return false;
-      }
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied) {
-        _showTelemetryError(
-          'Location permission is required before you can continue.',
-        );
-        return false;
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showTelemetryError(
-          'Location is blocked for Invify. Enable it in Settings, then try again.',
-        );
-        await Geolocator.openAppSettings();
-        return false;
-      }
-
-      late Position position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        ).timeout(const Duration(seconds: 20));
-      } on TimeoutException {
-        _showTelemetryError(
-          'Could not get a GPS fix. Move outdoors or near a window, then try again.',
-        );
-        return false;
-      }
-
-      final gps =
-          'Lat: ${position.latitude.toStringAsFixed(6)}, Lng: ${position.longitude.toStringAsFixed(6)}';
-      if (!_isValidGps(gps)) {
-        _showTelemetryError('GPS returned an invalid location. Please try again.');
+        await RequiredLocation.openSettings(location);
         return false;
       }
 
       if (!mounted) return false;
       setState(() {
         _capturedDeviceId = deviceId;
-        _capturedGpsLocation = gps;
+        _capturedGpsLocation = location.location;
       });
       await _persistDraft();
       return true;
@@ -415,9 +395,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
-  Future<String> _getCurrentLocation() async {
+  Future<String?> _getCurrentLocation() async {
     final ok = await _ensureDeviceTelemetry(forceRefresh: true);
-    return ok ? (_capturedGpsLocation ?? 'Unknown Location') : 'Unknown Location';
+    if (!ok || !_isValidGps(_capturedGpsLocation)) return null;
+    return _capturedGpsLocation;
   }
 
   Future<void> _primeDeviceId() async {
@@ -432,12 +413,35 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
-  Future<bool> _checkEmailExists(String email) async {
-    final normalized = email.trim().toLowerCase();
-    if (normalized.isEmpty) return false;
+  bool _deviceIdsLookSame(String? left, String? right) {
+    final a = (left ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final b = (right ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    if (a.isEmpty || b.isEmpty || a == 'UNKNOWN' || b == 'UNKNOWN') return false;
+    if (a == b) return true;
+    if (a.length >= 6 && b.length >= 6) return a.endsWith(b) || b.endsWith(a);
+    return false;
+  }
 
+  List<String> _asStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<_EmailAccountCheck> _inspectEmailAccount(String email) async {
+    final normalized = email.trim().toLowerCase();
     await _primeDeviceId();
     final deviceId = _isValidDeviceId(_capturedDeviceId) ? _capturedDeviceId!.trim() : null;
+    _EmailAccountCheck result = _EmailAccountCheck(
+      exists: false,
+      sameDevice: false,
+      thisDeviceId: deviceId,
+    );
+    if (normalized.isEmpty) return result;
 
     setState(() => _isCheckingEmail = true);
 
@@ -454,14 +458,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         '${AppConfig.baseUrl3000}/api/auth/check-email',
         '${AppConfig.baseUrl3000}/auth/check-email',
       ],
-      // Fallback LAN / local URLs
       'http://192.168.1.193:3004/api/auth/check-email',
       'http://192.168.1.193:3004/auth/check-email',
       'http://10.0.2.2:3004/api/auth/check-email',
       'http://localhost:3004/api/auth/check-email',
     ];
-
-    bool found = false;
 
     try {
       for (final url in urls) {
@@ -470,67 +471,57 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             'email': normalized,
             if (deviceId != null) 'deviceId': deviceId,
           });
-          if (res.statusCode == 200 && res.data != null && res.data is Map) {
-            if (res.data['sameDevice'] == true) {
-              found = false;
-              return false;
+          if (res.data is! Map) continue;
+          final data = res.data as Map;
+          final registered = _asStringList(data['registeredDevices']);
+          final sameDevice = data['sameDevice'] == true;
+          if (res.statusCode == 200) {
+            if (data['exists'] == true || sameDevice) {
+              return _EmailAccountCheck(
+                exists: data['exists'] == true || sameDevice,
+                sameDevice: sameDevice,
+                thisDeviceId: (data['thisDeviceId']?.toString().trim().isNotEmpty == true)
+                    ? data['thisDeviceId'].toString()
+                    : deviceId,
+                registeredDevices: registered,
+              );
             }
-            if (res.data['exists'] == true) {
-              found = true;
-              return true;
-            }
-            if (res.data['exists'] == false) {
-              found = false;
+            if (data['exists'] == false) {
+              result = _EmailAccountCheck(
+                exists: false,
+                sameDevice: false,
+                thisDeviceId: deviceId,
+                registeredDevices: registered,
+              );
               break;
             }
           }
           if (res.statusCode == 409 ||
-              (res.data is Map &&
-                  res.data['sameDevice'] != true &&
-                  (res.data['exists'] == true || res.data['code'] == 'EMAIL_ALREADY_EXISTS'))) {
-            found = true;
-            return true;
+              data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+              data['exists'] == true) {
+            return _EmailAccountCheck(
+              exists: true,
+              sameDevice: sameDevice,
+              thisDeviceId: deviceId,
+              registeredDevices: registered,
+            );
           }
         } catch (_) {}
       }
 
-      // Direct Supabase RPC check fallback if backend endpoints were unreachable or did not report
-      if (!found) {
+      if (!result.exists) {
         try {
           final escaped = normalized.replaceAll("'", "''");
-          final escapedDevice = (deviceId ?? '')
-              .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
-              .toUpperCase()
-              .replaceAll("'", "''");
-          final sameDeviceClause = escapedDevice.isEmpty
-              ? 'false'
-              : """EXISTS (
-                   SELECT 1 FROM public.device_registrations dr
-                   WHERE upper(regexp_replace(coalesce(dr.device_id, ''), '[^a-zA-Z0-9]', '', 'g')) IN ('$escapedDevice')
-                     AND (
-                       lower(coalesce(dr.owner_email, '')) = '$escaped'
-                       OR dr.tenant_id IN (SELECT id FROM public.tenants WHERE lower(owner_email) = '$escaped')
-                       OR dr.tenant_id IN (SELECT tenant_id FROM public.users WHERE lower(email) = '$escaped')
-                     )
-                 ) OR EXISTS (
-                   SELECT 1 FROM public.devices d
-                   WHERE upper(regexp_replace(coalesce(d.device_id, ''), '[^a-zA-Z0-9]', '', 'g')) IN ('$escapedDevice')
-                     AND d.tenant_id IN (
-                       SELECT id FROM public.tenants WHERE lower(owner_email) = '$escaped'
-                       UNION
-                       SELECT tenant_id FROM public.users WHERE lower(email) = '$escaped'
-                     )
-                 )""";
-          final query = "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists, ($sameDeviceClause) as same_device";
+          final query =
+              "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists";
           final rpcRes = await Supabase.instance.client.rpc('execute_sql', params: {'sql_query': query});
           if (rpcRes is List && rpcRes.isNotEmpty && rpcRes.first is Map) {
-            if (rpcRes.first['same_device'] == true) {
-              found = false;
-              return false;
-            }
             if (rpcRes.first['exists'] == true) {
-              found = true;
-              return true;
+              result = _EmailAccountCheck(
+                exists: true,
+                sameDevice: false,
+                thisDeviceId: deviceId,
+              );
             }
           }
         } catch (e) {
@@ -542,11 +533,56 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         setState(() => _isCheckingEmail = false);
       }
     }
-    return found;
+    return result;
   }
 
-  Future<void> _showExistingEmailDialog(String email) async {
+  Widget _deviceIdRow({
+    required String label,
+    required String value,
+    required bool matches,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SelectableText(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              if (matches)
+                const Padding(
+                  padding: EdgeInsets.only(left: 6, top: 1),
+                  child: Icon(Icons.check_circle, color: Color(0xFF34D399), size: 16),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showExistingEmailDialog(String email, _EmailAccountCheck check) async {
     if (!mounted) return;
+    final thisId = (check.thisDeviceId?.trim().isNotEmpty == true)
+        ? check.thisDeviceId!.trim()
+        : (_capturedDeviceId ?? 'Not captured yet');
+    final registered = check.registeredDevices;
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -568,17 +604,72 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ),
           ],
         ),
-        content: RichText(
-          text: TextSpan(
-            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const TextSpan(text: 'An account associated with '),
-              TextSpan(
-                text: email,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                  children: [
+                    const TextSpan(text: 'An account associated with '),
+                    TextSpan(
+                      text: email,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(
+                      text: ' already exists. Compare this tablet with the devices stored for that account.',
+                    ),
+                  ],
+                ),
               ),
-              const TextSpan(
-                text: ' already exists.\n\nIf you already have an Invify account, you can link this device directly via QR code from your web dashboard. Otherwise, please enter a different email address.',
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _deviceIdRow(
+                      label: 'THIS TABLET',
+                      value: thisId,
+                      matches: registered.any((id) => _deviceIdsLookSame(id, thisId)),
+                    ),
+                    const Divider(color: Colors.white12, height: 16),
+                    const Text(
+                      'ACCOUNT DEVICES (BACKEND)',
+                      style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    if (registered.isEmpty)
+                      const Text(
+                        'No device IDs were returned for this account.',
+                        style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.3),
+                      )
+                    else
+                      ...List.generate(registered.length, (index) {
+                        final id = registered[index];
+                        return _deviceIdRow(
+                          label: registered.length == 1
+                              ? 'REGISTERED DEVICE'
+                              : 'REGISTERED DEVICE ${index + 1}',
+                          value: id,
+                          matches: _deviceIdsLookSame(id, thisId),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'If this tablet ID matches a registered device, this is the original device. If they differ, link this device from the web dashboard or use a different email.',
+                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
               ),
             ],
           ),
@@ -621,22 +712,29 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       setState(() => _currentStep = 1);
       return;
     }
+    if (InputValidator.validateStreetAddress(_streetController.text) != null) {
+      setState(() => _currentStep = 2);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.validate();
+      });
+      return;
+    }
 
     final email = _emailController.text.trim();
-    final emailExists = await _checkEmailExists(email);
-    if (emailExists) {
+    final emailCheck = await _inspectEmailAccount(email);
+    if (emailCheck.isConflict) {
       if (mounted) {
         setState(() {
           _currentStep = 1;
           _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
         });
         _formKey.currentState!.validate();
-        await _showExistingEmailDialog(email);
+        await _showExistingEmailDialog(email, emailCheck);
       }
       return;
     }
 
-    final telemetryReady = await _ensureDeviceTelemetry();
+    final telemetryReady = await _ensureDeviceTelemetry(forceRefresh: true);
     if (!telemetryReady || !mounted) return;
     if (!_isValidDeviceId(_capturedDeviceId) || !_isValidGps(_capturedGpsLocation)) {
       _showTelemetryError(
@@ -1200,6 +1298,15 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF6366F1)),
         ),
+        errorStyle: const TextStyle(color: Color(0xFFF87171), fontSize: 12),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
       ),
       validator: customValidator ?? (isRequired ? (value) => value == null || value.trim().isEmpty ? 'Required' : null : null),
     );
@@ -1522,7 +1629,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     final isSelected = _selectedIndustry == id;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedIndustry = id),
+        onTap: () {
+          setState(() => _selectedIndustry = id);
+          OnboardingNavigator.persistOnboardingPreferences(industry: id);
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1546,7 +1656,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   Widget _buildColorOption(String hex, Color color) {
     final isSelected = _primaryColorHex == hex;
     return InkWell(
-      onTap: () => setState(() => _primaryColorHex = hex),
+      onTap: () {
+        setState(() => _primaryColorHex = hex);
+        OnboardingNavigator.persistOnboardingPreferences(themeColor: hex);
+      },
       customBorder: const CircleBorder(),
       child: Container(
         padding: const EdgeInsets.all(4),
@@ -1565,15 +1678,22 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  _goToStep(_currentStep + 1);
-                },
+                onPressed: _isCapturingTelemetry
+                    ? null
+                    : () async {
+                        final ready = await _ensureDeviceTelemetry();
+                        if (!ready || !mounted) return;
+                        _goToStep(_currentStep + 1);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6366F1),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  _isCapturingTelemetry ? 'REQUESTING LOCATION…' : 'NEXT STEP',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1609,23 +1729,20 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               if (_currentStep == 1) {
                 if (!_formKey.currentState!.validate()) return;
                 final email = _emailController.text.trim();
-                final exists = await _checkEmailExists(email);
-                if (exists) {
+                final check = await _inspectEmailAccount(email);
+                if (check.isConflict) {
                   if (!mounted) return;
                   setState(() {
                     _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
                   });
                   _formKey.currentState!.validate();
-                  await _showExistingEmailDialog(email);
+                  await _showExistingEmailDialog(email, check);
                   return;
                 }
               }
               if (!mounted) return;
               if (_currentStep == 2) {
-                 if (_streetController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Street Address is required')));
-                    return;
-                 }
+                 if (!_formKey.currentState!.validate()) return;
                  if (_selectedCountry == null) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country is required')));
                     return;
@@ -1672,25 +1789,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           child: ElevatedButton(
             onPressed: (_isLoading || _isCapturingTelemetry)
                 ? null
-                : () => _submitOnboarding(isTrial: false),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text(
-              _isCapturingTelemetry
-                  ? 'GETTING GPS & DEVICE ID…'
-                  : 'ONBOARD & ACTIVATE DEVICE',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton(
-            onPressed: (_isLoading || _isCapturingTelemetry)
-                ? null
                 : () => _submitOnboarding(isTrial: true),
-            style: OutlinedButton.styleFrom(side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)), foregroundColor: const Color(0xFF10B981), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: Text(
               _isCapturingTelemetry
                   ? 'GETTING GPS & DEVICE ID…'
@@ -1740,7 +1840,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTextField(_streetController, 'Street Address', Icons.location_on),
+        _buildTextField(
+          _streetController,
+          'Street Address',
+          Icons.location_on,
+          helperText: 'e.g. 12 Adeola Street, Ikeja',
+          customValidator: InputValidator.validateStreetAddress,
+        ),
         const SizedBox(height: 20),
         SearchableDropdown(
           label: 'Country',
@@ -1810,20 +1916,42 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     if (scannedCode == null || scannedCode.isEmpty) return;
     if (!mounted) return;
 
+    final payload = LinkDeviceQrPayload.tryParse(scannedCode);
+    if (payload == null) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(
+          content: Text(LinkDeviceQrPayload.invalidMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Capture context-dependent refs BEFORE any await
     final settingsBloc = this.context.read<SettingsBloc>();
+    final token = payload.token;
+    final tenantId = payload.tenantId;
 
-    // Parse the QR payload
     try {
-      final data = jsonDecode(scannedCode);
-      if (data['action'] == 'LINK_DEVICE') {
-        final token = data['token'] as String;
-        final tenantId = data['tenantId'] as String;
-
         setState(() => _isLoading = true);
 
-        final deviceId = await DeviceInfoService.getDeviceSuffix();
+        var deviceId = await DeviceInfoService.getDeviceSuffix();
+        if (!_isValidDeviceId(deviceId)) {
+          deviceId = await DeviceInfoService.getDeviceSuffix();
+        }
+        if (!_isValidDeviceId(deviceId)) {
+          if (mounted) setState(() => _isLoading = false);
+          _showTelemetryError(
+            'Could not read this device serial number. Enable phone permission and try again.',
+          );
+          return;
+        }
         final gpsLocation = await _getCurrentLocation();
+        if (gpsLocation == null) {
+          if (mounted) setState(() => _isLoading = false);
+          _showTelemetryError('Location is required before this device can be linked.');
+          return;
+        }
 
         final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
         final urls = [
@@ -1885,20 +2013,15 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ),
           );
         }
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(this.context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid QR code format for device linking.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text('Error parsing QR code: $e'),
+          content: Text(friendlyApiError(
+            e,
+            fallback: 'Failed to link device. Please try again.',
+          )),
           backgroundColor: Colors.red,
         ),
       );

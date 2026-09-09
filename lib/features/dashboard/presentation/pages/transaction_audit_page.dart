@@ -11,6 +11,7 @@ import 'package:involve_app/features/school_finance/domain/repositories/finance_
 import 'package:involve_app/features/services/domain/entities/service_job.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/presentation/templates/service_pdf_generator.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 class TransactionAuditPage extends StatefulWidget {
@@ -44,6 +45,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     'Cash',
     'POS',
     'Transfer',
+    'VA Transfer',
     'Wallet',
     'Credit',
   ];
@@ -80,7 +82,14 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     final m = (raw ?? '').trim().toLowerCase();
     if (m == 'unpaid' || m == 'none' || m == '—') return 'Unpaid';
     if (m.contains('pos') || m.contains('card') || m.contains('emv')) return 'POS';
-    if (m.contains('transfer') || m.contains('virtual')) return 'Transfer';
+    if (m.contains('virtual') ||
+        m.contains('va transfer') ||
+        m == 'va' ||
+        m.startsWith('va ') ||
+        m.contains('quasar')) {
+      return 'VA Transfer';
+    }
+    if (m.contains('transfer')) return 'Transfer';
     if (m.contains('wallet')) return 'Wallet';
     if (m.contains('credit') || m == 'clear') return 'Credit';
     if (m.contains('cash')) return 'Cash';
@@ -136,6 +145,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         return Icons.credit_card;
       case 'Transfer':
         return Icons.account_balance;
+      case 'VA Transfer':
+        return Icons.account_balance_outlined;
       case 'Wallet':
         return Icons.account_balance_wallet;
       case 'Credit':
@@ -183,7 +194,16 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
 
   String _rowMethodStatus(TransactionAuditModel tx) {
     if (_effectiveStatus(tx) == 'Payment Pending') return 'Payment Pending';
-    return '${tx.paymentMethod} · ${_displayStatus(tx)}';
+    return '${_normalizeMethod(tx.paymentMethod)} · ${_displayStatus(tx)}';
+  }
+
+  String _customerLine(_TxRow row, String customerLabel) {
+    final name = row.audit.customerName.trim().isNotEmpty
+        ? row.audit.customerName
+        : customerLabel;
+    final studentId = (row.invoice?.admissionNumber ?? '').trim();
+    if (studentId.isEmpty) return name;
+    return '$name · ID $studentId';
   }
 
   Color _rowBackground(TransactionAuditModel tx) {
@@ -381,6 +401,30 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         }
       } catch (_) {}
 
+      try {
+        final schoolRepo = context.read<SchoolRepository>();
+        final cache = <int, String>{};
+        for (final key in byKey.keys.toList()) {
+          final row = byKey[key]!;
+          final inv = row.invoice;
+          if (inv == null || (inv.admissionNumber ?? '').trim().isNotEmpty) continue;
+          final sid = inv.studentId;
+          if (sid == null) continue;
+          var admission = cache[sid];
+          if (admission == null) {
+            final student = await schoolRepo.getStudentById(sid);
+            admission = student?.admissionNumber.trim() ?? '';
+            cache[sid] = admission;
+          }
+          if (admission.isEmpty) continue;
+          byKey[key] = _TxRow(
+            invoice: inv.copyWith(admissionNumber: admission),
+            audit: row.audit,
+            serviceJob: row.serviceJob,
+          );
+        }
+      } catch (_) {}
+
       final merged = byKey.values.toList()
         ..sort((a, b) => b.audit.date.compareTo(a.audit.date));
 
@@ -489,7 +533,10 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                   ),
                 const SizedBox(height: 16),
                 _detailLine('Reference', tx.reference.isNotEmpty ? tx.reference : '—'),
+                _detailLine('Payment method', _normalizeMethod(tx.paymentMethod)),
                 _detailLine('Customer', tx.customerName.isNotEmpty ? tx.customerName : '—'),
+                if ((invoice?.admissionNumber ?? '').trim().isNotEmpty)
+                  _detailLine('Student ID', invoice!.admissionNumber!.trim()),
                 _detailLine('Staff', tx.staffName),
                 _detailLine(
                   'Date',
@@ -820,9 +867,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            tx.customerName.isNotEmpty
-                                                ? tx.customerName
-                                                : customerLabel,
+                                            _customerLine(row, customerLabel),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),

@@ -301,6 +301,27 @@ class AppSettings extends Equatable {
   bool get isServicesMode => normalizedBusinessMode == 'services';
   bool get isSchoolMode => normalizedBusinessMode == 'school';
 
+  static String modeFromOnboarding(String? raw) {
+    final mode = (raw ?? '').toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (mode == 'service' || mode == 'hospitality' || mode == 'invify_services' || mode == 'services') {
+      return 'services';
+    }
+    if (mode == 'school' || mode == 'education' || mode == 'invify_school') {
+      return 'school';
+    }
+    return 'retail';
+  }
+
+  static int? colorFromHex(String? hex) {
+    var clean = (hex ?? '').trim();
+    if (clean.isEmpty) return null;
+    if (clean.startsWith('#')) clean = clean.substring(1);
+    if (clean.toLowerCase().startsWith('0x')) clean = clean.substring(2);
+    if (clean.length == 6) clean = 'FF$clean';
+    if (clean.length != 8) return null;
+    return int.tryParse(clean, radix: 16);
+  }
+
   @override
   List<Object?> get props => [
         id,

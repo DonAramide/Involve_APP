@@ -50,6 +50,10 @@ function formatBytesToHuman(bytes: any): string {
   return '—';
 }
 
+function displayPackageName(stored: string): string {
+  return String(stored || '').replace(/#slot-\d+$/i, '');
+}
+
 export class ApkVaultService {
   static async getVault() {
     const { data, error } = await supabase
@@ -66,7 +70,7 @@ export class ApkVaultService {
     return (data || []).map((a: any) => ({
       id: a.id,
       name: a.name,
-      packageName: a.package_name,
+      packageName: displayPackageName(a.package_name),
       version: a.version,
       size: formatBytesToHuman(a.size),
       status: a.status,
@@ -120,35 +124,48 @@ export class ApkVaultService {
     }
 
     const id = `apk-${Date.now()}`;
-    const newApk = {
-      id,
-      name: apkData.name,
-      package_name: apkData.packageName,
-      version: apkData.version,
-      size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
-      status: 'READY',
-      upload_progress: 100,
-      install_count: 0,
-      uninstall_count: 0,
-      version_distribution: [
-        { version: apkData.version, deviceCount: 0 }
-      ],
-      selected_deploy_version: apkData.version,
-      s3_url: apkData.s3Url,
-      created_by: operatorEmail,
-      updated_by: operatorEmail
-    };
+    const basePackage = displayPackageName(apkData.packageName);
+    const packageCandidates = vault.length === 0
+      ? [basePackage]
+      : [basePackage, `${basePackage}#slot-${vault.length + 1}`];
 
-    const { data, error } = await supabase
-      .from('apk_vault')
-      .insert([newApk])
-      .select()
-      .single();
+    let data: any = null;
+    let error: any = null;
+    for (const packageName of packageCandidates) {
+      const newApk = {
+        id,
+        name: apkData.name,
+        package_name: packageName,
+        version: apkData.version,
+        size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
+        status: 'READY',
+        upload_progress: 100,
+        install_count: 0,
+        uninstall_count: 0,
+        version_distribution: [
+          { version: apkData.version, deviceCount: 0 }
+        ],
+        selected_deploy_version: apkData.version,
+        s3_url: apkData.s3Url,
+        created_by: operatorEmail,
+        updated_by: operatorEmail
+      };
+
+      const inserted = await supabase
+        .from('apk_vault')
+        .insert([newApk])
+        .select()
+        .single();
+      data = inserted.data;
+      error = inserted.error;
+      if (!error) break;
+      if (error.code !== '23505') break;
+    }
 
     if (error) {
       if (error.code === '23505') {
         throw new Error(
-          `${apkData.packageName} is already in the vault. Use Upload New Version on that slot.`,
+          `${apkData.packageName} could not occupy a new slot because apk_vault still has a unique package_name index. Apply the 20260909 vault-slots migration, then retry Upload New APK.`,
         );
       }
       throw error;
@@ -157,7 +174,7 @@ export class ApkVaultService {
     return {
       id: data.id,
       name: data.name,
-      packageName: data.package_name,
+      packageName: displayPackageName(data.package_name),
       version: data.version,
       size: formatBytesToHuman(data.size),
       status: data.status,
@@ -213,7 +230,7 @@ export class ApkVaultService {
     return {
       id: data.id,
       name: data.name,
-      packageName: data.package_name,
+      packageName: displayPackageName(data.package_name),
       version: data.version,
       size: formatBytesToHuman(data.size),
       status: data.status,
@@ -249,7 +266,7 @@ export class ApkVaultService {
     return {
       id: data.id,
       name: data.name,
-      packageName: data.package_name,
+      packageName: displayPackageName(data.package_name),
       version: data.version,
       size: formatBytesToHuman(data.size),
       status: data.status,
@@ -289,7 +306,7 @@ export class ApkVaultService {
     return {
       id: existing.id,
       name: existing.name,
-      packageName: existing.package_name,
+      packageName: displayPackageName(existing.package_name),
       version: existing.version,
       size: formatBytesToHuman(existing.size),
       status: existing.status,

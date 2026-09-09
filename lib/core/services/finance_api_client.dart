@@ -10,7 +10,6 @@ import '../../features/settings/domain/services/security_service.dart';
 import '../license/storage_service.dart';
 import '../license/license_validator.dart';
 import '../license/license_model.dart';
-import '../license/license_service.dart';
 import '../utils/api_error_message.dart';
 
 // ── Custom Exceptions ──────────────────────────────────────────────────────────
@@ -99,7 +98,8 @@ class PlanGatingInterceptor extends Interceptor {
         DioException(
           requestOptions: options,
           error: const FinanceApiException(
-            message: 'Local operations only. Cloud synchronisation and online features require a Pro Plan subscription.',
+            message:
+                'Cloud sync and the tenant dashboard require Standard or Premium. Basic and free trial stay on the device only.',
             statusCode: 403,
           ),
           type: DioExceptionType.badResponse,
@@ -116,34 +116,31 @@ class PlanGatingInterceptor extends Interceptor {
       final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
       if (!isSyncEnabled) return false;
 
-      // 1. Check for Lifetime status
+      // 1. Check for Lifetime status (Premium)
       final isLifetime = await SecurityService().isDeviceAuthorized();
       if (isLifetime) return true;
 
-      // 2. Check for Manual/Direct Pro status
+      // 2. Check for Manual/Direct Pro status (Standard)
       final proExpiry = await StorageService.getProExpiryDate();
       if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
         return true;
       }
 
-      // 3. Check for Active License key
+      // 3. Paid activation key: Standard / Premium / Enterprise only — not Basic
       final code = await StorageService.getLicense();
       if (code != null) {
         final peeked = LicenseValidator.peek(code);
         if (peeked != null) {
           final planType = peeked['planType'] as PlanType;
           final expiryDate = peeked['expiryDate'] as DateTime;
-          if (DateTime.now().isBefore(expiryDate)) {
-            if (planType != PlanType.basic) {
-              return true;
-            }
+          if (DateTime.now().isBefore(expiryDate) &&
+              planType != PlanType.basic) {
+            return true;
           }
         }
       }
 
-      // 4. Check for Trial validity
-      final isTrialValid = await LicenseService.isTrialValid();
-      if (isTrialValid) return true;
+      // Free trial and Basic stay offline: no tenant dashboard upload.
     } catch (_) {
       // Fallback
     }

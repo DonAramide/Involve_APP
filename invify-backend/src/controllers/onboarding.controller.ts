@@ -11,6 +11,7 @@ import {
   deviceIdsMatch,
   emptyEmailDeviceResolution,
   EmailDeviceResolution,
+  isUsableDeviceId,
   normalizeDeviceId,
   uniqueDeviceIds,
 } from '../utils/device-identity';
@@ -619,7 +620,7 @@ export class OnboardingController {
       const normalizedPhone = (phone || '').replace(/\D/g, '');
       const normalizedType = (industry || 'retail').toLowerCase();
       const effectiveAgentCode = (agentCode && agentCode.trim()) ? agentCode.trim().toUpperCase() : 'AAA000';
-      const effectiveDeviceId = deviceId || null;
+      const effectiveDeviceId = isUsableDeviceId(deviceId) ? normalizeDeviceId(deviceId) : null;
       const effectiveLocation = location || (streetAddress ? `${streetAddress}${state ? ', ' + state : ''}${country ? ', ' + country : ''}` : null);
 
       console.log(`[OnboardingController] Registering user ${firstName} ${lastName} (${email}) — Business: ${tenantName} | Device: ${effectiveDeviceId} | Agent: ${effectiveAgentCode}`);
@@ -1006,10 +1007,11 @@ export class OnboardingController {
     try {
       const { token, deviceId, agentCode, location, ownerName, ownerEmail } = req.body;
 
-      if (!token || !deviceId) {
-        res.status(400).json({ success: false, error: 'token and deviceId are required' });
+      if (!token || !isUsableDeviceId(deviceId)) {
+        res.status(400).json({ success: false, error: 'token and a valid device serial number are required' });
         return;
       }
+      const linkedDeviceId = normalizeDeviceId(deviceId);
 
       // Validate token
       const { data: linkToken, error: tokenErr } = await supabaseAdmin
@@ -1045,7 +1047,7 @@ export class OnboardingController {
       // Register the new device
       const { error: devErr } = await supabaseAdmin.from('device_registrations').insert({
         tenant_id: tenantId,
-        device_id: deviceId,
+        device_id: linkedDeviceId,
         agent_code: (agentCode || 'AAA000').toUpperCase(),
         location: location || null,
         device_number: newDeviceNumber,
@@ -1069,7 +1071,7 @@ export class OnboardingController {
       await supabaseAdmin.from('device_registrations')
         .update({ trial_ends_at: trialEndsAt, is_trial: true })
         .eq('tenant_id', tenantId)
-        .eq('device_id', deviceId);
+        .eq('device_id', linkedDeviceId);
 
       res.status(200).json({
         success: true,

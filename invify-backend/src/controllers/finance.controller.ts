@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
+import { collectedInvoiceAmount, outstandingInvoiceAmount } from '../utils/invoice-collection';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 import { splitUnsweptVirtualAccountFunds } from '../utils/virtual-account-funds';
 
@@ -45,7 +46,7 @@ export class ExecutiveFinanceController {
       ] = await Promise.all([
         supabaseAdmin.from('wallets').select('balance').eq('tenant_id', tenantId).single(),
         invoiceQuery,
-        supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, created_at').eq('tenant_id', tenantId),
+        supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, payment_status, total_amount, created_at').eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
         supabaseAdmin
           .from('transactions_log')
@@ -93,6 +94,7 @@ export class ExecutiveFinanceController {
 
       let totalInvoiced = 0;
       let totalCollected = 0;
+      let totalPending = 0;
       let card = 0;
       let vaTransfer = 0;
       let bankTransfer = 0;
@@ -102,32 +104,33 @@ export class ExecutiveFinanceController {
 
       for (const inv of (invoices || [])) {
         const amt = Number(inv.total_amount || 0);
-        const paid = Number(inv.amount_paid || 0);
+        const collected = collectedInvoiceAmount(inv);
         totalInvoiced += amt;
-        totalCollected += paid;
+        totalCollected += collected;
+        totalPending += outstandingInvoiceAmount(inv);
 
         const rail = classifyInvoicePaymentMethod(inv.payment_method);
         if (rail === 'cash') {
-          cash += paid;
+          cash += collected;
         } else if (rail === 'va_transfer') {
-          vaTransfer += paid;
+          vaTransfer += collected;
         } else if (rail === 'bank_transfer') {
-          bankTransfer += paid;
+          bankTransfer += collected;
         } else if (rail === 'card') {
-          card += paid;
+          card += collected;
         } else if (rail === 'wallet') {
-          walletAmount += paid;
+          walletAmount += collected;
         }
       }
 
-      const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0) || 0;
+      const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + collectedInvoiceAmount(inv), 0) || 0;
 
       // Only card/POS + Quasar VA invoices. Tenant personal-bank transfers stay out.
       let totalQuasarFromCardInvoices = 0;
       for (const inv of (allInvoices || [])) {
-        const paid = Number(inv.amount_paid || 0);
+        const collected = collectedInvoiceAmount(inv);
         const rail = classifyInvoicePaymentMethod(inv.payment_method);
-        if (rail === 'card') totalQuasarFromCardInvoices += paid;
+        if (rail === 'card') totalQuasarFromCardInvoices += collected;
       }
 
       // Live Quasar VA / webhook deposits (dedupe by reference)
@@ -219,6 +222,7 @@ export class ExecutiveFinanceController {
         salesSummary: {
           totalInvoiced,
           totalCollected,
+          totalPending,
           card,
           vaTransfer,
           bankTransfer,

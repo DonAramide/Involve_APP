@@ -208,10 +208,10 @@ class _MobileCartButton extends StatelessWidget {
                   // Local scaffold so SnackBars/toasts appear above the cart sheet
                   backgroundColor: Colors.transparent,
                   body: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: Theme.of(sheetContext).colorScheme.surface,
                       borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
+                          const BorderRadius.vertical(top: Radius.circular(20)),
                     ),
                     child: _CartSummary(
                       isSidePanel: false,
@@ -600,9 +600,11 @@ class _POSItemCard extends StatelessWidget {
                     flex: 3,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[100],
                         gradient: LinearGradient(
-                          colors: [Colors.grey[100]!, Colors.grey[200]!],
+                          colors: isDark
+                              ? [const Color(0xFF2C2C2C), const Color(0xFF1E1E1E)]
+                              : [Colors.grey[100]!, Colors.grey[200]!],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ),
@@ -738,8 +740,8 @@ class _CartSummary extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                  color: isDark ? theme.colorScheme.surface : Colors.grey[50],
+                  border: Border(bottom: BorderSide(color: isDark ? theme.dividerColor : Colors.grey[100]!)),
                 ),
                 child: Row(
                   children: [
@@ -785,7 +787,7 @@ class _CartSummary extends StatelessWidget {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                          border: Border(bottom: BorderSide(color: isDark ? theme.dividerColor : Colors.grey[100]!)),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Column(
@@ -860,7 +862,7 @@ class _CartSummary extends StatelessWidget {
                                 // Controls (Right)
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.grey[100],
+                                    color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
                                     borderRadius: BorderRadius.circular(24),
                                   ),
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -907,7 +909,7 @@ class _CartSummary extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[50],
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   ),
                   child: SingleChildScrollView(
@@ -955,7 +957,7 @@ class _CartSummary extends StatelessWidget {
                                       'Add Customer Name & Phone'),
                               style: TextStyle(
                                   color: state.customerName != null
-                                      ? Colors.black
+                                      ? (isDark ? Colors.white : Colors.black)
                                       : Colors.blue),
                             ),
                             subtitle: state.customerAddress != null
@@ -1051,6 +1053,9 @@ class _CartSummary extends StatelessWidget {
   }
 
   Widget _buildSummaryRow(BuildContext context, String label, double amount, String currency, {bool isTotal = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1062,7 +1067,7 @@ class _CartSummary extends StatelessWidget {
               style: TextStyle(
                 fontSize: isTotal ? 18 : 14,
                 fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-                color: isTotal ? Colors.black : Colors.grey[600],
+                color: isTotal ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.grey[400] : Colors.grey[600]),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1076,7 +1081,7 @@ class _CartSummary extends StatelessWidget {
             style: TextStyle(
               fontSize: isTotal ? 20 : 15,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
-              color: isTotal ? Theme.of(context).colorScheme.primary : Colors.black,
+              color: isTotal ? theme.colorScheme.primary : (isDark ? Colors.white : Colors.black),
             ),
           ),
         ],
@@ -1127,6 +1132,7 @@ class _CartSummary extends StatelessWidget {
     final hasAssignee = state.customerName?.trim().isNotEmpty == true;
     final isRosterStudent = state.studentId != null;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1178,7 +1184,7 @@ class _CartSummary extends StatelessWidget {
                           state.customerPhone!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[700],
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
                           ),
                         ),
                       if (!isRosterStudent &&
@@ -1187,7 +1193,7 @@ class _CartSummary extends StatelessWidget {
                           state.customerAddress!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
                       if (isRosterStudent &&
@@ -1196,7 +1202,7 @@ class _CartSummary extends StatelessWidget {
                           'ID: ${state.admissionNumber}${state.className != null ? ' · ${state.className}' : ''}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
                     ],
@@ -1211,7 +1217,7 @@ class _CartSummary extends StatelessWidget {
           title: Text(
             settings?.assignToCustomerLabel ?? 'Assign to Student',
             style: TextStyle(
-              color: isRosterStudent ? Colors.black : Colors.blue,
+              color: isRosterStudent ? (isDark ? Colors.white : Colors.black) : Colors.blue,
               fontWeight: isRosterStudent ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
@@ -1235,7 +1241,7 @@ class _CartSummary extends StatelessWidget {
             settings?.assignExternalCustomerLabel ??
                 'Add External Customer/Student',
             style: TextStyle(
-              color: hasAssignee && !isRosterStudent ? Colors.black : Colors.blue,
+              color: hasAssignee && !isRosterStudent ? (isDark ? Colors.white : Colors.black) : Colors.blue,
               fontWeight: hasAssignee && !isRosterStudent
                   ? FontWeight.w600
                   : FontWeight.normal,
@@ -1314,6 +1320,9 @@ class _CartSummary extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
+          final theme = Theme.of(ctx);
+          final isDark = theme.brightness == Brightness.dark;
+
           return AlertDialog(
             title: const Text('Apply Discount'),
             content: SingleChildScrollView(
@@ -1324,7 +1333,7 @@ class _CartSummary extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1335,7 +1344,7 @@ class _CartSummary extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: selectedType == DiscountType.amount ? Colors.white : Colors.transparent,
+                                color: selectedType == DiscountType.amount ? (isDark ? theme.cardColor : Colors.white) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: selectedType == DiscountType.amount ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
                               ),
@@ -1349,7 +1358,7 @@ class _CartSummary extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: selectedType == DiscountType.percentage ? Colors.white : Colors.transparent,
+                                color: selectedType == DiscountType.percentage ? (isDark ? theme.cardColor : Colors.white) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: selectedType == DiscountType.percentage ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
                               ),
@@ -1651,10 +1660,13 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
           (c.phone != null && c.phone!.contains(query))
         ).toList();
         
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(16),
           height: MediaQuery.of(context).size.height * 0.75,
@@ -1664,7 +1676,7 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
                 width: 40,
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(color: isDark ? Colors.grey[700] : Colors.grey[300], borderRadius: BorderRadius.circular(2)),
               ),
               const Text('Select Customer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
@@ -1674,7 +1686,7 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   filled: true,
-                  fillColor: Colors.grey[100],
+                  fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
                 ),
                 onChanged: (val) => setState(() => query = val.toLowerCase()),
               ),
@@ -1743,9 +1755,12 @@ void _showExternalCustomerDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Use this for walk-in or non-roster payers. Details appear on the receipt.',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1855,38 +1870,42 @@ void _showStudentPicker(BuildContext context) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => StatefulBuilder(
-      builder: (context, setState) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(16),
-        height: MediaQuery.of(context).size.height * 0.85,
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      builder: (context, setState) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Text('Select ${settings?.customerLabel ?? "Customer"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            
-            // Search Bar for Students
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by name or admission number...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey[100],
+              Text('Select ${settings?.customerLabel ?? "Customer"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              
+              // Search Bar for Students
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by name or admission number...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
+                ),
+                onChanged: (val) => setState(() => studentSearchQuery = val.toLowerCase()),
               ),
-              onChanged: (val) => setState(() => studentSearchQuery = val.toLowerCase()),
-            ),
             const SizedBox(height: 12),
 
             // Class Filter
@@ -2023,9 +2042,10 @@ void _showStudentPicker(BuildContext context) {
             ),
           ],
         ),
-      ),
-    ),
-  );
+      );
+    },
+  ),
+);
 }
 
 void _showQuantityDialog(BuildContext context, InvoiceItem item) {

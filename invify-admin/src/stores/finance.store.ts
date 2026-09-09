@@ -32,6 +32,7 @@ export interface FinanceSummaryViewModel {
   salesSummary?: {
     totalInvoiced: number;
     totalCollected: number;
+    totalPending: number;
     card: number;
     vaTransfer: number;
     bankTransfer: number;
@@ -180,14 +181,18 @@ export const useFinanceStore = defineStore('finance', {
             const invoices = Array.isArray(invRes?.data)
               ? invRes.data
               : (Array.isArray(invRes) ? invRes : []);
-            mapped = invoices.slice(0, 12).map((inv: any) => ({
-              id: inv.id || inv.syncId || inv.invoice_number,
-              amountFormatted: `₦${Number(inv.amount_paid ?? inv.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-              type: (Number(inv.amount_paid || 0) > 0 ? 'credit' : 'debit') as 'credit' | 'debit',
-              description: `${inv.invoice_number || inv.invoiceNumber || 'Invoice'} · ${inv.payment_status || inv.paymentStatus || '—'}`,
-              date: new Date(inv.created_at || inv.dateCreated || Date.now()).toLocaleString(),
-              reference: inv.invoice_number || inv.invoiceNumber,
-            }));
+            mapped = invoices.slice(0, 12).map((inv: any) => {
+              const status = String(inv.payment_status || inv.paymentStatus || '').toLowerCase();
+              const collected = status === 'pending' ? 0 : Number(inv.amount_paid ?? 0);
+              return {
+                id: inv.id || inv.syncId || inv.invoice_number,
+                amountFormatted: `₦${collected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                type: (collected > 0 ? 'credit' : 'debit') as 'credit' | 'debit',
+                description: `${inv.invoice_number || inv.invoiceNumber || 'Invoice'} · ${inv.payment_status || inv.paymentStatus || '—'}`,
+                date: new Date(inv.created_at || inv.dateCreated || Date.now()).toLocaleString(),
+                reference: inv.invoice_number || inv.invoiceNumber,
+              };
+            });
           } catch (_) {
             // keep wallet empty state
           }

@@ -14,6 +14,8 @@ class StorageService {
   static const _serverPlanKey = 'server_activated_plan';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
+  static const _onboardingIndustryKey = 'onboarding_industry';
+  static const _onboardingThemeColorKey = 'onboarding_theme_color';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
 
@@ -126,6 +128,25 @@ class StorageService {
   static Future<bool> isOnboardingCompleted() async {
     final val = await _secureStorage.read(key: _onboardingCompleteKey);
     return val == 'true';
+  }
+
+  static Future<void> setOnboardingIndustry(String industry) async {
+    await _secureStorage.write(key: _onboardingIndustryKey, value: industry.trim().toLowerCase());
+  }
+
+  static Future<String?> getOnboardingIndustry() async {
+    final val = await _secureStorage.read(key: _onboardingIndustryKey);
+    final clean = (val ?? '').trim();
+    return clean.isEmpty ? null : clean;
+  }
+
+  static Future<void> setOnboardingThemeColor(int color) async {
+    await _secureStorage.write(key: _onboardingThemeColorKey, value: color.toString());
+  }
+
+  static Future<int?> getOnboardingThemeColor() async {
+    final val = await _secureStorage.read(key: _onboardingThemeColorKey);
+    return int.tryParse((val ?? '').trim());
   }
 
   static Future<void> setOnlineSyncEnabled(bool enabled) async {

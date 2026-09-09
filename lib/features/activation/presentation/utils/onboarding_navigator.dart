@@ -152,10 +152,11 @@ class OnboardingNavigator {
       // so LandingPage does not send them to the activation-key screen.
       await StorageService.setOnboardingCompleted(true);
       await StorageService.saveTrialStartDate(DateTime.now());
+      await _persistOnboardingPreferences(payload);
       await OnboardingDraftStore.clear();
 
       if (isMounted) {
-        // Sync the business name globally
+        // Sync the business name, operational mode, and brand color globally
         try {
           final settingsBloc = context.read<SettingsBloc>();
           final currentSettings = settingsBloc.state.settings;
@@ -167,12 +168,15 @@ class OnboardingNavigator {
                     ? ''
                     : currentSettings.address);
             final nextEmail = (payload['email']?.toString() ?? '').trim().toLowerCase();
+            final nextColor = AppSettings.colorFromHex(payload['themeColor']?.toString());
             settingsBloc.add(UpdateAppSettings(
               currentSettings.copyWith(
                 organizationName: payload['businessName'] ?? currentSettings.organizationName,
                 phone: payload['phone'] ?? currentSettings.phone,
                 email: nextEmail.isNotEmpty ? nextEmail : currentSettings.email,
                 address: nextAddress,
+                businessMode: AppSettings.modeFromOnboarding(payload['industry']?.toString()),
+                primaryColor: nextColor ?? currentSettings.primaryColor,
               )
             ));
           }
@@ -196,6 +200,27 @@ class OnboardingNavigator {
         );
       }
     }
+  }
+
+  static Future<void> persistOnboardingPreferences({
+    String? industry,
+    String? themeColor,
+  }) async {
+    final mode = (industry ?? '').trim();
+    if (mode.isNotEmpty) {
+      await StorageService.setOnboardingIndustry(AppSettings.modeFromOnboarding(mode));
+    }
+    final color = AppSettings.colorFromHex(themeColor);
+    if (color != null) {
+      await StorageService.setOnboardingThemeColor(color);
+    }
+  }
+
+  static Future<void> _persistOnboardingPreferences(Map<String, dynamic> payload) {
+    return persistOnboardingPreferences(
+      industry: payload['industry']?.toString(),
+      themeColor: payload['themeColor']?.toString(),
+    );
   }
 
   static Future<void> _sendOtp(Dio dio, String identifier, String type, {String? deviceId}) async {

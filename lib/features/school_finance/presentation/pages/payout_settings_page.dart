@@ -200,6 +200,8 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
   Future<void> _showBankSearchDialog() async {
     final searchController = TextEditingController();
     List<Map<String, String>> filtered = List.from(_banks);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     await showModalBottomSheet(
       context: context,
@@ -224,9 +226,9 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
 
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.75,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            decoration: BoxDecoration(
+              color: isDark ? theme.colorScheme.surface : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
               children: [
@@ -235,7 +237,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -244,9 +246,13 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Select Bank',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close),
@@ -289,26 +295,31 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                       ? const Center(
                           child: Text('No banks found', style: TextStyle(color: Colors.grey)),
                         )
-                      : ListView.builder(
+                      : ListView.separated(
                           itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final bank = filtered[index];
                             final isSelected = bank['code'] == _selectedBankCode;
                             return ListTile(
                               leading: CircleAvatar(
                                 radius: 18,
-                                backgroundColor: isSelected ? Colors.blue.shade50 : Colors.grey.shade100,
+                                backgroundColor: isSelected
+                                    ? (isDark ? Colors.blue.withOpacity(0.3) : Colors.blue.shade50)
+                                    : (isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade100),
                                 child: Icon(
                                   Icons.account_balance,
                                   size: 18,
-                                  color: isSelected ? Colors.blue : Colors.grey.shade600,
+                                  color: isSelected ? Colors.blue : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                                 ),
                               ),
                               title: Text(
                                 bank['name'] ?? '',
                                 style: TextStyle(
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? Colors.blue : Colors.black87,
+                                  color: isSelected
+                                      ? (isDark ? Colors.blue.shade300 : Colors.blue)
+                                      : (isDark ? Colors.white : Colors.black87),
                                 ),
                               ),
                               trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
@@ -339,13 +350,22 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8F9FB),
       appBar: AppBar(
-        title: const Text('Payout Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Payout Settings',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
       ),
       body: _isLoading
           ? const InvifyLoadingIndicator(message: 'FETCHING PAYOUT CONFIGURATION...')
@@ -358,31 +378,51 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                   children: [
                     _buildInfoCard(),
                     const SizedBox(height: 24),
-                    const Text('Bank Account Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1C1E))),
+                    Text(
+                      'Bank Account Details',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     // Bank selection
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Bank', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                        Text(
+                          'Bank',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         InkWell(
                           onTap: _loadingBanks ? null : _showBankSearchDialog,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? theme.cardColor : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.account_balance_rounded, size: 20, color: Color(0xFF1A1C1E)),
+                                Icon(
+                                  Icons.account_balance_rounded,
+                                  size: 20,
+                                  color: isDark ? Colors.white70 : const Color(0xFF1A1C1E),
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     _bankNameController.text.isNotEmpty ? _bankNameController.text : 'Select Bank (Tap to search)',
                                     style: TextStyle(
-                                      color: _bankNameController.text.isNotEmpty ? Colors.black : Colors.grey.shade500,
+                                      color: _bankNameController.text.isNotEmpty
+                                          ? (isDark ? Colors.white : Colors.black)
+                                          : Colors.grey.shade500,
                                       fontWeight: _bankNameController.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
                                     ),
                                   ),
@@ -399,7 +439,14 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Account Number', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                        Text(
+                          'Account Number',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _accountNumberController,
@@ -407,7 +454,11 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                           maxLength: 10,
                           decoration: InputDecoration(
                             hintText: 'Enter 10-digit account number',
-                            prefixIcon: const Icon(Icons.numbers_rounded, size: 20, color: Color(0xFF1A1C1E)),
+                            prefixIcon: Icon(
+                              Icons.numbers_rounded,
+                              size: 20,
+                              color: isDark ? Colors.white70 : const Color(0xFF1A1C1E),
+                            ),
                             counterText: '',
                             suffixIcon: _resolvingAccount
                                 ? const Padding(
@@ -420,10 +471,13 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                                   )
                                 : null,
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: isDark ? theme.cardColor : Colors.white,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF1A1C1E), width: 1)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: isDark ? theme.colorScheme.primary : const Color(0xFF1A1C1E), width: 1),
+                            ),
                           ),
                           onChanged: (val) {
                             final trimmed = val.trim();
@@ -446,13 +500,23 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Account Name (Auto-populated)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                        Text(
+                          'Account Name (Auto-populated)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _accountNameController,
                           readOnly: true,
                           enableInteractiveSelection: false,
-                          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                           decoration: InputDecoration(
                             hintText: _resolvingAccount ? 'Validating with Quasar…' : 'Auto-populated from Quasar',
                             prefixIcon: const Icon(Icons.verified_user_outlined, size: 20, color: Colors.blue),
@@ -482,10 +546,13 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                               fontWeight: FontWeight.w500,
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: isDark ? theme.cardColor : Colors.white,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF1A1C1E), width: 1)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: isDark ? theme.colorScheme.primary : const Color(0xFF1A1C1E), width: 1),
+                            ),
                           ),
                         ),
                       ],
@@ -497,7 +564,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                       child: ElevatedButton(
                         onPressed: _isSaving ? null : _handleSave,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1A1C1E),
+                          backgroundColor: isDark ? theme.colorScheme.primary : const Color(0xFF1A1C1E),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
@@ -523,21 +590,27 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
   }
 
   Widget _buildInfoCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: isDark ? Colors.blue.withOpacity(0.15) : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blue.shade100),
+        border: Border.all(color: isDark ? Colors.blue.withOpacity(0.3) : Colors.blue.shade100),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: Colors.blue.shade700),
+          Icon(Icons.info_outline_rounded, color: isDark ? Colors.blue.shade300 : Colors.blue.shade700),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
               'Specify the bank account where you want school funds to be transferred. Account name is automatically validated and retrieved from Quasar.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF0D47A1), height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.blue.shade200 : const Color(0xFF0D47A1),
+                height: 1.4,
+              ),
             ),
           ),
         ],

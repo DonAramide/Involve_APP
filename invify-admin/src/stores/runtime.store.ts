@@ -71,7 +71,7 @@ export const useRuntimeStore = defineStore('runtime', {
       return !!(this.config.capabilities as any)[capability];
     },
     async hydrate() {
-      if (this.isReady) return; // Already hydrated
+      if (this.isReady || this.isLoading) return;
       this.isLoading = true;
       try {
         const tenantId = localStorage.getItem('tenant_id');

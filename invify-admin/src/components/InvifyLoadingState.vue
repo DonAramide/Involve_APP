@@ -6,11 +6,20 @@
         <img :src="logoSrc" alt="Invify" class="invify-loading__logo" />
       </div>
     </div>
-    <div class="invify-loading__message">{{ message }}</div>
+    <div class="invify-loading__message">{{ stuck ? 'Still loading. Check your connection, then refresh.' : message }}</div>
+    <button
+      v-if="stuck"
+      type="button"
+      class="invify-loading__retry"
+      @click="reload"
+    >
+      Refresh
+    </button>
   </div>
 </template>
 
 <script setup>
+import { onMounted, onUnmounted, ref } from 'vue'
 import logoSrc from '../assets/logo_transparent.png'
 
 defineProps({
@@ -23,6 +32,23 @@ defineProps({
     default: false,
   },
 })
+
+const stuck = ref(false)
+let timer = null
+
+onMounted(() => {
+  timer = window.setTimeout(() => {
+    stuck.value = true
+  }, 12000)
+})
+
+onUnmounted(() => {
+  if (timer) window.clearTimeout(timer)
+})
+
+function reload() {
+  window.location.reload()
+}
 </script>
 
 <style scoped>
@@ -87,6 +113,18 @@ defineProps({
   font-weight: 700;
   letter-spacing: 1.5px;
   text-align: center;
+  max-width: 280px;
+}
+
+.invify-loading__retry {
+  margin-top: 4px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 @keyframes invify-pulse {

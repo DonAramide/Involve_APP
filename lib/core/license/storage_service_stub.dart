@@ -25,6 +25,10 @@ class StorageService {
   static Future<bool> isDeviceAccessGranted() async => false;
   static Future<void> setOnboardingCompleted(bool completed) async {}
   static Future<bool> isOnboardingCompleted() async => false;
+  static Future<void> setOnboardingIndustry(String industry) async {}
+  static Future<String?> getOnboardingIndustry() async => null;
+  static Future<void> setOnboardingThemeColor(int color) async {}
+  static Future<int?> getOnboardingThemeColor() async => null;
   static Future<void> setOnlineSyncEnabled(bool enabled) async {}
   static Future<bool> isOnlineSyncEnabled() async => true;
   static Future<void> setOnlineInvoiceUpdateEnabled(bool enabled) async {}

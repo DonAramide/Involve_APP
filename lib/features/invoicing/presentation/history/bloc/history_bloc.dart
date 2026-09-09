@@ -54,11 +54,16 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
 
       // Heal unpaid prior bills already collected via "Previous Term Balance"
       // on a later invoice (Create Invoice path), then reload if anything changed.
+      var healed = false;
+      try {
+        if (await getHistory.repository.healSettledPartialInvoices()) {
+          healed = true;
+        }
+      } catch (_) {}
       final studentIds = invoices
           .where((inv) => inv.studentId != null)
           .map((inv) => inv.studentId!)
           .toSet();
-      var healed = false;
       for (final studentId in studentIds) {
         final changed =
             await getHistory.repository.reconcileStudentCarryForwardSettlements(studentId);
@@ -96,13 +101,13 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       if (event.paymentStatus != null && event.paymentStatus != 'All') {
         final status = event.paymentStatus;
         if (status == 'Full Payment') {
-          invoices = invoices.where((inv) => inv.paymentStatus == 'Paid').toList();
+          invoices = invoices.where((inv) => inv.displayPaymentStatus == 'Paid').toList();
         } else if (status == 'Partial Payment') {
-          invoices = invoices.where((inv) => inv.paymentStatus == 'Partial').toList();
+          invoices = invoices.where((inv) => inv.displayPaymentStatus == 'Partial').toList();
         } else if (status == 'Unpaid') {
-          invoices = invoices.where((inv) => inv.paymentStatus == 'Unpaid').toList();
+          invoices = invoices.where((inv) => inv.displayPaymentStatus == 'Unpaid').toList();
         } else if (status == 'Outstanding') {
-          invoices = invoices.where((inv) => inv.balanceAmount > 0).toList();
+          invoices = invoices.where((inv) => inv.displayBalance > 0).toList();
         } else if (status == 'Pending') {
           invoices = invoices.where((inv) => inv.paymentStatus == 'Pending').toList();
         }
@@ -116,13 +121,15 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         invoices = invoices.where((inv) => inv.classId == event.classId).toList();
       }
       
-      final totalCollected = invoices.fold<double>(0, (sum, inv) => sum + inv.amountPaid);
+      final totalCollected = invoices.fold<double>(0, (sum, inv) => sum + inv.collectedAmount);
       final totalInvoiced = invoices.fold<double>(0, (sum, inv) => sum + inv.totalAmount);
+      final totalPending = invoices.fold<double>(0, (sum, inv) => sum + inv.outstandingAmount);
 
       emit(HistoryLoaded(
         invoices, 
         totalSales: totalCollected,
         totalInvoiced: totalInvoiced,
+        totalPending: totalPending,
         query: event.query, 
         amount: event.amount,
         paymentMethod: event.paymentMethod,

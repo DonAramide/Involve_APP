@@ -584,7 +584,7 @@ import { joinApiUrl } from '../../config/env'
 import { WEB_APP_VERSION } from '../../config/appVersion'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { persistAuthenticatedSession } from '../../auth/session'
-import { resolvePostAuthRedirect, homePathForRole } from '../../utils/authLoginPaths'
+import { navigateAfterAuth } from '../../utils/authLoginPaths'
 import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
 import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 import { useQuasar, copyToClipboard } from 'quasar'
@@ -722,7 +722,7 @@ const resetForm = ref({
   confirmPassword: ''
 })
 const activeUserId = ref(null)
-const activeUserRole = ref('SUPER_ADMIN')
+const activeUserRole = ref('tenant_admin')
 const challengeToken = ref('')
 const challengeContextMessage = ref('')
 
@@ -906,11 +906,7 @@ const verifyRecoveryOtp = async () => {
     successMessage.value = 'Recovery email verified. Set your new passphrase.'
   } catch (err) {
     otpVerified.value = false
-    errorMessage.value =
-      err?.response?.data?.error ||
-      err?.response?.data?.message ||
-      err?.message ||
-      'Invalid or expired recovery code. Request a new OTP.'
+    errorMessage.value = 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
@@ -1002,22 +998,23 @@ const executeLoginPass = async () => {
       successMessage.value = 'FIRST SIGN-IN DETECTED: You must personalize your passphrase.'
       return
     } else if (res.status === 202 || res.data?.requiresMfaSetup || res.data?.requires2FA) {
-      // MFA Gateway triggered
       activeUserId.value = res.data.userId
-      activeUserRole.value = res.data.role || activeUserRole.value
+      activeUserRole.value = res.data.role || activeUserRole.value || 'tenant_admin'
       challengeToken.value = res.data.challengeToken || ''
-      
+      sessionStorage.setItem('mfa_challenge_userId', res.data.userId || '')
+      sessionStorage.setItem('operator_role', String(activeUserRole.value || 'tenant_admin').toUpperCase())
       if (res.data.requiresMfaSetup) {
-        // Cache short-lived configuration access inside window parameters safely
-        sessionStorage.setItem('mfa_setup_token', res.data.setupToken)
+        sessionStorage.setItem('mfa_setup_token', res.data.setupToken || res.data.challengeToken)
         sessionStorage.setItem('mfa_setup_userId', res.data.userId)
+        sessionStorage.removeItem('mfa_challenge_token')
         router.push('/mfa/challenge').catch(() => {})
         return
-      } else {
-        // Enforce inline token verification prompt
-        pendingChallengeState.value = true
-        challengeContextMessage.value = res.data.message || 'MANDATORY_MFA_GATEWAY: Continuous account elevation demands multi-factor signature.'
       }
+      sessionStorage.setItem('mfa_challenge_token', challengeToken.value)
+      pendingChallengeState.value = true
+      challengeContextMessage.value =
+        res.data.message || 'Enter the 6-digit code from your authenticator app.'
+      return
     } else if (res.data?.token) {
       // Set explicit MFA clearance variables cleanly
       const role = res.data?.user?.role || res.data?.role || ''
@@ -1029,7 +1026,10 @@ const executeLoginPass = async () => {
       }
       localStorage.setItem('mfa_status_verified', 'true')
       finalizeAuthenticatedSession(res.data)
+      return
     }
+
+    errorMessage.value = 'Your session could not be established. Please try again.'
   } catch (err) {
     const errorResponse = err.response?.data
     if (errorResponse?.error === 'DEVICE_APPROVAL_REQUIRED') {
@@ -1101,7 +1101,7 @@ const executeMfaVerification = async () => {
       errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Invalid single-use envelope signature.'
+    errorMessage.value = 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
@@ -1152,11 +1152,11 @@ const finalizeAuthenticatedSession = (tokenData) => {
     ...tokenData,
     user: {
       ...(tokenData.user || {}),
-      role: tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN',
+      role: tokenData.user?.role || tokenData.role || activeUserRole.value || 'tenant_admin',
       email: tokenData.user?.email || form.value.email,
     },
   })
-  const cleanRole = (localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
+  const cleanRole = (localStorage.getItem('operator_role') || 'TENANT_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
   localStorage.setItem('operator_email', form.value.email || tokenData.user?.email || '')
 
@@ -1176,10 +1176,7 @@ const finalizeAuthenticatedSession = (tokenData) => {
 
   pendingChallengeState.value = false
   successMessage.value = 'Signed in successfully. Opening your dashboard…'
-  const dest = resolvePostAuthRedirect(cleanRole, route.query?.redirect)
-  router.replace(dest).catch(() => {
-    router.replace(homePathForRole(cleanRole)).catch(() => {})
-  })
+  navigateAfterAuth(router, cleanRole, route.query?.redirect)
 }
 </script>
 

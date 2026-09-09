@@ -13,6 +13,7 @@ import {
   sanitizeTenantUpdates,
   withoutOptionalTenantColumns,
 } from '../utils/sanitize-tenant-updates';
+import { collectedInvoiceAmount } from '../utils/invoice-collection';
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -1385,7 +1386,7 @@ export class AdminController {
 
       const invoices = invoicesRes.data || [];
       const totalRevenue = invoices.reduce(
-        (sum, inv) => sum + Number(inv.amount_paid || 0),
+        (sum, inv) => sum + collectedInvoiceAmount(inv),
         0,
       );
       const pendingInvoices = invoices.filter((inv) => {

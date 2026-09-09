@@ -1034,7 +1034,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       TextCommand('Merchant Name: ${merchantName ?? "N/A"}'),
       TextCommand('SSL: ${_terminalConfig?.primaryHost?['sslEnabled'] == true ? "Enabled" : "Disabled"}'),
       TextCommand('Date/Time: $now'),
-      TextCommand('App Version: 1.0.0'),
+      TextCommand('App Version: 1.0.1'),
     ];
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }

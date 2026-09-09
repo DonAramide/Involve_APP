@@ -61,6 +61,30 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
     super.dispose();
   }
 
+  Future<void> _pickImageFrom(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        imageQuality: 85,
+      );
+      if (pickedFile == null) return;
+      final bytes = await pickedFile.readAsBytes();
+      if (!mounted) return;
+      setState(() => imageBytes = bytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}. $e',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<SchoolBloc, SchoolState>(
@@ -93,21 +117,32 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: state.isLoading ? null : () async {
-                          final picker = ImagePicker();
-                          final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-                          if (pickedFile != null) {
-                            final bytes = await pickedFile.readAsBytes();
-                            setState(() {
-                              imageBytes = bytes;
-                            });
-                          }
-                        },
+                        onTap: state.isLoading ? null : () => _pickImageFrom(ImageSource.gallery),
                         child: CircleAvatar(
                           radius: 40,
                           backgroundImage: imageBytes != null ? MemoryImage(imageBytes!) : null,
                           child: imageBytes == null ? const Icon(Icons.add_a_photo) : null,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: state.isLoading ? null : () => _pickImageFrom(ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                              label: const Text('Take photo'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: state.isLoading ? null : () => _pickImageFrom(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined, size: 18),
+                              label: const Text('Gallery'),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

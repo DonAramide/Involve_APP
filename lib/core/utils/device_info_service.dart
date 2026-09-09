@@ -8,8 +8,64 @@ class DeviceInfoService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   static const MethodChannel _mposChannel = MethodChannel('com.invify.app/mpos');
 
-  /// Returns the last 6 uppercase alphanumeric characters of the device ID.
-  /// Uses MachineGUID on Windows/Linux, AndroidID on Android, IdentifierForVendor on iOS.
+  static bool isUsableDeviceId(String? raw) {
+    final clean = (raw ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    if (clean.length < 4) return false;
+    const blocked = {
+      'UNKNOWN',
+      'NULL',
+      'NONE',
+      '0',
+      'M1AJQ',
+      'WEBCLIENT',
+      'IOSDEVICE',
+      'MACOSDEVICE',
+    };
+    return !blocked.contains(clean);
+  }
+
+  static String _clean(String? raw) =>
+      (raw ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+  static Future<String?> _invokeSerial(String method) async {
+    try {
+      final value = await _mposChannel.invokeMethod<String>(method);
+      final clean = _clean(value);
+      return isUsableDeviceId(clean) ? clean : null;
+    } catch (e) {
+      debugPrint('Device serial $method failed: $e');
+      return null;
+    }
+  }
+
+  /// Always try native serial first. If it is null/unknown, request phone
+  /// permission and read the hardware serial again before any UUID fallback.
+  static Future<String?> _forceAndroidSerial() async {
+    var serial = await _invokeSerial('getHardwareSerial');
+    if (serial != null) return serial;
+
+    var status = await Permission.phone.status;
+    if (!status.isGranted) {
+      status = await Permission.phone.request();
+    }
+    if (status.isGranted) {
+      serial = await _invokeSerial('getHardwareSerial');
+      if (serial != null) return serial;
+    }
+
+    serial = await _invokeSerial('getMposSerialNumber');
+    if (serial != null) return serial;
+
+    // Last native retry — serial can be empty for a moment at boot.
+    for (var i = 0; i < 2; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      serial = await _invokeSerial('getHardwareSerial');
+      if (serial != null) return serial;
+    }
+    return null;
+  }
+
+  /// Returns the hardware serial / device ID. Never returns null.
   static Future<String> getDeviceSuffix() async {
     String deviceId = 'UNKNOWN';
 
@@ -18,28 +74,7 @@ class DeviceInfoService {
         final webInfo = await _deviceInfo.webBrowserInfo;
         deviceId = webInfo.userAgent ?? 'WEB-CLIENT';
       } else if (defaultTargetPlatform == TargetPlatform.android) {
-        try {
-          var status = await Permission.phone.status;
-          if (!status.isGranted) {
-            status = await Permission.phone.request();
-          }
-          if (status.isGranted) {
-            final hardwareSerial = await _mposChannel.invokeMethod<String>('getHardwareSerial');
-            if (hardwareSerial != null && hardwareSerial.toLowerCase() != 'unknown' && hardwareSerial.isNotEmpty) {
-              deviceId = hardwareSerial;
-            } else {
-              final androidInfo = await _deviceInfo.androidInfo;
-              deviceId = androidInfo.id;
-            }
-          } else {
-            final androidInfo = await _deviceInfo.androidInfo;
-            deviceId = androidInfo.id;
-          }
-        } catch (e) {
-          debugPrint('Failed to get hardware serial: $e');
-          final androidInfo = await _deviceInfo.androidInfo;
-          deviceId = androidInfo.id;
-        }
+        deviceId = await _forceAndroidSerial() ?? 'UNKNOWN';
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'IOS-DEVICE';
@@ -47,20 +82,17 @@ class DeviceInfoService {
         final windowsInfo = await _deviceInfo.windowsInfo;
         deviceId = windowsInfo.deviceId; // MachineGuid
       } else if (defaultTargetPlatform == TargetPlatform.macOS) {
-        // MacOS doesn't expose a serial easily without entitlement, fallback
         deviceId = 'MAC-OS-DEVICE';
       }
     } catch (e) {
       debugPrint('Error getting device info: $e');
     }
 
-    // Clean and return the full hardware serial/device ID
-    final cleanId = deviceId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    if (cleanId.isEmpty || cleanId == 'UNKNOWN') {
-      final persistentId = await SecurityService().getPersistentDeviceId();
-      return persistentId.replaceAll('-', '').toUpperCase();
-    }
-    return cleanId;
+    final cleanId = _clean(deviceId);
+    if (isUsableDeviceId(cleanId)) return cleanId;
+
+    final persistentId = await SecurityService().getPersistentDeviceId();
+    return persistentId.replaceAll('-', '').toUpperCase();
   }
 
   /// Returns the last 6 characters of the full device ID for activation purposes.
@@ -107,26 +139,10 @@ class DeviceInfoService {
         osVersion = webInfo.appVersion ?? 'unknown';
       } else if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await _deviceInfo.androidInfo;
-        
-        try {
-          var status = await Permission.phone.status;
-          if (!status.isGranted) {
-            status = await Permission.phone.request();
-          }
-          if (status.isGranted) {
-            final hardwareSerial = await _mposChannel.invokeMethod<String>('getHardwareSerial');
-            if (hardwareSerial != null && hardwareSerial.toLowerCase() != 'unknown' && hardwareSerial.isNotEmpty) {
-              deviceId = hardwareSerial;
-              serialNumber = hardwareSerial;
-            } else {
-              deviceId = androidInfo.id;
-            }
-          } else {
-            deviceId = androidInfo.id;
-          }
-        } catch (e) {
-          debugPrint('Failed to get hardware serial: $e');
-          deviceId = androidInfo.id;
+        final forced = await _forceAndroidSerial();
+        if (forced != null) {
+          deviceId = forced;
+          serialNumber = forced;
         }
 
         os = 'Android';
@@ -159,6 +175,10 @@ class DeviceInfoService {
     }
 
     final suffix = await getDeviceSuffix();
+    if (!isUsableDeviceId(_clean(deviceId))) {
+      deviceId = suffix;
+    }
+    serialNumber ??= isUsableDeviceId(suffix) ? suffix : null;
 
     return {
       'deviceId': deviceId,

@@ -22,12 +22,15 @@ export class NotificationController {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('[NotificationController] Fetch Error:', error.message);
+        return res.status(200).json([]);
+      }
 
-      return res.status(200).json(data);
+      return res.status(200).json(data || []);
     } catch (error: any) {
-      console.error('[NotificationController] Fetch Error:', error.message);
-      return res.status(500).json({ error: 'Failed to fetch notifications' });
+      console.warn('[NotificationController] Fetch Error:', error?.message || error);
+      return res.status(200).json([]);
     }
   }
 

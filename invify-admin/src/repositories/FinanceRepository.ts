@@ -77,6 +77,7 @@ export class FinanceRepository {
           salesSummary: data.salesSummary || {
             totalInvoiced: 0,
             totalCollected: 0,
+            totalPending: 0,
             card: 0,
             vaTransfer: 0,
             bankTransfer: 0,

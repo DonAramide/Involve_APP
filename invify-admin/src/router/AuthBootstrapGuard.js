@@ -1,6 +1,7 @@
 // invify-admin/src/router/AuthBootstrapGuard.js
 
 import { loginPathForContext, homePathForRole, hasPlatformStaffRole } from '../utils/authLoginPaths'
+import { permissionsForOperatorRole } from '../utils/operatorPermissions'
 import { clearMfaChallengeState, hasVerifiedOperatorSession } from '../auth/session'
 
 /**
@@ -15,20 +16,16 @@ import { clearMfaChallengeState, hasVerifiedOperatorSession } from '../auth/sess
  *    exclusively after token verification and RBAC assertion pipelines complete cleanly.
  */
 export function registerAuthBootstrapGuard(router) {
-  const getRolesArray = (roleStr) => {
-    if (!roleStr) return []
-    return roleStr.split(',').map(r => r.trim())
-  }
-
   const getHomePath = (roleStr) => homePathForRole(roleStr)
 
   const getLoginPath = (toPath) =>
     loginPathForContext({ pathname: toPath, role: localStorage.getItem('operator_role') })
 
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach((to, from, next) => {
+    try {
     // 1. Extract state storage parameters
     const token = localStorage.getItem('invify_token')
-    const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+    const operatorRole = localStorage.getItem('operator_role') || ''
     const isVerifiedSession = hasVerifiedOperatorSession()
     if (isVerifiedSession) {
       // Leftover challenge tokens from a later login attempt must not eject a live session.
@@ -105,51 +102,17 @@ export function registerAuthBootstrapGuard(router) {
 
       // Gate 3: Native RBAC Claim evaluations
       if (to.meta?.permission) {
-        const userScopeMatrix = {
-          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications', 'admin_agent_management', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'view_deployment_queue', 'view_governance_queue', 'approve_finance', 'approve_operations', 'approve_deployment', 'approve_governance'],
-          ADMIN_FINANCE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
-          ADMIN_TREASURY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
-          ADMIN_RISK: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
-          ADMIN_OPS: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
-          ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'approve_finance', 'approve_operations'],
-          ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_deployment_queue', 'approve_deployment'],
-          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_own_requests'],
-          OWNER: [
-            'tenant.dashboard.view', 'tenant.transaction.view', 'tenant.wallet.view',
-            'tenant.ledger.view', 'tenant.users.manage', 'tenant.roles.view',
-            'tenant.invitations.manage', 'tenant.activity.view', 'tenant.reports.view',
-            'tenant.settings.manage', 'tenant.settlement.view', 'tenant.payout.create',
-            'tenant.devices.view', 'tenant.terminals.view', 'tenant.compliance.view',
-            'tenant.audit.view', 'tenant.analytics.view', 'tenant.inventory.view'
-          ],
-          TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
-        }
-
-        const rolesArray = getRolesArray(operatorRole)
-        let activePermissions = []
-        
-        if (rolesArray.includes('SUPER_ADMIN')) {
-          activePermissions = userScopeMatrix['SUPER_ADMIN']
-        } else {
-          rolesArray.forEach(r => {
-            if (userScopeMatrix[r]) {
-              activePermissions = activePermissions.concat(userScopeMatrix[r])
-            }
-          })
-          if (activePermissions.length === 0) activePermissions = userScopeMatrix['SUPER_ADMIN'] // fallback
-        }
+        const activePermissions = permissionsForOperatorRole(operatorRole)
 
         if (!activePermissions.includes(to.meta.permission)) {
           console.warn(`[RBAC GATEWAY DENIAL] Operator scope [${operatorRole}] missing required capability claim: [${to.meta.permission}]`)
           
-          // Avoid infinite redirect loops
+          // Never abort in place (next(false) left tenant login stuck on success).
           const homePath = getHomePath(operatorRole)
           if (to.path !== homePath) {
             return next(homePath)
-          } else {
-            // Fallback to error or simply stop navigation
-            return next(false)
           }
+          return next()
         }
       }
 
@@ -168,6 +131,10 @@ export function registerAuthBootstrapGuard(router) {
     }
 
     // Default processing for static catch-all screens
-    next()
+    return next()
+    } catch (err) {
+      console.error('[AuthBootstrapGuard] Navigation guard failed:', err)
+      return next()
+    }
   })
 }

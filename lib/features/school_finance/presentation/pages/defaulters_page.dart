@@ -62,13 +62,22 @@ class _DefaultersPageState extends State<DefaultersPage> {
         final mode = settings?.businessMode ?? 'retail';
         final isSchool = mode == 'school';
 
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
           appBar: AppBar(
-            title: Text('${settings?.customersLabel ?? "Customer"} Debt Report', style: const TextStyle(fontWeight: FontWeight.w900)),
+            title: Text(
+              '${settings?.customersLabel ?? "Customer"} Debt Report',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
             elevation: 0,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+            foregroundColor: isDark ? Colors.white : Colors.black,
             actions: [
               IconButton(icon: const Icon(Icons.sort_rounded), onPressed: () {}),
             ],
@@ -98,11 +107,13 @@ class _DefaultersPageState extends State<DefaultersPage> {
   }
 
   Widget _buildFilters(AppSettings? settings) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final classes = ['JSS 1', 'JSS 2', 'JSS 3', 'SSS 1', 'SSS 2', 'SSS 3'];
     final categoryLabel = settings?.categoryLabel ?? 'Class';
     return Container(
       height: 60,
-      color: Colors.white,
+      color: isDark ? theme.colorScheme.surface : Colors.white,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -123,8 +134,11 @@ class _DefaultersPageState extends State<DefaultersPage> {
                 });
                 _fetchDefaulters();
               },
-              selectedColor: const Color(0xFF1A1C1E),
-              labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
+              selectedColor: isDark ? theme.colorScheme.primary : const Color(0xFF1A1C1E),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                fontWeight: FontWeight.bold,
+              ),
             ),
           );
         },
@@ -133,6 +147,8 @@ class _DefaultersPageState extends State<DefaultersPage> {
   }
 
   Widget _buildDefaulterCard(Map<String, dynamic> item, AppSettings? settings) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final outstanding = item['outstanding'] as double;
     
@@ -140,26 +156,48 @@ class _DefaultersPageState extends State<DefaultersPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.red.withOpacity(0.1)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.red.shade50,
-                child: Text((item['studentName'] ?? item['customerName'] ?? '?')[0], style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+                backgroundColor: isDark ? Colors.red.withOpacity(0.2) : Colors.red.shade50,
+                child: Text(
+                  (item['studentName'] ?? item['customerName'] ?? '?')[0],
+                  style: TextStyle(
+                    color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item['studentName'] ?? item['customerName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                    if (item['class'] != null) Text(item['class'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(
+                      item['studentName'] ?? item['customerName'] ?? 'Unknown',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                    if (item['class'] != null)
+                      Text(
+                        item['class'],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -167,7 +205,13 @@ class _DefaultersPageState extends State<DefaultersPage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(currencyFormat.format(outstanding), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.red)),
-                  const Text('Outstanding', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text(
+                    'Outstanding',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -182,7 +226,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
                   label: const Text('Profile'),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    foregroundColor: Colors.black87,
+                    foregroundColor: isDark ? Colors.white70 : Colors.black87,
                   ),
                 ),
               ),

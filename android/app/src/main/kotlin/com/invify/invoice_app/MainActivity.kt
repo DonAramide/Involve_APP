@@ -83,36 +83,7 @@ class MainActivity: FlutterActivity() {
                     result.success(serialNumber)
                 }
                 "getHardwareSerial" -> {
-                    try {
-                        var serial = ""
-                        try {
-                            val c = Class.forName("android.os.SystemProperties")
-                            val get = c.getMethod("get", String::class.java)
-                            val props = arrayOf("ril.serialnumber", "ro.serialno", "ro.boot.serialno", "sys.serialnumber")
-                            for (prop in props) {
-                                serial = get.invoke(c, prop) as String
-                                if (serial.isNotEmpty() && !serial.equals("unknown", ignoreCase = true) && !serial.equals("M1AJQ", ignoreCase = true)) {
-                                    break
-                                }
-                            }
-                        } catch (ignored: Exception) {}
-
-                        if (serial.isEmpty() || serial.equals("unknown", ignoreCase = true) || serial.equals("M1AJQ", ignoreCase = true)) {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                serial = android.os.Build.getSerial()
-                            } else {
-                                @Suppress("DEPRECATION")
-                                serial = android.os.Build.SERIAL
-                            }
-                        }
-                        result.success(serial)
-                    } catch (e: SecurityException) {
-                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
-                        result.success(androidId)
-                    } catch (e: Exception) {
-                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
-                        result.success(androidId)
-                    }
+                    result.success(readHardwareSerial())
                 }
                 "loadParams" -> {
                     if (isMoreFun) {
@@ -452,5 +423,56 @@ class MainActivity: FlutterActivity() {
     private fun isMoreFunDevice(deviceType: String): Boolean {
         val t = deviceType.uppercase().replace(" ", "").replace("-", "").replace("_", "")
         return t.contains("MOREFUN") || t.contains("MP63") || t == "MPOSDIRECT"
+    }
+
+    private fun isBlankSerial(value: String?): Boolean {
+        val serial = value?.trim().orEmpty()
+        return serial.isEmpty() ||
+            serial.equals("unknown", ignoreCase = true) ||
+            serial.equals("null", ignoreCase = true) ||
+            serial.equals("none", ignoreCase = true) ||
+            serial.equals("0", ignoreCase = true) ||
+            serial.equals("M1AJQ", ignoreCase = true)
+    }
+
+    /// Never returns null. Tries hardware serial, then ANDROID_ID.
+    private fun readHardwareSerial(): String {
+        var serial = ""
+        try {
+            val c = Class.forName("android.os.SystemProperties")
+            val get = c.getMethod("get", String::class.java)
+            val props = arrayOf("ril.serialnumber", "ro.serialno", "ro.boot.serialno", "sys.serialnumber")
+            for (prop in props) {
+                val value = (get.invoke(null, prop) as? String).orEmpty()
+                if (!isBlankSerial(value)) {
+                    serial = value
+                    break
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (isBlankSerial(serial)) {
+            try {
+                serial = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    android.os.Build.getSerial()
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.os.Build.SERIAL
+                }
+            } catch (_: SecurityException) {
+                serial = ""
+            } catch (_: Exception) {
+                serial = ""
+            }
+        }
+
+        if (isBlankSerial(serial)) {
+            serial = android.provider.Settings.Secure.getString(
+                contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ).orEmpty()
+        }
+
+        return serial
     }
 }

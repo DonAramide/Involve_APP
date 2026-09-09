@@ -25,4 +25,25 @@ class InputValidator {
   static String? validatePhone(String? value, {bool required = true}) {
     return PhoneNumberInput.validate(value, required: required, minDigits: required ? 7 : 0);
   }
+
+  /// Physical street address: 9+ characters, at least 2 letters, and at least
+  /// two spaces (three words), e.g. "12 Adeola Street".
+  static String? validateStreetAddress(String? value) {
+    final address = (value ?? '').trim();
+    if (address.isEmpty) {
+      return 'Enter your street address';
+    }
+    if (address.length < 9) {
+      return 'Address must be at least 9 characters';
+    }
+    final spaceCount = RegExp(r'\s').allMatches(address).length;
+    if (spaceCount < 2) {
+      return 'Enter a full street address (e.g. 12 Adeola Street)';
+    }
+    final letterCount = RegExp(r'[A-Za-z]').allMatches(address).length;
+    if (letterCount < 2) {
+      return 'Address must include at least 2 letters';
+    }
+    return null;
+  }
 }

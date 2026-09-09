@@ -264,10 +264,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
 
     final bool isSmallScreen = constraints.maxWidth < 800;
     final bool isSchoolMode = context.read<SettingsBloc>().state.settings?.businessMode == 'school';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.grey[100],
+      color: isDark ? theme.scaffoldBackgroundColor : Colors.grey[100],
       child: isSmallScreen
           ? Wrap(
               spacing: 12,
@@ -380,6 +382,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       hint = 'Search Invoice ID or Customer';
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fieldBg = isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white;
+
     return TextField(
       controller: _searchController,
       decoration: InputDecoration(
@@ -387,7 +393,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         prefixIcon: const Icon(Icons.search),
         border: const OutlineInputBorder(),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: fieldBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         suffixIcon: _searchController.text.isNotEmpty 
           ? IconButton(
@@ -422,6 +428,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   }
 
   Widget _buildAmountField(BuildContext context, HistoryState state, String currentQuery) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fieldBg = isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white;
+
     return TextField(
       controller: _amountController,
       keyboardType: TextInputType.number,
@@ -433,7 +443,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         ),
         border: const OutlineInputBorder(),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: fieldBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         suffixIcon: _amountController.text.isNotEmpty 
           ? IconButton(
@@ -506,7 +516,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       ),
                     ),
                   const SizedBox(width: 8),
-                  _buildStatusBadge(invoice.paymentStatus),
+                  _buildStatusBadge(invoice.displayPaymentStatus),
                 ],
               ),
             ),
@@ -564,8 +574,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 _buildHistorySummaryRow('Paid', invoice.amountPaid, context),
                 if (invoice.changeGiven > 0)
                   _buildHistorySummaryRow('Change Given', invoice.changeGiven, context, color: Colors.green),
-                if (invoice.balanceAmount > 0)
-                  _buildHistorySummaryRow('Balance', invoice.balanceAmount, context, color: Colors.red, isBold: true),
+                if (invoice.displayBalance > 0)
+                  _buildHistorySummaryRow('Balance', invoice.displayBalance, context, color: Colors.red, isBold: true),
                 if (invoice.staffName != null && invoice.staffName!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   _buildHistoryTextRow('Billed By', invoice.staffName!, context),
@@ -605,7 +615,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     ),
                   ],
                 ],
-                if (invoice.balanceAmount > 0 && invoice.paymentStatus.toLowerCase() != 'pending')
+                if (invoice.displayBalance > 0 && invoice.displayPaymentStatus.toLowerCase() != 'pending')
                   ElevatedButton.icon(
                     onPressed: () => _showBalancePaymentDialog(context, invoice),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -723,7 +733,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                         children: [
                           Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
-                          _buildStatusBadge(invoice.paymentStatus, isMini: true),
+                          _buildStatusBadge(invoice.displayPaymentStatus, isMini: true),
                         ],
                       ),
                     ),
@@ -975,14 +985,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     final plan = context.read<SettingsBloc>().state.userPlan;
     final methods = _paymentMethodChoices(includeAll: true, plan: plan);
     final value = methods.contains(currentMethod) ? currentMethod! : 'All';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return DropdownButtonFormField<String>(
       value: value,
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
+      dropdownColor: isDark ? theme.colorScheme.surfaceContainerHighest : null,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+        fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
       ),
       items: methods.map((method) {
         return DropdownMenuItem(
@@ -1012,14 +1025,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     if (state is HistoryLoaded) {
       currentStatus = state.paymentStatus;
     }
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return DropdownButtonFormField<String>(
       value: currentStatus ?? 'All',
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
+      dropdownColor: isDark ? theme.colorScheme.surfaceContainerHighest : null,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+        fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
       ),
       items: ['All', 'Full Payment', 'Partial Payment', 'Unpaid', 'Outstanding'].map((status) {
         return DropdownMenuItem(value: status, child: Text(status, style: const TextStyle(fontSize: 12)));
@@ -1048,16 +1064,19 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         if (state is HistoryLoaded) {
           currentStaffId = state.staffId;
         }
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
 
         return DropdownButtonFormField<int?>(
           value: currentStaffId,
           isExpanded: true,
-          decoration: const InputDecoration(
+          dropdownColor: isDark ? theme.colorScheme.surfaceContainerHighest : null,
+          decoration: InputDecoration(
             hintText: 'All Staff',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
             filled: true,
-            fillColor: Colors.white,
-            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+            fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
           ),
           items: [
             const DropdownMenuItem<int?>(value: null, child: Text('All Staff', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
@@ -1092,16 +1111,19 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         if (state is HistoryLoaded) {
           currentClassId = state.classId;
         }
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
 
         return DropdownButtonFormField<int?>(
           value: currentClassId,
           isExpanded: true,
-          decoration: const InputDecoration(
+          dropdownColor: isDark ? theme.colorScheme.surfaceContainerHighest : null,
+          decoration: InputDecoration(
             hintText: 'All Classes',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
             filled: true,
-            fillColor: Colors.white,
-            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+            fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
           ),
           items: [
             const DropdownMenuItem<int?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
@@ -1131,6 +1153,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
 
   Widget _buildTotalSummary(BuildContext context, HistoryLoaded state) {
     final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dividerColor = isDark ? Colors.grey[700] : Colors.grey[300];
+
     return Column(
       children: [
         Container(
@@ -1157,24 +1182,43 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Column(
-                    children: [
-                      const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                      Text(
-                        CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                        Text(
+                          CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ],
+                    ),
                   ),
-                  Container(height: 30, width: 1, color: Colors.grey[300]),
-                  Column(
-                    children: [
-                      const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                      Text(
-                        CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
-                      ),
-                    ],
+                  Container(height: 30, width: 1, color: dividerColor),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                        Text(
+                          CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(height: 30, width: 1, color: dividerColor),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text('TOTAL PENDING', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                        Text(
+                          CurrencyFormatter.formatWithSymbol(state.totalPending, symbol: currency),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1187,18 +1231,20 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   double totalCash = 0;
                   
                   for (final inv in state.invoices) {
+                    final collected = inv.collectedAmount;
+                    if (collected <= 0) continue;
                     final method = (inv.paymentMethod ?? '').toLowerCase().trim();
                     if (method == 'pos' || method == 'card') {
-                      totalCard += inv.amountPaid;
+                      totalCard += collected;
                     } else if (method == 'virtualaccount' ||
                         method == 'va transfer' ||
                         method.contains('virtual')) {
-                      totalVaTransfer += inv.amountPaid;
+                      totalVaTransfer += collected;
                     } else if (method == 'transfer' ||
                         method.startsWith('transfer')) {
-                      totalTransfer += inv.amountPaid;
+                      totalTransfer += collected;
                     } else if (method == 'cash') {
-                      totalCash += inv.amountPaid;
+                      totalCash += collected;
                     }
                   }
 
@@ -1234,11 +1280,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       Row(
                         children: [
                           metric('CARD (POS)', totalCard, Colors.orange),
-                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          Container(height: 28, width: 1, color: dividerColor),
                           metric('TRANSFER', totalTransfer, Colors.purple),
-                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          Container(height: 28, width: 1, color: dividerColor),
                           metric('VA TRANSFER', totalVaTransfer, Colors.indigo),
-                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          Container(height: 28, width: 1, color: dividerColor),
                           metric('CASH', totalCash, Colors.teal),
                         ],
                       ),
@@ -1267,7 +1313,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     // Group sales by day
     final dailySales = groupBy(state.invoices, (Invoice inv) {
       return DateTime(inv.dateCreated.year, inv.dateCreated.month, inv.dateCreated.day);
-    }).map((date, invs) => MapEntry(date, invs.fold(0.0, (sum, inv) => sum + inv.totalAmount)));
+    }).map((date, invs) => MapEntry(date, invs.fold(0.0, (sum, inv) => sum + inv.collectedAmount)));
 
     final sortedDates = dailySales.keys.toList()..sort();
     final spots = sortedDates.asMap().entries.map((e) {
@@ -1280,18 +1326,33 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       spots.add(FlSpot(0.5, spots[0].y));
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black12,
+            blurRadius: 4,
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const Text('REVENUE TREND', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey)),
+          Text(
+            'REVENUE TREND',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: isDark ? Colors.grey[300] : Colors.blueGrey,
+            ),
+          ),
           const SizedBox(height: 16),
           Expanded(
             child: LineChart(
@@ -1307,7 +1368,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                         final date = sortedDates[idx];
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
-                          child: Text('${date.day}/${date.month}', style: const TextStyle(fontSize: 10)),
+                          child: Text(
+                            '${date.day}/${date.month}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.grey[400] : null,
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -2457,6 +2524,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 : 0.0;
 
             final double remainingBalance = pendingAmount - selectedTransfersSum;
+            final theme = Theme.of(dialogContext);
+            final isDark = theme.brightness == Brightness.dark;
 
             return AlertDialog(
               title: Row(
@@ -2497,9 +2566,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: isDark ? theme.colorScheme.surface : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade300),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2673,9 +2742,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: isDark ? theme.colorScheme.surface : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade300),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2708,11 +2777,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                                     final isSelected = selectedInvoice?.id == inv.id;
 
                                     return Card(
-                                      color: isSelected ? Colors.blue.shade50 : Colors.white,
+                                      color: isSelected ? (isDark ? Colors.blue.withOpacity(0.25) : Colors.blue.shade50) : (isDark ? theme.cardColor : Colors.white),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(6),
                                         side: BorderSide(
-                                          color: isSelected ? Colors.blue : Colors.grey.shade300,
+                                          color: isSelected ? Colors.blue : (isDark ? theme.dividerColor : Colors.grey.shade300),
                                           width: isSelected ? 1.5 : 1,
                                         ),
                                       ),
