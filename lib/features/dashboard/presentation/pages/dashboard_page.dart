@@ -34,7 +34,6 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
 import 'dart:async';
-import 'package:involve_app/services/socket_service.dart';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
 import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
@@ -61,10 +60,9 @@ import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_d
 
 import 'package:involve_app/services/terminal_sync_service.dart';
 import '../widgets/notification_bell.dart';
+import '../widgets/network_status_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:involve_app/services/socket_service.dart' as import_socket_service;
-import 'package:http/http.dart' as http;
-import 'package:involve_app/core/utils/app_config.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -218,47 +216,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               const SizedBox(width: 4),
               if (settings?.showNetworkIndicator == true)
-                ValueListenableBuilder<bool>(
-                  valueListenable: SocketService().isConnected,
-                  builder: (context, isConnected, child) {
-                    return ValueListenableBuilder<String?>(
-                      valueListenable: SocketService().lastError,
-                      builder: (context, lastErr, _) {
-                        final icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
-                        final color = isConnected ? Colors.greenAccent : Colors.redAccent;
-                        final tooltip = isConnected
-                            ? 'Live socket connected (${AppConfig.baseUrl})\nLong-press for Sync Configuration'
-                            : (lastErr == null || lastErr.isEmpty)
-                                ? 'Live socket offline (${AppConfig.baseUrl})\nTap to reconnect · Long-press for Sync Configuration'
-                                : 'Live socket offline (${AppConfig.baseUrl})\n$lastErr\nTap to reconnect · Long-press for Sync Configuration';
-
-                        return Tooltip(
-                          message: tooltip,
-                          child: GestureDetector(
-                            onTap: () async {
-                              await SocketService().reconnect();
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    SocketService().isConnected.value
-                                        ? 'Live socket connected'
-                                        : 'Reconnecting live socket…',
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            onLongPress: () => showSyncConfigurationDialog(context),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              child: Icon(icon, size: 20, color: color),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                NetworkStatusIndicator(
+                  onLongPress: () => showSyncConfigurationDialog(context),
                 ),
               const SizedBox(width: 4),
               BlocBuilder<SettingsBloc, SettingsState>(
@@ -1008,51 +967,58 @@ class _DashboardPageState extends State<DashboardPage> {
               )
             else if (indicatorColor != null || secondaryIndicatorColor != null)
               Positioned(
-                top: 16,
-                right: 16,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (secondaryIndicatorColor != null)
-                      Tooltip(
-                        message: secondaryIndicatorTooltip ?? '',
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: secondaryIndicatorColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: secondaryIndicatorColor.withOpacity(0.4),
-                                blurRadius: 6,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(isDark ? 0.45 : 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (secondaryIndicatorColor != null)
+                        Tooltip(
+                          message: secondaryIndicatorTooltip ?? '',
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: secondaryIndicatorColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: secondaryIndicatorColor.withOpacity(0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    if (indicatorColor != null)
-                      Tooltip(
-                        message: indicatorTooltip ?? '',
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: indicatorColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: indicatorColor.withOpacity(0.4),
-                                blurRadius: 6,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                      if (indicatorColor != null)
+                        Tooltip(
+                          message: indicatorTooltip ?? '',
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: indicatorColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: indicatorColor.withOpacity(0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
           ],

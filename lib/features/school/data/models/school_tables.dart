@@ -79,6 +79,7 @@ class Students extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get admissionNumber => text().unique()();
   TextColumn get firstName => text()();
+  TextColumn get middleName => text().nullable()();
   TextColumn get lastName => text()();
   IntColumn get classId => integer().references(Classes, #id)();
   IntColumn get academicYearId => integer().nullable().references(AcademicYears, #id)();

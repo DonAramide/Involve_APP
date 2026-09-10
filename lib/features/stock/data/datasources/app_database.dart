@@ -64,7 +64,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 91;
+  int get schemaVersion => 92;
 
   @override
   MigrationStrategy get migration {
@@ -462,6 +462,9 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 91) {
           await _safeAddColumn(m, settings, settings.servicesDescriptionFormatEnabled);
+        }
+        if (from < 92) {
+          await _safeAddColumn(m, students, students.middleName);
         }
       },
       beforeOpen: (details) async {

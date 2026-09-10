@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,10 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import '../../domain/services/student_csv_import.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import './student_profile_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
@@ -54,6 +56,9 @@ class _StudentListPageState extends State<StudentListPage> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<SchoolBloc, SchoolState>(
+      listenWhen: (previous, current) =>
+          previous.error != current.error ||
+          previous.successMessage != current.successMessage,
       listener: (context, state) {
         if (state.error != null) {
           String message = friendlyApiError(state.error);
@@ -73,6 +78,14 @@ class _StudentListPageState extends State<StudentListPage> {
             SnackBar(
               content: Text(message),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else if (state.successMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.successMessage!),
+              backgroundColor: Colors.green.shade700,
               duration: const Duration(seconds: 4),
             ),
           );
@@ -102,7 +115,7 @@ class _StudentListPageState extends State<StudentListPage> {
             ],
           ),
           floatingActionButton: _isSelectionMode ? null : FloatingActionButton(
-            onPressed: () => _showStudentDialog(context),
+            onPressed: () => _showAddStudentOptions(context),
             child: const Icon(Icons.person_add),
           ),
           body: state.isLoading 
@@ -423,9 +436,174 @@ class _StudentListPageState extends State<StudentListPage> {
     );
   }
 
+  void _showAddStudentOptions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_add_alt_1),
+              title: const Text('Add single student'),
+              subtitle: const Text('Enter one student record'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showStudentDialog(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload_file),
+              title: const Text('Upload students (CSV)'),
+              subtitle: const Text('Import multiple records from a CSV file'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _importStudentsCsv(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: const Text('Download CSV template'),
+              subtitle: const Text('Headers match the Add Student form'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _downloadStudentCsvTemplate(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadStudentCsvTemplate(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save student CSV template',
+        fileName: 'student_import_template.csv',
+        bytes: Uint8List.fromList(utf8.encode(StudentCsvImport.template)),
+      );
+      if (!context.mounted || result == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CSV template saved.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not save the template: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _importStudentsCsv(BuildContext context) async {
+    final bloc = context.read<SchoolBloc>();
+    if (bloc.state.classes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add at least one class before importing students.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['csv'],
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+
+    final file = picked.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read the selected CSV file.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final parsed = StudentCsvImport.parse(
+      utf8.decode(bytes, allowMalformed: true),
+      classes: bloc.state.classes,
+      startingAdmissionNumber: bloc.state.nextAdmissionNumber ?? '0001',
+    );
+
+    if (!context.mounted) return;
+
+    if (parsed.students.isEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Could not import students'),
+          content: SingleChildScrollView(
+            child: Text(parsed.errors.join('\n')),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    var shouldImport = true;
+    if (parsed.errors.isNotEmpty) {
+      shouldImport = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Some rows were skipped'),
+              content: SingleChildScrollView(
+                child: Text(
+                  '${parsed.students.length} valid student${parsed.students.length == 1 ? '' : 's'} ready to import.\n\n'
+                  '${parsed.errors.join('\n')}',
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text('IMPORT ${parsed.students.length}'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+    } else {
+      shouldImport = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Import students'),
+              content: Text(
+                'Import ${parsed.students.length} student${parsed.students.length == 1 ? '' : 's'} from ${file.name}?',
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('IMPORT'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+    }
+
+    if (!shouldImport || !context.mounted) return;
+    bloc.add(ImportStudentsEvent(parsed.students));
+  }
+
   void _showStudentDialog(BuildContext context, {Student? student}) {
     final formKey = GlobalKey<FormState>();
     final firstNameController = TextEditingController(text: student?.firstName);
+    final middleNameController = TextEditingController(text: student?.middleName);
     final lastNameController = TextEditingController(text: student?.lastName);
     final admissionController = TextEditingController(
       text: student?.admissionNumber ?? context.read<SchoolBloc>().state.nextAdmissionNumber
@@ -503,6 +681,10 @@ class _StudentListPageState extends State<StudentListPage> {
                       controller: firstNameController, 
                       decoration: const InputDecoration(labelText: 'First Name *'),
                       validator: (val) => val == null || val.isEmpty ? 'First Name is required' : null,
+                    ),
+                    TextFormField(
+                      controller: middleNameController,
+                      decoration: const InputDecoration(labelText: 'Middle Name'),
                     ),
                     TextFormField(
                       controller: lastNameController, 
@@ -591,8 +773,10 @@ class _StudentListPageState extends State<StudentListPage> {
               ElevatedButton(
                 onPressed: () {
                   if (formKey.currentState!.validate()) {
+                    final middleName = middleNameController.text.trim();
                     final newStudent = student?.copyWith(
                           firstName: firstNameController.text,
+                          middleName: middleName,
                           lastName: lastNameController.text,
                           admissionNumber: admissionController.text,
                           parentName: parentNameController.text,
@@ -605,6 +789,7 @@ class _StudentListPageState extends State<StudentListPage> {
                         ) ??
                         Student(
                           firstName: firstNameController.text,
+                          middleName: middleName.isEmpty ? null : middleName,
                           lastName: lastNameController.text,
                           admissionNumber: admissionController.text,
                           parentName: parentNameController.text,

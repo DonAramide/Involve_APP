@@ -2526,49 +2526,18 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             final double remainingBalance = pendingAmount - selectedTransfersSum;
             final theme = Theme.of(dialogContext);
             final isDark = theme.brightness == Brightness.dark;
+            final media = MediaQuery.of(dialogContext);
+            final stacked = media.size.width < 640;
+            final hasVirtualAccount =
+                (activeStaff.virtualAccountNumber ?? '').trim().isNotEmpty;
+            final isManualTransferInvoice = selectedInvoice?.paymentMethod == 'Transfer';
 
-            return AlertDialog(
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Reconciliation Workspace',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Virtual Account: ${activeStaff.virtualAccountNumber ?? "Not Set"} (${activeStaff.name})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: activeStaff.virtualAccountNumber != null ? Colors.blue.shade700 : Colors.red.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(dialogContext),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 800,
-                height: 500,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // LEFT COLUMN: RECEIVED TRANSFERS
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
+            Widget transferPane = Container(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         decoration: BoxDecoration(
-                          color: isDark ? theme.colorScheme.surface : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade300),
+                          color: isDark ? theme.colorScheme.surface : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isDark ? theme.dividerColor : const Color(0xFFE6E8EB)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2634,39 +2603,14 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                               )
                             else if (receivedTransfers.isEmpty)
                               Expanded(
-                                child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.account_balance_wallet_outlined, size: 44, color: Colors.grey.shade400),
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          activeStaff.virtualAccountNumber == null || activeStaff.virtualAccountNumber!.trim().isEmpty
-                                              ? 'No Virtual Account assigned to ${activeStaff.name}.\nGenerate a staff virtual account in Admin Hub to match bank deposits automatically.'
-                                              : 'No pending bank deposits found for ${activeStaff.name} (${activeStaff.virtualAccountNumber}).',
-                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        if (activeStaff.virtualAccountNumber == null || activeStaff.virtualAccountNumber!.trim().isEmpty) ...[
-                                          const SizedBox(height: 14),
-                                          ElevatedButton.icon(
-                                            onPressed: () {
-                                              Navigator.pop(dialogContext);
-                                              Navigator.pushNamed(context, '/system_setup');
-                                            },
-                                            icon: const Icon(Icons.admin_panel_settings, size: 16),
-                                            label: const Text('GO TO STAFF SETUP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue.shade700,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
+                                child: _ReconciliationEmptyState(
+                                  icon: Icons.account_balance_wallet_outlined,
+                                  title: hasVirtualAccount
+                                      ? 'No deposits yet'
+                                      : 'No virtual account assigned',
+                                  message: hasVirtualAccount
+                                      ? 'No pending bank deposits found for ${activeStaff.name} (${activeStaff.virtualAccountNumber}).'
+                                      : 'Generate a staff virtual account in Admin Hub to match bank deposits automatically.',
                                 ),
                               )
                             else
@@ -2733,18 +2677,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                               ),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // RIGHT COLUMN: PENDING INVOICES
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
+                      );
+            Widget invoicePane = Container(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         decoration: BoxDecoration(
-                          color: isDark ? theme.colorScheme.surface : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade300),
+                          color: isDark ? theme.colorScheme.surface : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isDark ? theme.dividerColor : const Color(0xFFE6E8EB)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2760,12 +2699,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                               )
                             else if (pendingInvoices.isEmpty)
                               const Expanded(
-                                child: Center(
-                                  child: Text(
-                                    'No pending transfer checkout invoices.',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                    textAlign: TextAlign.center,
-                                  ),
+                                child: _ReconciliationEmptyState(
+                                  icon: Icons.receipt_long_outlined,
+                                  title: 'No pending invoices',
+                                  message: 'There are no transfer checkout invoices waiting to be matched.',
                                 ),
                               )
                             else
@@ -2899,19 +2836,127 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                               ),
                           ],
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+
+            final Widget workspaceBody;
+            if (!hasVirtualAccount && !isManualTransferInvoice) {
+              workspaceBody = _ReconciliationEmptyState(
+                icon: Icons.account_balance_wallet_outlined,
+                title: 'No virtual account for ${activeStaff.name}',
+                message:
+                    'Generate a staff virtual account in Admin Hub so bank deposits can be matched automatically.',
+                action: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.pushNamed(context, '/system_setup');
+                  },
+                  icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                  label: const Text('Go to staff setup'),
                 ),
+              );
+            } else if (stacked) {
+              workspaceBody = Column(
+                children: [
+                  Expanded(child: transferPane),
+                  const SizedBox(height: 12),
+                  Expanded(child: invoicePane),
+                ],
+              );
+            } else {
+              workspaceBody = Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: transferPane),
+                  const SizedBox(width: 12),
+                  Expanded(child: invoicePane),
+                ],
+              );
+            }
+
+            return Dialog(
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: stacked ? 12 : 28,
+                vertical: stacked ? 18 : 32,
               ),
-              actions: [
-                if (selectedInvoice != null) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 880,
+                  maxHeight: media.size.height * 0.92,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Reconciliation Workspace',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: hasVirtualAccount
+                                        ? Colors.blue.shade50
+                                        : Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    hasVirtualAccount
+                                        ? 'Virtual account ${activeStaff.virtualAccountNumber} · ${activeStaff.name}'
+                                        : 'Virtual account not set · ${activeStaff.name}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: hasVirtualAccount
+                                          ? Colors.blue.shade800
+                                          : Colors.red.shade800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(dialogContext),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(child: workspaceBody),
+                      const SizedBox(height: 12),
+                      if (selectedInvoice != null) ...[
+                  Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (stacked) ...[
+                          Text(
+                            'Selected invoice pending: ${CurrencyFormatter.format(pendingAmount)}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedInvoice!.paymentMethod == 'Transfer'
+                                ? 'Company bank transfer'
+                                : 'Mapped transfers: ${CurrencyFormatter.format(selectedTransfersSum)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: selectedInvoice!.paymentMethod == 'Transfer'
+                                  ? Colors.amber.shade800
+                                  : (selectedTransfersSum > 0 ? Colors.green : Colors.grey),
+                            ),
+                          ),
+                        ] else
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -2959,17 +3004,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                         const SizedBox(height: 8),
                       ],
                     ),
-                  ),
-                ],
+                      ],
                 isSubmitting
                     ? const Padding(
-                        padding: EdgeInsets.only(right: 16),
-                        child: CircularProgressIndicator(),
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(child: CircularProgressIndicator()),
                       )
-                    : Builder(
+                    : SizedBox(
+                        width: double.infinity,
+                        child: Builder(
                         builder: (context) {
                           final isManualTransfer = selectedInvoice?.paymentMethod == 'Transfer';
-                          final isVirtualAccount = selectedInvoice != null && !isManualTransfer;
                           final canSubmit = selectedInvoice != null && (isManualTransfer || selectedTransferIds.isNotEmpty);
 
                           return ElevatedButton(
@@ -3134,19 +3179,87 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                                 : null,
                             child: Text(
                               selectedInvoice == null
-                                  ? 'Select an Invoice'
+                                  ? 'Select an invoice'
                                   : isManualTransfer
-                                      ? 'Confirm Paid (Company Bank Transfer)'
+                                      ? 'Confirm paid (company bank transfer)'
                                       : (selectedTransferIds.isEmpty
-                                          ? 'Select Received Transfer to Match'
-                                          : 'Complete Match (${CurrencyFormatter.format(selectedTransfersSum)})'),
+                                          ? 'Select a received transfer to match'
+                                          : 'Complete match (${CurrencyFormatter.format(selectedTransfersSum)})'),
                             ),
                           );
                         },
                       ),
-              ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _ReconciliationEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final Widget? action;
+
+  const _ReconciliationEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.hasBoundedHeight ? constraints.maxHeight : 0,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 30, color: Colors.grey.shade500),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                if (action != null) ...[
+                  const SizedBox(height: 20),
+                  action!,
+                ],
+              ],
+            ),
+          ),
         );
       },
     );

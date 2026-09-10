@@ -24,6 +24,7 @@ class SchoolState extends Equatable {
   final String? nextAdmissionNumber;
   final bool isLoading;
   final String? error;
+  final String? successMessage;
   final SchoolStatus status;
   /// Most recent Cash/POS payment slip (for success popup + print).
   final Invoice? lastPaymentReceipt;
@@ -46,6 +47,7 @@ class SchoolState extends Equatable {
     this.nextAdmissionNumber,
     this.isLoading = false,
     this.error,
+    this.successMessage,
     this.status = SchoolStatus.initial,
     this.lastPaymentReceipt,
   });
@@ -71,9 +73,11 @@ class SchoolState extends Equatable {
     String? nextAdmissionNumber,
     bool? isLoading,
     String? error,
+    String? successMessage,
     SchoolStatus? status,
     Invoice? lastPaymentReceipt,
     bool clearLastPaymentReceipt = false,
+    bool clearSuccessMessage = false,
   }) {
     return SchoolState(
       academicYears: academicYears ?? this.academicYears,
@@ -93,6 +97,7 @@ class SchoolState extends Equatable {
       nextAdmissionNumber: nextAdmissionNumber ?? this.nextAdmissionNumber,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      successMessage: clearSuccessMessage ? null : (successMessage ?? this.successMessage),
       status: status ?? this.status,
       lastPaymentReceipt: clearLastPaymentReceipt
           ? null
@@ -119,6 +124,7 @@ class SchoolState extends Equatable {
         nextAdmissionNumber,
         isLoading,
         error,
+        successMessage,
         status,
         lastPaymentReceipt,
       ];

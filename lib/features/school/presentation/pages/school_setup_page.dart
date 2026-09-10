@@ -67,6 +67,9 @@ class SchoolSetupPage extends StatelessWidget {
   }
 }
 
+int _compareByName(String a, String b) =>
+    a.toLowerCase().compareTo(b.toLowerCase());
+
 final _academicSessionPattern = RegExp(r'^(\d{4})/(\d{4})$');
 
 String? _validateAcademicSession(String? value) {
@@ -120,15 +123,17 @@ class _YearsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final years = [...state.academicYears]
+      ..sort((a, b) => _compareByName(a.name, b.name));
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddYearDialog(context),
         child: const Icon(Icons.add),
       ),
       body: ListView.builder(
-        itemCount: state.academicYears.length,
+        itemCount: years.length,
         itemBuilder: (context, index) {
-          final year = state.academicYears[index];
+          final year = years[index];
           return ListTile(
             title: Text(year.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             trailing: Row(
@@ -243,6 +248,9 @@ class _TermsTab extends StatelessWidget {
       return const Center(child: Text('Please add an Academic Year first.'));
     }
 
+    final terms = [...state.terms]
+      ..sort((a, b) => _compareByName(a.name, b.name));
+
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTermDialog(context, activeYear.id!),
@@ -256,9 +264,9 @@ class _TermsTab extends StatelessWidget {
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: state.terms.length,
+              itemCount: terms.length,
               itemBuilder: (context, index) {
-                final term = state.terms[index];
+                final term = terms[index];
                 return ListTile(
                   title: Text(term.name),
                   trailing: Row(
@@ -355,15 +363,17 @@ class _ClassesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final classes = [...state.classes]
+      ..sort((a, b) => _compareByName(a.name, b.name));
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddClassDialog(context),
         child: const Icon(Icons.add),
       ),
       body: ListView.builder(
-        itemCount: state.classes.length,
+        itemCount: classes.length,
         itemBuilder: (context, index) {
-          final sClass = state.classes[index];
+          final sClass = classes[index];
           return ListTile(
             title: Text(sClass.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: sClass.description != null ? Text(sClass.description!) : null,

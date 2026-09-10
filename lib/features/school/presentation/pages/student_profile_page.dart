@@ -376,6 +376,13 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         const SizedBox(height: 10),
         _buildDetailsCard([
           _buildInfoRow(
+            icon: Icons.badge_outlined,
+            label: 'Middle Name',
+            value: student.middleName?.trim().isNotEmpty == true
+                ? student.middleName!.trim()
+                : 'Not set',
+          ),
+          _buildInfoRow(
             icon: Icons.cake_outlined,
             label: 'Date of Birth',
             value: student.dateOfBirth != null

@@ -42,6 +42,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<AddClassEvent>(_onAddClass, transformer: sequential());
     on<DeleteClassEvent>(_onDeleteClass, transformer: sequential());
     on<AddStudentEvent>(_onAddStudent, transformer: sequential());
+    on<ImportStudentsEvent>(_onImportStudents, transformer: sequential());
     on<UpdateStudentEvent>(_onUpdateStudent, transformer: sequential());
     on<DeleteStudentEvent>(_onDeleteStudent, transformer: sequential());
     on<PromoteStudentsEvent>(_onPromoteStudents, transformer: sequential());
@@ -68,7 +69,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<ProvisionStudentVirtualAccountEvent>(_onProvisionVirtualAccount, transformer: sequential());
     on<ClearStudentDebitEvent>(_onClearStudentDebit, transformer: sequential());
 
-    on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)), transformer: sequential());
+    on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null, clearSuccessMessage: true)), transformer: sequential());
     
     add(LoadSchoolData());
   }
@@ -209,7 +210,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   }
 
   Future<void> _onAddStudent(AddStudentEvent event, Emitter<SchoolState> emit) async {
-    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null, clearSuccessMessage: true));
     try {
       var studentToAdd = event.student;
       if (studentToAdd.academicYearId == null && state.activeYear != null) {
@@ -217,6 +218,57 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       }
       await repository.addStudent(studentToAdd);
       emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onImportStudents(ImportStudentsEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null, clearSuccessMessage: true));
+    try {
+      var imported = 0;
+      final failures = <String>[];
+      for (final student in event.students) {
+        try {
+          var studentToAdd = student;
+          if (studentToAdd.academicYearId == null && state.activeYear != null) {
+            studentToAdd = studentToAdd.copyWith(academicYearId: state.activeYear!.id);
+          }
+          await repository.addStudent(studentToAdd);
+          imported++;
+        } catch (e) {
+          final reason = friendlyApiError(e);
+          final label = student.admissionNumber.isNotEmpty
+              ? '${student.fullName} (${student.admissionNumber})'
+              : student.fullName;
+          failures.add('$label: $reason');
+        }
+      }
+
+      if (imported == 0) {
+        emit(state.copyWith(
+          isLoading: false,
+          status: SchoolStatus.failure,
+          error: failures.isEmpty
+              ? 'No students were imported.'
+              : 'Could not import students.\n${failures.take(5).join('\n')}',
+        ));
+        return;
+      }
+
+      final summary = imported == 1
+          ? '1 student imported.'
+          : '$imported students imported.';
+      final suffix = failures.isEmpty
+          ? ''
+          : ' ${failures.length} row${failures.length == 1 ? '' : 's'} skipped.';
+      emit(state.copyWith(
+        status: SchoolStatus.success,
+        successMessage: failures.isEmpty
+            ? summary
+            : '$summary$suffix ${failures.first}',
+      ));
       add(LoadSchoolData());
     } catch (e) {
       emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));

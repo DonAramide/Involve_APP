@@ -78,6 +78,13 @@ class AddStudentEvent extends SchoolEvent {
   List<Object?> get props => [student];
 }
 
+class ImportStudentsEvent extends SchoolEvent {
+  final List<Student> students;
+  const ImportStudentsEvent(this.students);
+  @override
+  List<Object?> get props => [students];
+}
+
 class UpdateStudentEvent extends SchoolEvent {
   final Student student;
   const UpdateStudentEvent(this.student);

@@ -12142,6 +12142,12 @@ class $StudentsTable extends Students
   late final GeneratedColumn<String> firstName = GeneratedColumn<String>(
       'first_name', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _middleNameMeta =
+      const VerificationMeta('middleName');
+  @override
+  late final GeneratedColumn<String> middleName = GeneratedColumn<String>(
+      'middle_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _lastNameMeta =
       const VerificationMeta('lastName');
   @override
@@ -12280,6 +12286,7 @@ class $StudentsTable extends Students
         id,
         admissionNumber,
         firstName,
+        middleName,
         lastName,
         classId,
         academicYearId,
@@ -12327,6 +12334,12 @@ class $StudentsTable extends Students
           firstName.isAcceptableOrUnknown(data['first_name']!, _firstNameMeta));
     } else if (isInserting) {
       context.missing(_firstNameMeta);
+    }
+    if (data.containsKey('middle_name')) {
+      context.handle(
+          _middleNameMeta,
+          middleName.isAcceptableOrUnknown(
+              data['middle_name']!, _middleNameMeta));
     }
     if (data.containsKey('last_name')) {
       context.handle(_lastNameMeta,
@@ -12447,6 +12460,8 @@ class $StudentsTable extends Students
           DriftSqlType.string, data['${effectivePrefix}admission_number'])!,
       firstName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}first_name'])!,
+      middleName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}middle_name']),
       lastName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}last_name'])!,
       classId: attachedDatabase.typeMapping
@@ -12502,6 +12517,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final int id;
   final String admissionNumber;
   final String firstName;
+  final String? middleName;
   final String lastName;
   final int classId;
   final int? academicYearId;
@@ -12526,6 +12542,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       {required this.id,
       required this.admissionNumber,
       required this.firstName,
+      this.middleName,
       required this.lastName,
       required this.classId,
       this.academicYearId,
@@ -12552,6 +12569,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     map['id'] = Variable<int>(id);
     map['admission_number'] = Variable<String>(admissionNumber);
     map['first_name'] = Variable<String>(firstName);
+    if (!nullToAbsent || middleName != null) {
+      map['middle_name'] = Variable<String>(middleName);
+    }
     map['last_name'] = Variable<String>(lastName);
     map['class_id'] = Variable<int>(classId);
     if (!nullToAbsent || academicYearId != null) {
@@ -12608,6 +12628,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       id: Value(id),
       admissionNumber: Value(admissionNumber),
       firstName: Value(firstName),
+      middleName: middleName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(middleName),
       lastName: Value(lastName),
       classId: Value(classId),
       academicYearId: academicYearId == null && nullToAbsent
@@ -12663,6 +12686,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       id: serializer.fromJson<int>(json['id']),
       admissionNumber: serializer.fromJson<String>(json['admissionNumber']),
       firstName: serializer.fromJson<String>(json['firstName']),
+      middleName: serializer.fromJson<String?>(json['middleName']),
       lastName: serializer.fromJson<String>(json['lastName']),
       classId: serializer.fromJson<int>(json['classId']),
       academicYearId: serializer.fromJson<int?>(json['academicYearId']),
@@ -12695,6 +12719,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'id': serializer.toJson<int>(id),
       'admissionNumber': serializer.toJson<String>(admissionNumber),
       'firstName': serializer.toJson<String>(firstName),
+      'middleName': serializer.toJson<String?>(middleName),
       'lastName': serializer.toJson<String>(lastName),
       'classId': serializer.toJson<int>(classId),
       'academicYearId': serializer.toJson<int?>(academicYearId),
@@ -12722,6 +12747,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           {int? id,
           String? admissionNumber,
           String? firstName,
+          Value<String?> middleName = const Value.absent(),
           String? lastName,
           int? classId,
           Value<int?> academicYearId = const Value.absent(),
@@ -12746,6 +12772,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         id: id ?? this.id,
         admissionNumber: admissionNumber ?? this.admissionNumber,
         firstName: firstName ?? this.firstName,
+        middleName: middleName.present ? middleName.value : this.middleName,
         lastName: lastName ?? this.lastName,
         classId: classId ?? this.classId,
         academicYearId:
@@ -12781,6 +12808,8 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ? data.admissionNumber.value
           : this.admissionNumber,
       firstName: data.firstName.present ? data.firstName.value : this.firstName,
+      middleName:
+          data.middleName.present ? data.middleName.value : this.middleName,
       lastName: data.lastName.present ? data.lastName.value : this.lastName,
       classId: data.classId.present ? data.classId.value : this.classId,
       academicYearId: data.academicYearId.present
@@ -12826,6 +12855,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('id: $id, ')
           ..write('admissionNumber: $admissionNumber, ')
           ..write('firstName: $firstName, ')
+          ..write('middleName: $middleName, ')
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
           ..write('academicYearId: $academicYearId, ')
@@ -12855,6 +12885,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         id,
         admissionNumber,
         firstName,
+        middleName,
         lastName,
         classId,
         academicYearId,
@@ -12883,6 +12914,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.id == this.id &&
           other.admissionNumber == this.admissionNumber &&
           other.firstName == this.firstName &&
+          other.middleName == this.middleName &&
           other.lastName == this.lastName &&
           other.classId == this.classId &&
           other.academicYearId == this.academicYearId &&
@@ -12909,6 +12941,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<int> id;
   final Value<String> admissionNumber;
   final Value<String> firstName;
+  final Value<String?> middleName;
   final Value<String> lastName;
   final Value<int> classId;
   final Value<int?> academicYearId;
@@ -12933,6 +12966,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.id = const Value.absent(),
     this.admissionNumber = const Value.absent(),
     this.firstName = const Value.absent(),
+    this.middleName = const Value.absent(),
     this.lastName = const Value.absent(),
     this.classId = const Value.absent(),
     this.academicYearId = const Value.absent(),
@@ -12958,6 +12992,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.id = const Value.absent(),
     required String admissionNumber,
     required String firstName,
+    this.middleName = const Value.absent(),
     required String lastName,
     required int classId,
     this.academicYearId = const Value.absent(),
@@ -12986,6 +13021,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<int>? id,
     Expression<String>? admissionNumber,
     Expression<String>? firstName,
+    Expression<String>? middleName,
     Expression<String>? lastName,
     Expression<int>? classId,
     Expression<int>? academicYearId,
@@ -13011,6 +13047,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (id != null) 'id': id,
       if (admissionNumber != null) 'admission_number': admissionNumber,
       if (firstName != null) 'first_name': firstName,
+      if (middleName != null) 'middle_name': middleName,
       if (lastName != null) 'last_name': lastName,
       if (classId != null) 'class_id': classId,
       if (academicYearId != null) 'academic_year_id': academicYearId,
@@ -13041,6 +13078,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       {Value<int>? id,
       Value<String>? admissionNumber,
       Value<String>? firstName,
+      Value<String?>? middleName,
       Value<String>? lastName,
       Value<int>? classId,
       Value<int?>? academicYearId,
@@ -13065,6 +13103,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       id: id ?? this.id,
       admissionNumber: admissionNumber ?? this.admissionNumber,
       firstName: firstName ?? this.firstName,
+      middleName: middleName ?? this.middleName,
       lastName: lastName ?? this.lastName,
       classId: classId ?? this.classId,
       academicYearId: academicYearId ?? this.academicYearId,
@@ -13099,6 +13138,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     }
     if (firstName.present) {
       map['first_name'] = Variable<String>(firstName.value);
+    }
+    if (middleName.present) {
+      map['middle_name'] = Variable<String>(middleName.value);
     }
     if (lastName.present) {
       map['last_name'] = Variable<String>(lastName.value);
@@ -13171,6 +13213,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('id: $id, ')
           ..write('admissionNumber: $admissionNumber, ')
           ..write('firstName: $firstName, ')
+          ..write('middleName: $middleName, ')
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
           ..write('academicYearId: $academicYearId, ')
@@ -29515,6 +29558,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<int> id,
   required String admissionNumber,
   required String firstName,
+  Value<String?> middleName,
   required String lastName,
   required int classId,
   Value<int?> academicYearId,
@@ -29540,6 +29584,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<int> id,
   Value<String> admissionNumber,
   Value<String> firstName,
+  Value<String?> middleName,
   Value<String> lastName,
   Value<int> classId,
   Value<int?> academicYearId,
@@ -29629,6 +29674,9 @@ class $$StudentsTableFilterComposer
 
   ColumnFilters<String> get firstName => $composableBuilder(
       column: $table.firstName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get middleName => $composableBuilder(
+      column: $table.middleName, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get lastName => $composableBuilder(
       column: $table.lastName, builder: (column) => ColumnFilters(column));
@@ -29769,6 +29817,9 @@ class $$StudentsTableOrderingComposer
   ColumnOrderings<String> get firstName => $composableBuilder(
       column: $table.firstName, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get middleName => $composableBuilder(
+      column: $table.middleName, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get lastName => $composableBuilder(
       column: $table.lastName, builder: (column) => ColumnOrderings(column));
 
@@ -29886,6 +29937,9 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<String> get firstName =>
       $composableBuilder(column: $table.firstName, builder: (column) => column);
+
+  GeneratedColumn<String> get middleName => $composableBuilder(
+      column: $table.middleName, builder: (column) => column);
 
   GeneratedColumn<String> get lastName =>
       $composableBuilder(column: $table.lastName, builder: (column) => column);
@@ -30030,6 +30084,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             Value<String> admissionNumber = const Value.absent(),
             Value<String> firstName = const Value.absent(),
+            Value<String?> middleName = const Value.absent(),
             Value<String> lastName = const Value.absent(),
             Value<int> classId = const Value.absent(),
             Value<int?> academicYearId = const Value.absent(),
@@ -30055,6 +30110,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             id: id,
             admissionNumber: admissionNumber,
             firstName: firstName,
+            middleName: middleName,
             lastName: lastName,
             classId: classId,
             academicYearId: academicYearId,
@@ -30080,6 +30136,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             required String admissionNumber,
             required String firstName,
+            Value<String?> middleName = const Value.absent(),
             required String lastName,
             required int classId,
             Value<int?> academicYearId = const Value.absent(),
@@ -30105,6 +30162,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             id: id,
             admissionNumber: admissionNumber,
             firstName: firstName,
+            middleName: middleName,
             lastName: lastName,
             classId: classId,
             academicYearId: academicYearId,
