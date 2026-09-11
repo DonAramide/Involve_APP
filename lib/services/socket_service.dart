@@ -6,6 +6,8 @@ import 'package:involve_app/core/services/payment_alert_sound.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/required_location.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'dart:developer';
@@ -229,6 +231,11 @@ class SocketService {
           debugPrint('Error saving broadcast: $e');
         }
       }
+    });
+
+    _socket!.on('device_identity_ping', (data) {
+      debugPrint('[SocketService] device_identity_ping received: $data');
+      unawaited(_replyDeviceIdentity(data));
     });
 
     _socket!.on('pos_routing_updated', (data) async {
@@ -602,6 +609,35 @@ class SocketService {
     isConnected.value = false;
     _reconnectInFlight = false;
     _reconnectInFlightAt = null;
+  }
+
+  Future<void> _replyDeviceIdentity(dynamic data) async {
+    try {
+      var deviceId = _lastDeviceId;
+      if (!DeviceInfoService.isUsableDeviceId(deviceId)) {
+        deviceId = await DeviceInfoService.getDeviceSuffix();
+      }
+      if (DeviceInfoService.isUsableDeviceId(deviceId)) {
+        _lastDeviceId = deviceId;
+      } else {
+        deviceId = null;
+      }
+
+      String? location;
+      final gps = await RequiredLocation.capture();
+      if (gps.ok) location = gps.location;
+
+      if (_socket == null || !_socket!.connected) return;
+      _socket!.emit('device_identity_pong', {
+        'requestId': data is Map ? data['requestId'] : null,
+        'tenantId': _lastTenantId,
+        'deviceId': deviceId,
+        'location': location,
+      });
+      debugPrint('[SocketService] device_identity_pong sent deviceId=$deviceId location=$location');
+    } catch (e) {
+      debugPrint('[SocketService] device_identity_pong failed: $e');
+    }
   }
 
   void _showBroadcastBanner(String message) {

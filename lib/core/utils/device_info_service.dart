@@ -20,6 +20,8 @@ class DeviceInfoService {
       'WEBCLIENT',
       'IOSDEVICE',
       'MACOSDEVICE',
+      'UNASSIGNED',
+      'WEBPORTAL',
     };
     return !blocked.contains(clean);
   }

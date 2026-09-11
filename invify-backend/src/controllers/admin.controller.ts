@@ -14,6 +14,7 @@ import {
   withoutOptionalTenantColumns,
 } from '../utils/sanitize-tenant-updates';
 import { collectedInvoiceAmount } from '../utils/invoice-collection';
+import { displayableDeviceId } from '../utils/device-identity';
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -530,9 +531,9 @@ export class AdminController {
         const primary = devices[0];
         return {
           ...tenant,
-          device_id: primary?.device_id ?? null,
+          device_id: displayableDeviceId(primary?.device_id),
           agent_code: primary?.agent_code ?? null,
-          location: primary?.location ?? null,
+          location: primary?.location || tenant.location || null,
           device_count: tenant.device_count || devices.length || 1,
           // Keep raw array for potential future use
           device_registrations: devices,
@@ -552,6 +553,87 @@ export class AdminController {
       if (isConnectionTimeout) {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/:id/ping-identity
+   * Ask the live tablet on this tenant socket room for serial + GPS.
+   */
+  static async pingTenantIdentity(req: Request, res: Response) {
+    try {
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Tenant id is required' });
+
+      const { data: tenant, error } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      const { io } = require('../app');
+      const { emitIdentityPing } = require('../utils/device-identity-ping');
+      const result = await emitIdentityPing(io, id);
+      return res.status(200).json({
+        success: true,
+        tenantId: id,
+        name: tenant.name,
+        ...result,
+        message: result.onlineSockets > 0
+          ? `Ping sent to ${result.onlineSockets} online tablet(s). Device ID and location will appear when they reply.`
+          : 'No tablet is connected for this tenant right now. Keep the app open on the device, then ping again.',
+      });
+    } catch (error: any) {
+      console.error('[AdminController] pingTenantIdentity Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/ping-missing-identity
+   * Ping every tenant that is missing a hardware serial or GPS location.
+   */
+  static async pingMissingTenantIdentities(_req: Request, res: Response) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, location, device_registrations(device_id, location, device_number)')
+        .eq('status', 'active');
+      if (error) throw error;
+
+      const { displayableDeviceId } = require('../utils/device-identity');
+      const missing = (data || []).filter((tenant: any) => {
+        const devices: any[] = tenant.device_registrations || [];
+        devices.sort((a: any, b: any) => (a.device_number || 1) - (b.device_number || 1));
+        const primary = devices[0];
+        const deviceId = displayableDeviceId(primary?.device_id);
+        const location = primary?.location || tenant.location;
+        return !deviceId || !location;
+      });
+
+      const { io } = require('../app');
+      const { emitIdentityPing } = require('../utils/device-identity-ping');
+      const results = [];
+      for (const tenant of missing) {
+        const ping = await emitIdentityPing(io, tenant.id);
+        results.push({ tenantId: tenant.id, name: tenant.name, ...ping });
+      }
+
+      const online = results.filter((r: any) => r.onlineSockets > 0).length;
+      return res.status(200).json({
+        success: true,
+        pinged: results.length,
+        onlineTenants: online,
+        results,
+        message: results.length === 0
+          ? 'Every active tenant already has a device ID and location.'
+          : `Pinged ${results.length} tenant(s); ${online} currently have a tablet online.`,
+      });
+    } catch (error: any) {
+      console.error('[AdminController] pingMissingTenantIdentities Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

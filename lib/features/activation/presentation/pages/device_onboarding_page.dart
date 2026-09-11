@@ -435,6 +435,16 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   Future<_EmailAccountCheck> _inspectEmailAccount(String email) async {
     final normalized = email.trim().toLowerCase();
     await _primeDeviceId();
+    if (!_isValidDeviceId(_capturedDeviceId)) {
+      try {
+        final forced = await DeviceInfoService.getDeviceSuffix();
+        if (_isValidDeviceId(forced) && mounted) {
+          setState(() => _capturedDeviceId = forced);
+        }
+      } catch (e) {
+        debugPrint('[CheckEmail] Forced device ID capture failed: $e');
+      }
+    }
     final deviceId = _isValidDeviceId(_capturedDeviceId) ? _capturedDeviceId!.trim() : null;
     _EmailAccountCheck result = _EmailAccountCheck(
       exists: false,
@@ -469,7 +479,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         try {
           final res = await dio.post(url, data: {
             'email': normalized,
-            if (deviceId != null) 'deviceId': deviceId,
+            'deviceId': deviceId,
+            'device_id': deviceId,
           });
           if (res.data is! Map) continue;
           final data = res.data as Map;
@@ -649,7 +660,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                     const SizedBox(height: 6),
                     if (registered.isEmpty)
                       const Text(
-                        'No device IDs were returned for this account.',
+                        'UNASSIGNED — no hardware serial is stored for this account yet.',
                         style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.3),
                       )
                     else
@@ -668,7 +679,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'If this tablet ID matches a registered device, this is the original device. If they differ, link this device from the web dashboard or use a different email.',
+                'If this tablet ID matches a registered device, this is the original device. If the account is UNASSIGNED, this tablet will take that slot. If they differ, link this device from the web dashboard or use a different email.',
                 style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
               ),
             ],

@@ -114,6 +114,8 @@ export const adminApi = {
   createTenant: (data) => api.post('/api/admin/tenants', data),
   updateTenant: (id, data) => api.patch(`/api/admin/tenants/${id}`, data),
   getTenantDetails: (id) => api.get(`/api/admin/tenants/${id}/details`),
+  pingTenantIdentity: (id) => api.post(`/api/admin/tenants/${id}/ping-identity`),
+  pingMissingTenantIdentities: () => api.post('/api/admin/tenants/ping-missing-identity'),
   getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
   provisionVirtualAccount: (id) => api.post(`/api/admin/tenants/${id}/provision-virtual-account`),
   

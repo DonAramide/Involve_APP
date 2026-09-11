@@ -313,6 +313,8 @@ const registerApiPair = (
 /** --- SYSTEM ADMIN (SUPER ADMIN ONLY) --- **/
 registerCollisionAdmin('get', '/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
 registerCollisionAdmin('post', '/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
+registerCollisionAdmin('post', '/tenants/ping-missing-identity', authenticate, checkRole(['super_admin']), AdminController.pingMissingTenantIdentities);
+registerCollisionAdmin('post', '/tenants/:id/ping-identity', authenticate, checkRole(['super_admin']), AdminController.pingTenantIdentity);
 registerCollisionAdmin('patch', '/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 registerCollisionAdmin('patch', '/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
 registerCollisionAdmin('post', '/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
@@ -1396,6 +1398,27 @@ io.on('connection', (socket: Socket) => {
       lat: data.lat,
       lng: data.lng
     });
+  });
+
+  socket.on('device_identity_pong', async (data: any) => {
+    try {
+      const tenantId = socket.data.tenantId || data?.tenantId;
+      if (!tenantId) return;
+      const { persistLiveDeviceIdentity } = require('./utils/persist-live-device-identity');
+      const { isUsableDeviceId, normalizeDeviceId } = require('./utils/device-identity');
+      const saved = await persistLiveDeviceIdentity({
+        tenantId,
+        deviceId: data?.deviceId,
+        location: data?.location,
+      });
+      if (saved.deviceId && isUsableDeviceId(saved.deviceId)) {
+        const serial = normalizeDeviceId(saved.deviceId);
+        socket.data.deviceId = serial;
+        socket.join(`device:${serial}`);
+      }
+    } catch (err: any) {
+      console.warn('[Socket.io] device_identity_pong failed:', err?.message || err);
+    }
   });
 
   socket.on('disconnect', () => {

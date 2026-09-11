@@ -1,4 +1,12 @@
-import { deviceIdsMatch, isUsableDeviceId, normalizeDeviceId, uniqueDeviceIds } from '../src/utils/device-identity';
+import {
+  deviceIdsMatch,
+  displayableDeviceId,
+  findPlaceholderRegistration,
+  isPlaceholderDeviceId,
+  isUsableDeviceId,
+  normalizeDeviceId,
+  uniqueDeviceIds,
+} from '../src/utils/device-identity';
 
 describe('device identity matching', () => {
   test('normalizes punctuation and case', () => {
@@ -20,6 +28,7 @@ describe('device identity matching', () => {
   test('rejects empty or unknown ids', () => {
     expect(deviceIdsMatch('', 'ABC123')).toBe(false);
     expect(deviceIdsMatch('UNKNOWN', 'UNKNOWN')).toBe(false);
+    expect(deviceIdsMatch('UNASSIGNED', 'UNASSIGNED')).toBe(false);
   });
 
   test('treats placeholder serials as unusable', () => {
@@ -28,6 +37,8 @@ describe('device identity matching', () => {
     expect(isUsableDeviceId('null')).toBe(false);
     expect(isUsableDeviceId('')).toBe(false);
     expect(isUsableDeviceId('0')).toBe(false);
+    expect(isUsableDeviceId('UNASSIGNED')).toBe(false);
+    expect(isUsableDeviceId('WEB-PORTAL')).toBe(false);
   });
 
   test('lists unique registered device ids', () => {
@@ -36,6 +47,19 @@ describe('device identity matching', () => {
       { device_id: 'ABC123' },
       { device_id: 'XYZ999' },
       { device_id: '' },
+      { device_id: 'UNASSIGNED' },
+      { device_id: null },
     ])).toEqual(['abc-123', 'XYZ999']);
+  });
+
+  test('treats empty and UNASSIGNED rows as placeholders', () => {
+    expect(isPlaceholderDeviceId(null)).toBe(true);
+    expect(isPlaceholderDeviceId('UNASSIGNED')).toBe(true);
+    expect(displayableDeviceId('UNASSIGNED')).toBeNull();
+    expect(displayableDeviceId('R52M20L8ZDZ')).toBe('R52M20L8ZDZ');
+    expect(findPlaceholderRegistration([
+      { id: '1', device_id: 'UNASSIGNED' },
+      { id: '2', device_id: 'R52M20L8ZDZ' },
+    ])?.id).toBe('1');
   });
 });

@@ -18,7 +18,16 @@
           <q-badge color="indigo-7" class="q-ml-sm">{{ rows.length }} Total</q-badge>
         </div>
       </div>
-      <div class="col-auto">
+      <div class="col-auto q-gutter-sm">
+        <q-btn 
+          outline
+          color="cyan-4" 
+          icon="sensors" 
+          label="Ping Missing Devices" 
+          class="q-px-md"
+          :loading="pingingMissing"
+          @click="pingMissingDevices"
+        />
         <q-btn 
           color="indigo-7" 
           icon="add" 
@@ -143,6 +152,16 @@
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-x-sm">
+          <q-btn
+            v-if="needsIdentityPing(props.row)"
+            flat round dense
+            icon="sensors"
+            color="amber-4"
+            :loading="pingingId === props.row.id"
+            @click="pingTenant(props.row)"
+          >
+            <q-tooltip>Ping tablet for device ID and GPS</q-tooltip>
+          </q-btn>
           <q-btn flat round dense icon="visibility" color="cyan-4" @click="viewDetails(props.row.id)">
             <q-tooltip>View Details</q-tooltip>
           </q-btn>
@@ -188,6 +207,8 @@ const $q = useQuasar()
 const $router = useRouter()
 
 const loading = ref(false)
+const pingingMissing = ref(false)
+const pingingId = ref(null)
 const rows = ref([])
 const filter = ref({ name: '', type: 'all', status: 'all' })
 const pagination = ref({ sortBy: 'created_at', descending: true, rowsPerPage: 15 })
@@ -264,6 +285,40 @@ const toggleStatus = async (row) => {
 
 const viewDetails = (id) => {
   $router.push(`/tenants/${id}`)
+}
+
+const needsIdentityPing = (row) => !row.device_id || !row.location
+
+const pingTenant = async (row) => {
+  pingingId.value = row.id
+  try {
+    const { data } = await adminApi.pingTenantIdentity(row.id)
+    $q.notify({
+      type: data?.onlineSockets > 0 ? 'positive' : 'warning',
+      message: data?.message || 'Ping sent',
+    })
+    setTimeout(() => fetchTenants(true), 4000)
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to ping device' })
+  } finally {
+    pingingId.value = null
+  }
+}
+
+const pingMissingDevices = async () => {
+  pingingMissing.value = true
+  try {
+    const { data } = await adminApi.pingMissingTenantIdentities()
+    $q.notify({
+      type: data?.onlineTenants > 0 ? 'positive' : 'warning',
+      message: data?.message || 'Ping sent',
+    })
+    setTimeout(() => fetchTenants(true), 4000)
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to ping missing devices' })
+  } finally {
+    pingingMissing.value = false
+  }
 }
 
 let syncInterval

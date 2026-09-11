@@ -15,6 +15,7 @@ import {
   normalizeDeviceId,
   uniqueDeviceIds,
 } from '../utils/device-identity';
+import { claimUnassignedDeviceForTenant } from '../utils/claim-unassigned-device';
 import { newSelfServeTenantPlan } from '../utils/new-tenant-plan';
 import { issueDeviceLinkQr, WEB_ISSUER_DEVICE_ID } from '../utils/device-link-qr';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
@@ -402,6 +403,23 @@ export class OnboardingController {
       console.log(
         `[OnboardingController] Device ${wantedDevice} already belongs to ${normalized} (tenant ${matched.tenant_id}).`,
       );
+      return result;
+    }
+
+    // Web-created tenants have no hardware serial (UNASSIGNED / null). Bind this tablet.
+    if (isUsableDeviceId(wantedDevice) && result.tenantId && result.registeredDevices.length === 0) {
+      const claim = await claimUnassignedDeviceForTenant({
+        tenantId: result.tenantId,
+        deviceId: wantedDevice,
+        ownerEmail: normalized,
+      });
+      if (claim.bound) {
+        result.sameDevice = true;
+        result.registeredDevices = [normalizeDeviceId(wantedDevice)];
+        console.log(
+          `[OnboardingController] Claimed UNASSIGNED device slot for ${normalized} → ${wantedDevice} (tenant ${result.tenantId}).`,
+        );
+      }
     }
 
     return result;
@@ -1064,6 +1082,35 @@ export class OnboardingController {
         .select('device_count, name')
         .eq('id', tenantId)
         .single();
+
+      const claimed = await claimUnassignedDeviceForTenant({
+        tenantId,
+        deviceId: linkedDeviceId,
+        ownerEmail: ownerEmail || null,
+        ownerName: ownerName || null,
+        agentCode: agentCode || 'AAA000',
+        location: location || null,
+      });
+      if (claimed.bound) {
+        await supabaseAdmin.from('device_link_tokens').update({ used: true }).eq('token', token);
+        const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+        await supabaseAdmin.from('device_registrations')
+          .update({ trial_ends_at: trialEndsAt, is_trial: true })
+          .eq('tenant_id', tenantId)
+          .eq('device_id', linkedDeviceId);
+        res.status(200).json({
+          success: true,
+          message: claimed.overrodeUnassigned
+            ? 'This tablet is now the assigned device for the account.'
+            : `Device #${claimed.deviceNumber} is already linked to this account.`,
+          tenantId,
+          deviceNumber: claimed.deviceNumber,
+          businessName: tenant?.name,
+          trialEndsAt,
+          overrodeUnassigned: claimed.overrodeUnassigned,
+        });
+        return;
+      }
 
       const currentCount = tenant?.device_count || 1;
       const newDeviceNumber = currentCount + 1;

@@ -50,10 +50,15 @@ function Repair-FlutterAssetManifest {
     $sdk = $env:ANDROID_SDK_ROOT
     if (-not $sdk) { $sdk = $env:ANDROID_HOME }
     if (-not $sdk) { $sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
-    if (-not (Test-Path (Join-Path $env:JAVA_HOME "bin\java.exe"))) {
-        $msJdk = Get-ChildItem "C:\Program Files\Microsoft\jdk-*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
-        if ($msJdk) { $env:JAVA_HOME = $msJdk.FullName }
-    }
+    $javaCandidates = @(
+        $env:JAVA_HOME,
+        'C:\Program Files\Android\Android Studio\jbr',
+        (Get-ChildItem "C:\Program Files\Microsoft\jdk-*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName)
+    ) | Where-Object { $_ }
+    $resolvedJava = $javaCandidates | Where-Object {
+        try { Test-Path (Join-Path $_ 'bin\java.exe') } catch { $false }
+    } | Select-Object -First 1
+    if ($resolvedJava) { $env:JAVA_HOME = $resolvedJava }
     $apksigner = Get-ChildItem -Path (Join-Path $sdk "build-tools") -Filter "apksigner.bat" -Recurse -ErrorAction SilentlyContinue |
         Sort-Object FullName -Descending |
         Select-Object -First 1
