@@ -315,6 +315,7 @@ registerCollisionAdmin('get', '/tenants', authenticate, checkRole(['super_admin'
 registerCollisionAdmin('post', '/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
 registerCollisionAdmin('post', '/tenants/ping-missing-identity', authenticate, checkRole(['super_admin']), AdminController.pingMissingTenantIdentities);
 registerCollisionAdmin('post', '/tenants/:id/ping-identity', authenticate, checkRole(['super_admin']), AdminController.pingTenantIdentity);
+registerCollisionAdmin('get', '/verification-log', authenticate, checkRole(['super_admin']), AdminController.listVerificationLog);
 registerCollisionAdmin('patch', '/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 registerCollisionAdmin('patch', '/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
 registerCollisionAdmin('post', '/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);

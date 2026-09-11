@@ -15,6 +15,12 @@ import {
 } from '../utils/sanitize-tenant-updates';
 import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { displayableDeviceId } from '../utils/device-identity';
+import {
+  sanitizeVerificationSearch,
+  toVerificationLogRow,
+  uniqueLatestByRecipient,
+  verificationLogSelect,
+} from '../utils/verification-log';
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -634,6 +640,64 @@ export class AdminController {
       });
     } catch (error: any) {
       console.error('[AdminController] pingMissingTenantIdentities Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /admin/verification-log
+   * Support view of recent email/WhatsApp OTP sends. Never returns the code.
+   */
+  static async listVerificationLog(req: Request, res: Response) {
+    try {
+      const q = sanitizeVerificationSearch(req.query.q);
+      const channel = String(req.query.channel || '').trim().toUpperCase();
+      const status = String(req.query.status || '').trim().toUpperCase();
+      const purpose = String(req.query.purpose || '').trim().toUpperCase();
+      const latestOnly = String(req.query.latest || '1') !== '0';
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 200);
+
+      let query = supabaseAdmin
+        .from('verification_codes')
+        .select(verificationLogSelect())
+        .order('created_at', { ascending: false })
+        .limit(latestOnly ? 1500 : limit);
+
+      if (q) {
+        query = query.or(`email.ilike.%${q}%,phone.ilike.%${q}%`);
+      }
+      if (['EMAIL', 'WHATSAPP'].includes(channel)) {
+        query = query.eq('channel', channel);
+      }
+      if (status === 'EXPIRED') {
+        query = query.in('status', ['EXPIRED', 'PENDING']);
+      } else if (['PENDING', 'VERIFIED', 'CANCELLED'].includes(status)) {
+        query = query.eq('status', status);
+      }
+      if (['SIGNUP', 'PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(purpose)) {
+        query = query.eq('purpose', purpose);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      let rows = (data || []).map((row: any) => toVerificationLogRow(row));
+      if (status === 'EXPIRED') {
+        rows = rows.filter((row: { displayStatus: string }) => row.displayStatus === 'EXPIRED');
+      } else if (status === 'PENDING') {
+        rows = rows.filter((row: { displayStatus: string }) => row.displayStatus === 'PENDING');
+      }
+      if (latestOnly) {
+        rows = uniqueLatestByRecipient(rows).slice(0, limit);
+      }
+
+      return res.status(200).json({
+        latestOnly,
+        count: rows.length,
+        rows,
+      });
+    } catch (error: any) {
+      console.error('[AdminController] listVerificationLog Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

@@ -6,6 +6,15 @@
         <h1 class="text-h5 q-my-none text-weight-bold">Authentication Settings</h1>
         <div class="text-caption text-grey-4">Manage onboarding verification channels</div>
       </div>
+      <q-space />
+      <q-btn
+        unelevated
+        color="indigo"
+        icon="mark_email_unread"
+        label="Verification log"
+        no-caps
+        to="/admin/settings/verification-log"
+      />
     </div>
 
     <div class="row q-col-gutter-md">
