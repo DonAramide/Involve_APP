@@ -33,7 +33,10 @@ class OnboardingNavigator {
     } else {
       // Navigate to the next channel
       Widget nextScreen;
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ));
       
       try {
         switch (nextChannel) {
@@ -71,7 +74,10 @@ class OnboardingNavigator {
 
   static Future<void> activateAccount(BuildContext context, Map<String, dynamic> payload, bool isMounted) async {
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 25),
+      ));
       
       final signupUrls = [
         '${AppConfig.baseUrl}/auth/register',
@@ -241,6 +247,7 @@ class OnboardingNavigator {
           data: {
             type == 'email' ? 'email' : 'phone': identifier,
             'purpose': 'SIGNUP',
+            'reuseIfPending': true,
             if (type == 'email' && deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
           },
         );

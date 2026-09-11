@@ -10,6 +10,7 @@ import { QuasarWebhookService } from '../integrations/quasar/quasar-webhook.serv
 import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 import { FinancialDisputeService } from '../services/financial-dispute.service';
+import { isParentCustomerId, pickParentOwnedAttribution } from '../utils/parent-va-routing';
 
 
 
@@ -64,6 +65,7 @@ export class WebhookController {
       let resolvedCustomerId: string | null = null;
       let resolvedStudentId: string | null = null;
       let resolvedAdmissionNumber: string | null = null;
+      let parentOwnedDeposit = false;
       let transaction: any = null;
 
       // Try finding the pre-existing checkout transaction by reference in transactions_log
@@ -95,22 +97,64 @@ export class WebhookController {
           if (tenantRec) {
             resolvedTenantId = tenantRec.id;
           } else {
-            // Check customers (includes school students mirrored as customers)
-            const { data: custRec } = await supabaseAdmin
+            const { data: parentVaEntities } = await supabaseAdmin
+              .from('school_entities')
+              .select('tenant_id, payload')
+              .eq('entity_type', 'parent_virtual_account')
+              .filter('payload->>accountNumber', 'eq', String(virtualAccountNumber))
+              .limit(5);
+
+            let parentVa = (parentVaEntities || [])[0] || null;
+            if (!parentVa) {
+              const { data: parentEntities } = await supabaseAdmin
+                .from('school_entities')
+                .select('tenant_id, payload')
+                .eq('entity_type', 'parent')
+                .filter('payload->>virtualAccountNumber', 'eq', String(virtualAccountNumber))
+                .limit(5);
+              parentVa = (parentEntities || [])[0] || null;
+            }
+
+            const { data: custRows } = await supabaseAdmin
               .from('customers')
               .select('id, tenant_id, name')
               .eq('virtual_account_number', virtualAccountNumber)
-              .maybeSingle();
+              .limit(20);
 
-            if (custRec) {
-              resolvedTenantId = custRec.tenant_id;
-              resolvedCustomerId = custRec.id;
-              if (typeof custRec.id === 'string' && custRec.id.startsWith('stu-')) {
-                resolvedStudentId = custRec.id;
-                resolvedAdmissionNumber = custRec.id.slice(4);
-              }
+            const { data: studentRecs } = await supabaseAdmin
+              .from('students')
+              .select('id, school_id, tenant_id, admission_number, first_name, last_name')
+              .eq('virtual_account_number', virtualAccountNumber)
+              .limit(10);
+
+            const parentPayload = (parentVa?.payload || {}) as Record<string, any>;
+            const parentHintRaw = String(
+              parentPayload.syncId || parentPayload.parentSyncId || parentVa?.tenant_id || '',
+            );
+            const parentCustomerIdHint = parentHintRaw
+              ? (parentHintRaw.startsWith('par-') ? parentHintRaw : `par-${parentHintRaw}`)
+              : null;
+
+            const attribution = pickParentOwnedAttribution({
+              customers: custRows || [],
+              students: studentRecs || [],
+              parentVaRegistered: Boolean(parentVa),
+              parentCustomerIdHint,
+            });
+
+            if (attribution.parentOwned) {
+              parentOwnedDeposit = true;
+              resolvedTenantId =
+                attribution.tenantId || parentVa?.tenant_id || (custRows || [])[0]?.tenant_id || null;
+              resolvedCustomerId = attribution.customerId;
+              resolvedStudentId = null;
+              resolvedAdmissionNumber = null;
+            } else if ((custRows || []).length) {
+              resolvedTenantId = attribution.tenantId;
+              resolvedCustomerId = attribution.customerId;
+              resolvedStudentId = attribution.studentId;
+              resolvedAdmissionNumber = attribution.admissionNumber;
             } else {
-              // Check staff users with assigned virtual accounts
               const { data: staffUser } = await supabaseAdmin
                 .from('users')
                 .select('id, tenant_id')
@@ -119,38 +163,32 @@ export class WebhookController {
 
               if (staffUser?.tenant_id) {
                 resolvedTenantId = staffUser.tenant_id;
+              } else if (studentRecs && studentRecs.length === 1) {
+                resolvedTenantId = attribution.tenantId;
+                resolvedCustomerId = attribution.customerId;
+                resolvedStudentId = attribution.studentId;
+                resolvedAdmissionNumber = attribution.admissionNumber;
               } else {
-                // Check cloud students table (school VA provision path)
-                const { data: studentRec } = await supabaseAdmin
-                  .from('students')
-                  .select('id, school_id, tenant_id, admission_number, first_name, last_name')
-                  .eq('virtual_account_number', virtualAccountNumber)
+                const { data: studentVa } = await supabaseAdmin
+                  .from('student_virtual_accounts')
+                  .select('student_id, school_id')
+                  .eq('account_number', virtualAccountNumber)
                   .maybeSingle();
 
-                if (studentRec) {
-                  resolvedTenantId = studentRec.tenant_id || studentRec.school_id;
-                  resolvedStudentId = studentRec.id;
-                  resolvedAdmissionNumber = studentRec.admission_number || null;
-                  if (!resolvedCustomerId && typeof studentRec.id === 'string') {
-                    resolvedCustomerId = studentRec.id;
-                  }
-                } else {
-                  // Legacy student_virtual_accounts table
-                  const { data: studentVa } = await supabaseAdmin
-                    .from('student_virtual_accounts')
-                    .select('student_id, school_id')
-                    .eq('account_number', virtualAccountNumber)
-                    .maybeSingle();
-
-                  if (studentVa) {
-                    resolvedTenantId = studentVa.school_id;
-                    resolvedStudentId = studentVa.student_id;
-                  }
+                if (studentVa) {
+                  resolvedTenantId = studentVa.school_id;
+                  resolvedStudentId = studentVa.student_id;
                 }
               }
             }
           }
         }
+      }
+
+      if (isParentCustomerId(resolvedCustomerId)) {
+        parentOwnedDeposit = true;
+        resolvedStudentId = null;
+        resolvedAdmissionNumber = null;
       }
 
       if (!resolvedTenantId) {
@@ -399,6 +437,12 @@ export class WebhookController {
                     ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
                     ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
                     ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                    ...(parentOwnedDeposit
+                      ? {
+                          paidVia: 'parent_account',
+                          ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                        }
+                      : {}),
                   }
                 };
                 io.to(`tenant:${resolvedTenantId}`).emit('payment.success', payload);
@@ -463,6 +507,12 @@ export class WebhookController {
                   ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
                   ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
                   ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                  ...(parentOwnedDeposit
+                    ? {
+                        paidVia: 'parent_account',
+                        ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                      }
+                    : {}),
                 },
                 idempotencyKey: `event:deposit_success:${reference}`
               });

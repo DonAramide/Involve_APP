@@ -21,10 +21,13 @@
 
     <q-tabs v-model="tab" dense class="text-primary" active-color="primary" indicator-color="primary" align="left">
       <q-tab name="students" label="Students" />
+      <q-tab name="parents" label="Parents" />
       <q-tab name="teachers" label="Teachers" />
       <q-tab name="classes" label="Classes" />
       <q-tab name="subjects" label="Subjects" />
       <q-tab name="results" label="Results" />
+      <q-tab name="terms" label="Terms" />
+      <q-tab name="years" label="Years" />
     </q-tabs>
     <q-separator />
 
@@ -47,6 +50,18 @@
             </q-td>
           </template>
         </q-table>
+      </q-tab-panel>
+      <q-tab-panel name="parents">
+        <q-table
+          class="roster-table cursor-pointer"
+          :rows="parents"
+          :columns="parentColumns"
+          row-key="id"
+          :loading="loading"
+          flat
+          bordered
+          @row-click="(_, row) => openProfile('parent', row)"
+        />
       </q-tab-panel>
       <q-tab-panel name="teachers">
         <q-table
@@ -117,6 +132,30 @@
           @row-click="(_, row) => openProfile('result', row)"
         />
       </q-tab-panel>
+      <q-tab-panel name="terms">
+        <q-table
+          class="roster-table cursor-pointer"
+          :rows="terms"
+          :columns="termColumns"
+          row-key="id"
+          :loading="loading"
+          flat
+          bordered
+          @row-click="(_, row) => openProfile('term', row)"
+        />
+      </q-tab-panel>
+      <q-tab-panel name="years">
+        <q-table
+          class="roster-table cursor-pointer"
+          :rows="years"
+          :columns="yearColumns"
+          row-key="id"
+          :loading="loading"
+          flat
+          bordered
+          @row-click="(_, row) => openProfile('year', row)"
+        />
+      </q-tab-panel>
     </q-tab-panels>
 
     <!-- Entity profile drawer -->
@@ -169,9 +208,9 @@
             </q-list>
 
             <!-- Related students for a class -->
-            <div v-if="selected.type === 'class' && relatedStudents.length" class="q-mb-md">
+            <div v-if="(selected.type === 'class' || selected.type === 'parent') && relatedStudents.length" class="q-mb-md">
               <div class="text-caption text-grey-7 text-uppercase q-mb-sm">
-                Students in class ({{ relatedStudents.length }})
+                {{ selected.type === 'parent' ? 'Children' : 'Students in class' }} ({{ relatedStudents.length }})
               </div>
               <q-list bordered separator class="rounded-borders">
                 <q-item
@@ -207,6 +246,7 @@
                     </q-item-label>
                     <q-item-label caption>
                       Score {{ r.totalScore ?? r.total_score ?? '—' }} · Grade {{ r.grade || '—' }}
+                      <span v-if="r.remarks"> · {{ r.remarks }}</span>
                     </q-item-label>
                   </q-item-section>
                 </q-item>
@@ -245,6 +285,7 @@ const emptyRoster = () => ({
   results: [],
   years: [],
   terms: [],
+  parents: [],
 })
 
 const loading = ref(false)
@@ -260,12 +301,29 @@ const teachers = computed(() => roster.value.teachers || [])
 const classes = computed(() => roster.value.classes || [])
 const subjects = computed(() => roster.value.subjects || [])
 const results = computed(() => roster.value.results || [])
+const terms = computed(() => roster.value.terms || [])
+const years = computed(() => roster.value.years || [])
+const parents = computed(() => {
+  const rows = roster.value.parents || []
+  const kids = students.value
+  return rows.map((p) => {
+    const children = kids.filter(
+      (s) => String(s.parentSyncId || '') === String(p.id || p.syncId || ''),
+    )
+    const outstanding = children.reduce(
+      (n, s) => n + Number(s.running_balance ?? s.balance ?? 0),
+      0,
+    )
+    return { ...p, childCount: children.length, outstanding, children }
+  })
+})
 
 const summaryCards = computed(() => [
   { label: 'Students', value: students.value.length },
   { label: 'Teachers', value: teachers.value.length },
   { label: 'Classes', value: classes.value.length },
   { label: 'Subjects', value: subjects.value.length },
+  { label: 'Parents', value: parents.value.length },
 ])
 
 const studentColumns = [
@@ -279,6 +337,8 @@ const teacherColumns = [
   { name: 'name', label: 'Name', field: (r) => r.fullName || r.name || '—', align: 'left' },
   { name: 'phone', label: 'Phone', field: (r) => r.phone || '—', align: 'left' },
   { name: 'profession', label: 'Profession', field: (r) => r.profession || '—', align: 'left' },
+  { name: 'classes', label: 'Classes', field: (r) => r.classNames || '—', align: 'left' },
+  { name: 'subjects', label: 'Subjects', field: (r) => r.subjectNames || '—', align: 'left' },
 ]
 
 const simpleColumns = [
@@ -289,13 +349,47 @@ const simpleColumns = [
 const subjectColumns = [
   { name: 'name', label: 'Subject', field: 'name', align: 'left' },
   { name: 'code', label: 'Code', field: (r) => r.code || '—', align: 'left' },
+  { name: 'teachers', label: 'Teachers', field: (r) => r.teacherNames || '—', align: 'left' },
+  { name: 'classes', label: 'Classes', field: (r) => r.classNames || '—', align: 'left' },
 ]
 
 const resultColumns = [
-  { name: 'student', label: 'Student ID', field: (r) => r.studentId || r.student_id, align: 'left' },
-  { name: 'subject', label: 'Subject ID', field: (r) => r.subjectId || r.subject_id, align: 'left' },
+  { name: 'student', label: 'Student', field: (r) => resolveStudentName(r), align: 'left' },
+  { name: 'subject', label: 'Subject', field: (r) => resolveSubjectName(r), align: 'left' },
+  { name: 'term', label: 'Term', field: (r) => r.termName || r.term || '—', align: 'left' },
   { name: 'total', label: 'Total', field: (r) => r.totalScore ?? r.total_score ?? 0, align: 'right' },
   { name: 'grade', label: 'Grade', field: (r) => r.grade || '—', align: 'left' },
+  { name: 'remarks', label: 'Remark', field: (r) => r.remarks || '—', align: 'left' },
+]
+
+function formatDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString()
+}
+
+const termColumns = [
+  { name: 'name', label: 'Term', field: 'name', align: 'left' },
+  { name: 'year', label: 'Session', field: (r) => r.academicYearName || r.year || '—', align: 'left' },
+  { name: 'start', label: 'Start', field: (r) => formatDate(r.startDate || r.start_date), align: 'left' },
+  { name: 'end', label: 'End', field: (r) => formatDate(r.endDate || r.end_date), align: 'left' },
+  { name: 'current', label: 'Current', field: (r) => (r.isCurrent ? 'Yes' : '—'), align: 'left' },
+]
+
+const yearColumns = [
+  { name: 'name', label: 'Session', field: 'name', align: 'left' },
+  { name: 'start', label: 'Start', field: (r) => formatDate(r.startDate || r.start_date), align: 'left' },
+  { name: 'end', label: 'End', field: (r) => formatDate(r.endDate || r.end_date), align: 'left' },
+  { name: 'current', label: 'Current', field: (r) => (r.isCurrent ? 'Yes' : '—'), align: 'left' },
+]
+
+const parentColumns = [
+  { name: 'name', label: 'Parent', field: (r) => r.fullName || r.name || '—', align: 'left' },
+  { name: 'phone', label: 'Phone', field: (r) => r.phone || '—', align: 'left' },
+  { name: 'children', label: 'Children', field: (r) => r.childCount ?? 0, align: 'right' },
+  { name: 'outstanding', label: 'Outstanding', field: (r) => r.outstanding ?? 0, align: 'right' },
+  { name: 'credit', label: 'Credit', field: (r) => r.creditBalance ?? 0, align: 'right' },
+  { name: 'va', label: 'Virtual Account', field: (r) => r.virtualAccountNumber || '—', align: 'left' },
 ]
 
 const TYPE_LABELS = {
@@ -304,18 +398,31 @@ const TYPE_LABELS = {
   class: 'Class profile',
   subject: 'Subject profile',
   result: 'Result record',
+  term: 'Term profile',
+  year: 'Academic year',
+  parent: 'Parent profile',
 }
 
 const HIDDEN_KEYS = new Set([
   'id', 'syncId', 'sync_id', 'tenant_id', 'school_id', 'payload',
-  'first_name', 'last_name', 'firstName', 'lastName', 'fullName', 'name',
+  'first_name', 'middle_name', 'last_name', 'firstName', 'middleName', 'lastName', 'fullName', 'name',
   'admission_number', 'admissionNumber', 'current_class', 'className',
   'running_balance', 'balance', 'phone', 'profession', 'email', 'code',
   'description', 'created_at', 'updated_at',
+  'teacherId', 'teacherIds', 'classId', 'classIds', 'subjectIds',
+  'studentId', 'subjectId', 'termId', 'academicYearId', 'localKey', 'isDeleted',
+  'studentSyncId', 'subjectSyncId', 'localId',
+  'childCount', 'children', 'outstanding', 'creditBalance',
+  'parentSyncId', 'parentId', 'virtualAccounts',
 ])
 
 function studentName(r) {
-  return `${r.first_name || r.firstName || ''} ${r.last_name || r.lastName || ''}`.trim()
+  const parts = [
+    r.first_name || r.firstName,
+    r.middle_name || r.middleName,
+    r.last_name || r.lastName,
+  ].filter((p) => String(p || '').trim())
+  return parts.join(' ').trim()
     || r.name
     || r.fullName
     || '—'
@@ -351,6 +458,7 @@ const selectedTitle = computed(() => {
   const { type, row } = selected.value
   if (type === 'student') return studentName(row)
   if (type === 'teacher') return row.fullName || row.name || 'Staff'
+  if (type === 'parent') return row.fullName || row.name || 'Parent'
   if (type === 'result') return `Result · ${row.grade || row.totalScore || row.total_score || '—'}`
   return row.name || row.code || 'Untitled'
 })
@@ -360,6 +468,7 @@ const selectedSubtitle = computed(() => {
   const { type, row } = selected.value
   if (type === 'student') return row.admission_number || row.admissionNumber || row.id
   if (type === 'teacher') return row.profession || row.phone || ''
+  if (type === 'parent') return row.phone || `${row.childCount ?? 0} child(ren)`
   if (type === 'class') return `${relatedStudents.value.length} student(s)`
   if (type === 'subject') return row.code || ''
   return row.id || ''
@@ -392,6 +501,16 @@ const selectedChips = computed(() => {
   if (type === 'subject' && row.code) {
     chips.push({ label: row.code, color: 'teal-1', textColor: 'teal-10' })
   }
+  if (type === 'parent') {
+    const owing = Number(row.outstanding ?? 0)
+    const credit = Number(row.creditBalance ?? 0)
+    if (owing > 0) chips.push({ label: `Owing ${formatMoney(owing)}`, color: 'red-2', textColor: 'red-10' })
+    else chips.push({ label: 'Settled', color: 'grey-3', textColor: 'grey-9' })
+    if (credit > 0) chips.push({ label: `Credit ${formatMoney(credit)}`, color: 'indigo-1', textColor: 'indigo-10' })
+    if (row.virtualAccountNumber) {
+      chips.push({ label: 'Parent VA', color: 'teal-1', textColor: 'teal-10' })
+    }
+  }
   return chips
 })
 
@@ -408,12 +527,15 @@ const selectedFields = computed(() => {
   if (type === 'student') {
     push('Admission number', row.admission_number || row.admissionNumber)
     push('Full name', studentName(row))
+    push('Middle name', row.middle_name || row.middleName)
     push('Class', row.current_class || row.className)
+    push('Academic year', row.academicYearName)
     push('Balance', formatMoney(row.running_balance ?? row.balance))
     push('Email', row.email)
     push('Phone', row.phone || row.parentPhone || row.parent_phone)
-    push('Guardian', row.guardianName || row.guardian_name || row.parentName)
+    push('Guardian', row.guardianName || row.guardian_name || row.parentName || row.parent_name)
     push('Gender', row.gender)
+    push('Department', row.department)
     push('Virtual account', row.virtual_account_number || row.virtualAccountNumber)
     push('Bank', row.virtual_account_bank || row.virtualAccountBank)
     push('Record ID', row.id)
@@ -423,6 +545,10 @@ const selectedFields = computed(() => {
     push('Phone', row.phone)
     push('Email', row.email)
     push('Profession', row.profession)
+    push('Assigned classes', row.classNames)
+    push('Assigned subjects', row.subjectNames)
+    push('Certificates', row.certificates)
+    push('Date joined', row.employmentDate)
     push('Staff ID', row.staffId || row.staff_id || row.employeeId)
     push('Address', row.address)
     push('Record ID', row.id)
@@ -436,16 +562,44 @@ const selectedFields = computed(() => {
   } else if (type === 'subject') {
     push('Subject', row.name)
     push('Code', row.code)
+    push('Teachers', row.teacherNames)
+    push('Classes', row.classNames)
     push('Description', row.description)
     push('Results on file', relatedResults.value.length)
     push('Record ID', row.id)
   } else if (type === 'result') {
     push('Student', resolveStudentName(row))
     push('Subject', resolveSubjectName(row))
+    push('CA', row.assessmentScore ?? row.assessment_score)
+    push('Exam', row.examScore ?? row.exam_score)
     push('Total score', row.totalScore ?? row.total_score)
     push('Grade', row.grade)
-    push('Term', row.termId || row.term_id || row.term)
-    push('Session', row.sessionId || row.academicYearId || row.year)
+    push('Remark', row.remarks)
+    push('Term', row.termName || row.term || row.termId)
+    push('Session', row.academicYearName || row.sessionId || row.academicYearId || row.year)
+    push('Record ID', row.id)
+  } else if (type === 'term') {
+    push('Term', row.name)
+    push('Session', row.academicYearName)
+    push('Start date', formatDate(row.startDate || row.start_date))
+    push('End date', formatDate(row.endDate || row.end_date))
+    push('Current', row.isCurrent ? 'Yes' : 'No')
+    push('Record ID', row.id)
+  } else if (type === 'year') {
+    push('Session', row.name)
+    push('Start date', formatDate(row.startDate || row.start_date))
+    push('End date', formatDate(row.endDate || row.end_date))
+    push('Current', row.isCurrent ? 'Yes' : 'No')
+    push('Record ID', row.id)
+  } else if (type === 'parent') {
+    push('Parent', row.fullName || row.name)
+    push('Phone', row.phone)
+    push('Email', row.email)
+    push('Children', row.childCount)
+    push('Outstanding', row.outstanding)
+    push('Parent credit', row.creditBalance)
+    push('Virtual account', row.virtualAccountNumber)
+    push('Bank', row.virtualAccountBank)
     push('Record ID', row.id)
   }
 
@@ -453,13 +607,26 @@ const selectedFields = computed(() => {
 })
 
 const relatedStudents = computed(() => {
+  if (!selected.value) return []
+  if (selected.value.type === 'parent') {
+    const parentIds = new Set([
+      String(selected.value.row.id || ''),
+      String(selected.value.row.syncId || ''),
+      String(selected.value.row.localId || ''),
+    ].filter(Boolean))
+    return students.value.filter((s) => parentIds.has(String(s.parentSyncId || s.parentId || '')))
+  }
   if (selected.value?.type !== 'class') return []
   const className = String(selected.value.row.name || '').trim().toLowerCase()
-  const classId = String(selected.value.row.id || '')
+  const classIds = new Set([
+    String(selected.value.row.id || ''),
+    String(selected.value.row.syncId || ''),
+    String(selected.value.row.localId || ''),
+  ].filter(Boolean))
   return students.value.filter((s) => {
     const sClass = String(s.current_class || s.className || '').trim().toLowerCase()
     const sClassId = String(s.classId || s.class_id || '')
-    return (className && sClass === className) || (classId && sClassId === classId)
+    return (className && sClass === className) || (sClassId && classIds.has(sClassId))
   })
 })
 
@@ -467,12 +634,26 @@ const relatedResults = computed(() => {
   if (!selected.value) return []
   const { type, row } = selected.value
   if (type === 'student') {
-    const sid = String(row.id || '')
-    return results.value.filter((r) => String(r.studentId || r.student_id || '') === sid).slice(0, 20)
+    const ids = new Set([
+      String(row.id || ''),
+      String(row.syncId || row.sync_id || ''),
+      String(row.localId || ''),
+    ].filter(Boolean))
+    return results.value.filter((r) => {
+      const keys = [r.studentSyncId, r.studentId, r.student_id]
+      return keys.some((k) => k != null && ids.has(String(k)))
+    }).slice(0, 20)
   }
   if (type === 'subject') {
-    const sid = String(row.id || '')
-    return results.value.filter((r) => String(r.subjectId || r.subject_id || '') === sid).slice(0, 20)
+    const ids = new Set([
+      String(row.id || ''),
+      String(row.syncId || row.sync_id || ''),
+      String(row.localId || ''),
+    ].filter(Boolean))
+    return results.value.filter((r) => {
+      const keys = [r.subjectSyncId, r.subjectId, r.subject_id]
+      return keys.some((k) => k != null && ids.has(String(k)))
+    }).slice(0, 20)
   }
   return []
 })
@@ -489,15 +670,29 @@ const extraPayloadKeys = computed(() => {
 })
 
 function resolveStudentName(r) {
-  const sid = r.studentId || r.student_id
-  const match = students.value.find((s) => String(s.id) === String(sid))
-  return match ? studentName(match) : (sid || '—')
+  if (r.studentName) return r.studentName
+  const keys = [r.studentSyncId, r.studentId, r.student_id].filter((k) => k != null)
+  const match = students.value.find((s) =>
+    keys.some((k) =>
+      String(s.id) === String(k) ||
+      String(s.syncId || s.sync_id || '') === String(k) ||
+      String(s.localId || '') === String(k),
+    ),
+  )
+  return match ? studentName(match) : (keys[0] || '—')
 }
 
 function resolveSubjectName(r) {
-  const sid = r.subjectId || r.subject_id
-  const match = subjects.value.find((s) => String(s.id) === String(sid))
-  return match?.name || sid || '—'
+  if (r.subjectName) return r.subjectName
+  const keys = [r.subjectSyncId, r.subjectId, r.subject_id].filter((k) => k != null)
+  const match = subjects.value.find((s) =>
+    keys.some((k) =>
+      String(s.id) === String(k) ||
+      String(s.syncId || s.sync_id || '') === String(k) ||
+      String(s.localId || '') === String(k),
+    ),
+  )
+  return match?.name || keys[0] || '—'
 }
 
 const fetchData = async () => {

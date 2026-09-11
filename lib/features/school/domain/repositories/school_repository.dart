@@ -25,10 +25,39 @@ abstract class SchoolRepository {
   // Students
   Future<List<Student>> getStudents();
   Future<List<Student>> getStudentSummaries();
-  Future<void> addStudent(Student student);
+  Future<int> addStudent(Student student);
   Future<void> updateStudent(Student student);
   Future<void> deleteStudent(int id);
   Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId});
+  Future<void> assignParentToStudents({
+    required List<int> studentIds,
+    required String parentName,
+    required String parentPhone,
+  });
+  Future<List<SchoolParent>> getParents();
+  Future<SchoolParent?> getParentById(int id);
+  Future<SchoolParent> ensureParent({
+    required String fullName,
+    String? phone,
+    String? email,
+  });
+  Future<SchoolParent> linkStudentsToParent({
+    required int parentId,
+    required List<int> studentIds,
+  });
+  Future<SchoolParent?> findParentByVirtualAccount(String accountNumber);
+  Future<void> saveParentVirtualAccount({
+    required int parentId,
+    required String accountNumber,
+    String? bankName,
+    String? accountName,
+    required bool canonical,
+  });
+  Future<void> updateParent(SchoolParent parent);
+  Future<bool> parentPaymentExists(String reference);
+  Future<ParentPaymentRecord> recordParentPayment(ParentPaymentRecord payment);
+  Future<List<ParentPaymentRecord>> getParentPayments(int parentId);
+  Future<void> backfillParentsFromStudents();
   Future<String?> getLastAdmissionNumber();
   Future<Student?> getStudentById(int id);
   Future<Student?> getStudentByVirtualAccount(String accountNumber);
@@ -66,9 +95,10 @@ abstract class SchoolRepository {
 
   // Teachers
   Future<List<Teacher>> getTeachers();
-  Future<void> addTeacher(Teacher teacher);
+  Future<int> addTeacher(Teacher teacher);
   Future<void> updateTeacher(Teacher teacher);
   Future<void> deleteTeacher(int id);
+  Future<void> assignTeacherToSubjects(int teacherId, List<int> subjectIds);
 
   // Curriculum
   Future<String?> getCurriculumTopic(int classId, int subjectId, int termId, int week);

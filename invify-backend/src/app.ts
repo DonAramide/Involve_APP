@@ -212,7 +212,7 @@ const authLimiter = rateLimit({
 
 const verificationLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_VERIFICATION_WINDOW_MS || '3600000', 10), // Default: 1 hour
-  max: parseInt(process.env.RATE_LIMIT_VERIFICATION_MAX || '10', 10),
+  max: parseInt(process.env.RATE_LIMIT_VERIFICATION_MAX || '30', 10),
   message: { error: 'Too many verification attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

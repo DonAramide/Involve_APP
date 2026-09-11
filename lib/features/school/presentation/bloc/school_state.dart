@@ -17,6 +17,7 @@ class SchoolState extends Equatable {
   final List<AcademicResult> results;
   final List<GradingRule> gradingRules;
   final List<Teacher> teachers;
+  final List<SchoolParent> parents;
   final double? studentAverage;
   final double? classAverage;
   final int? studentPosition;
@@ -28,6 +29,8 @@ class SchoolState extends Equatable {
   final SchoolStatus status;
   /// Most recent Cash/POS payment slip (for success popup + print).
   final Invoice? lastPaymentReceipt;
+  /// Most recent parent cash/card/company-account payment.
+  final ParentPaymentRecord? lastParentPayment;
 
   const SchoolState({
     this.academicYears = const [],
@@ -40,6 +43,7 @@ class SchoolState extends Equatable {
     this.results = const [],
     this.gradingRules = const [],
     this.teachers = const [],
+    this.parents = const [],
     this.studentAverage,
     this.classAverage,
     this.studentPosition,
@@ -50,6 +54,7 @@ class SchoolState extends Equatable {
     this.successMessage,
     this.status = SchoolStatus.initial,
     this.lastPaymentReceipt,
+    this.lastParentPayment,
   });
 
   AcademicYear? get activeYear => academicYears.where((y) => y.isCurrent).firstOrNull ?? academicYears.firstOrNull;
@@ -66,6 +71,7 @@ class SchoolState extends Equatable {
     List<AcademicResult>? results,
     List<GradingRule>? gradingRules,
     List<Teacher>? teachers,
+    List<SchoolParent>? parents,
     double? studentAverage,
     double? classAverage,
     int? studentPosition,
@@ -76,7 +82,9 @@ class SchoolState extends Equatable {
     String? successMessage,
     SchoolStatus? status,
     Invoice? lastPaymentReceipt,
+    ParentPaymentRecord? lastParentPayment,
     bool clearLastPaymentReceipt = false,
+    bool clearLastParentPayment = false,
     bool clearSuccessMessage = false,
   }) {
     return SchoolState(
@@ -90,6 +98,7 @@ class SchoolState extends Equatable {
       results: results ?? this.results,
       gradingRules: gradingRules ?? this.gradingRules,
       teachers: teachers ?? this.teachers,
+      parents: parents ?? this.parents,
       studentAverage: studentAverage ?? this.studentAverage,
       classAverage: classAverage ?? this.classAverage,
       studentPosition: studentPosition ?? this.studentPosition,
@@ -102,6 +111,9 @@ class SchoolState extends Equatable {
       lastPaymentReceipt: clearLastPaymentReceipt
           ? null
           : (lastPaymentReceipt ?? this.lastPaymentReceipt),
+      lastParentPayment: clearLastParentPayment
+          ? null
+          : (lastParentPayment ?? this.lastParentPayment),
     );
   }
 
@@ -117,6 +129,7 @@ class SchoolState extends Equatable {
         results,
         gradingRules,
         teachers,
+        parents,
         studentAverage,
         classAverage,
         studentPosition,
@@ -127,5 +140,6 @@ class SchoolState extends Equatable {
         successMessage,
         status,
         lastPaymentReceipt,
+        lastParentPayment,
       ];
 }

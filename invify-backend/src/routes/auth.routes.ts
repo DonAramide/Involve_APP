@@ -7,7 +7,7 @@ const router = Router();
 
 const otpRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Max 10 requests per IP per hour for OTP endpoints (to prevent basic spam)
+  max: 30, // send + verify retries share this bucket
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 

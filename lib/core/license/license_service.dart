@@ -181,6 +181,25 @@ class LicenseService {
     return DateTime.now().isBefore(trialExpiry);
   }
 
+  /// Standard, Premium, or legacy Pro / lifetime — required for VA and card/POS.
+  static Future<bool> hasOnlinePlanAccess({String? businessName}) async {
+    if (await isOnFreeTrialOnly(businessName: businessName)) return false;
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      final p = serverPlan.planType.toLowerCase().trim();
+      return p == 'standard' ||
+          p == 'pro' ||
+          p == 'premium' ||
+          p == 'enterprise' ||
+          p == 'lifetime';
+    }
+    final license = await getActiveLicense(businessName);
+    if (license == null || DateTime.now().isAfter(license.expiryDate)) return false;
+    return license.planType == PlanType.standard ||
+        license.planType == PlanType.premium ||
+        license.planType == PlanType.enterprise;
+  }
+
   /// True when on free 3-day trial only (no Pro / lifetime / activation license).
   static Future<bool> isOnFreeTrialOnly({String? businessName}) async {
     if (await isActivated(businessName)) return false;

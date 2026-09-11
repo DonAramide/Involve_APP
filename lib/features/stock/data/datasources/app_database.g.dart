@@ -12113,6 +12113,1976 @@ class ClassesCompanion extends UpdateCompanion<ClassTable> {
   }
 }
 
+class $ParentsTable extends Parents with TableInfo<$ParentsTable, ParentTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _fullNameMeta =
+      const VerificationMeta('fullName');
+  @override
+  late final GeneratedColumn<String> fullName = GeneratedColumn<String>(
+      'full_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+      'phone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+      'email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNumberMeta =
+      const VerificationMeta('virtualAccountNumber');
+  @override
+  late final GeneratedColumn<String> virtualAccountNumber =
+      GeneratedColumn<String>('virtual_account_number', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountBankMeta =
+      const VerificationMeta('virtualAccountBank');
+  @override
+  late final GeneratedColumn<String> virtualAccountBank =
+      GeneratedColumn<String>('virtual_account_bank', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNameMeta =
+      const VerificationMeta('virtualAccountName');
+  @override
+  late final GeneratedColumn<String> virtualAccountName =
+      GeneratedColumn<String>('virtual_account_name', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountStatusMeta =
+      const VerificationMeta('virtualAccountStatus');
+  @override
+  late final GeneratedColumn<String> virtualAccountStatus =
+      GeneratedColumn<String>('virtual_account_status', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _creditBalanceMeta =
+      const VerificationMeta('creditBalance');
+  @override
+  late final GeneratedColumn<double> creditBalance = GeneratedColumn<double>(
+      'credit_balance', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        fullName,
+        phone,
+        email,
+        virtualAccountNumber,
+        virtualAccountBank,
+        virtualAccountName,
+        virtualAccountStatus,
+        creditBalance,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parents';
+  @override
+  VerificationContext validateIntegrity(Insertable<ParentTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('full_name')) {
+      context.handle(_fullNameMeta,
+          fullName.isAcceptableOrUnknown(data['full_name']!, _fullNameMeta));
+    } else if (isInserting) {
+      context.missing(_fullNameMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+          _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
+    }
+    if (data.containsKey('virtual_account_number')) {
+      context.handle(
+          _virtualAccountNumberMeta,
+          virtualAccountNumber.isAcceptableOrUnknown(
+              data['virtual_account_number']!, _virtualAccountNumberMeta));
+    }
+    if (data.containsKey('virtual_account_bank')) {
+      context.handle(
+          _virtualAccountBankMeta,
+          virtualAccountBank.isAcceptableOrUnknown(
+              data['virtual_account_bank']!, _virtualAccountBankMeta));
+    }
+    if (data.containsKey('virtual_account_name')) {
+      context.handle(
+          _virtualAccountNameMeta,
+          virtualAccountName.isAcceptableOrUnknown(
+              data['virtual_account_name']!, _virtualAccountNameMeta));
+    }
+    if (data.containsKey('virtual_account_status')) {
+      context.handle(
+          _virtualAccountStatusMeta,
+          virtualAccountStatus.isAcceptableOrUnknown(
+              data['virtual_account_status']!, _virtualAccountStatusMeta));
+    }
+    if (data.containsKey('credit_balance')) {
+      context.handle(
+          _creditBalanceMeta,
+          creditBalance.isAcceptableOrUnknown(
+              data['credit_balance']!, _creditBalanceMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ParentTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParentTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      fullName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}full_name'])!,
+      phone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}phone']),
+      email: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}email']),
+      virtualAccountNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_number']),
+      virtualAccountBank: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_bank']),
+      virtualAccountName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_name']),
+      virtualAccountStatus: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_status']),
+      creditBalance: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}credit_balance'])!,
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $ParentsTable createAlias(String alias) {
+    return $ParentsTable(attachedDatabase, alias);
+  }
+}
+
+class ParentTable extends DataClass implements Insertable<ParentTable> {
+  final int id;
+  final String fullName;
+  final String? phone;
+  final String? email;
+  final String? virtualAccountNumber;
+  final String? virtualAccountBank;
+  final String? virtualAccountName;
+  final String? virtualAccountStatus;
+  final double creditBalance;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const ParentTable(
+      {required this.id,
+      required this.fullName,
+      this.phone,
+      this.email,
+      this.virtualAccountNumber,
+      this.virtualAccountBank,
+      this.virtualAccountName,
+      this.virtualAccountStatus,
+      required this.creditBalance,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['full_name'] = Variable<String>(fullName);
+    if (!nullToAbsent || phone != null) {
+      map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || virtualAccountNumber != null) {
+      map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
+    }
+    if (!nullToAbsent || virtualAccountBank != null) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank);
+    }
+    if (!nullToAbsent || virtualAccountName != null) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName);
+    }
+    if (!nullToAbsent || virtualAccountStatus != null) {
+      map['virtual_account_status'] = Variable<String>(virtualAccountStatus);
+    }
+    map['credit_balance'] = Variable<double>(creditBalance);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  ParentsCompanion toCompanion(bool nullToAbsent) {
+    return ParentsCompanion(
+      id: Value(id),
+      fullName: Value(fullName),
+      phone:
+          phone == null && nullToAbsent ? const Value.absent() : Value(phone),
+      email:
+          email == null && nullToAbsent ? const Value.absent() : Value(email),
+      virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountNumber),
+      virtualAccountBank: virtualAccountBank == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountBank),
+      virtualAccountName: virtualAccountName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountName),
+      virtualAccountStatus: virtualAccountStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountStatus),
+      creditBalance: Value(creditBalance),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory ParentTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParentTable(
+      id: serializer.fromJson<int>(json['id']),
+      fullName: serializer.fromJson<String>(json['fullName']),
+      phone: serializer.fromJson<String?>(json['phone']),
+      email: serializer.fromJson<String?>(json['email']),
+      virtualAccountNumber:
+          serializer.fromJson<String?>(json['virtualAccountNumber']),
+      virtualAccountBank:
+          serializer.fromJson<String?>(json['virtualAccountBank']),
+      virtualAccountName:
+          serializer.fromJson<String?>(json['virtualAccountName']),
+      virtualAccountStatus:
+          serializer.fromJson<String?>(json['virtualAccountStatus']),
+      creditBalance: serializer.fromJson<double>(json['creditBalance']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'fullName': serializer.toJson<String>(fullName),
+      'phone': serializer.toJson<String?>(phone),
+      'email': serializer.toJson<String?>(email),
+      'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
+      'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
+      'virtualAccountName': serializer.toJson<String?>(virtualAccountName),
+      'virtualAccountStatus': serializer.toJson<String?>(virtualAccountStatus),
+      'creditBalance': serializer.toJson<double>(creditBalance),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  ParentTable copyWith(
+          {int? id,
+          String? fullName,
+          Value<String?> phone = const Value.absent(),
+          Value<String?> email = const Value.absent(),
+          Value<String?> virtualAccountNumber = const Value.absent(),
+          Value<String?> virtualAccountBank = const Value.absent(),
+          Value<String?> virtualAccountName = const Value.absent(),
+          Value<String?> virtualAccountStatus = const Value.absent(),
+          double? creditBalance,
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      ParentTable(
+        id: id ?? this.id,
+        fullName: fullName ?? this.fullName,
+        phone: phone.present ? phone.value : this.phone,
+        email: email.present ? email.value : this.email,
+        virtualAccountNumber: virtualAccountNumber.present
+            ? virtualAccountNumber.value
+            : this.virtualAccountNumber,
+        virtualAccountBank: virtualAccountBank.present
+            ? virtualAccountBank.value
+            : this.virtualAccountBank,
+        virtualAccountName: virtualAccountName.present
+            ? virtualAccountName.value
+            : this.virtualAccountName,
+        virtualAccountStatus: virtualAccountStatus.present
+            ? virtualAccountStatus.value
+            : this.virtualAccountStatus,
+        creditBalance: creditBalance ?? this.creditBalance,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  ParentTable copyWithCompanion(ParentsCompanion data) {
+    return ParentTable(
+      id: data.id.present ? data.id.value : this.id,
+      fullName: data.fullName.present ? data.fullName.value : this.fullName,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      email: data.email.present ? data.email.value : this.email,
+      virtualAccountNumber: data.virtualAccountNumber.present
+          ? data.virtualAccountNumber.value
+          : this.virtualAccountNumber,
+      virtualAccountBank: data.virtualAccountBank.present
+          ? data.virtualAccountBank.value
+          : this.virtualAccountBank,
+      virtualAccountName: data.virtualAccountName.present
+          ? data.virtualAccountName.value
+          : this.virtualAccountName,
+      virtualAccountStatus: data.virtualAccountStatus.present
+          ? data.virtualAccountStatus.value
+          : this.virtualAccountStatus,
+      creditBalance: data.creditBalance.present
+          ? data.creditBalance.value
+          : this.creditBalance,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentTable(')
+          ..write('id: $id, ')
+          ..write('fullName: $fullName, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('virtualAccountStatus: $virtualAccountStatus, ')
+          ..write('creditBalance: $creditBalance, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      fullName,
+      phone,
+      email,
+      virtualAccountNumber,
+      virtualAccountBank,
+      virtualAccountName,
+      virtualAccountStatus,
+      creditBalance,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParentTable &&
+          other.id == this.id &&
+          other.fullName == this.fullName &&
+          other.phone == this.phone &&
+          other.email == this.email &&
+          other.virtualAccountNumber == this.virtualAccountNumber &&
+          other.virtualAccountBank == this.virtualAccountBank &&
+          other.virtualAccountName == this.virtualAccountName &&
+          other.virtualAccountStatus == this.virtualAccountStatus &&
+          other.creditBalance == this.creditBalance &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class ParentsCompanion extends UpdateCompanion<ParentTable> {
+  final Value<int> id;
+  final Value<String> fullName;
+  final Value<String?> phone;
+  final Value<String?> email;
+  final Value<String?> virtualAccountNumber;
+  final Value<String?> virtualAccountBank;
+  final Value<String?> virtualAccountName;
+  final Value<String?> virtualAccountStatus;
+  final Value<double> creditBalance;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const ParentsCompanion({
+    this.id = const Value.absent(),
+    this.fullName = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
+    this.virtualAccountStatus = const Value.absent(),
+    this.creditBalance = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  ParentsCompanion.insert({
+    this.id = const Value.absent(),
+    required String fullName,
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
+    this.virtualAccountStatus = const Value.absent(),
+    this.creditBalance = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  }) : fullName = Value(fullName);
+  static Insertable<ParentTable> custom({
+    Expression<int>? id,
+    Expression<String>? fullName,
+    Expression<String>? phone,
+    Expression<String>? email,
+    Expression<String>? virtualAccountNumber,
+    Expression<String>? virtualAccountBank,
+    Expression<String>? virtualAccountName,
+    Expression<String>? virtualAccountStatus,
+    Expression<double>? creditBalance,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fullName != null) 'full_name': fullName,
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
+      if (virtualAccountNumber != null)
+        'virtual_account_number': virtualAccountNumber,
+      if (virtualAccountBank != null)
+        'virtual_account_bank': virtualAccountBank,
+      if (virtualAccountName != null)
+        'virtual_account_name': virtualAccountName,
+      if (virtualAccountStatus != null)
+        'virtual_account_status': virtualAccountStatus,
+      if (creditBalance != null) 'credit_balance': creditBalance,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  ParentsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? fullName,
+      Value<String?>? phone,
+      Value<String?>? email,
+      Value<String?>? virtualAccountNumber,
+      Value<String?>? virtualAccountBank,
+      Value<String?>? virtualAccountName,
+      Value<String?>? virtualAccountStatus,
+      Value<double>? creditBalance,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return ParentsCompanion(
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
+      virtualAccountName: virtualAccountName ?? this.virtualAccountName,
+      virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
+      creditBalance: creditBalance ?? this.creditBalance,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (fullName.present) {
+      map['full_name'] = Variable<String>(fullName.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (virtualAccountNumber.present) {
+      map['virtual_account_number'] =
+          Variable<String>(virtualAccountNumber.value);
+    }
+    if (virtualAccountBank.present) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank.value);
+    }
+    if (virtualAccountName.present) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName.value);
+    }
+    if (virtualAccountStatus.present) {
+      map['virtual_account_status'] =
+          Variable<String>(virtualAccountStatus.value);
+    }
+    if (creditBalance.present) {
+      map['credit_balance'] = Variable<double>(creditBalance.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentsCompanion(')
+          ..write('id: $id, ')
+          ..write('fullName: $fullName, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('virtualAccountStatus: $virtualAccountStatus, ')
+          ..write('creditBalance: $creditBalance, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ParentVirtualAccountsTable extends ParentVirtualAccounts
+    with TableInfo<$ParentVirtualAccountsTable, ParentVirtualAccountTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParentVirtualAccountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _parentIdMeta =
+      const VerificationMeta('parentId');
+  @override
+  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+      'parent_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES parents (id)'));
+  static const VerificationMeta _accountNumberMeta =
+      const VerificationMeta('accountNumber');
+  @override
+  late final GeneratedColumn<String> accountNumber = GeneratedColumn<String>(
+      'account_number', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _bankNameMeta =
+      const VerificationMeta('bankName');
+  @override
+  late final GeneratedColumn<String> bankName = GeneratedColumn<String>(
+      'bank_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _accountNameMeta =
+      const VerificationMeta('accountName');
+  @override
+  late final GeneratedColumn<String> accountName = GeneratedColumn<String>(
+      'account_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('legacy'));
+  static const VerificationMeta _isCanonicalMeta =
+      const VerificationMeta('isCanonical');
+  @override
+  late final GeneratedColumn<bool> isCanonical = GeneratedColumn<bool>(
+      'is_canonical', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_canonical" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        parentId,
+        accountNumber,
+        bankName,
+        accountName,
+        kind,
+        isCanonical,
+        syncId,
+        updatedAt,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parent_virtual_accounts';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ParentVirtualAccountTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(_parentIdMeta,
+          parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta));
+    } else if (isInserting) {
+      context.missing(_parentIdMeta);
+    }
+    if (data.containsKey('account_number')) {
+      context.handle(
+          _accountNumberMeta,
+          accountNumber.isAcceptableOrUnknown(
+              data['account_number']!, _accountNumberMeta));
+    } else if (isInserting) {
+      context.missing(_accountNumberMeta);
+    }
+    if (data.containsKey('bank_name')) {
+      context.handle(_bankNameMeta,
+          bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta));
+    }
+    if (data.containsKey('account_name')) {
+      context.handle(
+          _accountNameMeta,
+          accountName.isAcceptableOrUnknown(
+              data['account_name']!, _accountNameMeta));
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    }
+    if (data.containsKey('is_canonical')) {
+      context.handle(
+          _isCanonicalMeta,
+          isCanonical.isAcceptableOrUnknown(
+              data['is_canonical']!, _isCanonicalMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {accountNumber},
+      ];
+  @override
+  ParentVirtualAccountTable map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParentVirtualAccountTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      parentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}parent_id'])!,
+      accountNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_number'])!,
+      bankName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}bank_name']),
+      accountName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_name']),
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      isCanonical: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_canonical'])!,
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+    );
+  }
+
+  @override
+  $ParentVirtualAccountsTable createAlias(String alias) {
+    return $ParentVirtualAccountsTable(attachedDatabase, alias);
+  }
+}
+
+class ParentVirtualAccountTable extends DataClass
+    implements Insertable<ParentVirtualAccountTable> {
+  final int id;
+  final int parentId;
+  final String accountNumber;
+  final String? bankName;
+  final String? accountName;
+
+  /// `canonical` or `legacy`
+  final String kind;
+  final bool isCanonical;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  const ParentVirtualAccountTable(
+      {required this.id,
+      required this.parentId,
+      required this.accountNumber,
+      this.bankName,
+      this.accountName,
+      required this.kind,
+      required this.isCanonical,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['parent_id'] = Variable<int>(parentId);
+    map['account_number'] = Variable<String>(accountNumber);
+    if (!nullToAbsent || bankName != null) {
+      map['bank_name'] = Variable<String>(bankName);
+    }
+    if (!nullToAbsent || accountName != null) {
+      map['account_name'] = Variable<String>(accountName);
+    }
+    map['kind'] = Variable<String>(kind);
+    map['is_canonical'] = Variable<bool>(isCanonical);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    return map;
+  }
+
+  ParentVirtualAccountsCompanion toCompanion(bool nullToAbsent) {
+    return ParentVirtualAccountsCompanion(
+      id: Value(id),
+      parentId: Value(parentId),
+      accountNumber: Value(accountNumber),
+      bankName: bankName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankName),
+      accountName: accountName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountName),
+      kind: Value(kind),
+      isCanonical: Value(isCanonical),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+    );
+  }
+
+  factory ParentVirtualAccountTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParentVirtualAccountTable(
+      id: serializer.fromJson<int>(json['id']),
+      parentId: serializer.fromJson<int>(json['parentId']),
+      accountNumber: serializer.fromJson<String>(json['accountNumber']),
+      bankName: serializer.fromJson<String?>(json['bankName']),
+      accountName: serializer.fromJson<String?>(json['accountName']),
+      kind: serializer.fromJson<String>(json['kind']),
+      isCanonical: serializer.fromJson<bool>(json['isCanonical']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'parentId': serializer.toJson<int>(parentId),
+      'accountNumber': serializer.toJson<String>(accountNumber),
+      'bankName': serializer.toJson<String?>(bankName),
+      'accountName': serializer.toJson<String?>(accountName),
+      'kind': serializer.toJson<String>(kind),
+      'isCanonical': serializer.toJson<bool>(isCanonical),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+    };
+  }
+
+  ParentVirtualAccountTable copyWith(
+          {int? id,
+          int? parentId,
+          String? accountNumber,
+          Value<String?> bankName = const Value.absent(),
+          Value<String?> accountName = const Value.absent(),
+          String? kind,
+          bool? isCanonical,
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent()}) =>
+      ParentVirtualAccountTable(
+        id: id ?? this.id,
+        parentId: parentId ?? this.parentId,
+        accountNumber: accountNumber ?? this.accountNumber,
+        bankName: bankName.present ? bankName.value : this.bankName,
+        accountName: accountName.present ? accountName.value : this.accountName,
+        kind: kind ?? this.kind,
+        isCanonical: isCanonical ?? this.isCanonical,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+      );
+  ParentVirtualAccountTable copyWithCompanion(
+      ParentVirtualAccountsCompanion data) {
+    return ParentVirtualAccountTable(
+      id: data.id.present ? data.id.value : this.id,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      accountNumber: data.accountNumber.present
+          ? data.accountNumber.value
+          : this.accountNumber,
+      bankName: data.bankName.present ? data.bankName.value : this.bankName,
+      accountName:
+          data.accountName.present ? data.accountName.value : this.accountName,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      isCanonical:
+          data.isCanonical.present ? data.isCanonical.value : this.isCanonical,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentVirtualAccountTable(')
+          ..write('id: $id, ')
+          ..write('parentId: $parentId, ')
+          ..write('accountNumber: $accountNumber, ')
+          ..write('bankName: $bankName, ')
+          ..write('accountName: $accountName, ')
+          ..write('kind: $kind, ')
+          ..write('isCanonical: $isCanonical, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, parentId, accountNumber, bankName,
+      accountName, kind, isCanonical, syncId, updatedAt, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParentVirtualAccountTable &&
+          other.id == this.id &&
+          other.parentId == this.parentId &&
+          other.accountNumber == this.accountNumber &&
+          other.bankName == this.bankName &&
+          other.accountName == this.accountName &&
+          other.kind == this.kind &&
+          other.isCanonical == this.isCanonical &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt);
+}
+
+class ParentVirtualAccountsCompanion
+    extends UpdateCompanion<ParentVirtualAccountTable> {
+  final Value<int> id;
+  final Value<int> parentId;
+  final Value<String> accountNumber;
+  final Value<String?> bankName;
+  final Value<String?> accountName;
+  final Value<String> kind;
+  final Value<bool> isCanonical;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  const ParentVirtualAccountsCompanion({
+    this.id = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.accountNumber = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.accountName = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.isCanonical = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  ParentVirtualAccountsCompanion.insert({
+    this.id = const Value.absent(),
+    required int parentId,
+    required String accountNumber,
+    this.bankName = const Value.absent(),
+    this.accountName = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.isCanonical = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  })  : parentId = Value(parentId),
+        accountNumber = Value(accountNumber);
+  static Insertable<ParentVirtualAccountTable> custom({
+    Expression<int>? id,
+    Expression<int>? parentId,
+    Expression<String>? accountNumber,
+    Expression<String>? bankName,
+    Expression<String>? accountName,
+    Expression<String>? kind,
+    Expression<bool>? isCanonical,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (parentId != null) 'parent_id': parentId,
+      if (accountNumber != null) 'account_number': accountNumber,
+      if (bankName != null) 'bank_name': bankName,
+      if (accountName != null) 'account_name': accountName,
+      if (kind != null) 'kind': kind,
+      if (isCanonical != null) 'is_canonical': isCanonical,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  ParentVirtualAccountsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? parentId,
+      Value<String>? accountNumber,
+      Value<String?>? bankName,
+      Value<String?>? accountName,
+      Value<String>? kind,
+      Value<bool>? isCanonical,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt}) {
+    return ParentVirtualAccountsCompanion(
+      id: id ?? this.id,
+      parentId: parentId ?? this.parentId,
+      accountNumber: accountNumber ?? this.accountNumber,
+      bankName: bankName ?? this.bankName,
+      accountName: accountName ?? this.accountName,
+      kind: kind ?? this.kind,
+      isCanonical: isCanonical ?? this.isCanonical,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<int>(parentId.value);
+    }
+    if (accountNumber.present) {
+      map['account_number'] = Variable<String>(accountNumber.value);
+    }
+    if (bankName.present) {
+      map['bank_name'] = Variable<String>(bankName.value);
+    }
+    if (accountName.present) {
+      map['account_name'] = Variable<String>(accountName.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (isCanonical.present) {
+      map['is_canonical'] = Variable<bool>(isCanonical.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentVirtualAccountsCompanion(')
+          ..write('id: $id, ')
+          ..write('parentId: $parentId, ')
+          ..write('accountNumber: $accountNumber, ')
+          ..write('bankName: $bankName, ')
+          ..write('accountName: $accountName, ')
+          ..write('kind: $kind, ')
+          ..write('isCanonical: $isCanonical, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ParentPaymentsTable extends ParentPayments
+    with TableInfo<$ParentPaymentsTable, ParentPaymentTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParentPaymentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _parentIdMeta =
+      const VerificationMeta('parentId');
+  @override
+  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+      'parent_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES parents (id)'));
+  static const VerificationMeta _referenceMeta =
+      const VerificationMeta('reference');
+  @override
+  late final GeneratedColumn<String> reference = GeneratedColumn<String>(
+      'reference', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+      'amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _appliedToDebtMeta =
+      const VerificationMeta('appliedToDebt');
+  @override
+  late final GeneratedColumn<double> appliedToDebt = GeneratedColumn<double>(
+      'applied_to_debt', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _toCreditMeta =
+      const VerificationMeta('toCredit');
+  @override
+  late final GeneratedColumn<double> toCredit = GeneratedColumn<double>(
+      'to_credit', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _parentOutstandingBeforeMeta =
+      const VerificationMeta('parentOutstandingBefore');
+  @override
+  late final GeneratedColumn<double> parentOutstandingBefore =
+      GeneratedColumn<double>('parent_outstanding_before', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
+  static const VerificationMeta _parentOutstandingAfterMeta =
+      const VerificationMeta('parentOutstandingAfter');
+  @override
+  late final GeneratedColumn<double> parentOutstandingAfter =
+      GeneratedColumn<double>('parent_outstanding_after', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
+  static const VerificationMeta _parentCreditBeforeMeta =
+      const VerificationMeta('parentCreditBefore');
+  @override
+  late final GeneratedColumn<double> parentCreditBefore =
+      GeneratedColumn<double>('parent_credit_before', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
+  static const VerificationMeta _parentCreditAfterMeta =
+      const VerificationMeta('parentCreditAfter');
+  @override
+  late final GeneratedColumn<double> parentCreditAfter =
+      GeneratedColumn<double>('parent_credit_after', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
+  static const VerificationMeta _virtualAccountNumberMeta =
+      const VerificationMeta('virtualAccountNumber');
+  @override
+  late final GeneratedColumn<String> virtualAccountNumber =
+      GeneratedColumn<String>('virtual_account_number', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('va_deposit'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        parentId,
+        reference,
+        amount,
+        appliedToDebt,
+        toCredit,
+        parentOutstandingBefore,
+        parentOutstandingAfter,
+        parentCreditBefore,
+        parentCreditAfter,
+        virtualAccountNumber,
+        source,
+        createdAt,
+        syncId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parent_payments';
+  @override
+  VerificationContext validateIntegrity(Insertable<ParentPaymentTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(_parentIdMeta,
+          parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta));
+    } else if (isInserting) {
+      context.missing(_parentIdMeta);
+    }
+    if (data.containsKey('reference')) {
+      context.handle(_referenceMeta,
+          reference.isAcceptableOrUnknown(data['reference']!, _referenceMeta));
+    } else if (isInserting) {
+      context.missing(_referenceMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(_amountMeta,
+          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('applied_to_debt')) {
+      context.handle(
+          _appliedToDebtMeta,
+          appliedToDebt.isAcceptableOrUnknown(
+              data['applied_to_debt']!, _appliedToDebtMeta));
+    }
+    if (data.containsKey('to_credit')) {
+      context.handle(_toCreditMeta,
+          toCredit.isAcceptableOrUnknown(data['to_credit']!, _toCreditMeta));
+    }
+    if (data.containsKey('parent_outstanding_before')) {
+      context.handle(
+          _parentOutstandingBeforeMeta,
+          parentOutstandingBefore.isAcceptableOrUnknown(
+              data['parent_outstanding_before']!,
+              _parentOutstandingBeforeMeta));
+    }
+    if (data.containsKey('parent_outstanding_after')) {
+      context.handle(
+          _parentOutstandingAfterMeta,
+          parentOutstandingAfter.isAcceptableOrUnknown(
+              data['parent_outstanding_after']!, _parentOutstandingAfterMeta));
+    }
+    if (data.containsKey('parent_credit_before')) {
+      context.handle(
+          _parentCreditBeforeMeta,
+          parentCreditBefore.isAcceptableOrUnknown(
+              data['parent_credit_before']!, _parentCreditBeforeMeta));
+    }
+    if (data.containsKey('parent_credit_after')) {
+      context.handle(
+          _parentCreditAfterMeta,
+          parentCreditAfter.isAcceptableOrUnknown(
+              data['parent_credit_after']!, _parentCreditAfterMeta));
+    }
+    if (data.containsKey('virtual_account_number')) {
+      context.handle(
+          _virtualAccountNumberMeta,
+          virtualAccountNumber.isAcceptableOrUnknown(
+              data['virtual_account_number']!, _virtualAccountNumberMeta));
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {reference},
+      ];
+  @override
+  ParentPaymentTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParentPaymentTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      parentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}parent_id'])!,
+      reference: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}reference'])!,
+      amount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      appliedToDebt: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}applied_to_debt'])!,
+      toCredit: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}to_credit'])!,
+      parentOutstandingBefore: attachedDatabase.typeMapping.read(
+          DriftSqlType.double,
+          data['${effectivePrefix}parent_outstanding_before'])!,
+      parentOutstandingAfter: attachedDatabase.typeMapping.read(
+          DriftSqlType.double,
+          data['${effectivePrefix}parent_outstanding_after'])!,
+      parentCreditBefore: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}parent_credit_before'])!,
+      parentCreditAfter: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}parent_credit_after'])!,
+      virtualAccountNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_number']),
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $ParentPaymentsTable createAlias(String alias) {
+    return $ParentPaymentsTable(attachedDatabase, alias);
+  }
+}
+
+class ParentPaymentTable extends DataClass
+    implements Insertable<ParentPaymentTable> {
+  final int id;
+  final int parentId;
+  final String reference;
+  final double amount;
+  final double appliedToDebt;
+  final double toCredit;
+  final double parentOutstandingBefore;
+  final double parentOutstandingAfter;
+  final double parentCreditBefore;
+  final double parentCreditAfter;
+  final String? virtualAccountNumber;
+  final String source;
+  final DateTime createdAt;
+  final String? syncId;
+  final bool isDeleted;
+  const ParentPaymentTable(
+      {required this.id,
+      required this.parentId,
+      required this.reference,
+      required this.amount,
+      required this.appliedToDebt,
+      required this.toCredit,
+      required this.parentOutstandingBefore,
+      required this.parentOutstandingAfter,
+      required this.parentCreditBefore,
+      required this.parentCreditAfter,
+      this.virtualAccountNumber,
+      required this.source,
+      required this.createdAt,
+      this.syncId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['parent_id'] = Variable<int>(parentId);
+    map['reference'] = Variable<String>(reference);
+    map['amount'] = Variable<double>(amount);
+    map['applied_to_debt'] = Variable<double>(appliedToDebt);
+    map['to_credit'] = Variable<double>(toCredit);
+    map['parent_outstanding_before'] =
+        Variable<double>(parentOutstandingBefore);
+    map['parent_outstanding_after'] = Variable<double>(parentOutstandingAfter);
+    map['parent_credit_before'] = Variable<double>(parentCreditBefore);
+    map['parent_credit_after'] = Variable<double>(parentCreditAfter);
+    if (!nullToAbsent || virtualAccountNumber != null) {
+      map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
+    }
+    map['source'] = Variable<String>(source);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  ParentPaymentsCompanion toCompanion(bool nullToAbsent) {
+    return ParentPaymentsCompanion(
+      id: Value(id),
+      parentId: Value(parentId),
+      reference: Value(reference),
+      amount: Value(amount),
+      appliedToDebt: Value(appliedToDebt),
+      toCredit: Value(toCredit),
+      parentOutstandingBefore: Value(parentOutstandingBefore),
+      parentOutstandingAfter: Value(parentOutstandingAfter),
+      parentCreditBefore: Value(parentCreditBefore),
+      parentCreditAfter: Value(parentCreditAfter),
+      virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountNumber),
+      source: Value(source),
+      createdAt: Value(createdAt),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory ParentPaymentTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParentPaymentTable(
+      id: serializer.fromJson<int>(json['id']),
+      parentId: serializer.fromJson<int>(json['parentId']),
+      reference: serializer.fromJson<String>(json['reference']),
+      amount: serializer.fromJson<double>(json['amount']),
+      appliedToDebt: serializer.fromJson<double>(json['appliedToDebt']),
+      toCredit: serializer.fromJson<double>(json['toCredit']),
+      parentOutstandingBefore:
+          serializer.fromJson<double>(json['parentOutstandingBefore']),
+      parentOutstandingAfter:
+          serializer.fromJson<double>(json['parentOutstandingAfter']),
+      parentCreditBefore:
+          serializer.fromJson<double>(json['parentCreditBefore']),
+      parentCreditAfter: serializer.fromJson<double>(json['parentCreditAfter']),
+      virtualAccountNumber:
+          serializer.fromJson<String?>(json['virtualAccountNumber']),
+      source: serializer.fromJson<String>(json['source']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'parentId': serializer.toJson<int>(parentId),
+      'reference': serializer.toJson<String>(reference),
+      'amount': serializer.toJson<double>(amount),
+      'appliedToDebt': serializer.toJson<double>(appliedToDebt),
+      'toCredit': serializer.toJson<double>(toCredit),
+      'parentOutstandingBefore':
+          serializer.toJson<double>(parentOutstandingBefore),
+      'parentOutstandingAfter':
+          serializer.toJson<double>(parentOutstandingAfter),
+      'parentCreditBefore': serializer.toJson<double>(parentCreditBefore),
+      'parentCreditAfter': serializer.toJson<double>(parentCreditAfter),
+      'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
+      'source': serializer.toJson<String>(source),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'syncId': serializer.toJson<String?>(syncId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  ParentPaymentTable copyWith(
+          {int? id,
+          int? parentId,
+          String? reference,
+          double? amount,
+          double? appliedToDebt,
+          double? toCredit,
+          double? parentOutstandingBefore,
+          double? parentOutstandingAfter,
+          double? parentCreditBefore,
+          double? parentCreditAfter,
+          Value<String?> virtualAccountNumber = const Value.absent(),
+          String? source,
+          DateTime? createdAt,
+          Value<String?> syncId = const Value.absent(),
+          bool? isDeleted}) =>
+      ParentPaymentTable(
+        id: id ?? this.id,
+        parentId: parentId ?? this.parentId,
+        reference: reference ?? this.reference,
+        amount: amount ?? this.amount,
+        appliedToDebt: appliedToDebt ?? this.appliedToDebt,
+        toCredit: toCredit ?? this.toCredit,
+        parentOutstandingBefore:
+            parentOutstandingBefore ?? this.parentOutstandingBefore,
+        parentOutstandingAfter:
+            parentOutstandingAfter ?? this.parentOutstandingAfter,
+        parentCreditBefore: parentCreditBefore ?? this.parentCreditBefore,
+        parentCreditAfter: parentCreditAfter ?? this.parentCreditAfter,
+        virtualAccountNumber: virtualAccountNumber.present
+            ? virtualAccountNumber.value
+            : this.virtualAccountNumber,
+        source: source ?? this.source,
+        createdAt: createdAt ?? this.createdAt,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  ParentPaymentTable copyWithCompanion(ParentPaymentsCompanion data) {
+    return ParentPaymentTable(
+      id: data.id.present ? data.id.value : this.id,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      reference: data.reference.present ? data.reference.value : this.reference,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      appliedToDebt: data.appliedToDebt.present
+          ? data.appliedToDebt.value
+          : this.appliedToDebt,
+      toCredit: data.toCredit.present ? data.toCredit.value : this.toCredit,
+      parentOutstandingBefore: data.parentOutstandingBefore.present
+          ? data.parentOutstandingBefore.value
+          : this.parentOutstandingBefore,
+      parentOutstandingAfter: data.parentOutstandingAfter.present
+          ? data.parentOutstandingAfter.value
+          : this.parentOutstandingAfter,
+      parentCreditBefore: data.parentCreditBefore.present
+          ? data.parentCreditBefore.value
+          : this.parentCreditBefore,
+      parentCreditAfter: data.parentCreditAfter.present
+          ? data.parentCreditAfter.value
+          : this.parentCreditAfter,
+      virtualAccountNumber: data.virtualAccountNumber.present
+          ? data.virtualAccountNumber.value
+          : this.virtualAccountNumber,
+      source: data.source.present ? data.source.value : this.source,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentPaymentTable(')
+          ..write('id: $id, ')
+          ..write('parentId: $parentId, ')
+          ..write('reference: $reference, ')
+          ..write('amount: $amount, ')
+          ..write('appliedToDebt: $appliedToDebt, ')
+          ..write('toCredit: $toCredit, ')
+          ..write('parentOutstandingBefore: $parentOutstandingBefore, ')
+          ..write('parentOutstandingAfter: $parentOutstandingAfter, ')
+          ..write('parentCreditBefore: $parentCreditBefore, ')
+          ..write('parentCreditAfter: $parentCreditAfter, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncId: $syncId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      parentId,
+      reference,
+      amount,
+      appliedToDebt,
+      toCredit,
+      parentOutstandingBefore,
+      parentOutstandingAfter,
+      parentCreditBefore,
+      parentCreditAfter,
+      virtualAccountNumber,
+      source,
+      createdAt,
+      syncId,
+      isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParentPaymentTable &&
+          other.id == this.id &&
+          other.parentId == this.parentId &&
+          other.reference == this.reference &&
+          other.amount == this.amount &&
+          other.appliedToDebt == this.appliedToDebt &&
+          other.toCredit == this.toCredit &&
+          other.parentOutstandingBefore == this.parentOutstandingBefore &&
+          other.parentOutstandingAfter == this.parentOutstandingAfter &&
+          other.parentCreditBefore == this.parentCreditBefore &&
+          other.parentCreditAfter == this.parentCreditAfter &&
+          other.virtualAccountNumber == this.virtualAccountNumber &&
+          other.source == this.source &&
+          other.createdAt == this.createdAt &&
+          other.syncId == this.syncId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class ParentPaymentsCompanion extends UpdateCompanion<ParentPaymentTable> {
+  final Value<int> id;
+  final Value<int> parentId;
+  final Value<String> reference;
+  final Value<double> amount;
+  final Value<double> appliedToDebt;
+  final Value<double> toCredit;
+  final Value<double> parentOutstandingBefore;
+  final Value<double> parentOutstandingAfter;
+  final Value<double> parentCreditBefore;
+  final Value<double> parentCreditAfter;
+  final Value<String?> virtualAccountNumber;
+  final Value<String> source;
+  final Value<DateTime> createdAt;
+  final Value<String?> syncId;
+  final Value<bool> isDeleted;
+  const ParentPaymentsCompanion({
+    this.id = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.reference = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.appliedToDebt = const Value.absent(),
+    this.toCredit = const Value.absent(),
+    this.parentOutstandingBefore = const Value.absent(),
+    this.parentOutstandingAfter = const Value.absent(),
+    this.parentCreditBefore = const Value.absent(),
+    this.parentCreditAfter = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  ParentPaymentsCompanion.insert({
+    this.id = const Value.absent(),
+    required int parentId,
+    required String reference,
+    required double amount,
+    this.appliedToDebt = const Value.absent(),
+    this.toCredit = const Value.absent(),
+    this.parentOutstandingBefore = const Value.absent(),
+    this.parentOutstandingAfter = const Value.absent(),
+    this.parentCreditBefore = const Value.absent(),
+    this.parentCreditAfter = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : parentId = Value(parentId),
+        reference = Value(reference),
+        amount = Value(amount);
+  static Insertable<ParentPaymentTable> custom({
+    Expression<int>? id,
+    Expression<int>? parentId,
+    Expression<String>? reference,
+    Expression<double>? amount,
+    Expression<double>? appliedToDebt,
+    Expression<double>? toCredit,
+    Expression<double>? parentOutstandingBefore,
+    Expression<double>? parentOutstandingAfter,
+    Expression<double>? parentCreditBefore,
+    Expression<double>? parentCreditAfter,
+    Expression<String>? virtualAccountNumber,
+    Expression<String>? source,
+    Expression<DateTime>? createdAt,
+    Expression<String>? syncId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (parentId != null) 'parent_id': parentId,
+      if (reference != null) 'reference': reference,
+      if (amount != null) 'amount': amount,
+      if (appliedToDebt != null) 'applied_to_debt': appliedToDebt,
+      if (toCredit != null) 'to_credit': toCredit,
+      if (parentOutstandingBefore != null)
+        'parent_outstanding_before': parentOutstandingBefore,
+      if (parentOutstandingAfter != null)
+        'parent_outstanding_after': parentOutstandingAfter,
+      if (parentCreditBefore != null)
+        'parent_credit_before': parentCreditBefore,
+      if (parentCreditAfter != null) 'parent_credit_after': parentCreditAfter,
+      if (virtualAccountNumber != null)
+        'virtual_account_number': virtualAccountNumber,
+      if (source != null) 'source': source,
+      if (createdAt != null) 'created_at': createdAt,
+      if (syncId != null) 'sync_id': syncId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  ParentPaymentsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? parentId,
+      Value<String>? reference,
+      Value<double>? amount,
+      Value<double>? appliedToDebt,
+      Value<double>? toCredit,
+      Value<double>? parentOutstandingBefore,
+      Value<double>? parentOutstandingAfter,
+      Value<double>? parentCreditBefore,
+      Value<double>? parentCreditAfter,
+      Value<String?>? virtualAccountNumber,
+      Value<String>? source,
+      Value<DateTime>? createdAt,
+      Value<String?>? syncId,
+      Value<bool>? isDeleted}) {
+    return ParentPaymentsCompanion(
+      id: id ?? this.id,
+      parentId: parentId ?? this.parentId,
+      reference: reference ?? this.reference,
+      amount: amount ?? this.amount,
+      appliedToDebt: appliedToDebt ?? this.appliedToDebt,
+      toCredit: toCredit ?? this.toCredit,
+      parentOutstandingBefore:
+          parentOutstandingBefore ?? this.parentOutstandingBefore,
+      parentOutstandingAfter:
+          parentOutstandingAfter ?? this.parentOutstandingAfter,
+      parentCreditBefore: parentCreditBefore ?? this.parentCreditBefore,
+      parentCreditAfter: parentCreditAfter ?? this.parentCreditAfter,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      source: source ?? this.source,
+      createdAt: createdAt ?? this.createdAt,
+      syncId: syncId ?? this.syncId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<int>(parentId.value);
+    }
+    if (reference.present) {
+      map['reference'] = Variable<String>(reference.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (appliedToDebt.present) {
+      map['applied_to_debt'] = Variable<double>(appliedToDebt.value);
+    }
+    if (toCredit.present) {
+      map['to_credit'] = Variable<double>(toCredit.value);
+    }
+    if (parentOutstandingBefore.present) {
+      map['parent_outstanding_before'] =
+          Variable<double>(parentOutstandingBefore.value);
+    }
+    if (parentOutstandingAfter.present) {
+      map['parent_outstanding_after'] =
+          Variable<double>(parentOutstandingAfter.value);
+    }
+    if (parentCreditBefore.present) {
+      map['parent_credit_before'] = Variable<double>(parentCreditBefore.value);
+    }
+    if (parentCreditAfter.present) {
+      map['parent_credit_after'] = Variable<double>(parentCreditAfter.value);
+    }
+    if (virtualAccountNumber.present) {
+      map['virtual_account_number'] =
+          Variable<String>(virtualAccountNumber.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentPaymentsCompanion(')
+          ..write('id: $id, ')
+          ..write('parentId: $parentId, ')
+          ..write('reference: $reference, ')
+          ..write('amount: $amount, ')
+          ..write('appliedToDebt: $appliedToDebt, ')
+          ..write('toCredit: $toCredit, ')
+          ..write('parentOutstandingBefore: $parentOutstandingBefore, ')
+          ..write('parentOutstandingAfter: $parentOutstandingAfter, ')
+          ..write('parentCreditBefore: $parentCreditBefore, ')
+          ..write('parentCreditAfter: $parentCreditAfter, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncId: $syncId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StudentsTable extends Students
     with TableInfo<$StudentsTable, StudentTable> {
   @override
@@ -12172,6 +14142,15 @@ class $StudentsTable extends Students
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES academic_years (id)'));
+  static const VerificationMeta _parentIdMeta =
+      const VerificationMeta('parentId');
+  @override
+  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+      'parent_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES parents (id)'));
   static const VerificationMeta _parentNameMeta =
       const VerificationMeta('parentName');
   @override
@@ -12290,6 +14269,7 @@ class $StudentsTable extends Students
         lastName,
         classId,
         academicYearId,
+        parentId,
         parentName,
         parentPhone,
         balance,
@@ -12358,6 +14338,10 @@ class $StudentsTable extends Students
           _academicYearIdMeta,
           academicYearId.isAcceptableOrUnknown(
               data['academic_year_id']!, _academicYearIdMeta));
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(_parentIdMeta,
+          parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta));
     }
     if (data.containsKey('parent_name')) {
       context.handle(
@@ -12468,6 +14452,8 @@ class $StudentsTable extends Students
           .read(DriftSqlType.int, data['${effectivePrefix}class_id'])!,
       academicYearId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}academic_year_id']),
+      parentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}parent_id']),
       parentName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}parent_name']),
       parentPhone: attachedDatabase.typeMapping
@@ -12521,6 +14507,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String lastName;
   final int classId;
   final int? academicYearId;
+  final int? parentId;
   final String? parentName;
   final String? parentPhone;
   final double balance;
@@ -12546,6 +14533,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       required this.lastName,
       required this.classId,
       this.academicYearId,
+      this.parentId,
       this.parentName,
       this.parentPhone,
       required this.balance,
@@ -12576,6 +14564,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     map['class_id'] = Variable<int>(classId);
     if (!nullToAbsent || academicYearId != null) {
       map['academic_year_id'] = Variable<int>(academicYearId);
+    }
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<int>(parentId);
     }
     if (!nullToAbsent || parentName != null) {
       map['parent_name'] = Variable<String>(parentName);
@@ -12636,6 +14627,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       academicYearId: academicYearId == null && nullToAbsent
           ? const Value.absent()
           : Value(academicYearId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
       parentName: parentName == null && nullToAbsent
           ? const Value.absent()
           : Value(parentName),
@@ -12690,6 +14684,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       lastName: serializer.fromJson<String>(json['lastName']),
       classId: serializer.fromJson<int>(json['classId']),
       academicYearId: serializer.fromJson<int?>(json['academicYearId']),
+      parentId: serializer.fromJson<int?>(json['parentId']),
       parentName: serializer.fromJson<String?>(json['parentName']),
       parentPhone: serializer.fromJson<String?>(json['parentPhone']),
       balance: serializer.fromJson<double>(json['balance']),
@@ -12723,6 +14718,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'lastName': serializer.toJson<String>(lastName),
       'classId': serializer.toJson<int>(classId),
       'academicYearId': serializer.toJson<int?>(academicYearId),
+      'parentId': serializer.toJson<int?>(parentId),
       'parentName': serializer.toJson<String?>(parentName),
       'parentPhone': serializer.toJson<String?>(parentPhone),
       'balance': serializer.toJson<double>(balance),
@@ -12751,6 +14747,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           String? lastName,
           int? classId,
           Value<int?> academicYearId = const Value.absent(),
+          Value<int?> parentId = const Value.absent(),
           Value<String?> parentName = const Value.absent(),
           Value<String?> parentPhone = const Value.absent(),
           double? balance,
@@ -12777,6 +14774,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         classId: classId ?? this.classId,
         academicYearId:
             academicYearId.present ? academicYearId.value : this.academicYearId,
+        parentId: parentId.present ? parentId.value : this.parentId,
         parentName: parentName.present ? parentName.value : this.parentName,
         parentPhone: parentPhone.present ? parentPhone.value : this.parentPhone,
         balance: balance ?? this.balance,
@@ -12815,6 +14813,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       academicYearId: data.academicYearId.present
           ? data.academicYearId.value
           : this.academicYearId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
       parentName:
           data.parentName.present ? data.parentName.value : this.parentName,
       parentPhone:
@@ -12859,6 +14858,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
           ..write('academicYearId: $academicYearId, ')
+          ..write('parentId: $parentId, ')
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
@@ -12889,6 +14889,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         lastName,
         classId,
         academicYearId,
+        parentId,
         parentName,
         parentPhone,
         balance,
@@ -12918,6 +14919,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.lastName == this.lastName &&
           other.classId == this.classId &&
           other.academicYearId == this.academicYearId &&
+          other.parentId == this.parentId &&
           other.parentName == this.parentName &&
           other.parentPhone == this.parentPhone &&
           other.balance == this.balance &&
@@ -12945,6 +14947,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String> lastName;
   final Value<int> classId;
   final Value<int?> academicYearId;
+  final Value<int?> parentId;
   final Value<String?> parentName;
   final Value<String?> parentPhone;
   final Value<double> balance;
@@ -12970,6 +14973,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.lastName = const Value.absent(),
     this.classId = const Value.absent(),
     this.academicYearId = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
@@ -12996,6 +15000,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     required String lastName,
     required int classId,
     this.academicYearId = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
@@ -13025,6 +15030,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? lastName,
     Expression<int>? classId,
     Expression<int>? academicYearId,
+    Expression<int>? parentId,
     Expression<String>? parentName,
     Expression<String>? parentPhone,
     Expression<double>? balance,
@@ -13051,6 +15057,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (lastName != null) 'last_name': lastName,
       if (classId != null) 'class_id': classId,
       if (academicYearId != null) 'academic_year_id': academicYearId,
+      if (parentId != null) 'parent_id': parentId,
       if (parentName != null) 'parent_name': parentName,
       if (parentPhone != null) 'parent_phone': parentPhone,
       if (balance != null) 'balance': balance,
@@ -13082,6 +15089,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String>? lastName,
       Value<int>? classId,
       Value<int?>? academicYearId,
+      Value<int?>? parentId,
       Value<String?>? parentName,
       Value<String?>? parentPhone,
       Value<double>? balance,
@@ -13107,6 +15115,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       lastName: lastName ?? this.lastName,
       classId: classId ?? this.classId,
       academicYearId: academicYearId ?? this.academicYearId,
+      parentId: parentId ?? this.parentId,
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
@@ -13150,6 +15159,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     }
     if (academicYearId.present) {
       map['academic_year_id'] = Variable<int>(academicYearId.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<int>(parentId.value);
     }
     if (parentName.present) {
       map['parent_name'] = Variable<String>(parentName.value);
@@ -13217,6 +15229,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
           ..write('academicYearId: $academicYearId, ')
+          ..write('parentId: $parentId, ')
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
@@ -13234,6 +15247,374 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
           ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ParentPaymentAllocationsTable extends ParentPaymentAllocations
+    with
+        TableInfo<$ParentPaymentAllocationsTable,
+            ParentPaymentAllocationTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParentPaymentAllocationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _parentPaymentIdMeta =
+      const VerificationMeta('parentPaymentId');
+  @override
+  late final GeneratedColumn<int> parentPaymentId = GeneratedColumn<int>(
+      'parent_payment_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES parent_payments (id)'));
+  static const VerificationMeta _studentIdMeta =
+      const VerificationMeta('studentId');
+  @override
+  late final GeneratedColumn<int> studentId = GeneratedColumn<int>(
+      'student_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES students (id)'));
+  static const VerificationMeta _outstandingBeforeMeta =
+      const VerificationMeta('outstandingBefore');
+  @override
+  late final GeneratedColumn<double> outstandingBefore =
+      GeneratedColumn<double>('outstanding_before', aliasedName, false,
+          type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _allocatedMeta =
+      const VerificationMeta('allocated');
+  @override
+  late final GeneratedColumn<double> allocated = GeneratedColumn<double>(
+      'allocated', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _outstandingAfterMeta =
+      const VerificationMeta('outstandingAfter');
+  @override
+  late final GeneratedColumn<double> outstandingAfter = GeneratedColumn<double>(
+      'outstanding_after', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        parentPaymentId,
+        studentId,
+        outstandingBefore,
+        allocated,
+        outstandingAfter
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parent_payment_allocations';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<ParentPaymentAllocationTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('parent_payment_id')) {
+      context.handle(
+          _parentPaymentIdMeta,
+          parentPaymentId.isAcceptableOrUnknown(
+              data['parent_payment_id']!, _parentPaymentIdMeta));
+    } else if (isInserting) {
+      context.missing(_parentPaymentIdMeta);
+    }
+    if (data.containsKey('student_id')) {
+      context.handle(_studentIdMeta,
+          studentId.isAcceptableOrUnknown(data['student_id']!, _studentIdMeta));
+    } else if (isInserting) {
+      context.missing(_studentIdMeta);
+    }
+    if (data.containsKey('outstanding_before')) {
+      context.handle(
+          _outstandingBeforeMeta,
+          outstandingBefore.isAcceptableOrUnknown(
+              data['outstanding_before']!, _outstandingBeforeMeta));
+    } else if (isInserting) {
+      context.missing(_outstandingBeforeMeta);
+    }
+    if (data.containsKey('allocated')) {
+      context.handle(_allocatedMeta,
+          allocated.isAcceptableOrUnknown(data['allocated']!, _allocatedMeta));
+    } else if (isInserting) {
+      context.missing(_allocatedMeta);
+    }
+    if (data.containsKey('outstanding_after')) {
+      context.handle(
+          _outstandingAfterMeta,
+          outstandingAfter.isAcceptableOrUnknown(
+              data['outstanding_after']!, _outstandingAfterMeta));
+    } else if (isInserting) {
+      context.missing(_outstandingAfterMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ParentPaymentAllocationTable map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParentPaymentAllocationTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      parentPaymentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}parent_payment_id'])!,
+      studentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}student_id'])!,
+      outstandingBefore: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}outstanding_before'])!,
+      allocated: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}allocated'])!,
+      outstandingAfter: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}outstanding_after'])!,
+    );
+  }
+
+  @override
+  $ParentPaymentAllocationsTable createAlias(String alias) {
+    return $ParentPaymentAllocationsTable(attachedDatabase, alias);
+  }
+}
+
+class ParentPaymentAllocationTable extends DataClass
+    implements Insertable<ParentPaymentAllocationTable> {
+  final int id;
+  final int parentPaymentId;
+  final int studentId;
+  final double outstandingBefore;
+  final double allocated;
+  final double outstandingAfter;
+  const ParentPaymentAllocationTable(
+      {required this.id,
+      required this.parentPaymentId,
+      required this.studentId,
+      required this.outstandingBefore,
+      required this.allocated,
+      required this.outstandingAfter});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['parent_payment_id'] = Variable<int>(parentPaymentId);
+    map['student_id'] = Variable<int>(studentId);
+    map['outstanding_before'] = Variable<double>(outstandingBefore);
+    map['allocated'] = Variable<double>(allocated);
+    map['outstanding_after'] = Variable<double>(outstandingAfter);
+    return map;
+  }
+
+  ParentPaymentAllocationsCompanion toCompanion(bool nullToAbsent) {
+    return ParentPaymentAllocationsCompanion(
+      id: Value(id),
+      parentPaymentId: Value(parentPaymentId),
+      studentId: Value(studentId),
+      outstandingBefore: Value(outstandingBefore),
+      allocated: Value(allocated),
+      outstandingAfter: Value(outstandingAfter),
+    );
+  }
+
+  factory ParentPaymentAllocationTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParentPaymentAllocationTable(
+      id: serializer.fromJson<int>(json['id']),
+      parentPaymentId: serializer.fromJson<int>(json['parentPaymentId']),
+      studentId: serializer.fromJson<int>(json['studentId']),
+      outstandingBefore: serializer.fromJson<double>(json['outstandingBefore']),
+      allocated: serializer.fromJson<double>(json['allocated']),
+      outstandingAfter: serializer.fromJson<double>(json['outstandingAfter']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'parentPaymentId': serializer.toJson<int>(parentPaymentId),
+      'studentId': serializer.toJson<int>(studentId),
+      'outstandingBefore': serializer.toJson<double>(outstandingBefore),
+      'allocated': serializer.toJson<double>(allocated),
+      'outstandingAfter': serializer.toJson<double>(outstandingAfter),
+    };
+  }
+
+  ParentPaymentAllocationTable copyWith(
+          {int? id,
+          int? parentPaymentId,
+          int? studentId,
+          double? outstandingBefore,
+          double? allocated,
+          double? outstandingAfter}) =>
+      ParentPaymentAllocationTable(
+        id: id ?? this.id,
+        parentPaymentId: parentPaymentId ?? this.parentPaymentId,
+        studentId: studentId ?? this.studentId,
+        outstandingBefore: outstandingBefore ?? this.outstandingBefore,
+        allocated: allocated ?? this.allocated,
+        outstandingAfter: outstandingAfter ?? this.outstandingAfter,
+      );
+  ParentPaymentAllocationTable copyWithCompanion(
+      ParentPaymentAllocationsCompanion data) {
+    return ParentPaymentAllocationTable(
+      id: data.id.present ? data.id.value : this.id,
+      parentPaymentId: data.parentPaymentId.present
+          ? data.parentPaymentId.value
+          : this.parentPaymentId,
+      studentId: data.studentId.present ? data.studentId.value : this.studentId,
+      outstandingBefore: data.outstandingBefore.present
+          ? data.outstandingBefore.value
+          : this.outstandingBefore,
+      allocated: data.allocated.present ? data.allocated.value : this.allocated,
+      outstandingAfter: data.outstandingAfter.present
+          ? data.outstandingAfter.value
+          : this.outstandingAfter,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentPaymentAllocationTable(')
+          ..write('id: $id, ')
+          ..write('parentPaymentId: $parentPaymentId, ')
+          ..write('studentId: $studentId, ')
+          ..write('outstandingBefore: $outstandingBefore, ')
+          ..write('allocated: $allocated, ')
+          ..write('outstandingAfter: $outstandingAfter')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, parentPaymentId, studentId,
+      outstandingBefore, allocated, outstandingAfter);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParentPaymentAllocationTable &&
+          other.id == this.id &&
+          other.parentPaymentId == this.parentPaymentId &&
+          other.studentId == this.studentId &&
+          other.outstandingBefore == this.outstandingBefore &&
+          other.allocated == this.allocated &&
+          other.outstandingAfter == this.outstandingAfter);
+}
+
+class ParentPaymentAllocationsCompanion
+    extends UpdateCompanion<ParentPaymentAllocationTable> {
+  final Value<int> id;
+  final Value<int> parentPaymentId;
+  final Value<int> studentId;
+  final Value<double> outstandingBefore;
+  final Value<double> allocated;
+  final Value<double> outstandingAfter;
+  const ParentPaymentAllocationsCompanion({
+    this.id = const Value.absent(),
+    this.parentPaymentId = const Value.absent(),
+    this.studentId = const Value.absent(),
+    this.outstandingBefore = const Value.absent(),
+    this.allocated = const Value.absent(),
+    this.outstandingAfter = const Value.absent(),
+  });
+  ParentPaymentAllocationsCompanion.insert({
+    this.id = const Value.absent(),
+    required int parentPaymentId,
+    required int studentId,
+    required double outstandingBefore,
+    required double allocated,
+    required double outstandingAfter,
+  })  : parentPaymentId = Value(parentPaymentId),
+        studentId = Value(studentId),
+        outstandingBefore = Value(outstandingBefore),
+        allocated = Value(allocated),
+        outstandingAfter = Value(outstandingAfter);
+  static Insertable<ParentPaymentAllocationTable> custom({
+    Expression<int>? id,
+    Expression<int>? parentPaymentId,
+    Expression<int>? studentId,
+    Expression<double>? outstandingBefore,
+    Expression<double>? allocated,
+    Expression<double>? outstandingAfter,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (parentPaymentId != null) 'parent_payment_id': parentPaymentId,
+      if (studentId != null) 'student_id': studentId,
+      if (outstandingBefore != null) 'outstanding_before': outstandingBefore,
+      if (allocated != null) 'allocated': allocated,
+      if (outstandingAfter != null) 'outstanding_after': outstandingAfter,
+    });
+  }
+
+  ParentPaymentAllocationsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? parentPaymentId,
+      Value<int>? studentId,
+      Value<double>? outstandingBefore,
+      Value<double>? allocated,
+      Value<double>? outstandingAfter}) {
+    return ParentPaymentAllocationsCompanion(
+      id: id ?? this.id,
+      parentPaymentId: parentPaymentId ?? this.parentPaymentId,
+      studentId: studentId ?? this.studentId,
+      outstandingBefore: outstandingBefore ?? this.outstandingBefore,
+      allocated: allocated ?? this.allocated,
+      outstandingAfter: outstandingAfter ?? this.outstandingAfter,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (parentPaymentId.present) {
+      map['parent_payment_id'] = Variable<int>(parentPaymentId.value);
+    }
+    if (studentId.present) {
+      map['student_id'] = Variable<int>(studentId.value);
+    }
+    if (outstandingBefore.present) {
+      map['outstanding_before'] = Variable<double>(outstandingBefore.value);
+    }
+    if (allocated.present) {
+      map['allocated'] = Variable<double>(allocated.value);
+    }
+    if (outstandingAfter.present) {
+      map['outstanding_after'] = Variable<double>(outstandingAfter.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParentPaymentAllocationsCompanion(')
+          ..write('id: $id, ')
+          ..write('parentPaymentId: $parentPaymentId, ')
+          ..write('studentId: $studentId, ')
+          ..write('outstandingBefore: $outstandingBefore, ')
+          ..write('allocated: $allocated, ')
+          ..write('outstandingAfter: $outstandingAfter')
           ..write(')'))
         .toString();
   }
@@ -14262,6 +16643,18 @@ class $SubjectsTable extends Subjects
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES teachers (id)'));
+  static const VerificationMeta _teacherIdsMeta =
+      const VerificationMeta('teacherIds');
+  @override
+  late final GeneratedColumn<String> teacherIds = GeneratedColumn<String>(
+      'teacher_ids', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _classIdsMeta =
+      const VerificationMeta('classIds');
+  @override
+  late final GeneratedColumn<String> classIds = GeneratedColumn<String>(
+      'class_ids', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -14301,6 +16694,8 @@ class $SubjectsTable extends Subjects
         name,
         code,
         teacherId,
+        teacherIds,
+        classIds,
         syncId,
         updatedAt,
         createdAt,
@@ -14333,6 +16728,16 @@ class $SubjectsTable extends Subjects
     if (data.containsKey('teacher_id')) {
       context.handle(_teacherIdMeta,
           teacherId.isAcceptableOrUnknown(data['teacher_id']!, _teacherIdMeta));
+    }
+    if (data.containsKey('teacher_ids')) {
+      context.handle(
+          _teacherIdsMeta,
+          teacherIds.isAcceptableOrUnknown(
+              data['teacher_ids']!, _teacherIdsMeta));
+    }
+    if (data.containsKey('class_ids')) {
+      context.handle(_classIdsMeta,
+          classIds.isAcceptableOrUnknown(data['class_ids']!, _classIdsMeta));
     }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
@@ -14371,6 +16776,10 @@ class $SubjectsTable extends Subjects
           .read(DriftSqlType.string, data['${effectivePrefix}code']),
       teacherId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}teacher_id']),
+      teacherIds: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}teacher_ids']),
+      classIds: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}class_ids']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -14395,6 +16804,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
   final String name;
   final String? code;
   final int? teacherId;
+  final String? teacherIds;
+  final String? classIds;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -14405,6 +16816,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
       required this.name,
       this.code,
       this.teacherId,
+      this.teacherIds,
+      this.classIds,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -14420,6 +16833,12 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
     }
     if (!nullToAbsent || teacherId != null) {
       map['teacher_id'] = Variable<int>(teacherId);
+    }
+    if (!nullToAbsent || teacherIds != null) {
+      map['teacher_ids'] = Variable<String>(teacherIds);
+    }
+    if (!nullToAbsent || classIds != null) {
+      map['class_ids'] = Variable<String>(classIds);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -14445,6 +16864,12 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
       teacherId: teacherId == null && nullToAbsent
           ? const Value.absent()
           : Value(teacherId),
+      teacherIds: teacherIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(teacherIds),
+      classIds: classIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(classIds),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -14468,6 +16893,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
       name: serializer.fromJson<String>(json['name']),
       code: serializer.fromJson<String?>(json['code']),
       teacherId: serializer.fromJson<int?>(json['teacherId']),
+      teacherIds: serializer.fromJson<String?>(json['teacherIds']),
+      classIds: serializer.fromJson<String?>(json['classIds']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -14483,6 +16910,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
       'name': serializer.toJson<String>(name),
       'code': serializer.toJson<String?>(code),
       'teacherId': serializer.toJson<int?>(teacherId),
+      'teacherIds': serializer.toJson<String?>(teacherIds),
+      'classIds': serializer.toJson<String?>(classIds),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -14496,6 +16925,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
           String? name,
           Value<String?> code = const Value.absent(),
           Value<int?> teacherId = const Value.absent(),
+          Value<String?> teacherIds = const Value.absent(),
+          Value<String?> classIds = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -14506,6 +16937,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
         name: name ?? this.name,
         code: code.present ? code.value : this.code,
         teacherId: teacherId.present ? teacherId.value : this.teacherId,
+        teacherIds: teacherIds.present ? teacherIds.value : this.teacherIds,
+        classIds: classIds.present ? classIds.value : this.classIds,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -14518,6 +16951,9 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
       name: data.name.present ? data.name.value : this.name,
       code: data.code.present ? data.code.value : this.code,
       teacherId: data.teacherId.present ? data.teacherId.value : this.teacherId,
+      teacherIds:
+          data.teacherIds.present ? data.teacherIds.value : this.teacherIds,
+      classIds: data.classIds.present ? data.classIds.value : this.classIds,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -14533,6 +16969,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
           ..write('name: $name, ')
           ..write('code: $code, ')
           ..write('teacherId: $teacherId, ')
+          ..write('teacherIds: $teacherIds, ')
+          ..write('classIds: $classIds, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -14543,8 +16981,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, code, teacherId, syncId, updatedAt,
-      createdAt, deviceId, isDeleted);
+  int get hashCode => Object.hash(id, name, code, teacherId, teacherIds,
+      classIds, syncId, updatedAt, createdAt, deviceId, isDeleted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -14553,6 +16991,8 @@ class SubjectTable extends DataClass implements Insertable<SubjectTable> {
           other.name == this.name &&
           other.code == this.code &&
           other.teacherId == this.teacherId &&
+          other.teacherIds == this.teacherIds &&
+          other.classIds == this.classIds &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -14565,6 +17005,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
   final Value<String> name;
   final Value<String?> code;
   final Value<int?> teacherId;
+  final Value<String?> teacherIds;
+  final Value<String?> classIds;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -14575,6 +17017,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
     this.name = const Value.absent(),
     this.code = const Value.absent(),
     this.teacherId = const Value.absent(),
+    this.teacherIds = const Value.absent(),
+    this.classIds = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -14586,6 +17030,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
     required String name,
     this.code = const Value.absent(),
     this.teacherId = const Value.absent(),
+    this.teacherIds = const Value.absent(),
+    this.classIds = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -14597,6 +17043,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
     Expression<String>? name,
     Expression<String>? code,
     Expression<int>? teacherId,
+    Expression<String>? teacherIds,
+    Expression<String>? classIds,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -14608,6 +17056,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
       if (name != null) 'name': name,
       if (code != null) 'code': code,
       if (teacherId != null) 'teacher_id': teacherId,
+      if (teacherIds != null) 'teacher_ids': teacherIds,
+      if (classIds != null) 'class_ids': classIds,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -14621,6 +17071,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
       Value<String>? name,
       Value<String?>? code,
       Value<int?>? teacherId,
+      Value<String?>? teacherIds,
+      Value<String?>? classIds,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -14631,6 +17083,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
       name: name ?? this.name,
       code: code ?? this.code,
       teacherId: teacherId ?? this.teacherId,
+      teacherIds: teacherIds ?? this.teacherIds,
+      classIds: classIds ?? this.classIds,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -14653,6 +17107,12 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
     }
     if (teacherId.present) {
       map['teacher_id'] = Variable<int>(teacherId.value);
+    }
+    if (teacherIds.present) {
+      map['teacher_ids'] = Variable<String>(teacherIds.value);
+    }
+    if (classIds.present) {
+      map['class_ids'] = Variable<String>(classIds.value);
     }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
@@ -14679,6 +17139,8 @@ class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
           ..write('name: $name, ')
           ..write('code: $code, ')
           ..write('teacherId: $teacherId, ')
+          ..write('teacherIds: $teacherIds, ')
+          ..write('classIds: $classIds, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -22058,7 +24520,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AcademicYearsTable academicYears = $AcademicYearsTable(this);
   late final $TermsTable terms = $TermsTable(this);
   late final $ClassesTable classes = $ClassesTable(this);
+  late final $ParentsTable parents = $ParentsTable(this);
+  late final $ParentVirtualAccountsTable parentVirtualAccounts =
+      $ParentVirtualAccountsTable(this);
+  late final $ParentPaymentsTable parentPayments = $ParentPaymentsTable(this);
   late final $StudentsTable students = $StudentsTable(this);
+  late final $ParentPaymentAllocationsTable parentPaymentAllocations =
+      $ParentPaymentAllocationsTable(this);
   late final $BusinessSettingsTable businessSettings =
       $BusinessSettingsTable(this);
   late final $TeachersTable teachers = $TeachersTable(this);
@@ -22111,7 +24579,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         academicYears,
         terms,
         classes,
+        parents,
+        parentVirtualAccounts,
+        parentPayments,
         students,
+        parentPaymentAllocations,
         businessSettings,
         teachers,
         subjects,
@@ -29554,6 +32026,1424 @@ typedef $$ClassesTableProcessedTableManager = ProcessedTableManager<
     ClassTable,
     PrefetchHooks Function(
         {bool studentsRefs, bool teachersRefs, bool curriculumMapRefs})>;
+typedef $$ParentsTableCreateCompanionBuilder = ParentsCompanion Function({
+  Value<int> id,
+  required String fullName,
+  Value<String?> phone,
+  Value<String?> email,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountBank,
+  Value<String?> virtualAccountName,
+  Value<String?> virtualAccountStatus,
+  Value<double> creditBalance,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$ParentsTableUpdateCompanionBuilder = ParentsCompanion Function({
+  Value<int> id,
+  Value<String> fullName,
+  Value<String?> phone,
+  Value<String?> email,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountBank,
+  Value<String?> virtualAccountName,
+  Value<String?> virtualAccountStatus,
+  Value<double> creditBalance,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+final class $$ParentsTableReferences
+    extends BaseReferences<_$AppDatabase, $ParentsTable, ParentTable> {
+  $$ParentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$ParentVirtualAccountsTable,
+      List<ParentVirtualAccountTable>> _parentVirtualAccountsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.parentVirtualAccounts,
+          aliasName: $_aliasNameGenerator(
+              db.parents.id, db.parentVirtualAccounts.parentId));
+
+  $$ParentVirtualAccountsTableProcessedTableManager
+      get parentVirtualAccountsRefs {
+    final manager = $$ParentVirtualAccountsTableTableManager(
+            $_db, $_db.parentVirtualAccounts)
+        .filter((f) => f.parentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_parentVirtualAccountsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$ParentPaymentsTable, List<ParentPaymentTable>>
+      _parentPaymentsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.parentPayments,
+              aliasName: $_aliasNameGenerator(
+                  db.parents.id, db.parentPayments.parentId));
+
+  $$ParentPaymentsTableProcessedTableManager get parentPaymentsRefs {
+    final manager = $$ParentPaymentsTableTableManager($_db, $_db.parentPayments)
+        .filter((f) => f.parentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_parentPaymentsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$StudentsTable, List<StudentTable>>
+      _studentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.students,
+          aliasName: $_aliasNameGenerator(db.parents.id, db.students.parentId));
+
+  $$StudentsTableProcessedTableManager get studentsRefs {
+    final manager = $$StudentsTableTableManager($_db, $_db.students)
+        .filter((f) => f.parentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_studentsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$ParentsTableFilterComposer
+    extends Composer<_$AppDatabase, $ParentsTable> {
+  $$ParentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get fullName => $composableBuilder(
+      column: $table.fullName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> parentVirtualAccountsRefs(
+      Expression<bool> Function($$ParentVirtualAccountsTableFilterComposer f)
+          f) {
+    final $$ParentVirtualAccountsTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentVirtualAccounts,
+            getReferencedColumn: (t) => t.parentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentVirtualAccountsTableFilterComposer(
+                  $db: $db,
+                  $table: $db.parentVirtualAccounts,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<bool> parentPaymentsRefs(
+      Expression<bool> Function($$ParentPaymentsTableFilterComposer f) f) {
+    final $$ParentPaymentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.parentPayments,
+        getReferencedColumn: (t) => t.parentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentPaymentsTableFilterComposer(
+              $db: $db,
+              $table: $db.parentPayments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> studentsRefs(
+      Expression<bool> Function($$StudentsTableFilterComposer f) f) {
+    final $$StudentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.parentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableFilterComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$ParentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ParentsTable> {
+  $$ParentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fullName => $composableBuilder(
+      column: $table.fullName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ParentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ParentsTable> {
+  $$ParentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fullName =>
+      $composableBuilder(column: $table.fullName, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus, builder: (column) => column);
+
+  GeneratedColumn<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  Expression<T> parentVirtualAccountsRefs<T extends Object>(
+      Expression<T> Function($$ParentVirtualAccountsTableAnnotationComposer a)
+          f) {
+    final $$ParentVirtualAccountsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentVirtualAccounts,
+            getReferencedColumn: (t) => t.parentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentVirtualAccountsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.parentVirtualAccounts,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<T> parentPaymentsRefs<T extends Object>(
+      Expression<T> Function($$ParentPaymentsTableAnnotationComposer a) f) {
+    final $$ParentPaymentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.parentPayments,
+        getReferencedColumn: (t) => t.parentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentPaymentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.parentPayments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<T> studentsRefs<T extends Object>(
+      Expression<T> Function($$StudentsTableAnnotationComposer a) f) {
+    final $$StudentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.parentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$ParentsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ParentsTable,
+    ParentTable,
+    $$ParentsTableFilterComposer,
+    $$ParentsTableOrderingComposer,
+    $$ParentsTableAnnotationComposer,
+    $$ParentsTableCreateCompanionBuilder,
+    $$ParentsTableUpdateCompanionBuilder,
+    (ParentTable, $$ParentsTableReferences),
+    ParentTable,
+    PrefetchHooks Function(
+        {bool parentVirtualAccountsRefs,
+        bool parentPaymentsRefs,
+        bool studentsRefs})> {
+  $$ParentsTableTableManager(_$AppDatabase db, $ParentsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ParentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ParentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ParentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> fullName = const Value.absent(),
+            Value<String?> phone = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> virtualAccountStatus = const Value.absent(),
+            Value<double> creditBalance = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ParentsCompanion(
+            id: id,
+            fullName: fullName,
+            phone: phone,
+            email: email,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountBank: virtualAccountBank,
+            virtualAccountName: virtualAccountName,
+            virtualAccountStatus: virtualAccountStatus,
+            creditBalance: creditBalance,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String fullName,
+            Value<String?> phone = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> virtualAccountStatus = const Value.absent(),
+            Value<double> creditBalance = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ParentsCompanion.insert(
+            id: id,
+            fullName: fullName,
+            phone: phone,
+            email: email,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountBank: virtualAccountBank,
+            virtualAccountName: virtualAccountName,
+            virtualAccountStatus: virtualAccountStatus,
+            creditBalance: creditBalance,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) =>
+                  (e.readTable(table), $$ParentsTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: (
+              {parentVirtualAccountsRefs = false,
+              parentPaymentsRefs = false,
+              studentsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (parentVirtualAccountsRefs) db.parentVirtualAccounts,
+                if (parentPaymentsRefs) db.parentPayments,
+                if (studentsRefs) db.students
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (parentVirtualAccountsRefs)
+                    await $_getPrefetchedData<ParentTable, $ParentsTable,
+                            ParentVirtualAccountTable>(
+                        currentTable: table,
+                        referencedTable: $$ParentsTableReferences
+                            ._parentVirtualAccountsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ParentsTableReferences(db, table, p0)
+                                .parentVirtualAccountsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.parentId == item.id),
+                        typedResults: items),
+                  if (parentPaymentsRefs)
+                    await $_getPrefetchedData<ParentTable, $ParentsTable,
+                            ParentPaymentTable>(
+                        currentTable: table,
+                        referencedTable: $$ParentsTableReferences
+                            ._parentPaymentsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ParentsTableReferences(db, table, p0)
+                                .parentPaymentsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.parentId == item.id),
+                        typedResults: items),
+                  if (studentsRefs)
+                    await $_getPrefetchedData<ParentTable, $ParentsTable,
+                            StudentTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$ParentsTableReferences._studentsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ParentsTableReferences(db, table, p0)
+                                .studentsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.parentId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ParentsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ParentsTable,
+    ParentTable,
+    $$ParentsTableFilterComposer,
+    $$ParentsTableOrderingComposer,
+    $$ParentsTableAnnotationComposer,
+    $$ParentsTableCreateCompanionBuilder,
+    $$ParentsTableUpdateCompanionBuilder,
+    (ParentTable, $$ParentsTableReferences),
+    ParentTable,
+    PrefetchHooks Function(
+        {bool parentVirtualAccountsRefs,
+        bool parentPaymentsRefs,
+        bool studentsRefs})>;
+typedef $$ParentVirtualAccountsTableCreateCompanionBuilder
+    = ParentVirtualAccountsCompanion Function({
+  Value<int> id,
+  required int parentId,
+  required String accountNumber,
+  Value<String?> bankName,
+  Value<String?> accountName,
+  Value<String> kind,
+  Value<bool> isCanonical,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+});
+typedef $$ParentVirtualAccountsTableUpdateCompanionBuilder
+    = ParentVirtualAccountsCompanion Function({
+  Value<int> id,
+  Value<int> parentId,
+  Value<String> accountNumber,
+  Value<String?> bankName,
+  Value<String?> accountName,
+  Value<String> kind,
+  Value<bool> isCanonical,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+});
+
+final class $$ParentVirtualAccountsTableReferences extends BaseReferences<
+    _$AppDatabase, $ParentVirtualAccountsTable, ParentVirtualAccountTable> {
+  $$ParentVirtualAccountsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $ParentsTable _parentIdTable(_$AppDatabase db) =>
+      db.parents.createAlias($_aliasNameGenerator(
+          db.parentVirtualAccounts.parentId, db.parents.id));
+
+  $$ParentsTableProcessedTableManager get parentId {
+    final $_column = $_itemColumn<int>('parent_id')!;
+
+    final manager = $$ParentsTableTableManager($_db, $_db.parents)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$ParentVirtualAccountsTableFilterComposer
+    extends Composer<_$AppDatabase, $ParentVirtualAccountsTable> {
+  $$ParentVirtualAccountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get bankName => $composableBuilder(
+      column: $table.bankName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isCanonical => $composableBuilder(
+      column: $table.isCanonical, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  $$ParentsTableFilterComposer get parentId {
+    final $$ParentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableFilterComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentVirtualAccountsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ParentVirtualAccountsTable> {
+  $$ParentVirtualAccountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get bankName => $composableBuilder(
+      column: $table.bankName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isCanonical => $composableBuilder(
+      column: $table.isCanonical, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  $$ParentsTableOrderingComposer get parentId {
+    final $$ParentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentVirtualAccountsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ParentVirtualAccountsTable> {
+  $$ParentVirtualAccountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get bankName =>
+      $composableBuilder(column: $table.bankName, builder: (column) => column);
+
+  GeneratedColumn<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<bool> get isCanonical => $composableBuilder(
+      column: $table.isCanonical, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ParentsTableAnnotationComposer get parentId {
+    final $$ParentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentVirtualAccountsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ParentVirtualAccountsTable,
+    ParentVirtualAccountTable,
+    $$ParentVirtualAccountsTableFilterComposer,
+    $$ParentVirtualAccountsTableOrderingComposer,
+    $$ParentVirtualAccountsTableAnnotationComposer,
+    $$ParentVirtualAccountsTableCreateCompanionBuilder,
+    $$ParentVirtualAccountsTableUpdateCompanionBuilder,
+    (ParentVirtualAccountTable, $$ParentVirtualAccountsTableReferences),
+    ParentVirtualAccountTable,
+    PrefetchHooks Function({bool parentId})> {
+  $$ParentVirtualAccountsTableTableManager(
+      _$AppDatabase db, $ParentVirtualAccountsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ParentVirtualAccountsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ParentVirtualAccountsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ParentVirtualAccountsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> parentId = const Value.absent(),
+            Value<String> accountNumber = const Value.absent(),
+            Value<String?> bankName = const Value.absent(),
+            Value<String?> accountName = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<bool> isCanonical = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+          }) =>
+              ParentVirtualAccountsCompanion(
+            id: id,
+            parentId: parentId,
+            accountNumber: accountNumber,
+            bankName: bankName,
+            accountName: accountName,
+            kind: kind,
+            isCanonical: isCanonical,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int parentId,
+            required String accountNumber,
+            Value<String?> bankName = const Value.absent(),
+            Value<String?> accountName = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<bool> isCanonical = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+          }) =>
+              ParentVirtualAccountsCompanion.insert(
+            id: id,
+            parentId: parentId,
+            accountNumber: accountNumber,
+            bankName: bankName,
+            accountName: accountName,
+            kind: kind,
+            isCanonical: isCanonical,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$ParentVirtualAccountsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({parentId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (parentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.parentId,
+                    referencedTable: $$ParentVirtualAccountsTableReferences
+                        ._parentIdTable(db),
+                    referencedColumn: $$ParentVirtualAccountsTableReferences
+                        ._parentIdTable(db)
+                        .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ParentVirtualAccountsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $ParentVirtualAccountsTable,
+        ParentVirtualAccountTable,
+        $$ParentVirtualAccountsTableFilterComposer,
+        $$ParentVirtualAccountsTableOrderingComposer,
+        $$ParentVirtualAccountsTableAnnotationComposer,
+        $$ParentVirtualAccountsTableCreateCompanionBuilder,
+        $$ParentVirtualAccountsTableUpdateCompanionBuilder,
+        (ParentVirtualAccountTable, $$ParentVirtualAccountsTableReferences),
+        ParentVirtualAccountTable,
+        PrefetchHooks Function({bool parentId})>;
+typedef $$ParentPaymentsTableCreateCompanionBuilder = ParentPaymentsCompanion
+    Function({
+  Value<int> id,
+  required int parentId,
+  required String reference,
+  required double amount,
+  Value<double> appliedToDebt,
+  Value<double> toCredit,
+  Value<double> parentOutstandingBefore,
+  Value<double> parentOutstandingAfter,
+  Value<double> parentCreditBefore,
+  Value<double> parentCreditAfter,
+  Value<String?> virtualAccountNumber,
+  Value<String> source,
+  Value<DateTime> createdAt,
+  Value<String?> syncId,
+  Value<bool> isDeleted,
+});
+typedef $$ParentPaymentsTableUpdateCompanionBuilder = ParentPaymentsCompanion
+    Function({
+  Value<int> id,
+  Value<int> parentId,
+  Value<String> reference,
+  Value<double> amount,
+  Value<double> appliedToDebt,
+  Value<double> toCredit,
+  Value<double> parentOutstandingBefore,
+  Value<double> parentOutstandingAfter,
+  Value<double> parentCreditBefore,
+  Value<double> parentCreditAfter,
+  Value<String?> virtualAccountNumber,
+  Value<String> source,
+  Value<DateTime> createdAt,
+  Value<String?> syncId,
+  Value<bool> isDeleted,
+});
+
+final class $$ParentPaymentsTableReferences extends BaseReferences<
+    _$AppDatabase, $ParentPaymentsTable, ParentPaymentTable> {
+  $$ParentPaymentsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $ParentsTable _parentIdTable(_$AppDatabase db) =>
+      db.parents.createAlias(
+          $_aliasNameGenerator(db.parentPayments.parentId, db.parents.id));
+
+  $$ParentsTableProcessedTableManager get parentId {
+    final $_column = $_itemColumn<int>('parent_id')!;
+
+    final manager = $$ParentsTableTableManager($_db, $_db.parents)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$ParentPaymentAllocationsTable,
+      List<ParentPaymentAllocationTable>> _parentPaymentAllocationsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.parentPaymentAllocations,
+          aliasName: $_aliasNameGenerator(db.parentPayments.id,
+              db.parentPaymentAllocations.parentPaymentId));
+
+  $$ParentPaymentAllocationsTableProcessedTableManager
+      get parentPaymentAllocationsRefs {
+    final manager = $$ParentPaymentAllocationsTableTableManager(
+            $_db, $_db.parentPaymentAllocations)
+        .filter(
+            (f) => f.parentPaymentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_parentPaymentAllocationsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$ParentPaymentsTableFilterComposer
+    extends Composer<_$AppDatabase, $ParentPaymentsTable> {
+  $$ParentPaymentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get reference => $composableBuilder(
+      column: $table.reference, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get appliedToDebt => $composableBuilder(
+      column: $table.appliedToDebt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get toCredit => $composableBuilder(
+      column: $table.toCredit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get parentOutstandingBefore => $composableBuilder(
+      column: $table.parentOutstandingBefore,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get parentOutstandingAfter => $composableBuilder(
+      column: $table.parentOutstandingAfter,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get parentCreditBefore => $composableBuilder(
+      column: $table.parentCreditBefore,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get parentCreditAfter => $composableBuilder(
+      column: $table.parentCreditAfter,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  $$ParentsTableFilterComposer get parentId {
+    final $$ParentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableFilterComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  Expression<bool> parentPaymentAllocationsRefs(
+      Expression<bool> Function($$ParentPaymentAllocationsTableFilterComposer f)
+          f) {
+    final $$ParentPaymentAllocationsTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentPaymentAllocations,
+            getReferencedColumn: (t) => t.parentPaymentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentPaymentAllocationsTableFilterComposer(
+                  $db: $db,
+                  $table: $db.parentPaymentAllocations,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$ParentPaymentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ParentPaymentsTable> {
+  $$ParentPaymentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get reference => $composableBuilder(
+      column: $table.reference, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get appliedToDebt => $composableBuilder(
+      column: $table.appliedToDebt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get toCredit => $composableBuilder(
+      column: $table.toCredit, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get parentOutstandingBefore => $composableBuilder(
+      column: $table.parentOutstandingBefore,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get parentOutstandingAfter => $composableBuilder(
+      column: $table.parentOutstandingAfter,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get parentCreditBefore => $composableBuilder(
+      column: $table.parentCreditBefore,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get parentCreditAfter => $composableBuilder(
+      column: $table.parentCreditAfter,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  $$ParentsTableOrderingComposer get parentId {
+    final $$ParentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentPaymentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ParentPaymentsTable> {
+  $$ParentPaymentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get reference =>
+      $composableBuilder(column: $table.reference, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<double> get appliedToDebt => $composableBuilder(
+      column: $table.appliedToDebt, builder: (column) => column);
+
+  GeneratedColumn<double> get toCredit =>
+      $composableBuilder(column: $table.toCredit, builder: (column) => column);
+
+  GeneratedColumn<double> get parentOutstandingBefore => $composableBuilder(
+      column: $table.parentOutstandingBefore, builder: (column) => column);
+
+  GeneratedColumn<double> get parentOutstandingAfter => $composableBuilder(
+      column: $table.parentOutstandingAfter, builder: (column) => column);
+
+  GeneratedColumn<double> get parentCreditBefore => $composableBuilder(
+      column: $table.parentCreditBefore, builder: (column) => column);
+
+  GeneratedColumn<double> get parentCreditAfter => $composableBuilder(
+      column: $table.parentCreditAfter, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  $$ParentsTableAnnotationComposer get parentId {
+    final $$ParentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  Expression<T> parentPaymentAllocationsRefs<T extends Object>(
+      Expression<T> Function(
+              $$ParentPaymentAllocationsTableAnnotationComposer a)
+          f) {
+    final $$ParentPaymentAllocationsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentPaymentAllocations,
+            getReferencedColumn: (t) => t.parentPaymentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentPaymentAllocationsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.parentPaymentAllocations,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+}
+
+class $$ParentPaymentsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ParentPaymentsTable,
+    ParentPaymentTable,
+    $$ParentPaymentsTableFilterComposer,
+    $$ParentPaymentsTableOrderingComposer,
+    $$ParentPaymentsTableAnnotationComposer,
+    $$ParentPaymentsTableCreateCompanionBuilder,
+    $$ParentPaymentsTableUpdateCompanionBuilder,
+    (ParentPaymentTable, $$ParentPaymentsTableReferences),
+    ParentPaymentTable,
+    PrefetchHooks Function(
+        {bool parentId, bool parentPaymentAllocationsRefs})> {
+  $$ParentPaymentsTableTableManager(
+      _$AppDatabase db, $ParentPaymentsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ParentPaymentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ParentPaymentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ParentPaymentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> parentId = const Value.absent(),
+            Value<String> reference = const Value.absent(),
+            Value<double> amount = const Value.absent(),
+            Value<double> appliedToDebt = const Value.absent(),
+            Value<double> toCredit = const Value.absent(),
+            Value<double> parentOutstandingBefore = const Value.absent(),
+            Value<double> parentOutstandingAfter = const Value.absent(),
+            Value<double> parentCreditBefore = const Value.absent(),
+            Value<double> parentCreditAfter = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ParentPaymentsCompanion(
+            id: id,
+            parentId: parentId,
+            reference: reference,
+            amount: amount,
+            appliedToDebt: appliedToDebt,
+            toCredit: toCredit,
+            parentOutstandingBefore: parentOutstandingBefore,
+            parentOutstandingAfter: parentOutstandingAfter,
+            parentCreditBefore: parentCreditBefore,
+            parentCreditAfter: parentCreditAfter,
+            virtualAccountNumber: virtualAccountNumber,
+            source: source,
+            createdAt: createdAt,
+            syncId: syncId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int parentId,
+            required String reference,
+            required double amount,
+            Value<double> appliedToDebt = const Value.absent(),
+            Value<double> toCredit = const Value.absent(),
+            Value<double> parentOutstandingBefore = const Value.absent(),
+            Value<double> parentOutstandingAfter = const Value.absent(),
+            Value<double> parentCreditBefore = const Value.absent(),
+            Value<double> parentCreditAfter = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ParentPaymentsCompanion.insert(
+            id: id,
+            parentId: parentId,
+            reference: reference,
+            amount: amount,
+            appliedToDebt: appliedToDebt,
+            toCredit: toCredit,
+            parentOutstandingBefore: parentOutstandingBefore,
+            parentOutstandingAfter: parentOutstandingAfter,
+            parentCreditBefore: parentCreditBefore,
+            parentCreditAfter: parentCreditAfter,
+            virtualAccountNumber: virtualAccountNumber,
+            source: source,
+            createdAt: createdAt,
+            syncId: syncId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$ParentPaymentsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {parentId = false, parentPaymentAllocationsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (parentPaymentAllocationsRefs) db.parentPaymentAllocations
+              ],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (parentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.parentId,
+                    referencedTable:
+                        $$ParentPaymentsTableReferences._parentIdTable(db),
+                    referencedColumn:
+                        $$ParentPaymentsTableReferences._parentIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (parentPaymentAllocationsRefs)
+                    await $_getPrefetchedData<ParentPaymentTable,
+                            $ParentPaymentsTable, ParentPaymentAllocationTable>(
+                        currentTable: table,
+                        referencedTable: $$ParentPaymentsTableReferences
+                            ._parentPaymentAllocationsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ParentPaymentsTableReferences(db, table, p0)
+                                .parentPaymentAllocationsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.parentPaymentId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ParentPaymentsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ParentPaymentsTable,
+    ParentPaymentTable,
+    $$ParentPaymentsTableFilterComposer,
+    $$ParentPaymentsTableOrderingComposer,
+    $$ParentPaymentsTableAnnotationComposer,
+    $$ParentPaymentsTableCreateCompanionBuilder,
+    $$ParentPaymentsTableUpdateCompanionBuilder,
+    (ParentPaymentTable, $$ParentPaymentsTableReferences),
+    ParentPaymentTable,
+    PrefetchHooks Function({bool parentId, bool parentPaymentAllocationsRefs})>;
 typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<int> id,
   required String admissionNumber,
@@ -29562,6 +33452,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   required String lastName,
   required int classId,
   Value<int?> academicYearId,
+  Value<int?> parentId,
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
@@ -29588,6 +33479,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String> lastName,
   Value<int> classId,
   Value<int?> academicYearId,
+  Value<int?> parentId,
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
@@ -29638,6 +33530,39 @@ final class $$StudentsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $ParentsTable _parentIdTable(_$AppDatabase db) => db.parents
+      .createAlias($_aliasNameGenerator(db.students.parentId, db.parents.id));
+
+  $$ParentsTableProcessedTableManager? get parentId {
+    final $_column = $_itemColumn<int>('parent_id');
+    if ($_column == null) return null;
+    final manager = $$ParentsTableTableManager($_db, $_db.parents)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$ParentPaymentAllocationsTable,
+      List<ParentPaymentAllocationTable>> _parentPaymentAllocationsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.parentPaymentAllocations,
+          aliasName: $_aliasNameGenerator(
+              db.students.id, db.parentPaymentAllocations.studentId));
+
+  $$ParentPaymentAllocationsTableProcessedTableManager
+      get parentPaymentAllocationsRefs {
+    final manager = $$ParentPaymentAllocationsTableTableManager(
+            $_db, $_db.parentPaymentAllocations)
+        .filter((f) => f.studentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_parentPaymentAllocationsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
   }
 
   static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
@@ -29774,6 +33699,49 @@ class $$StudentsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  $$ParentsTableFilterComposer get parentId {
+    final $$ParentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableFilterComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  Expression<bool> parentPaymentAllocationsRefs(
+      Expression<bool> Function($$ParentPaymentAllocationsTableFilterComposer f)
+          f) {
+    final $$ParentPaymentAllocationsTableFilterComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentPaymentAllocations,
+            getReferencedColumn: (t) => t.studentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentPaymentAllocationsTableFilterComposer(
+                  $db: $db,
+                  $table: $db.parentPaymentAllocations,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
   }
 
   Expression<bool> resultsRefs(
@@ -29918,6 +33886,26 @@ class $$StudentsTableOrderingComposer
             ));
     return composer;
   }
+
+  $$ParentsTableOrderingComposer get parentId {
+    final $$ParentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$StudentsTableAnnotationComposer
@@ -30035,6 +34023,50 @@ class $$StudentsTableAnnotationComposer
     return composer;
   }
 
+  $$ParentsTableAnnotationComposer get parentId {
+    final $$ParentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentId,
+        referencedTable: $db.parents,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.parents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  Expression<T> parentPaymentAllocationsRefs<T extends Object>(
+      Expression<T> Function(
+              $$ParentPaymentAllocationsTableAnnotationComposer a)
+          f) {
+    final $$ParentPaymentAllocationsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.parentPaymentAllocations,
+            getReferencedColumn: (t) => t.studentId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ParentPaymentAllocationsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.parentPaymentAllocations,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
   Expression<T> resultsRefs<T extends Object>(
       Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
     final $$ResultsTableAnnotationComposer composer = $composerBuilder(
@@ -30069,7 +34101,11 @@ class $$StudentsTableTableManager extends RootTableManager<
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
     PrefetchHooks Function(
-        {bool classId, bool academicYearId, bool resultsRefs})> {
+        {bool classId,
+        bool academicYearId,
+        bool parentId,
+        bool parentPaymentAllocationsRefs,
+        bool resultsRefs})> {
   $$StudentsTableTableManager(_$AppDatabase db, $StudentsTable table)
       : super(TableManagerState(
           db: db,
@@ -30088,6 +34124,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String> lastName = const Value.absent(),
             Value<int> classId = const Value.absent(),
             Value<int?> academicYearId = const Value.absent(),
+            Value<int?> parentId = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
@@ -30114,6 +34151,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             lastName: lastName,
             classId: classId,
             academicYearId: academicYearId,
+            parentId: parentId,
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
@@ -30140,6 +34178,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             required String lastName,
             required int classId,
             Value<int?> academicYearId = const Value.absent(),
+            Value<int?> parentId = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
@@ -30166,6 +34205,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             lastName: lastName,
             classId: classId,
             academicYearId: academicYearId,
+            parentId: parentId,
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
@@ -30189,10 +34229,17 @@ class $$StudentsTableTableManager extends RootTableManager<
                   (e.readTable(table), $$StudentsTableReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: (
-              {classId = false, academicYearId = false, resultsRefs = false}) {
+              {classId = false,
+              academicYearId = false,
+              parentId = false,
+              parentPaymentAllocationsRefs = false,
+              resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (resultsRefs) db.results],
+              explicitlyWatchedTables: [
+                if (parentPaymentAllocationsRefs) db.parentPaymentAllocations,
+                if (resultsRefs) db.results
+              ],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -30226,11 +34273,34 @@ class $$StudentsTableTableManager extends RootTableManager<
                         $$StudentsTableReferences._academicYearIdTable(db).id,
                   ) as T;
                 }
+                if (parentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.parentId,
+                    referencedTable:
+                        $$StudentsTableReferences._parentIdTable(db),
+                    referencedColumn:
+                        $$StudentsTableReferences._parentIdTable(db).id,
+                  ) as T;
+                }
 
                 return state;
               },
               getPrefetchedDataCallback: (items) async {
                 return [
+                  if (parentPaymentAllocationsRefs)
+                    await $_getPrefetchedData<StudentTable, $StudentsTable,
+                            ParentPaymentAllocationTable>(
+                        currentTable: table,
+                        referencedTable: $$StudentsTableReferences
+                            ._parentPaymentAllocationsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$StudentsTableReferences(db, table, p0)
+                                .parentPaymentAllocationsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.studentId == item.id),
+                        typedResults: items),
                   if (resultsRefs)
                     await $_getPrefetchedData<StudentTable, $StudentsTable,
                             ResultTable>(
@@ -30263,7 +34333,389 @@ typedef $$StudentsTableProcessedTableManager = ProcessedTableManager<
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
     PrefetchHooks Function(
-        {bool classId, bool academicYearId, bool resultsRefs})>;
+        {bool classId,
+        bool academicYearId,
+        bool parentId,
+        bool parentPaymentAllocationsRefs,
+        bool resultsRefs})>;
+typedef $$ParentPaymentAllocationsTableCreateCompanionBuilder
+    = ParentPaymentAllocationsCompanion Function({
+  Value<int> id,
+  required int parentPaymentId,
+  required int studentId,
+  required double outstandingBefore,
+  required double allocated,
+  required double outstandingAfter,
+});
+typedef $$ParentPaymentAllocationsTableUpdateCompanionBuilder
+    = ParentPaymentAllocationsCompanion Function({
+  Value<int> id,
+  Value<int> parentPaymentId,
+  Value<int> studentId,
+  Value<double> outstandingBefore,
+  Value<double> allocated,
+  Value<double> outstandingAfter,
+});
+
+final class $$ParentPaymentAllocationsTableReferences extends BaseReferences<
+    _$AppDatabase,
+    $ParentPaymentAllocationsTable,
+    ParentPaymentAllocationTable> {
+  $$ParentPaymentAllocationsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $ParentPaymentsTable _parentPaymentIdTable(_$AppDatabase db) =>
+      db.parentPayments.createAlias($_aliasNameGenerator(
+          db.parentPaymentAllocations.parentPaymentId, db.parentPayments.id));
+
+  $$ParentPaymentsTableProcessedTableManager get parentPaymentId {
+    final $_column = $_itemColumn<int>('parent_payment_id')!;
+
+    final manager = $$ParentPaymentsTableTableManager($_db, $_db.parentPayments)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_parentPaymentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $StudentsTable _studentIdTable(_$AppDatabase db) =>
+      db.students.createAlias($_aliasNameGenerator(
+          db.parentPaymentAllocations.studentId, db.students.id));
+
+  $$StudentsTableProcessedTableManager get studentId {
+    final $_column = $_itemColumn<int>('student_id')!;
+
+    final manager = $$StudentsTableTableManager($_db, $_db.students)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_studentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$ParentPaymentAllocationsTableFilterComposer
+    extends Composer<_$AppDatabase, $ParentPaymentAllocationsTable> {
+  $$ParentPaymentAllocationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get outstandingBefore => $composableBuilder(
+      column: $table.outstandingBefore,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get allocated => $composableBuilder(
+      column: $table.allocated, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get outstandingAfter => $composableBuilder(
+      column: $table.outstandingAfter,
+      builder: (column) => ColumnFilters(column));
+
+  $$ParentPaymentsTableFilterComposer get parentPaymentId {
+    final $$ParentPaymentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentPaymentId,
+        referencedTable: $db.parentPayments,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentPaymentsTableFilterComposer(
+              $db: $db,
+              $table: $db.parentPayments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StudentsTableFilterComposer get studentId {
+    final $$StudentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableFilterComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentPaymentAllocationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ParentPaymentAllocationsTable> {
+  $$ParentPaymentAllocationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get outstandingBefore => $composableBuilder(
+      column: $table.outstandingBefore,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get allocated => $composableBuilder(
+      column: $table.allocated, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get outstandingAfter => $composableBuilder(
+      column: $table.outstandingAfter,
+      builder: (column) => ColumnOrderings(column));
+
+  $$ParentPaymentsTableOrderingComposer get parentPaymentId {
+    final $$ParentPaymentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentPaymentId,
+        referencedTable: $db.parentPayments,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentPaymentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.parentPayments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StudentsTableOrderingComposer get studentId {
+    final $$StudentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentPaymentAllocationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ParentPaymentAllocationsTable> {
+  $$ParentPaymentAllocationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get outstandingBefore => $composableBuilder(
+      column: $table.outstandingBefore, builder: (column) => column);
+
+  GeneratedColumn<double> get allocated =>
+      $composableBuilder(column: $table.allocated, builder: (column) => column);
+
+  GeneratedColumn<double> get outstandingAfter => $composableBuilder(
+      column: $table.outstandingAfter, builder: (column) => column);
+
+  $$ParentPaymentsTableAnnotationComposer get parentPaymentId {
+    final $$ParentPaymentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.parentPaymentId,
+        referencedTable: $db.parentPayments,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ParentPaymentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.parentPayments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StudentsTableAnnotationComposer get studentId {
+    final $$StudentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ParentPaymentAllocationsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ParentPaymentAllocationsTable,
+    ParentPaymentAllocationTable,
+    $$ParentPaymentAllocationsTableFilterComposer,
+    $$ParentPaymentAllocationsTableOrderingComposer,
+    $$ParentPaymentAllocationsTableAnnotationComposer,
+    $$ParentPaymentAllocationsTableCreateCompanionBuilder,
+    $$ParentPaymentAllocationsTableUpdateCompanionBuilder,
+    (ParentPaymentAllocationTable, $$ParentPaymentAllocationsTableReferences),
+    ParentPaymentAllocationTable,
+    PrefetchHooks Function({bool parentPaymentId, bool studentId})> {
+  $$ParentPaymentAllocationsTableTableManager(
+      _$AppDatabase db, $ParentPaymentAllocationsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ParentPaymentAllocationsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ParentPaymentAllocationsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ParentPaymentAllocationsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> parentPaymentId = const Value.absent(),
+            Value<int> studentId = const Value.absent(),
+            Value<double> outstandingBefore = const Value.absent(),
+            Value<double> allocated = const Value.absent(),
+            Value<double> outstandingAfter = const Value.absent(),
+          }) =>
+              ParentPaymentAllocationsCompanion(
+            id: id,
+            parentPaymentId: parentPaymentId,
+            studentId: studentId,
+            outstandingBefore: outstandingBefore,
+            allocated: allocated,
+            outstandingAfter: outstandingAfter,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int parentPaymentId,
+            required int studentId,
+            required double outstandingBefore,
+            required double allocated,
+            required double outstandingAfter,
+          }) =>
+              ParentPaymentAllocationsCompanion.insert(
+            id: id,
+            parentPaymentId: parentPaymentId,
+            studentId: studentId,
+            outstandingBefore: outstandingBefore,
+            allocated: allocated,
+            outstandingAfter: outstandingAfter,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$ParentPaymentAllocationsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {parentPaymentId = false, studentId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (parentPaymentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.parentPaymentId,
+                    referencedTable: $$ParentPaymentAllocationsTableReferences
+                        ._parentPaymentIdTable(db),
+                    referencedColumn: $$ParentPaymentAllocationsTableReferences
+                        ._parentPaymentIdTable(db)
+                        .id,
+                  ) as T;
+                }
+                if (studentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.studentId,
+                    referencedTable: $$ParentPaymentAllocationsTableReferences
+                        ._studentIdTable(db),
+                    referencedColumn: $$ParentPaymentAllocationsTableReferences
+                        ._studentIdTable(db)
+                        .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ParentPaymentAllocationsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $ParentPaymentAllocationsTable,
+        ParentPaymentAllocationTable,
+        $$ParentPaymentAllocationsTableFilterComposer,
+        $$ParentPaymentAllocationsTableOrderingComposer,
+        $$ParentPaymentAllocationsTableAnnotationComposer,
+        $$ParentPaymentAllocationsTableCreateCompanionBuilder,
+        $$ParentPaymentAllocationsTableUpdateCompanionBuilder,
+        (
+          ParentPaymentAllocationTable,
+          $$ParentPaymentAllocationsTableReferences
+        ),
+        ParentPaymentAllocationTable,
+        PrefetchHooks Function({bool parentPaymentId, bool studentId})>;
 typedef $$BusinessSettingsTableCreateCompanionBuilder
     = BusinessSettingsCompanion Function({
   Value<int> id,
@@ -30914,6 +35366,8 @@ typedef $$SubjectsTableCreateCompanionBuilder = SubjectsCompanion Function({
   required String name,
   Value<String?> code,
   Value<int?> teacherId,
+  Value<String?> teacherIds,
+  Value<String?> classIds,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -30925,6 +35379,8 @@ typedef $$SubjectsTableUpdateCompanionBuilder = SubjectsCompanion Function({
   Value<String> name,
   Value<String?> code,
   Value<int?> teacherId,
+  Value<String?> teacherIds,
+  Value<String?> classIds,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -30998,6 +35454,12 @@ class $$SubjectsTableFilterComposer
 
   ColumnFilters<String> get code => $composableBuilder(
       column: $table.code, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get teacherIds => $composableBuilder(
+      column: $table.teacherIds, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get classIds => $composableBuilder(
+      column: $table.classIds, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -31095,6 +35557,12 @@ class $$SubjectsTableOrderingComposer
   ColumnOrderings<String> get code => $composableBuilder(
       column: $table.code, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get teacherIds => $composableBuilder(
+      column: $table.teacherIds, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get classIds => $composableBuilder(
+      column: $table.classIds, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -31148,6 +35616,12 @@ class $$SubjectsTableAnnotationComposer
 
   GeneratedColumn<String> get code =>
       $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get teacherIds => $composableBuilder(
+      column: $table.teacherIds, builder: (column) => column);
+
+  GeneratedColumn<String> get classIds =>
+      $composableBuilder(column: $table.classIds, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -31255,6 +35729,8 @@ class $$SubjectsTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<String?> code = const Value.absent(),
             Value<int?> teacherId = const Value.absent(),
+            Value<String?> teacherIds = const Value.absent(),
+            Value<String?> classIds = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -31266,6 +35742,8 @@ class $$SubjectsTableTableManager extends RootTableManager<
             name: name,
             code: code,
             teacherId: teacherId,
+            teacherIds: teacherIds,
+            classIds: classIds,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -31277,6 +35755,8 @@ class $$SubjectsTableTableManager extends RootTableManager<
             required String name,
             Value<String?> code = const Value.absent(),
             Value<int?> teacherId = const Value.absent(),
+            Value<String?> teacherIds = const Value.absent(),
+            Value<String?> classIds = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -31288,6 +35768,8 @@ class $$SubjectsTableTableManager extends RootTableManager<
             name: name,
             code: code,
             teacherId: teacherId,
+            teacherIds: teacherIds,
+            classIds: classIds,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -36564,8 +41046,17 @@ class $AppDatabaseManager {
       $$TermsTableTableManager(_db, _db.terms);
   $$ClassesTableTableManager get classes =>
       $$ClassesTableTableManager(_db, _db.classes);
+  $$ParentsTableTableManager get parents =>
+      $$ParentsTableTableManager(_db, _db.parents);
+  $$ParentVirtualAccountsTableTableManager get parentVirtualAccounts =>
+      $$ParentVirtualAccountsTableTableManager(_db, _db.parentVirtualAccounts);
+  $$ParentPaymentsTableTableManager get parentPayments =>
+      $$ParentPaymentsTableTableManager(_db, _db.parentPayments);
   $$StudentsTableTableManager get students =>
       $$StudentsTableTableManager(_db, _db.students);
+  $$ParentPaymentAllocationsTableTableManager get parentPaymentAllocations =>
+      $$ParentPaymentAllocationsTableTableManager(
+          _db, _db.parentPaymentAllocations);
   $$BusinessSettingsTableTableManager get businessSettings =>
       $$BusinessSettingsTableTableManager(_db, _db.businessSettings);
   $$TeachersTableTableManager get teachers =>

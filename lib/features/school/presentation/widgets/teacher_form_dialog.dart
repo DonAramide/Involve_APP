@@ -34,6 +34,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
   late TextEditingController certCtrl;
   DateTime? selectedEmploymentDate;
   List<int> selectedClassIds = [];
+  List<int> selectedSubjectIds = [];
   Uint8List? imageBytes;
  
   @override
@@ -49,6 +50,15 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
         ? List<int>.from(widget.teacher!.classIds!)
         : (widget.teacher?.classId != null ? [widget.teacher!.classId!] : []);
     imageBytes = widget.teacher?.image;
+    if (widget.teacher?.id != null) {
+      selectedSubjectIds = context
+          .read<SchoolBloc>()
+          .state
+          .subjects
+          .where((s) => s.isTaughtBy(widget.teacher!.id))
+          .map((s) => s.id!)
+          .toList();
+    }
   }
 
   @override
@@ -192,6 +202,28 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: state.isLoading ? null : () => _showMultiSelectSubjectsDialog(context, state.subjects),
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            key: ValueKey(selectedSubjectIds.join(',')),
+                            decoration: const InputDecoration(
+                              labelText: 'Assign to Subjects',
+                              border: OutlineInputBorder(),
+                              suffixIcon: Icon(Icons.arrow_drop_down),
+                            ),
+                            controller: TextEditingController(
+                              text: selectedSubjectIds.isEmpty
+                                  ? 'None'
+                                  : state.subjects
+                                      .where((s) => selectedSubjectIds.contains(s.id))
+                                      .map((s) => s.name)
+                                      .join(', '),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: salaryCtrl,
                         enabled: !state.isLoading,
@@ -256,9 +288,13 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                           );
 
                           if (widget.teacher == null) {
-                            context.read<SchoolBloc>().add(AddTeacherEvent(newTeacher));
+                            context.read<SchoolBloc>().add(
+                              AddTeacherEvent(newTeacher, subjectIds: selectedSubjectIds),
+                            );
                           } else {
-                            context.read<SchoolBloc>().add(UpdateTeacherEvent(newTeacher));
+                            context.read<SchoolBloc>().add(
+                              UpdateTeacherEvent(newTeacher, subjectIds: selectedSubjectIds),
+                            );
                           }
                         }
                       },
@@ -270,6 +306,52 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
           );
         },
       ),
+    );
+  }
+
+  void _showMultiSelectSubjectsDialog(BuildContext context, List<Subject> subjects) {
+    final sorted = [...subjects]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select Subjects'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: sorted.isEmpty
+                      ? [const Text('Add subjects first, then assign this teacher.')]
+                      : sorted.map((s) {
+                          final isSelected = selectedSubjectIds.contains(s.id);
+                          return CheckboxListTile(
+                            title: Text(s.name),
+                            value: isSelected,
+                            onChanged: (checked) {
+                              setDialogState(() {
+                                if (checked == true) {
+                                  selectedSubjectIds.add(s.id!);
+                                } else {
+                                  selectedSubjectIds.remove(s.id);
+                                }
+                              });
+                              setState(() {});
+                            },
+                          );
+                        }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

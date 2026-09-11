@@ -74,6 +74,81 @@ class Teachers extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('ParentTable')
+class Parents extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get fullName => text()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get virtualAccountNumber => text().nullable()();
+  TextColumn get virtualAccountBank => text().nullable()();
+  TextColumn get virtualAccountName => text().nullable()();
+  TextColumn get virtualAccountStatus => text().nullable()();
+  RealColumn get creditBalance => real().withDefault(const Constant(0.0))();
+
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+}
+
+@DataClassName('ParentVirtualAccountTable')
+class ParentVirtualAccounts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get parentId => integer().references(Parents, #id)();
+  TextColumn get accountNumber => text()();
+  TextColumn get bankName => text().nullable()();
+  TextColumn get accountName => text().nullable()();
+  /// `canonical` or `legacy`
+  TextColumn get kind => text().withDefault(const Constant('legacy'))();
+  BoolColumn get isCanonical => boolean().withDefault(const Constant(false))();
+
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {accountNumber},
+      ];
+}
+
+@DataClassName('ParentPaymentTable')
+class ParentPayments extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get parentId => integer().references(Parents, #id)();
+  TextColumn get reference => text()();
+  RealColumn get amount => real()();
+  RealColumn get appliedToDebt => real().withDefault(const Constant(0.0))();
+  RealColumn get toCredit => real().withDefault(const Constant(0.0))();
+  RealColumn get parentOutstandingBefore => real().withDefault(const Constant(0.0))();
+  RealColumn get parentOutstandingAfter => real().withDefault(const Constant(0.0))();
+  RealColumn get parentCreditBefore => real().withDefault(const Constant(0.0))();
+  RealColumn get parentCreditAfter => real().withDefault(const Constant(0.0))();
+  TextColumn get virtualAccountNumber => text().nullable()();
+  TextColumn get source => text().withDefault(const Constant('va_deposit'))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  TextColumn get syncId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {reference},
+      ];
+}
+
+@DataClassName('ParentPaymentAllocationTable')
+class ParentPaymentAllocations extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get parentPaymentId => integer().references(ParentPayments, #id)();
+  IntColumn get studentId => integer().references(Students, #id)();
+  RealColumn get outstandingBefore => real()();
+  RealColumn get allocated => real()();
+  RealColumn get outstandingAfter => real()();
+}
+
 @DataClassName('StudentTable')
 class Students extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -83,6 +158,7 @@ class Students extends Table {
   TextColumn get lastName => text()();
   IntColumn get classId => integer().references(Classes, #id)();
   IntColumn get academicYearId => integer().nullable().references(AcademicYears, #id)();
+  IntColumn get parentId => integer().nullable().references(Parents, #id)();
   TextColumn get parentName => text().nullable()();
   TextColumn get parentPhone => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0.0))();
@@ -117,6 +193,8 @@ class Subjects extends Table {
   TextColumn get name => text().unique()();
   TextColumn get code => text().nullable()();
   IntColumn get teacherId => integer().nullable().references(Teachers, #id)();
+  TextColumn get teacherIds => text().nullable()();
+  TextColumn get classIds => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

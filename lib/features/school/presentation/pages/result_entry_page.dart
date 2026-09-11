@@ -195,6 +195,10 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                     _disposeControllers();
                     setState(() {
                       _selectedClassId = val;
+                      final stillOffered = state.subjects.any(
+                        (s) => s.id == _selectedSubjectId && s.isOfferedTo(val),
+                      );
+                      if (!stillOffered) _selectedSubjectId = null;
                       _loadingNewSelection = true;
                     });
                     _loadExistingResults();
@@ -206,7 +210,10 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                 child: DropdownButtonFormField<int>(
                   value: _selectedSubjectId,
                   decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
-                  items: state.subjects.map((s) => DropdownMenuItem(value: s.id!, child: Text(s.name))).toList(),
+                  items: state.subjects
+                      .where((s) => s.isOfferedTo(_selectedClassId))
+                      .map((s) => DropdownMenuItem(value: s.id!, child: Text(s.name)))
+                      .toList(),
                   onChanged: (val) {
                     // Subject changed: clear controllers so they reload for the new subject
                     _disposeControllers();
@@ -222,7 +229,8 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Term: ${state.activeTerm?.name ?? 'N/A'} | Year: ${state.activeYear?.name ?? 'N/A'}',
+            'Term: ${state.activeTerm?.name ?? 'N/A'}'
+            '${state.activeTerm != null ? ' (${state.activeTerm!.dateRangeLabel})' : ''} | Year: ${state.activeYear?.name ?? 'N/A'}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
         ],
@@ -333,7 +341,11 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
         examScore: exam,
         totalScore: total,
         grade: _calculateGrade(total, state.gradingRules).split(' ').first,
-        remarks: studentControllers['remarks']!.text,
+        remarks: () {
+          final typed = studentControllers['remarks']!.text.trim();
+          if (typed.isNotEmpty) return typed;
+          return _remarkForScore(total, state.gradingRules);
+        }(),
         dateEntered: DateTime.now(),
       ));
     });
@@ -354,5 +366,18 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       }
     }
     return 'F';
+  }
+
+  String? _remarkForScore(double total, List<GradingRule> rules) {
+    if (rules.isEmpty) return null;
+    final sortedRules = List<GradingRule>.from(rules)
+      ..sort((a, b) => b.minScore.compareTo(a.minScore));
+    for (final rule in sortedRules) {
+      if (total >= rule.minScore) {
+        final remark = rule.remarks?.trim();
+        return (remark == null || remark.isEmpty) ? null : remark;
+      }
+    }
+    return null;
   }
 }

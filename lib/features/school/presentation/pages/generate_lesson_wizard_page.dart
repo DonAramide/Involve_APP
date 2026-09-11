@@ -127,7 +127,13 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                           DropdownMenuItem(value: c.id, child: Text(c.name))
                         ).toList(),
                         onChanged: (val) {
-                          setState(() => _selectedClassId = val);
+                          setState(() {
+                            _selectedClassId = val;
+                            final stillOffered = schoolState.subjects.any(
+                              (s) => s.id == _selectedSubjectId && s.isOfferedTo(val),
+                            );
+                            if (!stillOffered) _selectedSubjectId = null;
+                          });
                           _attemptTopicAutofill();
                         },
                         icon: Icons.class_,
@@ -138,9 +144,10 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                       _buildDropdown<int>(
                         label: 'Subject',
                         value: _selectedSubjectId,
-                        items: schoolState.subjects.map((s) => 
-                          DropdownMenuItem(value: s.id, child: Text(s.name))
-                        ).toList(),
+                        items: schoolState.subjects
+                          .where((s) => s.isOfferedTo(_selectedClassId))
+                          .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                          .toList(),
                         onChanged: (val) {
                           setState(() => _selectedSubjectId = val);
                           _attemptTopicAutofill();

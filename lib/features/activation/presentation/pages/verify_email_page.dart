@@ -19,12 +19,25 @@ class VerifyEmailPage extends StatefulWidget {
 class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldownMixin {
   bool _isVerifying = false;
   bool _isResending = false;
+  bool _verifyLock = false;
   String _currentPin = '';
 
   static const _accent = Color(0xFF6366F1);
+  static const _copyStyle = TextStyle(
+    color: Color(0xFFB0B0B0),
+    fontSize: 15,
+    height: 1.45,
+    fontFamily: 'Roboto',
+    fontFamilyFallback: ['sans-serif'],
+    wordSpacing: 1,
+  );
 
   String get _email =>
       (widget.payload['email']?.toString() ?? '').trim().toLowerCase();
+
+  bool get _emailAlreadyVerified =>
+      ((widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ?? [])
+          .contains('EMAIL');
 
   @override
   void initState() {
@@ -34,10 +47,24 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
   }
 
   Future<void> _verifyOtp([String? pinOverride]) async {
-    if (_isVerifying || _isResending) return;
+    if (_verifyLock || _isVerifying || _isResending) return;
+    _verifyLock = true;
+
+    if (_emailAlreadyVerified) {
+      setState(() => _isVerifying = true);
+      await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _verifyLock = false;
+        });
+      }
+      return;
+    }
 
     final pin = (pinOverride ?? _currentPin).trim();
     if (pin.length < 6) {
+      _verifyLock = false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter the 6-digit OTP.')),
       );
@@ -51,35 +78,30 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
 
     try {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
         validateStatus: (status) => status != null && status < 500,
       ));
-
-      final verifyUrls = [
-        '${AppConfig.baseUrl}/api/auth/verify-email-otp',
-      ];
 
       String? lastError;
       bool otpVerified = false;
 
-      for (final url in verifyUrls) {
-        try {
-          final response = await dio.post(
-            url,
-            data: {'email': _email, 'code': pin, 'otp': pin, 'purpose': 'SIGNUP'},
-          );
-          if (response.statusCode == 200 && (response.data?['success'] != false)) {
-            otpVerified = true;
-            break;
-          }
+      try {
+        final response = await dio.post(
+          '${AppConfig.baseUrl}/api/auth/verify-email-otp',
+          data: {'email': _email, 'code': pin, 'otp': pin, 'purpose': 'SIGNUP'},
+        );
+        if (response.statusCode == 200 && (response.data?['success'] != false)) {
+          otpVerified = true;
+        } else {
           lastError = extractApiErrorBody(response.data) ??
               'Invalid or expired verification code.';
-        } catch (e) {
-          lastError = friendlyApiError(
-            e,
-            fallback: 'Could not verify email. Please try again.',
-          );
         }
+      } catch (e) {
+        lastError = friendlyApiError(
+          e,
+          fallback: 'Could not verify email. Please try again.',
+        );
       }
 
       if (!otpVerified) {
@@ -91,15 +113,24 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
       final existingChannels =
           (widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ??
               [];
-      widget.payload['completedChannels'] = <String>[...existingChannels, 'EMAIL'];
+      if (!existingChannels.contains('EMAIL')) {
+        widget.payload['completedChannels'] = <String>[...existingChannels, 'EMAIL'];
+      }
       widget.payload['email'] = _email;
 
-      // Keep progress bar visible until navigation completes.
       await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
-      if (mounted) setState(() => _isVerifying = false);
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _verifyLock = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isVerifying = false);
+      setState(() {
+        _isVerifying = false;
+        _verifyLock = false;
+      });
       showFriendlyErrorSnackBar(
         context,
         e,
@@ -109,43 +140,41 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
   }
 
   Future<void> _resendOtp() async {
-    if (_isVerifying || _isResending || !canResendOtp) return;
+    if (_verifyLock || _isVerifying || _isResending || !canResendOtp) return;
     setState(() => _isResending = true);
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
-      final urls = [
-        '${AppConfig.baseUrl}/api/auth/send-email-otp',
-      ];
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ));
 
       bool sent = false;
       String? lastError;
-      for (final url in urls) {
-        try {
-          await dio.post(url, data: {
-            'email': _email,
-            'purpose': 'SIGNUP',
-            if (widget.payload['deviceId'] != null) 'deviceId': widget.payload['deviceId'],
-          });
-          sent = true;
-          break;
-        } on DioException catch (dioErr) {
-          if (dioErr.response?.statusCode == 409 ||
-              (dioErr.response?.data is Map &&
-                  (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
-                   dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
-            lastError = 'An account with this email already exists. Please sign in or use a different email.';
-            break;
-          }
+      try {
+        await dio.post('${AppConfig.baseUrl}/api/auth/send-email-otp', data: {
+          'email': _email,
+          'purpose': 'SIGNUP',
+          'resend': true,
+          if (widget.payload['deviceId'] != null) 'deviceId': widget.payload['deviceId'],
+        });
+        sent = true;
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 409 ||
+            (dioErr.response?.data is Map &&
+                (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                 dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+          lastError = 'An account with this email already exists. Please sign in or use a different email.';
+        } else {
           lastError = friendlyApiError(
             dioErr,
             fallback: 'Could not resend the code. Please try again.',
           );
-        } catch (e) {
-          lastError = friendlyApiError(
-            e,
-            fallback: 'Could not resend the code. Please try again.',
-          );
         }
+      } catch (e) {
+        lastError = friendlyApiError(
+          e,
+          fallback: 'Could not resend the code. Please try again.',
+        );
       }
 
       if (!sent) {
@@ -158,7 +187,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('OTP resent successfully! Check your email.'),
+          content: Text('OTP resent successfully! Check your newest email.'),
           backgroundColor: Colors.green,
         ),
       );
@@ -175,94 +204,117 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF05070D),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: _isVerifying ? null : () => Navigator.of(context).pop(),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
+    return DefaultTextStyle.merge(
+      style: const TextStyle(
+        fontFamily: 'Roboto',
+        fontFamilyFallback: ['sans-serif'],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.email_outlined, color: _accent, size: 64),
-              const SizedBox(height: 24),
-              const Text(
-                'Verify Your Email',
-                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We sent a 6-digit code to $_email. Please enter it below.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
-              ),
-              const SizedBox(height: 40),
-              IgnorePointer(
-                ignoring: _isVerifying,
-                child: Opacity(
-                  opacity: _isVerifying ? 0.5 : 1,
-                  child: CustomPinInput(
-                    length: 6,
-                    onChanged: (pin) => setState(() => _currentPin = pin),
-                    onCompleted: (pin) => _verifyOtp(pin),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF05070D),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: _isVerifying ? null : () => Navigator.of(context).pop(),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.email_outlined, color: _accent, size: 64),
+                const SizedBox(height: 24),
+                const Text(
+                  'Verify Your Email',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                    fontFamilyFallback: ['sans-serif'],
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
-              if (_isVerifying)
-                buildOtpVerifyingProgress(color: _accent)
-              else
-                Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isResending ? null : () => _verifyOtp(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accent,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: _accent.withOpacity(0.4),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text(
-                          'VERIFY & CONTINUE',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (_isResending)
-                      const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
-                      )
-                    else if (!canResendOtp)
-                      Text(
-                        resendCooldownLabel,
-                        style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600),
-                      )
-                    else
-                      TextButton(
-                        onPressed: _resendOtp,
-                        child: const Text(
-                          'Didn\'t receive code? Resend OTP',
-                          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                  ],
+                const SizedBox(height: 12),
+                Text(
+                  'We sent a 6-digit code to $_email.\nPlease enter it below.',
+                  textAlign: TextAlign.center,
+                  style: _copyStyle,
                 ),
-            ],
+                const SizedBox(height: 40),
+                IgnorePointer(
+                  ignoring: _isVerifying,
+                  child: Opacity(
+                    opacity: _isVerifying ? 0.5 : 1,
+                    child: CustomPinInput(
+                      length: 6,
+                      onChanged: (pin) => setState(() => _currentPin = pin),
+                      onCompleted: (pin) => _verifyOtp(pin),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                if (_isVerifying)
+                  buildOtpVerifyingProgress(color: _accent)
+                else
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _isResending ? null : () => _verifyOtp(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _accent,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: _accent.withOpacity(0.4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text(
+                            'VERIFY & CONTINUE',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (_isResending)
+                        const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
+                        )
+                      else if (!canResendOtp)
+                        Text(
+                          resendCooldownLabel,
+                          style: const TextStyle(
+                            color: Color(0xFF9E9E9E),
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                            fontFamilyFallback: ['sans-serif'],
+                          ),
+                        )
+                      else
+                        TextButton(
+                          onPressed: _resendOtp,
+                          child: const Text(
+                            'Didn\'t receive code? Resend OTP',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                              fontFamilyFallback: ['sans-serif'],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),

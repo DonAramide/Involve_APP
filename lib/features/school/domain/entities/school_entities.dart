@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'dart:typed_data';
+import 'package:intl/intl.dart';
 
 class AcademicYear extends Equatable {
   final int? id;
@@ -75,6 +76,11 @@ class Term extends Equatable {
 
   bool get isActive => isCurrent;
 
+  String get dateRangeLabel {
+    final fmt = DateFormat('dd MMM yyyy');
+    return '${fmt.format(startDate)} – ${fmt.format(endDate)}';
+  }
+
   @override
   List<Object?> get props => [id, academicYearId, name, startDate, endDate, isCurrent];
 }
@@ -110,6 +116,7 @@ class Student extends Equatable {
   final String lastName;
   final int classId;
   final int? academicYearId;
+  final int? parentId;
   final String? parentName;
   final String? parentPhone;
   final double balance;
@@ -131,6 +138,7 @@ class Student extends Equatable {
     required this.lastName,
     required this.classId,
     this.academicYearId,
+    this.parentId,
     this.parentName,
     this.parentPhone,
     this.balance = 0.0,
@@ -153,6 +161,7 @@ class Student extends Equatable {
     String? lastName,
     int? classId,
     int? academicYearId,
+    int? parentId,
     String? parentName,
     String? parentPhone,
     double? balance,
@@ -174,6 +183,7 @@ class Student extends Equatable {
       lastName: lastName ?? this.lastName,
       classId: classId ?? this.classId,
       academicYearId: academicYearId ?? this.academicYearId,
+      parentId: parentId ?? this.parentId,
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
@@ -195,6 +205,17 @@ class Student extends Equatable {
     return '$firstName $mid $lastName';
   }
 
+  /// Same name + phone means the same parent/guardian across siblings.
+  static String parentIdentity(String? name, String? phone) {
+    final n = (name ?? '').trim().toLowerCase();
+    final p = (phone ?? '').replaceAll(RegExp(r'\D'), '');
+    return '$n|$p';
+  }
+
+  String get parentKey => parentIdentity(parentName, parentPhone);
+
+  bool get hasParent => (parentName ?? '').trim().isNotEmpty;
+
   @override
   List<Object?> get props => [
         id,
@@ -204,6 +225,7 @@ class Student extends Equatable {
         lastName,
         classId,
         academicYearId,
+        parentId,
         parentName,
         parentPhone,
         balance,
@@ -224,30 +246,55 @@ class Subject extends Equatable {
   final String name;
   final String? code;
   final int? teacherId;
+  final List<int>? teacherIds;
+  final List<int>? classIds;
 
   const Subject({
     this.id,
     required this.name,
     this.code,
     this.teacherId,
+    this.teacherIds,
+    this.classIds,
   });
+
+  List<int> get assignedTeacherIds {
+    final ids = <int>{...?teacherIds};
+    if (teacherId != null) ids.add(teacherId!);
+    return ids.toList()..sort();
+  }
+
+  bool isTaughtBy(int? id) => id != null && assignedTeacherIds.contains(id);
 
   Subject copyWith({
     int? id,
     String? name,
     String? code,
     int? teacherId,
+    List<int>? teacherIds,
+    List<int>? classIds,
   }) {
+    final nextTeacherIds = teacherIds ?? this.teacherIds;
     return Subject(
       id: id ?? this.id,
       name: name ?? this.name,
       code: code ?? this.code,
-      teacherId: teacherId ?? this.teacherId,
+      teacherId: teacherIds != null
+          ? (teacherIds.isEmpty ? null : teacherIds.first)
+          : (teacherId ?? this.teacherId),
+      teacherIds: nextTeacherIds,
+      classIds: classIds ?? this.classIds,
     );
   }
 
+  bool isOfferedTo(int? classId) {
+    if (classId == null) return true;
+    if (classIds == null || classIds!.isEmpty) return true;
+    return classIds!.contains(classId);
+  }
+
   @override
-  List<Object?> get props => [id, name, code, teacherId];
+  List<Object?> get props => [id, name, code, teacherId, teacherIds, classIds];
 }
 
 class AcademicResult extends Equatable {
@@ -382,4 +429,179 @@ class Teacher extends Equatable {
         image,
         classIds,
       ];
+}
+
+class SchoolParent extends Equatable {
+  final int? id;
+  final String? syncId;
+  final String fullName;
+  final String? phone;
+  final String? email;
+  final String? virtualAccountNumber;
+  final String? virtualAccountBank;
+  final String? virtualAccountName;
+  final String? virtualAccountStatus;
+  final double creditBalance;
+  final DateTime createdAt;
+  final List<ParentVaAccount> virtualAccounts;
+
+  const SchoolParent({
+    this.id,
+    this.syncId,
+    required this.fullName,
+    this.phone,
+    this.email,
+    this.virtualAccountNumber,
+    this.virtualAccountBank,
+    this.virtualAccountName,
+    this.virtualAccountStatus,
+    this.creditBalance = 0,
+    required this.createdAt,
+    this.virtualAccounts = const [],
+  });
+
+  String get parentKey => Student.parentIdentity(fullName, phone);
+
+  bool get hasCanonicalVa =>
+      (virtualAccountNumber ?? '').trim().isNotEmpty;
+
+  SchoolParent copyWith({
+    int? id,
+    String? syncId,
+    String? fullName,
+    String? phone,
+    String? email,
+    String? virtualAccountNumber,
+    String? virtualAccountBank,
+    String? virtualAccountName,
+    String? virtualAccountStatus,
+    double? creditBalance,
+    DateTime? createdAt,
+    List<ParentVaAccount>? virtualAccounts,
+  }) {
+    return SchoolParent(
+      id: id ?? this.id,
+      syncId: syncId ?? this.syncId,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
+      virtualAccountName: virtualAccountName ?? this.virtualAccountName,
+      virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
+      creditBalance: creditBalance ?? this.creditBalance,
+      createdAt: createdAt ?? this.createdAt,
+      virtualAccounts: virtualAccounts ?? this.virtualAccounts,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        syncId,
+        fullName,
+        phone,
+        email,
+        virtualAccountNumber,
+        virtualAccountBank,
+        virtualAccountName,
+        virtualAccountStatus,
+        creditBalance,
+        createdAt,
+        virtualAccounts,
+      ];
+}
+
+class ParentVaAccount extends Equatable {
+  final int? id;
+  final int parentId;
+  final String accountNumber;
+  final String? bankName;
+  final String? accountName;
+  final String kind;
+  final bool isCanonical;
+
+  const ParentVaAccount({
+    this.id,
+    required this.parentId,
+    required this.accountNumber,
+    this.bankName,
+    this.accountName,
+    this.kind = 'legacy',
+    this.isCanonical = false,
+  });
+
+  @override
+  List<Object?> get props =>
+      [id, parentId, accountNumber, bankName, accountName, kind, isCanonical];
+}
+
+class ParentPaymentRecord extends Equatable {
+  final int? id;
+  final int parentId;
+  final String reference;
+  final double amount;
+  final double appliedToDebt;
+  final double toCredit;
+  final double parentOutstandingBefore;
+  final double parentOutstandingAfter;
+  final double parentCreditBefore;
+  final double parentCreditAfter;
+  final String? virtualAccountNumber;
+  final String source;
+  final DateTime createdAt;
+  final List<ParentPaymentAllocationRecord> allocations;
+
+  const ParentPaymentRecord({
+    this.id,
+    required this.parentId,
+    required this.reference,
+    required this.amount,
+    this.appliedToDebt = 0,
+    this.toCredit = 0,
+    this.parentOutstandingBefore = 0,
+    this.parentOutstandingAfter = 0,
+    this.parentCreditBefore = 0,
+    this.parentCreditAfter = 0,
+    this.virtualAccountNumber,
+    this.source = 'va_deposit',
+    required this.createdAt,
+    this.allocations = const [],
+  });
+
+  @override
+  List<Object?> get props => [
+        id,
+        parentId,
+        reference,
+        amount,
+        appliedToDebt,
+        toCredit,
+        parentOutstandingBefore,
+        parentOutstandingAfter,
+        parentCreditBefore,
+        parentCreditAfter,
+        virtualAccountNumber,
+        source,
+        createdAt,
+        allocations,
+      ];
+}
+
+class ParentPaymentAllocationRecord extends Equatable {
+  final int studentId;
+  final double outstandingBefore;
+  final double allocated;
+  final double outstandingAfter;
+
+  const ParentPaymentAllocationRecord({
+    required this.studentId,
+    required this.outstandingBefore,
+    required this.allocated,
+    required this.outstandingAfter,
+  });
+
+  @override
+  List<Object?> get props =>
+      [studentId, outstandingBefore, allocated, outstandingAfter];
 }

@@ -65,12 +65,15 @@ export class StudentController {
 
       // Quasar path param must be UUID; keep external key for CRM / webhook school matching.
       const externalKey = String(studentId).trim();
+      const isParentAccount = externalKey.startsWith('par-');
       const quasarChildId = toQuasarChildUuid(tenantId, externalKey);
       const invifyCustomerId = isUuid(externalKey)
         ? externalKey
-        : externalKey.startsWith('stu-')
+        : isParentAccount
           ? externalKey
-          : `stu-${admission.replace(/\s+/g, '') || externalKey}`;
+          : externalKey.startsWith('stu-')
+            ? externalKey
+            : `stu-${admission.replace(/\s+/g, '') || externalKey}`;
 
       console.log(
         `[StudentController] Provision VA externalKey=${externalKey} quasarChildId=${quasarChildId}`,
@@ -108,7 +111,9 @@ export class StudentController {
         }
       }
 
-      const { data: existingStudent } = await supabaseAdmin
+      const { data: existingStudent } = isParentAccount
+        ? { data: null }
+        : await supabaseAdmin
         .from('students')
         .select('virtual_account_number, virtual_account_bank, first_name, last_name')
         .or(`id.eq.${invifyCustomerId},id.eq.${quasarChildId},admission_number.eq.${admission}`)
@@ -134,11 +139,13 @@ export class StudentController {
         lastName: last,
         parentShareBps: 0,
         metadata: {
-          type: 'student_account',
+          type: String(externalKey).startsWith('par-') ? 'parent_account' : 'student_account',
           tenantId,
           admissionNumber: admission,
           phone: phone || undefined,
-          source: 'school_student_provisioning',
+          source: String(externalKey).startsWith('par-')
+            ? 'school_parent_provisioning'
+            : 'school_student_provisioning',
           externalStudentKey: externalKey,
           invifyCustomerId,
         },
@@ -149,6 +156,8 @@ export class StudentController {
       const accountName = (quasarAccount as any).accountName || fullName;
 
       // Prefer UUID row for students table (often uuid-typed); keep stu- key on customers for webhooks.
+      // Parent accounts are never stored as child rows — they live on customers as par-*.
+      if (!isParentAccount) {
       const studentRow = {
         id: quasarChildId,
         school_id: tenantId,
@@ -168,8 +177,9 @@ export class StudentController {
           console.warn('[StudentController] students upsert soft-failed:', studentSave.error.message);
         }
       }
+      }
 
-      // Mirror as CRM customer under stu-* id so VA webhooks can detect school students
+      // Mirror as CRM customer. Parent VAs use par-* so webhooks never treat them as child-owned.
       const customerSave = await supabaseAdmin.from('customers').upsert(
         {
           id: invifyCustomerId,
@@ -186,10 +196,10 @@ export class StudentController {
       );
       if (customerSave.error) {
         console.warn('[StudentController] customers upsert soft-failed:', customerSave.error.message);
-        // Fallback: store under Quasar UUID if stu-* id is rejected
+        // Fallback: keep par-* prefix for parent accounts so routing stays parent-owned
         const fallback = await supabaseAdmin.from('customers').upsert(
           {
-            id: quasarChildId,
+            id: isParentAccount ? `par-${quasarChildId}` : quasarChildId,
             tenant_id: tenantId,
             name: fullName,
             phone: phone || null,

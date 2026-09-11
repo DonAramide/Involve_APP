@@ -43,7 +43,7 @@ class AboutPage extends StatelessWidget {
             
             // Version
             const Text(
-              'Version 1.0.1',
+              'Version 1.0.3',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey,

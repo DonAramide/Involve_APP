@@ -73,9 +73,10 @@ class DeleteClassEvent extends SchoolEvent {
 
 class AddStudentEvent extends SchoolEvent {
   final Student student;
-  const AddStudentEvent(this.student);
+  final List<int> alsoAssignStudentIds;
+  const AddStudentEvent(this.student, {this.alsoAssignStudentIds = const []});
   @override
-  List<Object?> get props => [student];
+  List<Object?> get props => [student, alsoAssignStudentIds];
 }
 
 class ImportStudentsEvent extends SchoolEvent {
@@ -87,9 +88,10 @@ class ImportStudentsEvent extends SchoolEvent {
 
 class UpdateStudentEvent extends SchoolEvent {
   final Student student;
-  const UpdateStudentEvent(this.student);
+  final List<int> alsoAssignStudentIds;
+  const UpdateStudentEvent(this.student, {this.alsoAssignStudentIds = const []});
   @override
-  List<Object?> get props => [student];
+  List<Object?> get props => [student, alsoAssignStudentIds];
 }
 
 class DeleteStudentEvent extends SchoolEvent {
@@ -120,9 +122,17 @@ class AddSubjectEvent extends SchoolEvent {
   final String name;
   final String? code;
   final int? teacherId;
-  const AddSubjectEvent({required this.name, this.code, this.teacherId});
+  final List<int>? teacherIds;
+  final List<int>? classIds;
+  const AddSubjectEvent({
+    required this.name,
+    this.code,
+    this.teacherId,
+    this.teacherIds,
+    this.classIds,
+  });
   @override
-  List<Object?> get props => [name, code, teacherId];
+  List<Object?> get props => [name, code, teacherId, teacherIds, classIds];
 }
 
 class UpdateSubjectEvent extends SchoolEvent {
@@ -185,16 +195,18 @@ class DeleteGradingRuleEvent extends SchoolEvent {
 
 class AddTeacherEvent extends SchoolEvent {
   final Teacher teacher;
-  const AddTeacherEvent(this.teacher);
+  final List<int> subjectIds;
+  const AddTeacherEvent(this.teacher, {this.subjectIds = const []});
   @override
-  List<Object?> get props => [teacher];
+  List<Object?> get props => [teacher, subjectIds];
 }
 
 class UpdateTeacherEvent extends SchoolEvent {
   final Teacher teacher;
-  const UpdateTeacherEvent(this.teacher);
+  final List<int>? subjectIds;
+  const UpdateTeacherEvent(this.teacher, {this.subjectIds});
   @override
-  List<Object?> get props => [teacher];
+  List<Object?> get props => [teacher, subjectIds];
 }
 
 class DeleteTeacherEvent extends SchoolEvent {
@@ -240,9 +252,31 @@ class ProvisionStudentVirtualAccountEvent extends SchoolEvent {
   List<Object?> get props => [studentId];
 }
 
+class ProvisionParentVirtualAccountEvent extends SchoolEvent {
+  final int parentId;
+  const ProvisionParentVirtualAccountEvent(this.parentId);
+  @override
+  List<Object?> get props => [parentId];
+}
+
 class ClearStudentDebitEvent extends SchoolEvent {
   final int studentId;
   const ClearStudentDebitEvent(this.studentId);
   @override
   List<Object?> get props => [studentId];
+}
+
+class MakeParentPaymentEvent extends SchoolEvent {
+  final int parentId;
+  final double amount;
+  final String method;
+  final String? remarks;
+  const MakeParentPaymentEvent({
+    required this.parentId,
+    required this.amount,
+    required this.method,
+    this.remarks,
+  });
+  @override
+  List<Object?> get props => [parentId, amount, method, remarks];
 }

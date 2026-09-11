@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
@@ -269,6 +270,7 @@ class _TermsTab extends StatelessWidget {
                 final term = terms[index];
                 return ListTile(
                   title: Text(term.name),
+                  subtitle: Text(term.dateRangeLabel),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -305,6 +307,8 @@ class _TermsTab extends StatelessWidget {
   void _showTermDialog(BuildContext context, {required int yearId, Term? term}) {
     final isEdit = term != null;
     final controller = TextEditingController(text: term?.name);
+    DateTime startDate = term?.startDate ?? DateTime.now();
+    DateTime endDate = term?.endDate ?? DateTime.now().add(const Duration(days: 90));
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -316,41 +320,92 @@ class _TermsTab extends StatelessWidget {
             Navigator.of(ctx).pop();
           }
         },
-        child: AlertDialog(
-          title: Text(isEdit ? 'Edit Term' : 'Add Term'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'e.g. First Term'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  if (isEdit) {
-                    context.read<SchoolBloc>().add(UpdateTermEvent(
-                      term!.copyWith(name: controller.text),
-                    ));
-                  } else {
-                    context.read<SchoolBloc>().add(AddTermEvent(
-                      academicYearId: yearId, 
-                      name: controller.text,
-                      startDate: DateTime.now(),
-                      endDate: DateTime.now().add(const Duration(days: 90)),
-                    ));
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> pickDate({required bool isStart}) async {
+              final initial = isStart ? startDate : endDate;
+              final date = await showDatePicker(
+                context: context,
+                initialDate: initial,
+                firstDate: DateTime(1990),
+                lastDate: DateTime(2100),
+              );
+              if (date == null) return;
+              setDialogState(() {
+                if (isStart) {
+                  startDate = date;
+                  if (endDate.isBefore(startDate)) {
+                    endDate = startDate.add(const Duration(days: 90));
                   }
+                } else {
+                  endDate = date.isBefore(startDate) ? startDate : date;
                 }
-              },
-              child: BlocBuilder<SchoolBloc, SchoolState>(
-                builder: (context, state) {
-                  if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
-                  }
-                  return Text(isEdit ? 'Update' : 'Add');
-                },
+              });
+            }
+
+            return AlertDialog(
+              title: Text(isEdit ? 'Edit Term' : 'Add Term'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Term name',
+                      hintText: 'e.g. First Term',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Start date'),
+                    subtitle: Text(DateFormat('dd MMM yyyy').format(startDate)),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () => pickDate(isStart: true),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('End date'),
+                    subtitle: Text(DateFormat('dd MMM yyyy').format(endDate)),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () => pickDate(isStart: false),
+                  ),
+                ],
               ),
-            ),
-          ],
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) return;
+                    if (isEdit) {
+                      context.read<SchoolBloc>().add(UpdateTermEvent(
+                        term!.copyWith(
+                          name: controller.text.trim(),
+                          startDate: startDate,
+                          endDate: endDate,
+                        ),
+                      ));
+                    } else {
+                      context.read<SchoolBloc>().add(AddTermEvent(
+                        academicYearId: yearId,
+                        name: controller.text.trim(),
+                        startDate: startDate,
+                        endDate: endDate,
+                      ));
+                    }
+                  },
+                  child: BlocBuilder<SchoolBloc, SchoolState>(
+                    builder: (context, state) {
+                      if (state.isLoading && state.status == SchoolStatus.loading) {
+                        return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
+                      }
+                      return Text(isEdit ? 'Update' : 'Add');
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -472,11 +472,23 @@ export class OnboardingController {
       }
 
       const safePurpose = VerificationService.normalizePurpose(purpose);
-      await verificationService.sendOTP(normalized, 'EMAIL', safePurpose);
+      const reuseIfPending = req.body?.reuseIfPending === true && req.body?.resend !== true;
+      await verificationService.sendOTP(normalized, 'EMAIL', safePurpose, undefined, { reuseIfPending });
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendEmailOtp error:', error.message);
-      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+      const msg = String(error?.message || '');
+      if (/could not send the verification/i.test(msg)) {
+        res.status(503).json({
+          success: false,
+          error: 'Could not send the verification email. Please try again shortly.',
+        });
+        return;
+      }
+      res.status(500).json({
+        success: false,
+        error: 'Could not send the verification email. Please try again.',
+      });
     }
   }
 
@@ -501,13 +513,13 @@ export class OnboardingController {
       } else {
         res.status(400).json({
           success: false,
-          error: 'Invalid or expired OTP',
-          message: 'Invalid or expired OTP',
+          error: result.error || 'Invalid or expired OTP',
+          message: result.error || 'Invalid or expired OTP',
         });
       }
     } catch (error: any) {
       console.error('[OnboardingController] verifyEmailOtp error:', error.message);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ success: false, error: 'Could not verify the code right now. Please try again.' });
     }
   }
 
@@ -522,11 +534,23 @@ export class OnboardingController {
         return;
       }
       const safePurpose = VerificationService.normalizePurpose(purpose);
-      await verificationService.sendOTP(phone.trim(), 'WHATSAPP', safePurpose);
+      const reuseIfPending = req.body?.reuseIfPending === true && req.body?.resend !== true;
+      await verificationService.sendOTP(phone.trim(), 'WHATSAPP', safePurpose, undefined, { reuseIfPending });
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendWhatsappOtp error:', error.message);
-      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+      const msg = String(error?.message || '');
+      if (/could not send/i.test(msg)) {
+        res.status(503).json({
+          success: false,
+          error: 'Could not send the WhatsApp verification code. Please try again shortly.',
+        });
+        return;
+      }
+      res.status(500).json({
+        success: false,
+        error: 'Could not send the WhatsApp verification code. Please try again.',
+      });
     }
   }
 

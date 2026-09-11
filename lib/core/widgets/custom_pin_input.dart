@@ -22,6 +22,7 @@ class CustomPinInput extends StatefulWidget {
 class _CustomPinInputState extends State<CustomPinInput> {
   late List<FocusNode> _focusNodes;
   late List<TextEditingController> _controllers;
+  String _lastCompleted = '';
 
   @override
   void initState() {
@@ -41,7 +42,42 @@ class _CustomPinInputState extends State<CustomPinInput> {
     super.dispose();
   }
 
+  String get _currentPin => _controllers.map((c) => c.text).join();
+
+  void _emitPin() {
+    final currentPin = _currentPin;
+    widget.onChanged?.call(currentPin);
+    if (currentPin.length == widget.length && currentPin != _lastCompleted) {
+      _lastCompleted = currentPin;
+      widget.onCompleted(currentPin);
+    } else if (currentPin.length < widget.length) {
+      _lastCompleted = '';
+    }
+  }
+
+  void _distributeDigits(String digits, int startIndex) {
+    final chars = digits.replaceAll(RegExp(r'\D'), '').split('');
+    if (chars.isEmpty) return;
+    var index = startIndex;
+    for (final char in chars) {
+      if (index >= widget.length) break;
+      _controllers[index].text = char;
+      index++;
+    }
+    if (index < widget.length) {
+      _focusNodes[index].requestFocus();
+    } else {
+      _focusNodes.last.unfocus();
+    }
+    _emitPin();
+  }
+
   void _onChanged(String value, int index) {
+    if (value.length > 1) {
+      _distributeDigits(value, index);
+      return;
+    }
+
     if (value.isNotEmpty) {
       if (index < widget.length - 1) {
         _focusNodes[index].unfocus();
@@ -49,30 +85,19 @@ class _CustomPinInputState extends State<CustomPinInput> {
       } else {
         _focusNodes[index].unfocus();
       }
-    } else {
-      if (index > 0) {
-        _focusNodes[index].unfocus();
-        FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
-      }
+    } else if (index > 0) {
+      _focusNodes[index].unfocus();
+      FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
     }
 
-    String currentPin = _controllers.map((c) => c.text).join();
-    if (widget.onChanged != null) {
-      widget.onChanged!(currentPin);
-    }
-    
-    if (currentPin.length == widget.length) {
-      widget.onCompleted(currentPin);
-    }
+    _emitPin();
   }
 
-  void _onKey(RawKeyEvent event, int index) {
-    if (event.runtimeType == RawKeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.backspace) {
-        if (_controllers[index].text.isEmpty && index > 0) {
-          _focusNodes[index].unfocus();
-          FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
-        }
+  void _onKey(KeyEvent event, int index) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+      if (_controllers[index].text.isEmpty && index > 0) {
+        _focusNodes[index].unfocus();
+        FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
       }
     }
   }
@@ -85,20 +110,21 @@ class _CustomPinInputState extends State<CustomPinInput> {
         return SizedBox(
           width: 45,
           height: 55,
-          child: RawKeyboardListener(
-            focusNode: FocusNode(),
-            onKey: (event) => _onKey(event, index),
+          child: KeyboardListener(
+            focusNode: FocusNode(skipTraversal: true),
+            onKeyEvent: (event) => _onKey(event, index),
             child: TextField(
               controller: _controllers[index],
               focusNode: _focusNodes[index],
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              maxLength: 1,
+              maxLength: index == 0 ? widget.length : 1,
               obscureText: widget.obscureText,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF6366F1),
+                fontFamily: 'Roboto',
               ),
               cursorColor: const Color(0xFF6366F1),
               decoration: InputDecoration(

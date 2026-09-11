@@ -66,7 +66,7 @@ class _HelpPageState extends State<HelpPage> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Version 1.0.1',
+                  'Version 1.0.3',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),

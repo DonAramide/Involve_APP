@@ -404,7 +404,7 @@ class _DashboardPageState extends State<DashboardPage> {
             right: 0,
             child: Center(
               child: Text(
-                'v1.0.1',
+                'v1.0.3',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),
@@ -804,6 +804,13 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.people_alt,
           color: Colors.indigo,
           onTap: () => Navigator.pushNamed(context, '/student_list'),
+        ),
+        _DashboardMenuItem(
+          id: 'parents',
+          title: 'PARENTS',
+          icon: Icons.family_restroom,
+          color: Colors.teal,
+          onTap: () => Navigator.pushNamed(context, '/parent_list'),
         ),
         _DashboardMenuItem(
           id: 'teachers',

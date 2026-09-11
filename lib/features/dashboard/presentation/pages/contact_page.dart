@@ -196,27 +196,21 @@ class _ContactPageState extends State<ContactPage> {
       builder: (context, state) {
         if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING PARENT DIRECTORY...');
 
-        // Extract unique parents from students
-        final Map<String, ({Student student, SchoolClass? schoolClass})> parentMap = {};
+        // Group siblings under the same parent name + phone.
+        final Map<String, List<Student>> parentMap = {};
         for (var student in state.students) {
-          if (student.parentName != null && student.parentName!.isNotEmpty) {
-            // APPLY CLASS FILTER
-            if (_selectedClassId != null && student.classId != _selectedClassId) continue;
-
-            final key = '${student.parentName}_${student.parentPhone}';
-            if (!parentMap.containsKey(key)) {
-              final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
-              parentMap[key] = (student: student, schoolClass: sClass);
-            }
-          }
+          if (!student.hasParent) continue;
+          if (_selectedClassId != null && student.classId != _selectedClassId) continue;
+          parentMap.putIfAbsent(student.parentKey, () => []).add(student);
         }
 
         final parentList = parentMap.values.toList();
-        final filteredList = parentList.where((p) {
+        final filteredList = parentList.where((children) {
           final query = _searchQuery;
-          return p.student.parentName!.toLowerCase().contains(query) || 
-                 (p.student.parentPhone?.contains(query) ?? false) ||
-                 p.student.fullName.toLowerCase().contains(query); // SEARCH BY STUDENT NAME
+          final parent = children.first;
+          return parent.parentName!.toLowerCase().contains(query) ||
+              (parent.parentPhone?.contains(query) ?? false) ||
+              children.any((s) => s.fullName.toLowerCase().contains(query));
         }).toList();
 
         if (filteredList.isEmpty) {
@@ -226,14 +220,19 @@ class _ContactPageState extends State<ContactPage> {
         return ListView.builder(
           itemCount: filteredList.length,
           itemBuilder: (context, index) {
-            final entry = filteredList[index];
-            final parent = entry.student;
-            final className = entry.schoolClass?.name ?? 'Unknown Class';
-            
+            final children = filteredList[index];
+            final parent = children.first;
+            final childLabels = children.map((s) {
+              final schoolClass = state.classes.firstWhereOrNull((c) => c.id == s.classId);
+              return '${s.fullName} [${schoolClass?.name ?? 'Unknown Class'}]';
+            }).join(', ');
+
             return _ContactTile(
               name: parent.parentName!,
               phone: parent.parentPhone,
-              subtitle: 'Parent of: ${parent.fullName} [$className]',
+              subtitle: children.length == 1
+                  ? 'Parent of: $childLabels'
+                  : 'Parent of ${children.length}: $childLabels',
               icon: Icons.family_restroom_outlined,
             );
           },

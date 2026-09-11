@@ -137,6 +137,7 @@ import 'package:involve_app/features/services/presentation/pages/customers_list_
 import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/parent_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
 import 'package:involve_app/features/school/presentation/pages/manage_subjects_page.dart';
@@ -926,6 +927,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/customers_list': (_) => const CustomersListPage(),
               '/student_analytics': (_) => const StudentAnalyticsPage(),
               '/student_list': (_) => const StudentListPage(),
+              '/parent_list': (_) => const ParentListPage(),
               '/teacher_list': (_) => const TeacherListPage(),
               '/school_setup': (_) => const SchoolSetupPage(),
               '/fee_management': (_) => const FeeManagementPage(),

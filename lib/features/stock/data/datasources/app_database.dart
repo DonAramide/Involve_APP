@@ -36,6 +36,10 @@ part 'app_database.g.dart';
   AcademicYears,
   Terms,
   Classes,
+  Parents,
+  ParentVirtualAccounts,
+  ParentPayments,
+  ParentPaymentAllocations,
   Students,
   BusinessSettings,
   Subjects,
@@ -64,7 +68,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 92;
+  int get schemaVersion => 95;
 
   @override
   MigrationStrategy get migration {
@@ -465,6 +469,23 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 92) {
           await _safeAddColumn(m, students, students.middleName);
+        }
+        if (from < 93) {
+          await _safeAddColumn(m, subjects, subjects.classIds);
+        }
+        if (from < 94) {
+          await _safeAddColumn(m, subjects, subjects.teacherIds);
+          await customStatement(
+            "UPDATE subjects SET teacher_ids = CAST(teacher_id AS TEXT) "
+            "WHERE teacher_id IS NOT NULL AND (teacher_ids IS NULL OR teacher_ids = '')",
+          );
+        }
+        if (from < 95) {
+          await _safeCreateTable(m, parents);
+          await _safeCreateTable(m, parentVirtualAccounts);
+          await _safeCreateTable(m, parentPayments);
+          await _safeCreateTable(m, parentPaymentAllocations);
+          await _safeAddColumn(m, students, students.parentId);
         }
       },
       beforeOpen: (details) async {

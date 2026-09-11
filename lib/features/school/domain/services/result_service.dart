@@ -117,6 +117,7 @@ class ResultService {
                       children: [
                         if (academicYear != null) _infoRow('Academic Year:', academicYear.name),
                         if (term != null) _infoRow('Term:', term.name),
+                        if (term != null) _infoRow('Term Dates:', term.dateRangeLabel),
                         _infoRow('Date:', DateFormat('dd MMM, yyyy').format(DateTime.now())),
                       ],
                     ),
@@ -339,6 +340,7 @@ class ResultService {
     }
     if (term != null) {
       commands.add(TextCommand('Term: ${term.name}'));
+      commands.add(TextCommand('Dates: ${term.dateRangeLabel}'));
     }
     commands.add(DividerCommand());
 

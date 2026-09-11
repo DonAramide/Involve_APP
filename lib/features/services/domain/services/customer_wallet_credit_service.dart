@@ -7,6 +7,7 @@ import 'package:involve_app/features/services/domain/entities/service_customer.d
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/school/domain/services/parent_payment_allocator.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 
 /// Applies VA deposit socket events to local customer wallets and school students.
@@ -258,9 +259,14 @@ class CustomerWalletCreditService {
         debugPrint('[CustomerWalletCredit] Services repository not bound yet');
       }
 
-      // 2) School student VA credit — pay open bills first, remainder → creditBalance
+      // 2) Parent VA (canonical or legacy). Never treat as a child-owned account.
       final schoolRepo = _schoolRepository;
       if (schoolRepo != null) {
+        SchoolParent? parent;
+        if (va != null && va.isNotEmpty) {
+          parent = await schoolRepo.findParentByVirtualAccount(va);
+        }
+
         Student? matched;
         if (va != null && va.isNotEmpty) {
           matched = await schoolRepo.getStudentByVirtualAccount(va);
@@ -273,18 +279,38 @@ class CustomerWalletCreditService {
         }
         if (matched == null && studentId != null && studentId.trim().isNotEmpty) {
           final key = studentId.trim();
-          if (key.startsWith('stu-')) {
+          if (key.startsWith('par-')) {
+            // Parent-key payload — ignore as student match.
+          } else if (key.startsWith('stu-')) {
             matched = await schoolRepo.getStudentByAdmissionNumber(key.substring(4));
           } else {
             matched = await schoolRepo.getStudentByAdmissionNumber(key);
           }
         }
+        if (parent == null && matched?.parentId != null) {
+          parent = await schoolRepo.getParentById(matched!.parentId!);
+        }
 
+        if (parent != null) {
+          final ok = await _applyParentDeposit(
+            parent: parent,
+            amount: amount,
+            reference: reference,
+            va: va,
+            senderName: senderName,
+            metadata: metadata,
+            customerId: customerId,
+          );
+          if (ok) return true;
+        }
+
+        // 3) Unlinked student VA (pre-parent migration only)
         Student? student;
-        if (matched?.id != null) {
+        final unlinked = matched;
+        if (unlinked != null && unlinked.id != null && unlinked.parentId == null) {
           // Bills drive the red "Balance" on the Students list — update them first.
           final leftover = await _applyDepositToStudentInvoices(
-            studentId: matched!.id!,
+            studentId: unlinked.id!,
             amount: amount,
             reference: reference,
           );
@@ -293,7 +319,7 @@ class CustomerWalletCreditService {
           final invoiceRepo = _invoiceRepository;
           if (invoiceRepo != null) {
             final invoices =
-                await invoiceRepo.getInvoicesByStudentId(matched.id!);
+                await invoiceRepo.getInvoicesByStudentId(unlinked.id!);
             invoiceDebt = invoices.fold<double>(0, (sum, inv) {
               final owing = inv.totalAmount - inv.amountPaid;
               return sum + (owing > 0 ? owing : 0);
@@ -310,13 +336,13 @@ class CustomerWalletCreditService {
           }
 
           if (student == null) {
-            student = matched.copyWith(
+            student = unlinked.copyWith(
               balance: invoiceDebt,
-              creditBalance: matched.creditBalance + leftover,
+              creditBalance: unlinked.creditBalance + leftover,
             );
             await schoolRepo.updateStudent(student);
           }
-        } else {
+        } else if (matched?.parentId == null) {
           student = await schoolRepo.creditStudentFromDeposit(
             amount: amount,
             reference: reference,
@@ -366,5 +392,122 @@ class CustomerWalletCreditService {
       debugPrint('[CustomerWalletCredit] apply failed: $e\n$st');
       return false;
     }
+  }
+
+  Future<bool> _applyParentDeposit({
+    required SchoolParent parent,
+    required double amount,
+    required String reference,
+    String? va,
+    required String senderName,
+    required Map<String, dynamic> metadata,
+    String? customerId,
+  }) async {
+    final schoolRepo = _schoolRepository;
+    if (schoolRepo == null || parent.id == null) return false;
+    if (await schoolRepo.parentPaymentExists(reference)) {
+      debugPrint('[CustomerWalletCredit] Parent duplicate ignored: $reference');
+      return true;
+    }
+
+    final children =
+        (await schoolRepo.getStudents()).where((s) => s.parentId == parent.id).toList();
+
+    Future<double> outstandingOf(Student s) async {
+      final invoiceRepo = _invoiceRepository;
+      if (invoiceRepo != null && s.id != null) {
+        final invoices = await invoiceRepo.getInvoicesByStudentId(s.id!);
+        var debt = 0.0;
+        for (final inv in invoices) {
+          if (inv.invoiceNumber.startsWith('PMT-')) continue;
+          final owing = inv.totalAmount - inv.amountPaid;
+          if (owing > 0) debt += owing;
+        }
+        if (debt > 0.001) return debt;
+      }
+      return s.balance > 0 ? s.balance : 0.0;
+    }
+
+    final debts = <ChildOutstanding>[];
+    for (final child in children) {
+      debts.add(ChildOutstanding(
+        studentId: child.id!,
+        outstandingNaira: await outstandingOf(child),
+      ));
+    }
+
+    final result = ParentPaymentAllocator.allocate(
+      paymentNaira: amount,
+      children: debts,
+    );
+
+    for (final alloc in result.allocations) {
+      if (alloc.allocatedKobo <= 0) continue;
+      await _applyDepositToStudentInvoices(
+        studentId: alloc.studentId,
+        amount: alloc.allocatedNaira,
+        reference: reference,
+      );
+      final child = children.firstWhere((s) => s.id == alloc.studentId);
+      await schoolRepo.updateStudent(
+        child.copyWith(balance: alloc.outstandingAfterNaira),
+      );
+      _studentCredits.add(child.copyWith(balance: alloc.outstandingAfterNaira));
+    }
+
+    await schoolRepo.recordParentPayment(
+      ParentPaymentRecord(
+        parentId: parent.id!,
+        reference: reference,
+        amount: result.paymentNaira,
+        appliedToDebt: result.appliedNaira,
+        toCredit: result.creditNaira,
+        parentOutstandingBefore: result.parentOutstandingBeforeNaira,
+        parentOutstandingAfter: result.parentOutstandingAfterNaira,
+        parentCreditBefore: parent.creditBalance,
+        parentCreditAfter: parent.creditBalance + result.creditNaira,
+        virtualAccountNumber: va,
+        source: 'va_deposit',
+        createdAt: DateTime.now(),
+        allocations: result.allocations
+            .map(
+              (a) => ParentPaymentAllocationRecord(
+                studentId: a.studentId,
+                outstandingBefore: a.outstandingBeforeNaira,
+                allocated: a.allocatedNaira,
+                outstandingAfter: a.outstandingAfterNaira,
+              ),
+            )
+            .toList(),
+      ),
+    );
+
+    final ledger = await loadLedger();
+    ledger.removeWhere(
+      (e) =>
+          e['reference']?.toString() == reference &&
+          e['source']?.toString() == 'catchup_notify_only',
+    );
+    await _saveLedger(ledger);
+    await _recordLedgerEntry(
+      reference: reference,
+      amount: amount,
+      customerId: customerId,
+      senderName: senderName,
+      metadata: {
+        ...metadata,
+        'parentId': parent.id,
+        'parentName': parent.fullName,
+        'paidVia': 'parent_account',
+        'appliedToDebt': result.appliedNaira,
+        'parentCredit': result.creditNaira,
+      },
+      source: 'parent_wallet',
+    );
+    debugPrint(
+      '[CustomerWalletCredit] Parent ${parent.fullName} ₦$amount '
+      '(applied=${result.appliedNaira}, credit=${result.creditNaira}, ref=$reference)',
+    );
+    return true;
   }
 }

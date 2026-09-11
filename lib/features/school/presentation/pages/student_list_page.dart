@@ -610,6 +610,17 @@ class _StudentListPageState extends State<StudentListPage> {
     );
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
+    final schoolState = context.read<SchoolBloc>().state;
+    String? selectedExistingParentKey = student != null && student.hasParent
+        ? student.parentKey
+        : null;
+    final alsoAssignIds = <int>{
+      if (student != null && student.hasParent)
+        ...schoolState.students
+            .where((s) => s.id != student.id && s.parentKey == student.parentKey)
+            .map((s) => s.id!)
+            .whereType<int>(),
+    };
     int? selectedClassId = student?.classId;
     String? selectedDepartment = student?.department;
     String? selectedGender = student?.gender;
@@ -748,6 +759,61 @@ class _StudentListPageState extends State<StudentListPage> {
                       },
                     ),
                     const SizedBox(height: 16),
+                    BlocBuilder<SchoolBloc, SchoolState>(
+                      builder: (context, state) {
+                        final parents = _uniqueParents(state.students);
+                        return DropdownButtonFormField<String>(
+                          value: parents.any((p) => p.key == selectedExistingParentKey)
+                              ? selectedExistingParentKey
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Existing parent / guardian',
+                          ),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('New parent (type below)'),
+                            ),
+                            ...parents.map(
+                              (p) => DropdownMenuItem<String>(
+                                value: p.key,
+                                child: Text(
+                                  '${p.name} · ${p.phone} (${p.childCount})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedExistingParentKey = val;
+                              if (val == null) return;
+                              _ExistingParent? match;
+                              for (final p in parents) {
+                                if (p.key == val) {
+                                  match = p;
+                                  break;
+                                }
+                              }
+                              if (match == null) return;
+                              parentNameController.text = match.name;
+                              parentPhoneController.text = match.phone;
+                              alsoAssignIds
+                                ..clear()
+                                ..addAll(
+                                  state.students
+                                      .where((s) =>
+                                          s.id != student?.id &&
+                                          s.parentKey == val)
+                                      .map((s) => s.id!)
+                                      .whereType<int>(),
+                                );
+                            });
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: parentNameController, 
                       decoration: const InputDecoration(labelText: 'Parent/Guardian Name *'),
@@ -762,6 +828,38 @@ class _StudentListPageState extends State<StudentListPage> {
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
                         return PhoneNumberInput.validate(v, required: true, minDigits: 11);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    BlocBuilder<SchoolBloc, SchoolState>(
+                      builder: (context, state) {
+                        final others = state.students
+                            .where((s) => s.id != student?.id)
+                            .toList()
+                          ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+                        final names = others
+                            .where((s) => alsoAssignIds.contains(s.id))
+                            .map((s) => s.fullName)
+                            .join(', ');
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Also parent of'),
+                          subtitle: Text(
+                            alsoAssignIds.isEmpty
+                                ? 'This student only'
+                                : names,
+                          ),
+                          trailing: const Icon(Icons.arrow_drop_down),
+                          onTap: others.isEmpty
+                              ? null
+                              : () => _showSiblingPicker(
+                                    context,
+                                    others: others,
+                                    classes: state.classes,
+                                    selectedIds: alsoAssignIds,
+                                    onChanged: () => setDialogState(() {}),
+                                  ),
+                        );
                       },
                     ),
                   ],
@@ -803,9 +901,15 @@ class _StudentListPageState extends State<StudentListPage> {
                         );
 
                     if (student == null) {
-                      context.read<SchoolBloc>().add(AddStudentEvent(newStudent));
+                      context.read<SchoolBloc>().add(AddStudentEvent(
+                            newStudent,
+                            alsoAssignStudentIds: alsoAssignIds.toList(),
+                          ));
                     } else {
-                      context.read<SchoolBloc>().add(UpdateStudentEvent(newStudent));
+                      context.read<SchoolBloc>().add(UpdateStudentEvent(
+                            newStudent,
+                            alsoAssignStudentIds: alsoAssignIds.toList(),
+                          ));
                     }
                   }
                 },
@@ -858,6 +962,109 @@ class _StudentListPageState extends State<StudentListPage> {
           ),
         ],
       ),
+    );
+  }
+
+  List<_ExistingParent> _uniqueParents(List<Student> students) {
+    final byKey = <String, _ExistingParent>{};
+    for (final s in students) {
+      if (!s.hasParent) continue;
+      final existing = byKey[s.parentKey];
+      if (existing == null) {
+        byKey[s.parentKey] = _ExistingParent(
+          key: s.parentKey,
+          name: s.parentName!.trim(),
+          phone: (s.parentPhone ?? '').trim(),
+          childCount: 1,
+        );
+      } else {
+        byKey[s.parentKey] = existing.copyWith(childCount: existing.childCount + 1);
+      }
+    }
+    final list = byKey.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  }
+
+  void _showSiblingPicker(
+    BuildContext context, {
+    required List<Student> others,
+    required List<SchoolClass> classes,
+    required Set<int> selectedIds,
+    required VoidCallback onChanged,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setPickerState) {
+            return AlertDialog(
+              title: const Text('Assign this parent to students'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: others.isEmpty
+                    ? const Text('No other students yet.')
+                    : ListView(
+                        shrinkWrap: true,
+                        children: others.map((s) {
+                          var className = '—';
+                          for (final c in classes) {
+                            if (c.id == s.classId) {
+                              className = c.name;
+                              break;
+                            }
+                          }
+                          return CheckboxListTile(
+                            title: Text(s.fullName),
+                            subtitle: Text(className),
+                            value: selectedIds.contains(s.id),
+                            onChanged: (checked) {
+                              setPickerState(() {
+                                if (checked == true) {
+                                  selectedIds.add(s.id!);
+                                } else {
+                                  selectedIds.remove(s.id);
+                                }
+                              });
+                              onChanged();
+                            },
+                          );
+                        }).toList(),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ExistingParent {
+  final String key;
+  final String name;
+  final String phone;
+  final int childCount;
+
+  const _ExistingParent({
+    required this.key,
+    required this.name,
+    required this.phone,
+    required this.childCount,
+  });
+
+  _ExistingParent copyWith({int? childCount}) {
+    return _ExistingParent(
+      key: key,
+      name: name,
+      phone: phone,
+      childCount: childCount ?? this.childCount,
     );
   }
 }
