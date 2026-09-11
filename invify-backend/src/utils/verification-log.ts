@@ -12,13 +12,27 @@ export type VerificationLogRow = {
   expiresAt: string | null;
   verifiedAt: string | null;
   createdAt: string | null;
+  otp: string | null;
 };
 
 const LOG_COLUMNS =
-  'id, tenant_id, email, phone, channel, purpose, status, attempt_count, expires_at, verified_at, created_at';
+  'id, tenant_id, email, phone, channel, purpose, status, attempt_count, expires_at, verified_at, created_at, plain_code, code';
 
-export function verificationLogSelect(): string {
-  return LOG_COLUMNS;
+const LOG_COLUMNS_WITHOUT_PLAIN =
+  'id, tenant_id, email, phone, channel, purpose, status, attempt_count, expires_at, verified_at, created_at, code';
+
+export function verificationLogSelect(includePlainCode = true): string {
+  return includePlainCode ? LOG_COLUMNS : LOG_COLUMNS_WITHOUT_PLAIN;
+}
+
+/** Only a 6-digit OTP. Never return a bcrypt hash. */
+export function extractSupportOtp(row: any): string | null {
+  const candidates = [row?.plain_code, row?.otp, row?.code];
+  for (const raw of candidates) {
+    const value = String(raw || '').trim();
+    if (/^\d{6}$/.test(value)) return value;
+  }
+  return null;
 }
 
 export function sanitizeVerificationSearch(raw: unknown): string {
@@ -48,6 +62,7 @@ export function toVerificationLogRow(row: any, now = Date.now()): VerificationLo
     expiresAt: row?.expires_at || null,
     verifiedAt: row?.verified_at || null,
     createdAt: row?.created_at || null,
+    otp: extractSupportOtp(row),
   };
 }
 

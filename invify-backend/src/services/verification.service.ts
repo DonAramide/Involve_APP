@@ -10,6 +10,40 @@ export class VerificationService {
   private readonly OTP_LENGTH = 6;
   private readonly OTP_EXPIRY_MINUTES = 10;
   private readonly MAX_RETRIES = 5;
+  private static plainCodeReady = false;
+
+  public static async ensurePlainCodeColumn(): Promise<boolean> {
+    if (VerificationService.plainCodeReady) return true;
+    const probe = await supabase.from('verification_codes').select('plain_code').limit(1);
+    if (!probe.error) {
+      VerificationService.plainCodeReady = true;
+      return true;
+    }
+
+    const sql =
+      "ALTER TABLE public.verification_codes ADD COLUMN IF NOT EXISTS plain_code VARCHAR(6); NOTIFY pgrst, 'reload schema'";
+    try {
+      if (process.env.DATABASE_URL) {
+        const { dbQuery } = await import('../db/pg');
+        await dbQuery(sql);
+      }
+    } catch (e: any) {
+      console.warn('[VerificationService] plain_code pg DDL:', e?.message || e);
+    }
+    try {
+      const ddl = `select 1) t; ${sql}; SELECT json_build_object('ok', true) as val --`;
+      const first = await supabase.rpc('execute_sql', { sql_query: ddl });
+      if (first.error) {
+        await supabase.rpc('execute_sql', { query_text: ddl });
+      }
+    } catch (e: any) {
+      console.warn('[VerificationService] plain_code execute_sql:', e?.message || e);
+    }
+    await new Promise((r) => setTimeout(r, 400));
+    const again = await supabase.from('verification_codes').select('plain_code').limit(1);
+    VerificationService.plainCodeReady = !again.error;
+    return VerificationService.plainCodeReady;
+  }
 
   private generateOTP(): string {
     const min = Math.pow(10, this.OTP_LENGTH - 1);
@@ -40,9 +74,11 @@ export class VerificationService {
     const email = channel === 'EMAIL' ? normalized : null;
     const phone = channel === 'WHATSAPP' ? normalized : null;
 
+    await VerificationService.ensurePlainCodeColumn();
+
     const { data: existingRows } = await supabase
       .from('verification_codes')
-      .select('id, expires_at')
+      .select('id, expires_at, plain_code, code')
       .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
       .eq('channel', channel)
       .eq('purpose', safePurpose)
@@ -69,21 +105,31 @@ export class VerificationService {
     const hashedOtp = await bcrypt.hash(rawOtp, saltRounds);
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
-    const { data: inserted, error: insertError } = await supabase
+    const payload: Record<string, unknown> = {
+      tenant_id: tenantId || null,
+      email,
+      phone,
+      code: hashedOtp,
+      plain_code: rawOtp,
+      channel,
+      purpose: safePurpose,
+      status: 'PENDING',
+      attempt_count: 0,
+      expires_at: expiresAt,
+    };
+
+    let { data: inserted, error: insertError } = await supabase
       .from('verification_codes')
-      .insert({
-        tenant_id: tenantId || null,
-        email,
-        phone,
-        code: hashedOtp,
-        channel,
-        purpose: safePurpose,
-        status: 'PENDING',
-        attempt_count: 0,
-        expires_at: expiresAt
-      })
+      .insert(payload)
       .select('id')
       .maybeSingle();
+
+    if (insertError && /plain_code/i.test(String(insertError.message || ''))) {
+      delete payload.plain_code;
+      const retry = await supabase.from('verification_codes').insert(payload).select('id').maybeSingle();
+      inserted = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError || !inserted?.id) {
       console.error('[VerificationService] Database error saving OTP:', insertError);

@@ -1045,7 +1045,7 @@ const getMenuDescription = (label) => {
     'Platform Overview': 'Single-pane-of-glass administrative command center aggregating ecosystem health, security, operations, and telemetry.',
     'Platform Configuration': 'Configure core platform parameters, localization & currency systems, session security policies, and whitelabel branding.',
     'Authentication Settings': 'Manage onboarding verification channels, SMS integrations, and security rules for new tenants.',
-    'Verification Log': 'See the latest email and WhatsApp verification sends per recipient, with time and status. Codes are never shown.',
+    'Verification Log': 'See the latest email and WhatsApp verification sends per recipient, including the OTP, time, and status.',
     'Contact Maintenance': 'Update support contact numbers and dispatch real-time emergency notifications to active devices.',
     'Global Setup & RBAC': 'Configure core platform parameters, primary currency defaults, global variables, and roles & permissions.',
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',

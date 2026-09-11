@@ -21,6 +21,7 @@ import {
   uniqueLatestByRecipient,
   verificationLogSelect,
 } from '../utils/verification-log';
+import { VerificationService } from '../services/verification.service';
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -646,7 +647,7 @@ export class AdminController {
 
   /**
    * GET /admin/verification-log
-   * Support view of recent email/WhatsApp OTP sends. Never returns the code.
+   * Super-admin support view of recent OTP sends, including the 6-digit code.
    */
   static async listVerificationLog(req: Request, res: Response) {
     try {
@@ -657,9 +658,10 @@ export class AdminController {
       const latestOnly = String(req.query.latest || '1') !== '0';
       const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 200);
 
+      const hasPlain = await VerificationService.ensurePlainCodeColumn();
       let query = supabaseAdmin
         .from('verification_codes')
-        .select(verificationLogSelect())
+        .select(verificationLogSelect(hasPlain))
         .order('created_at', { ascending: false })
         .limit(latestOnly ? 1500 : limit);
 
@@ -678,7 +680,22 @@ export class AdminController {
         query = query.eq('purpose', purpose);
       }
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+      if (error && /plain_code/i.test(String(error.message || ''))) {
+        query = supabaseAdmin
+          .from('verification_codes')
+          .select(verificationLogSelect(false))
+          .order('created_at', { ascending: false })
+          .limit(latestOnly ? 1500 : limit);
+        if (q) query = query.or(`email.ilike.%${q}%,phone.ilike.%${q}%`);
+        if (['EMAIL', 'WHATSAPP'].includes(channel)) query = query.eq('channel', channel);
+        if (status === 'EXPIRED') query = query.in('status', ['EXPIRED', 'PENDING']);
+        else if (['PENDING', 'VERIFIED', 'CANCELLED'].includes(status)) query = query.eq('status', status);
+        if (['SIGNUP', 'PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(purpose)) {
+          query = query.eq('purpose', purpose);
+        }
+        ({ data, error } = await query);
+      }
       if (error) throw error;
 
       let rows = (data || []).map((row: any) => toVerificationLogRow(row));

@@ -5,7 +5,7 @@
       <div class="col">
         <h1 class="text-h5 q-my-none text-weight-bold">Verification Log</h1>
         <div class="text-caption text-grey-4">
-          Latest email and WhatsApp OTP sends. Codes are never shown here.
+          Latest email and WhatsApp OTP sends. Older rows stay blank if the code was only stored as a hash.
         </div>
       </div>
       <div class="col-auto">
@@ -114,6 +114,26 @@
         </q-td>
       </template>
 
+      <template v-slot:body-cell-otp="props">
+        <q-td :props="props">
+          <div v-if="props.row.otp" class="row items-center no-wrap">
+            <span class="text-weight-bold otp-code">{{ props.row.otp }}</span>
+            <q-btn
+              flat
+              dense
+              round
+              size="sm"
+              icon="content_copy"
+              class="q-ml-xs"
+              @click="copyOtp(props.row.otp)"
+            >
+              <q-tooltip>Copy code</q-tooltip>
+            </q-btn>
+          </div>
+          <span v-else class="text-grey-6">—</span>
+        </q-td>
+      </template>
+
       <template v-slot:body-cell-displayStatus="props">
         <q-td :props="props">
           <q-badge :color="statusColor(props.row.displayStatus)" :label="props.row.displayStatus" />
@@ -125,11 +145,13 @@
 
 <script>
 import { defineComponent, onMounted, ref } from 'vue'
+import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 
 export default defineComponent({
   name: 'VerificationLogPage',
   setup () {
+    const $q = useQuasar()
     const loading = ref(false)
     const rows = ref([])
     const errorMessage = ref('')
@@ -162,6 +184,7 @@ export default defineComponent({
 
     const columns = [
       { name: 'recipient', label: 'Recipient', field: 'recipient', align: 'left', sortable: true },
+      { name: 'otp', label: 'OTP', field: 'otp', align: 'left' },
       { name: 'displayStatus', label: 'Status', field: 'displayStatus', align: 'left', sortable: true },
       {
         name: 'createdAt',
@@ -197,6 +220,15 @@ export default defineComponent({
 
     function formatPurpose (value) {
       return String(value || '').replace(/_/g, ' ').toLowerCase()
+    }
+
+    async function copyOtp (otp) {
+      try {
+        await navigator.clipboard.writeText(String(otp || ''))
+        $q.notify({ type: 'positive', message: 'OTP copied', timeout: 1200 })
+      } catch (_) {
+        $q.notify({ type: 'negative', message: 'Could not copy OTP' })
+      }
     }
 
     function statusColor (value) {
@@ -244,7 +276,8 @@ export default defineComponent({
       columns,
       fetchRows,
       formatPurpose,
-      statusColor
+      statusColor,
+      copyOtp
     }
   }
 })
@@ -253,5 +286,9 @@ export default defineComponent({
 <style scoped>
 .border-indigo {
   border: 1px solid rgba(99, 102, 241, 0.2);
+}
+.otp-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
 }
 </style>

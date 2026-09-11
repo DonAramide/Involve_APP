@@ -1,4 +1,5 @@
 import {
+  extractSupportOtp,
   sanitizeVerificationSearch,
   toVerificationLogRow,
   uniqueLatestByRecipient,
@@ -6,18 +7,20 @@ import {
 } from '../src/utils/verification-log';
 
 describe('verification log', () => {
-  test('select list never includes the OTP hash column', () => {
+  test('select list includes support OTP columns but maps hashes out of the API row', () => {
     const cols = verificationLogSelect().split(',').map((c) => c.trim());
-    expect(cols).not.toContain('code');
-    expect(verificationLogSelect()).not.toMatch(/\bcode\b/);
+    expect(cols).toContain('plain_code');
+    expect(cols).toContain('code');
   });
 
-  test('strips plaintext or hashed codes from API rows', () => {
+  test('exposes a 6-digit OTP and never a bcrypt hash', () => {
+    const hash = '$2b$10$abcdefghijklmnopqrstuv';
     const row = toVerificationLogRow({
       id: 'a',
       email: 'aramyde@gmail.com',
       phone: null,
-      code: '482913',
+      code: hash,
+      plain_code: '482913',
       channel: 'EMAIL',
       purpose: 'SIGNUP',
       status: 'PENDING',
@@ -26,10 +29,15 @@ describe('verification log', () => {
       verified_at: null,
       created_at: new Date().toISOString(),
     });
+    expect(row.otp).toBe('482913');
+    expect(JSON.stringify(row)).not.toContain(hash);
     expect(row).not.toHaveProperty('code');
-    expect(JSON.stringify(row)).not.toContain('482913');
-    expect(row.recipient).toBe('aramyde@gmail.com');
-    expect(row.displayStatus).toBe('PENDING');
+    expect(row).not.toHaveProperty('plain_code');
+  });
+
+  test('recovers a legacy plaintext code stored in the hash column', () => {
+    expect(extractSupportOtp({ code: '119204' })).toBe('119204');
+    expect(extractSupportOtp({ code: '$2b$10$not-an-otp' })).toBeNull();
   });
 
   test('marks overdue pending rows as expired without mutating storage', () => {
@@ -43,6 +51,7 @@ describe('verification log', () => {
     });
     expect(row.status).toBe('PENDING');
     expect(row.displayStatus).toBe('EXPIRED');
+    expect(row.otp).toBeNull();
   });
 
   test('keeps the newest row per email', () => {
