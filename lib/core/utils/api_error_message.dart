@@ -103,6 +103,12 @@ String? _mapSensitive(String text) {
       t.contains('access token')) {
     return 'Your session expired. Please sign in again.';
   }
+  if (t.contains('financial_platform_unprovisioned') ||
+      t.contains('financial platform') ||
+      t.contains('unprovisioned')) {
+    return 'Virtual accounts need the Financial Platform activated for this school first. '
+        'On Invify Admin (super admin or tenant admin), open this school → Financial Platform → Activate Platform, then try again.';
+  }
   if (t.contains('invalid api key') ||
       t.contains('api key') ||
       t.contains('apikey') ||

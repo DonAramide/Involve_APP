@@ -126,7 +126,20 @@ class PlanGatingInterceptor extends Interceptor {
         return true;
       }
 
-      // 3. Paid activation key: Standard / Premium / Enterprise only — not Basic
+      // 3. Server-redeemed Standard / Premium (QR / portal), even without HMAC blob
+      final serverPlan = await StorageService.getServerActivatedPlan();
+      if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+        final p = serverPlan.planType.toLowerCase().trim();
+        if (p == 'standard' ||
+            p == 'pro' ||
+            p == 'premium' ||
+            p == 'enterprise' ||
+            p == 'lifetime') {
+          return true;
+        }
+      }
+
+      // 4. Paid activation key: Standard / Premium / Enterprise only — not Basic
       final code = await StorageService.getLicense();
       if (code != null) {
         final peeked = LicenseValidator.peek(code);

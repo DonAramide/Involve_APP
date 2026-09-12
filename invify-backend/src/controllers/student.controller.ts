@@ -5,7 +5,7 @@ import { getQuasarService } from '../integrations/quasar/factory';
 import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { isUuid, toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
-import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
+import { rejectIfVaBlocked } from '../utils/free-trial-guard';
 
 export class StudentController {
   /**
@@ -25,7 +25,7 @@ export class StudentController {
         return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       }
 
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
 
       const virtualAccount = await StudentService.getOrCreateVirtualAccount(studentId, tenantId);
       
@@ -53,7 +53,7 @@ export class StudentController {
       if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
       if (!tenantId) return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
 
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
 
       const first = String(firstName || '').trim() || 'Student';
       const last = String(lastName || '').trim() || String(admissionNumber || studentId).trim() || 'Learner';
@@ -241,7 +241,7 @@ export class StudentController {
       if (/econnrefused|connection refused/i.test(msg)) {
         return res.status(503).json({
           error:
-            'Payment account service is temporarily unavailable. If you are on Free Trial, activate your license to use Virtual Accounts.',
+            'Payment account service is temporarily unavailable. If Financial Platform is still UNPROVISIONED, activate it for this school in Invify Admin, then try again.',
           code: 'VA_SERVICE_UNAVAILABLE',
         });
       }

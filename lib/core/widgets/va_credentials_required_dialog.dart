@@ -73,15 +73,15 @@ Future<void> showVirtualAccountFailureDialog(
   Object error, {
   String subject = 'virtual account',
 }) {
-  final text = error.toString().toLowerCase();
-  if (text.contains('free trial') || text.contains('free_trial_feature_locked')) {
+  final parsed = _parseVaFailure(error);
+  if (parsed.kind == _VaFailureKind.freeTrial) {
     return showDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Free Trial'),
         content: const Text(
           'You can’t access Virtual Account generation on Free Trial mode.\n\n'
-          'Activate a Pro / paid license to unlock virtual accounts for School, Retail, and Services.',
+          'Activate a Standard or Premium license to unlock virtual accounts for School, Retail, and Services.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
@@ -100,7 +100,6 @@ Future<void> showVirtualAccountFailureDialog(
     );
   }
 
-  final parsed = _parseVaFailure(error);
   final needsWebActivation = parsed.needsWebActivation;
 
   return showDialog<void>(
@@ -116,7 +115,9 @@ Future<void> showVirtualAccountFailureDialog(
           Expanded(
             child: Text(
               needsWebActivation
-                  ? 'Activate VA Credentials'
+                  ? (parsed.kind == _VaFailureKind.financialPlatform
+                      ? 'Activate Financial Platform'
+                      : 'Activate VA Credentials')
                   : 'Could Not Generate VA',
               style: const TextStyle(fontSize: 18),
             ),
@@ -130,7 +131,9 @@ Future<void> showVirtualAccountFailureDialog(
           children: [
             Text(
               needsWebActivation
-                  ? 'This $subject cannot be created yet because virtual-account credentials are not activated for this business.'
+                  ? (parsed.kind == _VaFailureKind.financialPlatform
+                      ? 'This $subject cannot be created yet because Financial Platform is still UNPROVISIONED for this school.'
+                      : 'This $subject cannot be created yet because virtual-account credentials are not activated for this business.')
                   : (parsed.message.isNotEmpty
                       ? parsed.message
                       : 'Virtual account generation failed. Please try again.'),
@@ -184,14 +187,18 @@ Future<void> showVirtualAccountFailureDialog(
   );
 }
 
+enum _VaFailureKind { freeTrial, financialPlatform, credentials, other }
+
 class _VaFailureInfo {
   final String message;
   final String? action;
   final bool needsWebActivation;
+  final _VaFailureKind kind;
 
   const _VaFailureInfo({
     required this.message,
     required this.needsWebActivation,
+    required this.kind,
     this.action,
   });
 }
@@ -214,7 +221,13 @@ _VaFailureInfo _parseVaFailure(Object error) {
   }
 
   final lower = '${code ?? ''} $message'.toLowerCase();
-  final needsWebActivation = code == 'VA_CREDENTIALS_REQUIRED' ||
+  final isFreeTrial = code == 'FREE_TRIAL_FEATURE_LOCKED';
+  final isPlatform = code == 'FINANCIAL_PLATFORM_UNPROVISIONED' ||
+      lower.contains('financial_platform_unprovisioned') ||
+      lower.contains('financial platform') ||
+      lower.contains('unprovisioned');
+  final needsWebActivation = isPlatform ||
+      code == 'VA_CREDENTIALS_REQUIRED' ||
       lower.contains('credential') ||
       lower.contains('not activated') ||
       lower.contains('not configured') ||
@@ -227,7 +240,20 @@ _VaFailureInfo _parseVaFailure(Object error) {
       message,
       fallback: 'Could not generate a virtual account. Please try again.',
     ),
-    action: action,
+    action: action ??
+        (isPlatform
+            ? '1. Open Invify Admin (super admin or tenant admin)\n'
+                '2. Open this school\n'
+                '3. Financial Platform → Activate Platform\n'
+                '4. Return here and tap Generate again'
+            : null),
     needsWebActivation: needsWebActivation,
+    kind: isFreeTrial
+        ? _VaFailureKind.freeTrial
+        : isPlatform
+            ? _VaFailureKind.financialPlatform
+            : needsWebActivation
+                ? _VaFailureKind.credentials
+                : _VaFailureKind.other,
   );
 }

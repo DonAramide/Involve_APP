@@ -5,7 +5,7 @@ import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
-import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
+import { rejectIfVaBlocked } from '../utils/free-trial-guard';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 function tenantFromRequest(req: Request, res: Response): string | null {
@@ -31,7 +31,7 @@ export class CustomerController {
 
       if (!customerId) return res.status(400).json({ error: "Customer ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
 
       if (!name || name.trim().split(/\s+/).length < 2) {
         return res.status(400).json({ error: "Customer's full name (first and last name) is required to provision a virtual account." });
@@ -213,7 +213,7 @@ export class CustomerController {
 
       if (!userId) return res.status(400).json({ error: "Staff User ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
       if (!customLastName || customLastName.trim() === '') {
         return res.status(400).json({ error: "Custom second name is required" });
       }

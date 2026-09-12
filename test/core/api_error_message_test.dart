@@ -39,6 +39,16 @@ void main() {
       expect(msg.toLowerCase(), isNot(contains('authorization')));
     });
 
+    test('maps unprovisioned financial platform to an activate-platform message', () {
+      final msg = friendlyApiError(
+        'FINANCIAL_PLATFORM_UNPROVISIONED: platform is UNPROVISIONED',
+        fallback: 'Could not generate virtual account. Please try again.',
+      );
+      expect(msg.toLowerCase(), contains('financial platform'));
+      expect(msg.toLowerCase(), contains('activate platform'));
+      expect(msg.toLowerCase(), isNot(contains('free trial')));
+    });
+
     test('hides Invalid API key internals', () {
       final msg = friendlyApiError(
         'Invalid API key',
