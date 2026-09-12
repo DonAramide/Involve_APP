@@ -85,8 +85,11 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                   ),
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pushNamed(context, '/system_setup');
+                      final navigator = Navigator.of(context, rootNavigator: true);
+                      navigator.pop();
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        navigator.pushNamed('/admin_hub');
+                      });
                     },
                     icon: const Icon(Icons.admin_panel_settings, size: 16),
                     label: const Text('GO TO ADMIN HUB'),
