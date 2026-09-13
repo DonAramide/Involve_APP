@@ -213,16 +213,16 @@
         <!-- ========================================================================= -->
         <div class="part-header" id="part3">
             <h2>PART 3: Complete School Mode Operations Guide</h2>
-            <p>System Setup, Term Bill POS, Fee Structuring, Student 360 Hub, Invoice History, Finance Treasury, Analytics, Digital Grading &amp; AI Lesson Notes</p>
+            <p>System Setup, Term Bill POS, Fee Structuring, Parent Management, Student 360 Hub, Invoice History, Finance Treasury, Analytics, Digital Grading &amp; AI Lesson Notes</p>
         </div>
 
-        <h3>School Mode 18-Tile Master Dashboard</h3>
+        <h3>School Mode 19-Tile Master Dashboard</h3>
         <div class="screenshot-figure">
             <div class="device-bezel">
                 <img src="school/Screenshot_20260827-153449.jpg" alt="School Dashboard Grid" class="app-screenshot">
             </div>
             <div class="screenshot-caption">
-                <strong>Figure 5:</strong> Invify School Mode Dashboard — 18 comprehensive tiles for bursary billing, academic management, student rosters, grading, lesson notes, and analytics.
+                <strong>Figure 5:</strong> Invify School Mode Dashboard — 19 comprehensive tiles for bursary billing, academic management, student rosters, parent directory, grading, lesson notes, and analytics.
             </div>
         </div>
 
@@ -265,6 +265,28 @@
                 <strong>Figure 9:</strong> Invoice Preview Modal — Branded institution header, fee subtotal, tax calculation, and 6 payment channels (Cash, POS, Transfer, Virtual Account, Wallet, Pay Later).
             </div>
         </div>
+
+        <h3>Parent Management &amp; Family Billing Hub</h3>
+        <p>
+            Accessible via the <strong>PARENTS</strong> tile on the dashboard (<code>/parent_list</code>), the Parent Management module streamlines multi-sibling fee collection, unified debt tracking, and family financial administration:
+        </p>
+        <ul>
+            <li><strong>Family Directory &amp; Class Filtering:</strong> Instant search by parent name or phone number, with dropdown filtering by child class tier. Displays the family's total enrolled children, classes, contact phone, Virtual Account (<code>VA</code>) badge, and aggregated outstanding balance across all siblings.</li>
+            <li><strong>Parent Profile 360° Console:</strong> Consolidated guardian overview displaying Total Outstanding (sum of all children's fee debts) alongside the family's <strong>Parent Credit</strong> balance. Provides direct triggers to <em>Fund / Pay Outstanding</em>, <em>Map Parent Credit to Children</em>, print thermal account statements, and export signed A5 PDF statements.</li>
+            <li><strong>Canonical Family Virtual Accounts:</strong> Generates a single 10-digit NUBAN virtual account (Wema / Providus / Titan via Quasar Gateway) covering all children in the household. Any inbound bank transfer is automatically routed and allocated across siblings per the school's configured share policy. Legacy child virtual accounts remain active as aliases to prevent failed transfers.</li>
+            <li><strong>5 Automated Payment Allocation (Share) Modes:</strong>
+                <ul>
+                    <li><strong>Auto Share (Proportional):</strong> Splits incoming funds proportionally across every child with outstanding fees based on their debt balance, using bankers-safe integer kobo math.</li>
+                    <li><strong>Lowest to Highest:</strong> Waterfalls payments to fully clear the student with the smallest balance first, maximizing the count of debt-free students.</li>
+                    <li><strong>Highest to Lowest:</strong> Waterfalls payments to clear the largest child debt first, reducing major institutional exposures.</li>
+                    <li><strong>First Matching Amount:</strong> If a child owes the exact sum transferred, applies 100% to that child; otherwise holds the funds in Parent Credit for staff mapping.</li>
+                    <li><strong>Management Decides:</strong> Directs 100% of the payment into Parent Credit without auto-applying, allowing bursary staff to manually assign the credit as instructed.</li>
+                </ul>
+                <em>Configurable under <strong>Academic Setup &gt; Payments Tab</strong> or <strong>Settings &gt; School Parent Payments</strong>.</em>
+            </li>
+            <li><strong>Parent Credit Wallet &amp; Mapping Tool:</strong> Any overpayment beyond family debt (or payments under Management Decides) is stored in the family's Parent Credit wallet. Bursars can tap <strong>Map parent credit to children</strong> at any time to allocate credit to pending child balances with real-time validation and debt capping.</li>
+            <li><strong>Transparent Family Audit Ledger:</strong> Chronological payment cards with expandable per-child allocation breakdowns (<em>Before</em> &rarr; <em>Allocated</em> &rarr; <em>After</em> balances), paired with duplicate thermal and PDF receipt generation.</li>
+        </ul>
 
         <h3>Student Profile 360° Hub &amp; Dedicated Virtual Accounts</h3>
         <div class="screenshot-figure">

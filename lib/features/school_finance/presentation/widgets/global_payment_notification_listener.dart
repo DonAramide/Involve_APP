@@ -30,6 +30,17 @@ class GlobalPaymentNotificationListener extends StatefulWidget {
 class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotificationListener> {
   StreamSubscription? _subscription;
   StreamSubscription? _studentCreditSub;
+  StreamSubscription? _parentCreditSub;
+
+  void _refreshSchool(String reason) {
+    final ctx = widget.navigatorKey.currentContext;
+    if (ctx == null) return;
+    try {
+      ctx.read<SchoolBloc>().add(LoadSchoolData());
+    } catch (e) {
+      debugPrint('[GlobalPaymentNotification] SchoolBloc refresh skipped ($reason): $e');
+    }
+  }
 
   @override
   void initState() {
@@ -41,14 +52,15 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
         '[GlobalPaymentNotification] Student credited: ${student.fullName} '
         'balance=${student.balance} credit=${student.creditBalance}',
       );
-      final ctx = widget.navigatorKey.currentContext;
-      if (ctx != null) {
-        try {
-          ctx.read<SchoolBloc>().add(LoadSchoolData());
-        } catch (e) {
-          debugPrint('[GlobalPaymentNotification] SchoolBloc refresh skipped: $e');
-        }
-      }
+      _refreshSchool('student');
+    });
+    _parentCreditSub =
+        CustomerWalletCreditService.instance.onParentCredited.listen((parent) {
+      debugPrint(
+        '[GlobalPaymentNotification] Parent credited: ${parent.fullName} '
+        'credit=${parent.creditBalance}',
+      );
+      _refreshSchool('parent');
     });
   }
 
@@ -132,6 +144,7 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   void dispose() {
     _subscription?.cancel();
     _studentCreditSub?.cancel();
+    _parentCreditSub?.cancel();
     super.dispose();
   }
 

@@ -11,9 +11,45 @@ import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integratio
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 import { FinancialDisputeService } from '../services/financial-dispute.service';
 import { isParentCustomerId, pickParentOwnedAttribution } from '../utils/parent-va-routing';
+import { WalletService } from '../services/wallet.service';
+import { roundNaira } from '../utils/virtual-account-funds';
 
+function isSandboxVaCredit(event: any): boolean {
+  return (
+    event?.event === 'virtual_account.funded' ||
+    event?.event === 'virtual_account.credit' ||
+    event?.data?.mode === 'sandbox_credit' ||
+    event?.data?.sandbox === true
+  );
+}
 
+function resolveWebhookTimestamp(req: Request, event: any): number | undefined {
+  const fromBody = Number(event?.timestamp);
+  if (Number.isFinite(fromBody) && fromBody > 0) {
+    return fromBody > 1e12 ? Math.floor(fromBody / 1000) : fromBody;
+  }
+  const fromHeader = Number(req.headers['x-quasar-timestamp']);
+  if (!Number.isFinite(fromHeader) || fromHeader <= 0) return undefined;
+  return fromHeader > 1e12 ? Math.floor(fromHeader / 1000) : fromHeader;
+}
 
+function resolveWebhookReference(req: Request, event: any): string | null {
+  const fromData = event?.data?.reference || event?.data?.id || event?.data?.deliveryId;
+  if (fromData) return String(fromData);
+  const deliveryId = String(req.headers['x-quasar-delivery-id'] || '').trim();
+  if (deliveryId) return `qfs:${deliveryId}`;
+  const va = event?.data?.accountNumber || event?.data?.virtualAccountNumber;
+  if (isSandboxVaCredit(event) && va) {
+    return `qfs:${va}:${event?.data?.reason || 'funded'}`;
+  }
+  return null;
+}
+
+function pushQuasarWebhookEnvSecrets(pushSecret: (value?: string | null) => void) {
+  pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
+  pushSecret(process.env.QUASAR_WEBHOOK_SECRET);
+  pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+}
 
 /**
  * WebhookController is the CRITICAL entry point for financial state updates.
@@ -31,13 +67,20 @@ export class WebhookController {
           ? rawBuf
           : JSON.stringify(req.body);
 
+    const incomingLen = Buffer.isBuffer(rawBuf) ? rawBuf.length : Buffer.byteLength(rawBody || '', 'utf8');
+    console.log(
+      `[Webhook] POST ${req.originalUrl || req.url} bodyLength=${incomingLen} hasSignature=${Boolean(signature)} delivery=${req.headers['x-quasar-delivery-id'] || '-'} ip=${req.ip}`,
+    );
+
     if (!signature || !rawBody) {
       return res.status(400).json({ error: 'Security headers or body missing' });
     }
 
     try {
       const event = req.body;
-      const { reference, amount, status } = event?.data || {};
+      const webhookTimestamp = resolveWebhookTimestamp(req, event);
+      const reference = resolveWebhookReference(req, event);
+      const { amount, status } = event?.data || {};
 
       // Card notification webhooks (Quasar → Invify) — ack even if HTTP timed out on switch path
       if (
@@ -56,8 +99,13 @@ export class WebhookController {
       }
 
       // 1. RESOLVE TRANSACTION & TENANT (Never trust tenantId from payload)
+      // QFS virtual_account.funded has no checkout reference — use delivery-id / VA.
       if (!reference) {
-        return res.status(400).json({ error: 'Missing reference in payload' });
+        return res.status(400).json({
+          error: isSandboxVaCredit(event)
+            ? 'Missing accountNumber or x-quasar-delivery-id for sandbox credit'
+            : 'Missing reference in payload',
+        });
       }
 
       let resolvedTenantId: string | null = null;
@@ -257,8 +305,7 @@ export class WebhookController {
           /* ignore decrypt failures */
         }
       }
-      pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
-      pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+      pushQuasarWebhookEnvSecrets(pushSecret);
 
       try {
         const { IntegrationVaultService } = await import('../services/integration-vault.service');
@@ -289,12 +336,13 @@ export class WebhookController {
       // Hydrate runtime env from first vault/tenant secret so subsequent requests stay warm
       if (!process.env.QUASAR_WEBHOOK_SIGNING_SECRET && candidateSecrets[0]) {
         process.env.QUASAR_WEBHOOK_SIGNING_SECRET = candidateSecrets[0];
+        process.env.QUASAR_WEBHOOK_SECRET = candidateSecrets[0];
       }
 
       // 3. VERIFY SIGNATURE (HMAC-SHA256, constant-time, timestamp replay protection)
       let isValid = false;
       for (const secret of candidateSecrets) {
-        if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) {
+        if (QuasarWebhookService.verifySignature(rawBody, signature, secret, webhookTimestamp)) {
           isValid = true;
           break;
         }
@@ -358,7 +406,7 @@ export class WebhookController {
           const virtualAccountNumber = event.data?.accountNumber || event.data?.virtualAccountNumber || event.data?.metadata?.virtualAccountNumber;
           const senderName = event.data?.senderName || event.data?.metadata?.senderName || event.data?.accountName || 'Unknown Sender';
           const senderBank = event.data?.senderBank || event.data?.metadata?.senderBank || event.data?.bankName || 'Unknown Bank';
-          const creditAmount = Number(amount);
+          const creditAmount = roundNaira(Number(amount));
           const isSandbox = event?.data?.sandbox === true;
 
           if (!Number.isFinite(creditAmount)) {
@@ -377,7 +425,7 @@ export class WebhookController {
                 reference,
                 tenant_id: resolvedTenantId,
                 wallet_id: resolvedWalletId,
-                amount: Math.round(creditAmount),
+                amount: creditAmount,
                 type: 'CREDIT',
                 provider: 'quasar',
                 status: 'SUCCESS',
@@ -388,9 +436,17 @@ export class WebhookController {
                   senderBank,
                   sandbox: isSandbox,
                   quasarEvent: event.event,
+                  amountNaira: creditAmount,
+                  amountRaw: amount,
                   ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
                   ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
                   ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                  ...(parentOwnedDeposit
+                    ? {
+                        paidVia: 'parent_account',
+                        ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                      }
+                    : {}),
                 }
               });
             if (insertErr) {
@@ -411,6 +467,15 @@ export class WebhookController {
                 provider: 'quasar',
                 metadata: { source: 'quasar_webhook', type: 'deposit', sandbox: isSandbox }
               });
+              try {
+                const derived = await WalletService.getBalance(resolvedTenantId);
+                await supabaseAdmin
+                  .from('wallets')
+                  .update({ balance: Number(derived?.balance || 0) })
+                  .eq('id', resolvedWalletId);
+              } catch (walletErr: any) {
+                console.warn(`[Webhook] Wallet cache refresh failed for ${resolvedTenantId}:`, walletErr?.message || walletErr);
+              }
             } else {
               console.warn(`[Webhook] No Invify wallet for tenant ${resolvedTenantId}; logged deposit without ledger for ${reference}`);
             }
@@ -828,8 +893,7 @@ export class WebhookController {
         /* ignore */
       }
     }
-    pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
-    pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+    pushQuasarWebhookEnvSecrets(pushSecret);
 
     for (const secret of candidateSecrets) {
       if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) return true;
@@ -965,8 +1029,7 @@ export class WebhookController {
         /* ignore */
       }
     }
-    pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
-    pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+    pushQuasarWebhookEnvSecrets(pushSecret);
 
     let isValid = false;
     for (const secret of candidateSecrets) {

@@ -1737,7 +1737,14 @@ const activateFinancialPlatform = async () => {
       await fetchDetails()
     } catch (err) {
       console.error('Activation failed:', err)
-      $q.notify({ type: 'negative', message: err.response?.data?.error || 'Failed to activate financial platform' })
+      $q.notify({
+        type: 'negative',
+        message:
+          err.response?.data?.details ||
+          err.response?.data?.error ||
+          'Failed to activate financial platform',
+        timeout: 8000,
+      })
     } finally {
       activatingPlatform.value = false
     }

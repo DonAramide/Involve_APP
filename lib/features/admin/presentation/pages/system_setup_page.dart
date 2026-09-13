@@ -11,6 +11,7 @@ import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../settings/presentation/bloc/staff_bloc.dart';
 import '../../../settings/presentation/bloc/staff_state.dart';
 import '../../../settings/domain/entities/settings.dart';
+import '../../../dashboard/domain/dashboard_menu_catalog.dart';
 import '../../../settings/domain/entities/staff.dart';
 import '../../../settings/presentation/widgets/upgrade_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -222,7 +223,12 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 _buildSwitchTile('Show Stock Value Pie Chart', settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))),
                 const Divider(),
 
-                // 8. Security
+                // 8. Admin Control — home dashboard icons
+                _buildSectionHeader(context, 'Admin Control'),
+                _buildAdminControlSection(context, settings),
+                const Divider(),
+
+                // 9. Security
                 _buildSectionHeader(context, 'Security'),
                 ListTile(
                   title: const Text('Change System Password'),
@@ -236,7 +242,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 ),
                 const Divider(),
 
-                // 9. Data Management
+                // 10. Data Management
                 _buildSectionHeader(context, 'Data Management'),
                 ListTile(
                   title: const Text('Restore Backup'),
@@ -257,6 +263,69 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
   void _update(BuildContext context, AppSettings settings) {
     context.read<SettingsBloc>().add(UpdateAppSettings(settings));
+  }
+
+  void _setDashboardIconVisible(
+    BuildContext context,
+    AppSettings settings,
+    String id,
+    bool visible,
+  ) {
+    if (DashboardMenuCatalog.isPinned(id)) return;
+    final hidden = List<String>.from(settings.hiddenDashboardIcons);
+    if (visible) {
+      hidden.remove(id);
+    } else if (!hidden.contains(id)) {
+      hidden.add(id);
+    }
+    _update(context, settings.copyWith(hiddenDashboardIcons: hidden));
+  }
+
+  Widget _buildAdminControlSection(BuildContext context, AppSettings settings) {
+    final options = DashboardMenuCatalog.forMode(settings.normalizedBusinessMode);
+    final hidden = settings.hiddenDashboardIcons;
+    final hiddenCount = hidden.where((id) => !DashboardMenuCatalog.isPinned(id)).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'Choose which menu icons appear on the home dashboard. Admin Hub stays visible so you can always return here.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+        ),
+        if (hiddenCount > 0)
+          ListTile(
+            leading: const Icon(Icons.visibility_outlined),
+            title: const Text('Show all icons'),
+            subtitle: Text('$hiddenCount currently hidden'),
+            onTap: () => _update(
+              context,
+              settings.copyWith(hiddenDashboardIcons: const []),
+            ),
+          ),
+        ...options.map((option) {
+          final pinned = option.pinned;
+          final visible = pinned || !hidden.contains(option.id);
+          return SwitchListTile(
+            title: Text(option.label),
+            subtitle: Text(
+              pinned
+                  ? 'Always visible — required to open System Setup'
+                  : visible
+                      ? 'Visible on home dashboard'
+                      : 'Hidden from home dashboard',
+            ),
+            value: visible,
+            onChanged: pinned
+                ? null
+                : (val) => _setDashboardIconVisible(context, settings, option.id, val),
+          );
+        }),
+      ],
+    );
   }
 
   void _showMaterialsLaborDialog(BuildContext context, AppSettings settings) {

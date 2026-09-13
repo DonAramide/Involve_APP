@@ -88,7 +88,13 @@ export class IntegrationVaultService {
   /**
    * INTERNAL: Retrieves and decrypts an active credential. Never exposed to API directly.
    */
-  static async getDecryptedCredential(serviceIdentifier: string, environment: string = 'PRODUCTION', tenantId?: string, keyName?: string): Promise<string | null> {
+  static async getDecryptedCredential(
+    serviceIdentifier: string,
+    environment: string = 'PRODUCTION',
+    tenantId?: string,
+    keyName?: string,
+    options?: { allowStandby?: boolean },
+  ): Promise<string | null> {
     // 1. Find Vault ID
     let vaultQuery = supabaseAdmin.from('integration_vault')
       .select('id')
@@ -104,22 +110,28 @@ export class IntegrationVaultService {
     const { data: vault, error: vaultErr } = await vaultQuery.maybeSingle();
     if (vaultErr || !vault) return null;
 
-    // 2. Fetch ACTIVE credential
-    let credQuery = supabaseAdmin.from('integration_credentials')
-      .select('*')
-      .eq('vault_id', vault.id)
-      .eq('environment', environment)
-      .eq('status', 'ACTIVE');
-      
-    if (keyName) {
-      credQuery = credQuery.eq('key_name', keyName);
+    const statuses = options?.allowStandby ? ['ACTIVE', 'STANDBY'] : ['ACTIVE'];
+    let cred: any = null;
+    for (const status of statuses) {
+      let credQuery = supabaseAdmin.from('integration_credentials')
+        .select('*')
+        .eq('vault_id', vault.id)
+        .eq('environment', environment)
+        .eq('status', status);
+
+      if (keyName) {
+        credQuery = credQuery.eq('key_name', keyName);
+      }
+
+      credQuery = credQuery.limit(1);
+      const { data, error: credErr } = await credQuery.maybeSingle();
+      if (!credErr && data) {
+        cred = data;
+        break;
+      }
     }
-    
-    credQuery = credQuery.limit(1);
 
-    const { data: cred, error: credErr } = await credQuery.maybeSingle();
-
-    if (credErr || !cred) return null;
+    if (!cred) return null;
 
     // 3. Decrypt
     const payload: EncryptedPayload = {
@@ -160,6 +172,63 @@ export class IntegrationVaultService {
       .select().single();
 
     if (error) throw new Error(`Failed to activate credential: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * Updates an existing credential in place (name, type, expiry, and/or secret).
+   * Does not create a new version. Optional promote flips STANDBY → ACTIVE.
+   */
+  static async updateCredential(vaultId: string, credentialId: string, payload: {
+    credential_type?: string;
+    key_name?: string;
+    expires_at?: string | null;
+    plaintext_value?: string;
+    promote?: boolean;
+  }) {
+    const { data: existing, error: fetchErr } = await supabaseAdmin.from('integration_credentials')
+      .select('id, status')
+      .eq('id', credentialId)
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (fetchErr || !existing) throw new Error('Credential not found');
+
+    const update: Record<string, unknown> = {};
+    if (payload.credential_type) update.credential_type = payload.credential_type;
+    if (payload.key_name) update.key_name = payload.key_name;
+    if (payload.expires_at !== undefined) update.expires_at = payload.expires_at || null;
+
+    const secret = typeof payload.plaintext_value === 'string' ? payload.plaintext_value.trim() : '';
+    if (secret) {
+      const encrypted = VaultEncryptionUtil.encrypt(secret);
+      update.encrypted_value = encrypted.encryptedValue;
+      update.iv = encrypted.iv;
+      update.auth_tag = encrypted.authTag;
+      update.key_version = encrypted.keyVersion;
+    }
+
+    if (Object.keys(update).length === 0 && !payload.promote) {
+      throw new Error('No changes provided');
+    }
+
+    if (Object.keys(update).length) {
+      const { error } = await supabaseAdmin.from('integration_credentials')
+        .update(update)
+        .eq('id', credentialId)
+        .eq('vault_id', vaultId);
+      if (error) throw new Error(`Failed to update credential: ${error.message}`);
+    }
+
+    if (payload.promote && existing.status !== 'ACTIVE') {
+      return this.activateCredential(vaultId, credentialId);
+    }
+
+    const { data, error } = await supabaseAdmin.from('integration_credentials')
+      .select('*')
+      .eq('id', credentialId)
+      .single();
+    if (error) throw new Error(`Failed to load updated credential: ${error.message}`);
     return data;
   }
 
@@ -235,7 +304,10 @@ export class IntegrationVaultService {
    * Status-only check for Quasar webhook signing secret (never returns plaintext).
    */
   static async getQuasarWebhookSecretStatus(environment: string = 'PRODUCTION') {
-    const fromEnv = Boolean(process.env.QUASAR_WEBHOOK_SIGNING_SECRET && process.env.QUASAR_WEBHOOK_SIGNING_SECRET.length >= 10);
+    const fromEnv = Boolean(
+      (process.env.QUASAR_WEBHOOK_SIGNING_SECRET && process.env.QUASAR_WEBHOOK_SIGNING_SECRET.length >= 10) ||
+      (process.env.QUASAR_WEBHOOK_SECRET && process.env.QUASAR_WEBHOOK_SECRET.length >= 10)
+    );
     const fromVault = Boolean(
       await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_WEBHOOK_SIGNING_SECRET'),
     );

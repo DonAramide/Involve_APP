@@ -78,5 +78,9 @@ class Settings extends Table {
   BoolColumn get servicesMaterialsEnabled => boolean().withDefault(const Constant(true))();
   BoolColumn get servicesLaborEnabled => boolean().withDefault(const Constant(true))();
   BoolColumn get servicesDescriptionFormatEnabled => boolean().withDefault(const Constant(true))();
+  TextColumn get parentPaymentShareMode =>
+      text().withDefault(const Constant('auto_share'))();
+  /// JSON list of dashboard menu IDs hidden by Admin Control.
+  TextColumn get hiddenDashboardIcons => text().nullable()();
 
 }

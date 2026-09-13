@@ -490,6 +490,7 @@ class AppDependencies {
     CustomerWalletCreditService.instance.bind(servicesRepo);
     CustomerWalletCreditService.instance.bindSchool(schoolRepository);
     CustomerWalletCreditService.instance.bindInvoices(invoiceRepository);
+    CustomerWalletCreditService.instance.bindSettings(settingsRepository);
 
     return AppDependencies(
       database: database,
@@ -785,6 +786,7 @@ class _InvolveAppState extends State<InvolveApp> {
               itemRepository: dependencies.itemRepository,
               invoiceRepository: dependencies.invoiceRepository,
               financeRepository: dependencies.financeRepositoryNew,
+              settingsRepository: dependencies.settingsRepository,
             ),
           ),
           BlocProvider(

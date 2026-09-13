@@ -36,74 +36,22 @@ class InMemoryActivationLockProvider {
 }
 
 import { IntegrationVaultService } from '../services/integration-vault.service';
+import { resolveQuasarPartnerCredentials } from '../integrations/quasar/quasar-partner-credentials';
 
 /** Resolve Quasar partner credentials for a vertical (school/retail/services). */
 async function resolveQuasarPlatformCreds(verticalRaw?: string) {
-  const vertical = String(verticalRaw || 'invify_retail').trim().toLowerCase() || 'invify_retail';
-
-  const verticalMap: Record<string, {
-    clientIdEnv: string[];
-    secretEnv: string[];
-    vaultSecretKeys: string[];
-    defaultClientId: string;
-  }> = {
-    invify_school: {
-      clientIdEnv: ['INVIFY_SCHOOL_CLIENT_ID'],
-      secretEnv: ['INVIFY_SCHOOL_CLIENT_SECRET'],
-      vaultSecretKeys: ['qip.schoolClientSecret'],
-      defaultClientId: 'INVIFY_SCHOOL',
-    },
-    invify_services: {
-      clientIdEnv: ['INVIFY_SERVICES_CLIENT_ID'],
-      secretEnv: ['INVIFY_SERVICES_CLIENT_SECRET'],
-      vaultSecretKeys: ['qip.servicesClientSecret'],
-      defaultClientId: 'INVIFY_SERVICES',
-    },
-    invify_retail: {
-      clientIdEnv: ['QUASAR_CLIENT_ID', 'INVIFY_RETAIL_CLIENT_ID'],
-      secretEnv: ['QUASAR_CLIENT_SECRET', 'INVIFY_RETAIL_CLIENT_SECRET', 'QUASAR_SERVICE_SECRET'],
-      vaultSecretKeys: ['qip.retailClientSecret'],
-      defaultClientId: 'INVIFY_RETAIL',
-    },
-  };
-
-  const cfg = verticalMap[vertical] || verticalMap.invify_retail;
-
-  let clientSecret: string | null = null;
-  for (const vaultKey of cfg.vaultSecretKeys) {
-    clientSecret =
-      (await IntegrationVaultService.getDecryptedCredential('qip', 'STAGING', undefined, vaultKey)) ||
-      (await IntegrationVaultService.getDecryptedCredential('qip', 'PRODUCTION', undefined, vaultKey));
-    if (clientSecret) break;
-  }
-
-  let clientId = cfg.defaultClientId;
-  for (const envKey of cfg.clientIdEnv) {
-    if (process.env[envKey]) {
-      clientId = process.env[envKey] as string;
-      break;
-    }
-  }
-
-  if (!clientSecret) {
-    for (const envKey of cfg.secretEnv) {
-      if (process.env[envKey]) {
-        clientSecret = process.env[envKey] as string;
-        break;
-      }
-    }
-  }
-
-  if (!clientSecret) {
+  const creds = await resolveQuasarPartnerCredentials(verticalRaw);
+  if (!creds.clientSecret) {
     console.warn(
-      `[FinancialPlatform] No Quasar client secret for vertical "${vertical}". ` +
-        `Set ${cfg.secretEnv[0]} in .env or save ${cfg.vaultSecretKeys[0]} via ECS Workspace.`
+      `[FinancialPlatform] No Quasar client secret for vertical "${creds.vertical}". ` +
+        `Promote INVIFY_*_CLIENT_SECRET in the vault or set it in env. source=${creds.source}`
     );
-    return { clientId, clientSecret: '' };
+    return { clientId: creds.clientId, clientSecret: '' };
   }
-
-  console.log(`[FinancialPlatform] Using Quasar partner ${clientId} for vertical ${vertical}`);
-  return { clientId, clientSecret };
+  console.log(
+    `[FinancialPlatform] Using Quasar partner ${creds.clientId} for vertical ${creds.vertical} (${creds.source})`
+  );
+  return { clientId: creds.clientId, clientSecret: creds.clientSecret };
 }
 
 const mockVaultClient = {

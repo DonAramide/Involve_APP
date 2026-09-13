@@ -458,7 +458,7 @@ Run on a device or emulator. School **and** retail profiles if available.
 | :--- | :--- | :--- |
 | Onboarding | Device wizard, activation key, KYC, email/WhatsApp OTP | |
 | Hardware | Printer scan, 58/80mm test print, calculator POS, cache audit | |
-| School | Roster, profile, fee + receipt print, AI lesson planner, grading bounds | |
+| School | Roster, profile, parent management (family VAs, allocation rules, credit wallet), fee + receipt print, AI lesson planner, grading bounds | |
 | Retail | Invoice cart, checkout, share, stock adjust, expenses/profit | |
 | Services | Jobs, technician log, materials, status timeline | |
 | Sync | Airplane mode queue → online sync | |

@@ -115,21 +115,26 @@ class SchoolRepositoryImpl implements SchoolRepository {
     return rows.map((row) => SchoolClass(
       id: row.id,
       name: row.name,
+      description: row.description,
     )).toList();
   }
 
   @override
   Future<void> addClass(SchoolClass schoolClass) async {
+    final desc = schoolClass.description?.trim();
     await database.into(database.classes).insert(db.ClassesCompanion.insert(
-      name: schoolClass.name,
+      name: schoolClass.name.trim(),
+      description: Value(desc == null || desc.isEmpty ? null : desc),
     ));
   }
 
   @override
   Future<void> updateClass(SchoolClass schoolClass) async {
+    final desc = schoolClass.description?.trim();
     await (database.update(database.classes)..where((t) => t.id.equals(schoolClass.id!)))
         .write(db.ClassesCompanion(
-      name: Value(schoolClass.name),
+      name: Value(schoolClass.name.trim()),
+      description: Value(desc == null || desc.isEmpty ? null : desc),
     ));
   }
 
@@ -162,6 +167,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
+      enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
     )).toList();
   }
 
@@ -187,6 +193,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.virtualAccountBank,
       database.students.virtualAccountStatus,
       database.students.department,
+      database.students.enrollmentStatus,
     ]);
     
     final rows = await query.get();
@@ -211,6 +218,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.read(database.students.virtualAccountBank),
       virtualAccountStatus: row.read(database.students.virtualAccountStatus),
       department: row.read(database.students.department),
+      enrollmentStatus: _enrollmentOf(row.read(database.students.enrollmentStatus)),
     )).toList();
   }
 
@@ -236,6 +244,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
+      enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
     ));
   }
 
@@ -262,6 +271,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
+      enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
     ));
   }
 
@@ -288,6 +298,17 @@ class SchoolRepositoryImpl implements SchoolRepository {
         .write(db.StudentsCompanion(
       classId: Value(targetClassId),
       academicYearId: academicYearId != null ? Value(academicYearId) : const Value.absent(),
+      enrollmentStatus: const Value('promoted'),
+    ));
+  }
+
+  @override
+  Future<void> setStudentsEnrollmentStatus(List<int> studentIds, String status) async {
+    if (studentIds.isEmpty) return;
+    await (database.update(database.students)
+          ..where((t) => t.id.isIn(studentIds)))
+        .write(db.StudentsCompanion(
+      enrollmentStatus: Value(_enrollmentOf(status)),
     ));
   }
 
@@ -408,7 +429,14 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
+      enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
     );
+  }
+
+  String _enrollmentOf(String? raw) {
+    final v = (raw ?? 'active').trim().toLowerCase();
+    if (v == 'graduated' || v == 'promoted') return v;
+    return 'active';
   }
 
   SchoolParent _mapParent(db.ParentTable row, List<ParentVaAccount> vas) {
@@ -418,6 +446,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       fullName: row.fullName,
       phone: row.phone,
       email: row.email,
+      address: row.address,
       virtualAccountNumber: row.virtualAccountNumber,
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountName: row.virtualAccountName,
@@ -546,6 +575,41 @@ class SchoolRepositoryImpl implements SchoolRepository {
     if (byCanonical != null) {
       return _mapParent(byCanonical, await _vasForParent(byCanonical.id));
     }
+    final want = va.replaceAll(RegExp(r'\D'), '');
+    if (want.length < 8) return null;
+    final allVas = await database.select(database.parentVirtualAccounts).get();
+    for (final candidate in allVas) {
+      if (candidate.accountNumber.replaceAll(RegExp(r'\D'), '') == want) {
+        return getParentById(candidate.parentId);
+      }
+    }
+    final parents = await (database.select(database.parents)
+          ..where((t) => t.virtualAccountNumber.isNotNull()))
+        .get();
+    for (final parent in parents) {
+      final local = (parent.virtualAccountNumber ?? '').replaceAll(RegExp(r'\D'), '');
+      if (local == want) {
+        return _mapParent(parent, await _vasForParent(parent.id));
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<SchoolParent?> findParentByExternalKey(String key) async {
+    final raw = key.trim();
+    if (raw.isEmpty) return null;
+    final stripped = raw.toLowerCase().startsWith('par-') ? raw.substring(4) : raw;
+    final parents = await getParents();
+    for (final parent in parents) {
+      final id = parent.id?.toString() ?? '';
+      final sync = (parent.syncId ?? '').trim();
+      if (raw == 'par-$id' ||
+          (sync.isNotEmpty && (raw == sync || raw == 'par-$sync' || stripped == sync)) ||
+          stripped == id) {
+        return parent;
+      }
+    }
     return null;
   }
 
@@ -626,12 +690,19 @@ class SchoolRepositoryImpl implements SchoolRepository {
       fullName: Value(parent.fullName),
       phone: Value(parent.phone),
       email: Value(parent.email),
+      address: Value(parent.address),
       virtualAccountNumber: Value(parent.virtualAccountNumber),
       virtualAccountBank: Value(parent.virtualAccountBank),
       virtualAccountName: Value(parent.virtualAccountName),
       virtualAccountStatus: Value(parent.virtualAccountStatus),
       creditBalance: Value(parent.creditBalance),
       syncId: Value(parent.syncId),
+      updatedAt: Value(DateTime.now()),
+    ));
+    await (database.update(database.students)..where((t) => t.parentId.equals(parent.id!)))
+        .write(db.StudentsCompanion(
+      parentName: Value(parent.fullName),
+      parentPhone: Value(parent.phone),
       updatedAt: Value(DateTime.now()),
     ));
   }

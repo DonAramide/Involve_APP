@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
 import 'package:involve_app/core/pos/nibss_geo.dart';
@@ -17,8 +18,10 @@ import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/domain/services/parent_payment_allocator.dart';
 import 'package:involve_app/features/school/domain/services/parent_payment_receipt_service.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
@@ -41,8 +44,50 @@ class ParentProfilePage extends StatefulWidget {
 
 class _ParentProfilePageState extends State<ParentProfilePage> {
   bool _awaitingPayment = false;
+  bool _awaitingCreditMap = false;
   bool _awaitingVa = false;
+  bool _awaitingParentSave = false;
+  bool _refreshingAccounts = false;
   int _historyTick = 0;
+
+  Future<void> _refreshInvifyAndQuasar(SchoolParent parent) async {
+    if (_refreshingAccounts) return;
+    setState(() => _refreshingAccounts = true);
+    final va = parent.virtualAccountNumber?.trim() ?? '';
+    try {
+      final applied = va.isNotEmpty
+          ? await PaymentCatchUpService.instance.refreshVirtualAccount(accountNumber: va)
+          : await PaymentCatchUpService.instance.runCatchUp(
+              force: true,
+              lookback: const Duration(days: 30),
+              showBanner: false,
+            );
+      if (!mounted) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      setState(() => _historyTick++);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            applied > 0
+                ? 'Updated from Invify & Quasar · $applied payment${applied == 1 ? '' : 's'} applied'
+                : 'Accounts refreshed. No new Quasar credits found.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyApiError(e, fallback: 'Could not refresh Invify / Quasar.')),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshingAccounts = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +117,30 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             ),
           );
         }
+        if (_awaitingCreditMap &&
+            state.status == SchoolStatus.success &&
+            state.lastParentPayment?.source == 'credit_map') {
+          _awaitingCreditMap = false;
+          setState(() => _historyTick++);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Mapped ${CurrencyFormatter.formatWithSymbol(state.lastParentPayment!.appliedToDebt)} to children.',
+              ),
+            ),
+          );
+        }
+        if (_awaitingCreditMap && state.status == SchoolStatus.failure) {
+          _awaitingCreditMap = false;
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error ?? 'Could not map parent credit'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
         if (_awaitingVa && state.status == SchoolStatus.success) {
           _awaitingVa = false;
           if (!mounted) return;
@@ -88,6 +157,23 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             subject: 'parent virtual account',
           );
         }
+        if (_awaitingParentSave && state.status == SchoolStatus.success) {
+          _awaitingParentSave = false;
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Parent details saved.')),
+          );
+        }
+        if (_awaitingParentSave && state.status == SchoolStatus.failure) {
+          _awaitingParentSave = false;
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error ?? 'Could not save parent details'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       },
       builder: (context, state) {
         final parent = _parentOf(state);
@@ -102,10 +188,30 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
           0,
           (sum, s) => sum + (s.balance > 0 ? s.balance : 0),
         );
+        final shareMode = ParentPaymentShareModeX.fromStorage(
+          context.read<SettingsBloc>().state.settings?.parentPaymentShareMode,
+        );
+        final canMapCredit = parent.creditBalance > 0.001 && outstanding > 0.001;
         return Scaffold(
           appBar: AppBar(
             title: Text(parent.fullName),
             actions: [
+              IconButton(
+                tooltip: 'Refresh Invify & Quasar',
+                onPressed: _refreshingAccounts ? null : () => _refreshInvifyAndQuasar(parent),
+                icon: _refreshingAccounts
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+              IconButton(
+                tooltip: 'Edit parent',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: state.isLoading ? null : () => _showEditParentDialog(context, parent),
+              ),
               IconButton(
                 tooltip: 'Print statement',
                 icon: const Icon(Icons.print_outlined),
@@ -133,9 +239,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(parent.phone ?? 'No phone', style: const TextStyle(color: Colors.blueGrey)),
-              if ((parent.email ?? '').isNotEmpty)
-                Text(parent.email!, style: const TextStyle(color: Colors.blueGrey)),
+              _parentContactCard(context, parent),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -172,9 +276,31 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                   label: const Text('Fund / pay outstanding'),
                 ),
               ),
+              if (canMapCredit) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: state.isLoading
+                        ? null
+                        : () => _showMapCreditDialog(
+                              context,
+                              parent: parent,
+                              children: children,
+                            ),
+                    icon: const Icon(Icons.assignment_turned_in_outlined),
+                    label: const Text('Map parent credit to children'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
-                'Cash or the school account on every plan. Card and virtual account need Standard or Premium.',
+                shareMode.fundHint(outstanding: outstanding),
+                style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Rule: ${shareMode.title}. Cash or the school account on every plan. Card and virtual account need Standard or Premium.',
                 style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade600),
               ),
               const SizedBox(height: 20),
@@ -352,6 +478,252 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     );
   }
 
+  Widget _parentContactCard(BuildContext context, SchoolParent parent) {
+    final phone = (parent.phone ?? '').trim();
+    final email = (parent.email ?? '').trim();
+    final address = (parent.address ?? '').trim();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Parent information', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                TextButton.icon(
+                  onPressed: () => _showEditParentDialog(context, parent),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
+                ),
+              ],
+            ),
+            _infoRow(Icons.person_outline, parent.fullName),
+            _infoRow(
+              Icons.phone_outlined,
+              phone.isEmpty ? 'No phone' : phone,
+              onTap: phone.isEmpty ? null : () => _launchContact('tel', phone),
+            ),
+            _infoRow(
+              Icons.email_outlined,
+              email.isEmpty ? 'No email' : email,
+              onTap: email.isEmpty ? null : () => _launchEmail(email, parent.fullName),
+            ),
+            _infoRow(Icons.home_outlined, address.isEmpty ? 'No address' : address),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: phone.isEmpty ? null : () => _launchContact('tel', phone),
+                  icon: const Icon(Icons.call, size: 18),
+                  label: const Text('Call'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: phone.isEmpty ? null : () => _launchContact('sms', phone),
+                  icon: const Icon(Icons.sms_outlined, size: 18),
+                  label: const Text('Message'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: phone.isEmpty ? null : () => _launchContact('whatsapp', phone),
+                  icon: const Icon(Icons.chat_outlined, size: 18),
+                  label: const Text('WhatsApp'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: email.isEmpty ? null : () => _launchEmail(email, parent.fullName),
+                  icon: const Icon(Icons.mail_outline, size: 18),
+                  label: const Text('Email'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String value, {VoidCallback? onTap}) {
+    final row = Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Colors.blueGrey),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, style: const TextStyle(height: 1.3))),
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
+  }
+
+  String _digitsOnly(String raw) => raw.replaceAll(RegExp(r'[^0-9+]'), '');
+
+  String _whatsappNumber(String raw) {
+    var n = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (n.startsWith('0') && n.length >= 10) {
+      n = '234${n.substring(1)}';
+    }
+    return n;
+  }
+
+  Future<void> _launchContact(String kind, String phone) async {
+    final Uri uri;
+    if (kind == 'whatsapp') {
+      uri = Uri.parse('https://wa.me/${_whatsappNumber(phone)}');
+    } else {
+      uri = Uri(scheme: kind, path: _digitsOnly(phone));
+    }
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open $kind for this number')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $kind for this number')),
+      );
+    }
+  }
+
+  Future<void> _launchEmail(String email, String name) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      query: 'subject=${Uri.encodeComponent('Message from school — $name')}',
+    );
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open email')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open email')),
+      );
+    }
+  }
+
+  Future<void> _showEditParentDialog(BuildContext context, SchoolParent parent) async {
+    final nameCtrl = TextEditingController(text: parent.fullName);
+    final phoneCtrl = TextEditingController(text: parent.phone ?? '');
+    final emailCtrl = TextEditingController(text: parent.email ?? '');
+    final addressCtrl = TextEditingController(text: parent.address ?? '');
+    final formKey = GlobalKey<FormState>();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit parent'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Full name',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (v) => (v ?? '').trim().isEmpty ? 'Name is required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                  validator: (v) {
+                    final value = (v ?? '').trim();
+                    if (value.isEmpty) return null;
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: addressCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Icon(Icons.home_outlined),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() != true) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    final name = nameCtrl.text.trim();
+    final phone = phoneCtrl.text.trim();
+    final email = emailCtrl.text.trim();
+    final address = addressCtrl.text.trim();
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    emailCtrl.dispose();
+    addressCtrl.dispose();
+    if (saved != true || !mounted) return;
+    setState(() => _awaitingParentSave = true);
+    context.read<SchoolBloc>().add(
+          UpdateParentEvent(
+            SchoolParent(
+              id: parent.id,
+              syncId: parent.syncId,
+              fullName: name,
+              phone: phone.isEmpty ? null : phone,
+              email: email.isEmpty ? null : email,
+              address: address.isEmpty ? null : address,
+              virtualAccountNumber: parent.virtualAccountNumber,
+              virtualAccountBank: parent.virtualAccountBank,
+              virtualAccountName: parent.virtualAccountName,
+              virtualAccountStatus: parent.virtualAccountStatus,
+              creditBalance: parent.creditBalance,
+              createdAt: parent.createdAt,
+              virtualAccounts: parent.virtualAccounts,
+            ),
+          ),
+        );
+  }
+
   SchoolParent? _parentOf(SchoolState state) {
     for (final p in state.parents) {
       if (p.id == widget.parentId) return p;
@@ -362,6 +734,128 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   List<Student> _childrenOf(SchoolState state) {
     return state.students.where((s) => s.parentId == widget.parentId).toList()
       ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+  }
+
+  Future<void> _showMapCreditDialog(
+    BuildContext context, {
+    required SchoolParent parent,
+    required List<Student> children,
+  }) async {
+    final owing = children
+        .where((s) => (s.balance > 0.001) && s.id != null)
+        .toList();
+    if (owing.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No outstanding children to map this credit to.')),
+      );
+      return;
+    }
+
+    final controllers = <int, TextEditingController>{
+      for (final child in owing)
+        child.id!: TextEditingController(),
+    };
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            double parsed(TextEditingController c) =>
+                double.tryParse(c.text.trim()) ?? 0;
+            final total = controllers.values.fold<double>(0, (sum, c) => sum + parsed(c));
+            return AlertDialog(
+              title: const Text('Map parent credit'),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Parent credit ${CurrencyFormatter.formatWithSymbol(parent.creditBalance)}. '
+                        'Enter how much to apply to each child.',
+                        style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
+                      ),
+                      const SizedBox(height: 12),
+                      ...owing.map((child) {
+                        final debt = child.balance > 0 ? child.balance : 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: TextField(
+                            controller: controllers[child.id!],
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => setDialogState(() {}),
+                            decoration: InputDecoration(
+                              labelText: child.fullName,
+                              helperText: 'Owes ${CurrencyFormatter.formatWithSymbol(debt)}',
+                              prefixText: '₦ ',
+                            ),
+                          ),
+                        );
+                      }),
+                      Text(
+                        'Mapping ${CurrencyFormatter.formatWithSymbol(total)} of '
+                        '${CurrencyFormatter.formatWithSymbol(parent.creditBalance)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: total > parent.creditBalance + 0.001
+                              ? Colors.red.shade700
+                              : Colors.indigo,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: total <= 0.001 || total > parent.creditBalance + 0.001
+                      ? null
+                      : () {
+                          final amounts = <int, double>{};
+                          for (final child in owing) {
+                            final amount = parsed(controllers[child.id!]!);
+                            if (amount <= 0.001) continue;
+                            if (amount > child.balance + 0.001) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${child.fullName} only owes ${CurrencyFormatter.formatWithSymbol(child.balance)}.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            amounts[child.id!] = amount;
+                          }
+                          if (amounts.isEmpty) return;
+                          Navigator.pop(ctx);
+                          setState(() => _awaitingCreditMap = true);
+                          context.read<SchoolBloc>().add(
+                                MapParentCreditEvent(
+                                  parentId: parent.id!,
+                                  amountsByStudentId: amounts,
+                                ),
+                              );
+                        },
+                  child: const Text('Map credit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    for (final c in controllers.values) {
+      c.dispose();
+    }
   }
 
   bool get _hasOnlinePlan =>
@@ -462,9 +956,9 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                       Text(status ?? 'Processing…', textAlign: TextAlign.center),
                     ] else ...[
                       Text(
-                        outstanding > 0
-                            ? 'Outstanding ${CurrencyFormatter.formatWithSymbol(outstanding)}. Extra becomes parent credit.'
-                            : 'No outstanding. The full amount is added as parent credit.',
+                        ParentPaymentShareModeX.fromStorage(
+                          settings?.parentPaymentShareMode,
+                        ).fundHint(outstanding: outstanding),
                         style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
                       ),
                       const SizedBox(height: 12),
@@ -833,6 +1327,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             const SizedBox(height: 8),
             Text('Applied ${CurrencyFormatter.formatWithSymbol(payment.appliedToDebt)} · '
                 'Credit ${CurrencyFormatter.formatWithSymbol(payment.toCredit)}'),
+            if (payment.appliedToDebt <= 0.001 && payment.toCredit > 0.001) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Nothing was applied to children yet. Use Map parent credit to children when you are ready.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(
               printNote ?? 'Receipt sent to printer.',

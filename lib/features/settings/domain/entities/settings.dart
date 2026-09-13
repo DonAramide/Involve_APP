@@ -78,6 +78,11 @@ class AppSettings extends Equatable {
   final bool servicesLaborEnabled;
   /// When true, Create Job shows Add category / description format tables.
   final bool servicesDescriptionFormatEnabled;
+  /// School parent-payment split: auto_share, lowest_to_highest,
+  /// highest_to_lowest, first_match_amount, management_decide.
+  final String parentPaymentShareMode;
+  /// Dashboard menu IDs hidden from the home grid (Admin Control).
+  final List<String> hiddenDashboardIcons;
 
   /// Seed/demo values that must never be shown as a real business address.
   static bool isPlaceholderAddress(String? value) {
@@ -152,6 +157,8 @@ class AppSettings extends Equatable {
     this.servicesMaterialsEnabled = true,
     this.servicesLaborEnabled = true,
     this.servicesDescriptionFormatEnabled = true,
+    this.parentPaymentShareMode = 'auto_share',
+    this.hiddenDashboardIcons = const [],
   });
 
   AppSettings copyWith({
@@ -219,6 +226,8 @@ class AppSettings extends Equatable {
     bool? servicesMaterialsEnabled,
     bool? servicesLaborEnabled,
     bool? servicesDescriptionFormatEnabled,
+    String? parentPaymentShareMode,
+    List<String>? hiddenDashboardIcons,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -287,6 +296,10 @@ class AppSettings extends Equatable {
       servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
       servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
           this.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode:
+          parentPaymentShareMode ?? this.parentPaymentShareMode,
+      hiddenDashboardIcons:
+          hiddenDashboardIcons ?? this.hiddenDashboardIcons,
     );
   }
 
@@ -386,5 +399,7 @@ class AppSettings extends Equatable {
         servicesMaterialsEnabled,
         servicesLaborEnabled,
         servicesDescriptionFormatEnabled,
+        parentPaymentShareMode,
+        hiddenDashboardIcons,
       ];
 }

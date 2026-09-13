@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
+import '../widgets/parent_payment_share_mode_picker.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import 'manage_grading_rules_page.dart';
@@ -19,7 +20,7 @@ class SchoolSetupPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Academic Setup'),
@@ -36,10 +37,12 @@ class SchoolSetupPage extends StatelessWidget {
             ),
           ],
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Years', icon: Icon(Icons.calendar_today)),
               Tab(text: 'Terms', icon: Icon(Icons.segment)),
               Tab(text: 'Classes', icon: Icon(Icons.class_)),
+              Tab(text: 'Payments', icon: Icon(Icons.payments_outlined)),
             ],
           ),
         ),
@@ -58,6 +61,7 @@ class SchoolSetupPage extends StatelessWidget {
                   _YearsTab(state: state),
                   _TermsTab(state: state),
                   _ClassesTab(state: state),
+                  const _ParentPaymentShareTab(),
                 ],
               );
             },
@@ -422,16 +426,25 @@ class _ClassesTab extends StatelessWidget {
       ..sort((a, b) => _compareByName(a.name, b.name));
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddClassDialog(context),
+        onPressed: () => _showClassDialog(context),
         child: const Icon(Icons.add),
       ),
       body: ListView.builder(
         itemCount: classes.length,
         itemBuilder: (context, index) {
           final sClass = classes[index];
+          final desc = sClass.description?.trim();
           return ListTile(
             title: Text(sClass.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: sClass.description != null ? Text(sClass.description!) : null,
+            subtitle: Text(
+              (desc == null || desc.isEmpty) ? 'No description' : desc,
+              style: TextStyle(
+                color: (desc == null || desc.isEmpty)
+                    ? Colors.grey.shade500
+                    : Colors.blueGrey.shade700,
+              ),
+            ),
+            onTap: () => _showClassDialog(context, existing: sClass),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () => _confirmDelete(context, sClass),
@@ -485,9 +498,10 @@ class _ClassesTab extends StatelessWidget {
     });
   }
 
-  void _showAddClassDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
+  void _showClassDialog(BuildContext context, {SchoolClass? existing}) {
+    final isEdit = existing != null;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final descController = TextEditingController(text: existing?.description ?? '');
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -500,7 +514,7 @@ class _ClassesTab extends StatelessWidget {
           }
         },
         child: AlertDialog(
-          title: const Text('Add Class'),
+          title: Text(isEdit ? 'Edit Class' : 'Add Class'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -512,8 +526,14 @@ class _ClassesTab extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  context.read<SchoolBloc>().add(AddClassEvent(nameController.text, description: descController.text));
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                if (isEdit) {
+                  context.read<SchoolBloc>().add(UpdateClassEvent(
+                    existing.copyWith(name: name, description: descController.text),
+                  ));
+                } else {
+                  context.read<SchoolBloc>().add(AddClassEvent(name, description: descController.text));
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(
@@ -521,13 +541,44 @@ class _ClassesTab extends StatelessWidget {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
                     return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
-                  return const Text('Add');
+                  return Text(isEdit ? 'Update' : 'Add');
                 },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ParentPaymentShareTab extends StatelessWidget {
+  const _ParentPaymentShareTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, state) {
+        final settings = state.settings;
+        if (settings == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ParentPaymentShareModePicker(
+              value: settings.parentPaymentShareMode,
+              onChanged: (value) {
+                context.read<SettingsBloc>().add(
+                      UpdateAppSettings(
+                        settings.copyWith(parentPaymentShareMode: value),
+                      ),
+                    );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

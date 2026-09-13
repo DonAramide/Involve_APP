@@ -278,7 +278,9 @@ function mapPaymentRow(p) {
     null
 
   let channel = p.provider || p.payment_method || p.channel || 'Payment'
-  if (/pos|card|emv/i.test(channel)) channel = 'POS Terminal'
+  if (/quasar/i.test(channel) || /virtual_account|va_transfer/i.test(String(p.type || p.metadata?.quasarEvent || ''))) {
+    channel = 'Quasar VA'
+  } else if (/pos|card|emv/i.test(channel)) channel = 'POS Terminal'
   else if (/wallet/i.test(channel)) channel = 'Wallet Transfer'
   else if (/transfer|virtual|bank/i.test(channel)) channel = 'Bank Transfer'
 

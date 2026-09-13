@@ -56,4 +56,17 @@ describe('splitUnsweptVirtualAccountFunds', () => {
     expect(split.unmapped).toBe(21.6);
     expect(split.total).toBe(9549);
   });
+
+  test('keeps kobo on VA totals (2.50 + 2.00 = 4.50, not 4.00)', () => {
+    const split = splitUnsweptVirtualAccountFunds({
+      customerVas: ['90012345688'],
+      staffVas: [],
+      transactions: [
+        { type: 'CREDIT', amount: 2, reference: 'va-2', metadata: { accountNumber: '90012345688', amountNaira: 2.5 } },
+        { type: 'CREDIT', amount: 2, reference: 'va-1', metadata: { accountNumber: '90012345688', amountNaira: 2 } },
+      ],
+    });
+    expect(split.customer).toBe(4.5);
+    expect(split.total).toBe(4.5);
+  });
 });

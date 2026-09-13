@@ -58,6 +58,8 @@
 	<array>
 		<string>mailto</string>
 		<string>tel</string>
+		<string>sms</string>
+		<string>whatsapp</string>
 	</array>
 </dict>
 </plist>

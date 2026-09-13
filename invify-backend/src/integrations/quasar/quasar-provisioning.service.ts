@@ -35,8 +35,14 @@ export interface ProvisionMerchantResult {
   webhookRegistered: boolean;
 }
 
-const INVIFY_WEBHOOK_URL =
-  process.env.INVIFY_QUASAR_WEBHOOK_URL ?? 'https://api.invify.org/webhooks/quasar';
+function resolveInvifyWebhookUrl(): string {
+  const explicit = String(process.env.INVIFY_QUASAR_WEBHOOK_URL || '').trim();
+  if (explicit) return explicit;
+  const env = String(process.env.NODE_ENV || '').trim().toLowerCase();
+  if (env === 'staging') return 'https://staging.invify.org/api/webhooks/quasar';
+  return 'https://api.invify.org/webhooks/quasar';
+}
+
 
 export class QuasarProvisioningService {
 
@@ -50,7 +56,7 @@ export class QuasarProvisioningService {
       tenantName,
       tenantType,
       environment = (process.env.QUASAR_ENV as 'test' | 'live') ?? 'test',
-      webhookReceiverUrl = INVIFY_WEBHOOK_URL,
+      webhookReceiverUrl = resolveInvifyWebhookUrl(),
     } = params;
 
     // ── Idempotency: return early if already provisioned ─────────────────────

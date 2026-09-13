@@ -33,6 +33,7 @@ class _StudentListPageState extends State<StudentListPage> {
   String _selectedOwingFilter = 'All'; // 'All', 'Owing', 'Not Owing'
   int? _selectedYearFilter;
   String _selectedDepartmentFilter = 'All'; // 'All', 'Science', 'Art', 'Commerce', 'None'
+  String _enrollmentFilter = 'Enrolled'; // 'Enrolled', 'Promoted', 'Graduated', 'All'
   String _searchQuery = '';
 
   @override
@@ -50,6 +51,17 @@ class _StudentListPageState extends State<StudentListPage> {
         _selectedStudentIds.add(id);
         _isSelectionMode = true;
       }
+    });
+  }
+
+  void _selectAllFiltered(List<Student> filtered) {
+    final ids = filtered.map((s) => s.id).whereType<int>().toList();
+    if (ids.isEmpty) return;
+    setState(() {
+      _selectedStudentIds
+        ..clear()
+        ..addAll(ids);
+      _isSelectionMode = true;
     });
   }
 
@@ -98,11 +110,25 @@ class _StudentListPageState extends State<StudentListPage> {
           appBar: AppBar(
             title: Text(_isSelectionMode ? '${_selectedStudentIds.length} Selected' : 'Students'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.select_all),
+                tooltip: 'Select all shown',
+                onPressed: () => _selectAllFiltered(filteredStudents),
+              ),
               if (_isSelectionMode) ...[
                 IconButton(
                   icon: const Icon(Icons.upgrade),
                   tooltip: 'Promote',
-                  onPressed: () => _showPromotionDialog(context, state.classes),
+                  onPressed: _selectedStudentIds.isEmpty
+                      ? null
+                      : () => _showPromotionDialog(context, state.classes),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.school),
+                  tooltip: 'Mark graduated',
+                  onPressed: _selectedStudentIds.isEmpty
+                      ? null
+                      : () => _showGraduateDialog(context),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -250,6 +276,17 @@ class _StudentListPageState extends State<StudentListPage> {
                   ],
                   onChanged: (val) => setState(() => _selectedYearFilter = val),
                 ),
+                const SizedBox(width: 16),
+                DropdownButton<String>(
+                  value: _enrollmentFilter,
+                  items: const [
+                    DropdownMenuItem(value: 'Enrolled', child: Text('Enrolled')),
+                    DropdownMenuItem(value: 'Promoted', child: Text('Promoted')),
+                    DropdownMenuItem(value: 'Graduated', child: Text('Graduated')),
+                    DropdownMenuItem(value: 'All', child: Text('All statuses')),
+                  ],
+                  onChanged: (val) => setState(() => _enrollmentFilter = val ?? 'Enrolled'),
+                ),
               ],
             ),
           ),
@@ -282,6 +319,10 @@ class _StudentListPageState extends State<StudentListPage> {
       final isOwing = dynamicBalance > 0;
       if (_selectedOwingFilter == 'Owing' && !isOwing) return false;
       if (_selectedOwingFilter == 'Not Owing' && isOwing) return false;
+
+      if (_enrollmentFilter == 'Enrolled' && s.isGraduated) return false;
+      if (_enrollmentFilter == 'Promoted' && !s.isPromoted) return false;
+      if (_enrollmentFilter == 'Graduated' && !s.isGraduated) return false;
 
       return true;
     }).toList();
@@ -321,7 +362,30 @@ class _StudentListPageState extends State<StudentListPage> {
                 child: student.image == null ? Text(student.firstName[0] + student.lastName[0]) : null,
               ),
             ),
-            title: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                if (student.isPromoted || student.isGraduated)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: student.isGraduated ? Colors.grey.shade200 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      student.enrollmentLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: student.isGraduated ? Colors.grey.shade700 : Colors.green.shade800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -402,7 +466,9 @@ class _StudentListPageState extends State<StudentListPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Move ${_selectedStudentIds.length} students to:'),
+            Text(
+              'Move ${_selectedStudentIds.length} selected student${_selectedStudentIds.length == 1 ? '' : 's'} to the next class. They will be marked Promoted.',
+            ),
             const SizedBox(height: 16),
             StatefulBuilder(
               builder: (context, setDialogState) => DropdownButtonFormField<int>(
@@ -430,6 +496,35 @@ class _StudentListPageState extends State<StudentListPage> {
               }
             },
             child: const Text('PROMOTE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGraduateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as graduated'),
+        content: Text(
+          'Mark ${_selectedStudentIds.length} selected student${_selectedStudentIds.length == 1 ? '' : 's'} as graduated? '
+          'They stay in records and the Graduated filter, and leave the Enrolled list.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<SchoolBloc>().add(
+                    GraduateStudentsEvent(_selectedStudentIds.toList()),
+                  );
+              setState(() {
+                _selectedStudentIds.clear();
+                _isSelectionMode = false;
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('GRADUATE'),
           ),
         ],
       ),

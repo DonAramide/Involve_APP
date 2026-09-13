@@ -129,6 +129,8 @@ class Student extends Equatable {
   final String? virtualAccountBank;
   final String? virtualAccountStatus;
   final String? department;
+  /// `active`, `promoted`, or `graduated`.
+  final String enrollmentStatus;
 
   const Student({
     this.id,
@@ -151,6 +153,7 @@ class Student extends Equatable {
     this.virtualAccountBank,
     this.virtualAccountStatus,
     this.department,
+    this.enrollmentStatus = 'active',
   });
 
   Student copyWith({
@@ -174,6 +177,7 @@ class Student extends Equatable {
     String? virtualAccountBank,
     String? virtualAccountStatus,
     String? department,
+    String? enrollmentStatus,
   }) {
     return Student(
       id: id ?? this.id,
@@ -196,7 +200,18 @@ class Student extends Equatable {
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
       department: department ?? this.department,
+      enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
     );
+  }
+
+  bool get isGraduated => enrollmentStatus == 'graduated';
+  bool get isPromoted => enrollmentStatus == 'promoted';
+  bool get isEnrolled => !isGraduated;
+
+  String get enrollmentLabel {
+    if (isGraduated) return 'Graduated';
+    if (isPromoted) return 'Promoted';
+    return 'Active';
   }
 
   String get fullName {
@@ -238,6 +253,7 @@ class Student extends Equatable {
         virtualAccountBank,
         virtualAccountStatus,
         department,
+        enrollmentStatus,
       ];
 }
 
@@ -437,6 +453,7 @@ class SchoolParent extends Equatable {
   final String fullName;
   final String? phone;
   final String? email;
+  final String? address;
   final String? virtualAccountNumber;
   final String? virtualAccountBank;
   final String? virtualAccountName;
@@ -451,6 +468,7 @@ class SchoolParent extends Equatable {
     required this.fullName,
     this.phone,
     this.email,
+    this.address,
     this.virtualAccountNumber,
     this.virtualAccountBank,
     this.virtualAccountName,
@@ -471,6 +489,7 @@ class SchoolParent extends Equatable {
     String? fullName,
     String? phone,
     String? email,
+    String? address,
     String? virtualAccountNumber,
     String? virtualAccountBank,
     String? virtualAccountName,
@@ -485,6 +504,7 @@ class SchoolParent extends Equatable {
       fullName: fullName ?? this.fullName,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      address: address ?? this.address,
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountName: virtualAccountName ?? this.virtualAccountName,
@@ -502,6 +522,7 @@ class SchoolParent extends Equatable {
         fullName,
         phone,
         email,
+        address,
         virtualAccountNumber,
         virtualAccountBank,
         virtualAccountName,

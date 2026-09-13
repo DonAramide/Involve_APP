@@ -80,6 +80,7 @@ class Parents extends Table {
   TextColumn get fullName => text()();
   TextColumn get phone => text().nullable()();
   TextColumn get email => text().nullable()();
+  TextColumn get address => text().nullable()();
   TextColumn get virtualAccountNumber => text().nullable()();
   TextColumn get virtualAccountBank => text().nullable()();
   TextColumn get virtualAccountName => text().nullable()();
@@ -171,6 +172,8 @@ class Students extends Table {
   TextColumn get virtualAccountBank => text().nullable()();
   TextColumn get virtualAccountStatus => text().nullable()();
   TextColumn get department => text().nullable()();
+  /// `active`, `promoted`, or `graduated`.
+  TextColumn get enrollmentStatus => text().withDefault(const Constant('active'))();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

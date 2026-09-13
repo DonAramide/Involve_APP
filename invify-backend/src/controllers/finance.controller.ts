@@ -4,7 +4,8 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
 import { collectedInvoiceAmount, outstandingInvoiceAmount } from '../utils/invoice-collection';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
-import { splitUnsweptVirtualAccountFunds } from '../utils/virtual-account-funds';
+import { splitUnsweptVirtualAccountFunds, transactionAmountNaira } from '../utils/virtual-account-funds';
+import { WalletService } from '../services/wallet.service';
 
 export class ExecutiveFinanceController {
   /**
@@ -44,7 +45,7 @@ export class ExecutiveFinanceController {
         staffVaRes,
         studentVaRes,
       ] = await Promise.all([
-        supabaseAdmin.from('wallets').select('balance').eq('tenant_id', tenantId).single(),
+        supabaseAdmin.from('wallets').select('id, balance').eq('tenant_id', tenantId).maybeSingle(),
         invoiceQuery,
         supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, payment_status, total_amount, created_at').eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
@@ -82,6 +83,15 @@ export class ExecutiveFinanceController {
       ]);
 
       const wallet = walletRes.data;
+      let derivedWalletBalance = Number(wallet?.balance || 0);
+      try {
+        const derived = await WalletService.getBalance(tenantId);
+        if (Number.isFinite(Number(derived?.balance))) {
+          derivedWalletBalance = Number(derived.balance);
+        }
+      } catch {
+        /* keep cached wallets.balance */
+      }
       const invoices = invoicesRes.data;
       const allInvoices = allInvoicesRes.data;
       const payouts = payoutsRes.data;
@@ -142,7 +152,7 @@ export class ExecutiveFinanceController {
           if (seenCreditRefs.has(ref)) continue;
           seenCreditRefs.add(ref);
         }
-        const amount = Number(tx.amount) || 0;
+        const amount = transactionAmountNaira(tx);
         if (amount > 0) totalQuasarFromDeposits += amount;
       }
 
@@ -201,7 +211,7 @@ export class ExecutiveFinanceController {
       }
 
       return res.status(200).json({
-        walletBalance: wallet?.balance || 0,
+        walletBalance: derivedWalletBalance,
         totalCollected: allTimeCollected + totalQuasarFromDeposits,
         revenueInRange: totalCollected,
         /** All-time Quasar inflows (VA deposits + card invoices). Own-bank transfers excluded. */
@@ -285,11 +295,12 @@ export class ExecutiveFinanceController {
         failedQuery = failedQuery.eq('tenant_id', tenantId);
       }
 
-      const [creditsRes, debitsRes, disputesRes, failedRes] = await Promise.all([
+      const [creditsRes, debitsRes, disputesRes, failedRes, walletInfo] = await Promise.all([
         creditsQuery,
         debitsQuery,
         disputesQuery,
-        failedQuery
+        failedQuery,
+        tenantId ? WalletService.getBalance(tenantId) : Promise.resolve(null),
       ]);
 
       if (creditsRes.error) console.error('Error fetching credits:', creditsRes.error);
@@ -299,8 +310,14 @@ export class ExecutiveFinanceController {
 
       const totalCredits = creditsRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
       const totalDebits = debitsRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
-      
-      const pendingSettlement = Math.max(0, totalCredits - totalDebits);
+
+      // VA webhook credits land on USER_WALLET, not entry_type=VIRTUAL_ACCOUNT_CREDIT.
+      const pendingSettlement = Math.max(
+        0,
+        walletInfo && Number.isFinite(Number(walletInfo.balance))
+          ? Number(walletInfo.balance)
+          : totalCredits - totalDebits,
+      );
       const clearedToday = totalDebits;
       const heldFunds = disputesRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.difference_amount || 0), 0) || 0;
       const failedTransfers = failedRes.data?.length || 0;
@@ -446,7 +463,7 @@ export class ExecutiveFinanceController {
           return {
             id: tx.id,
             reference: tx.reference,
-            amount: Number(tx.amount) || 0,
+            amount: transactionAmountNaira(tx),
             type: 'payment.success',
             status: tx.status,
             createdAt: tx.created_at,
@@ -467,6 +484,9 @@ export class ExecutiveFinanceController {
               studentName: meta.studentName || meta.senderName || 'Unknown Sender',
               senderBank: meta.senderBank || meta.bankName || '',
               sandbox: meta.sandbox === true,
+              paidVia: meta.paidVia || null,
+              parentKey: meta.parentKey || meta.customerId || meta.customer_id || null,
+              amountNaira: transactionAmountNaira(tx),
             },
           };
         });

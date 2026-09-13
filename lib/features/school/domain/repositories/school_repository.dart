@@ -29,6 +29,7 @@ abstract class SchoolRepository {
   Future<void> updateStudent(Student student);
   Future<void> deleteStudent(int id);
   Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId});
+  Future<void> setStudentsEnrollmentStatus(List<int> studentIds, String status);
   Future<void> assignParentToStudents({
     required List<int> studentIds,
     required String parentName,
@@ -46,6 +47,7 @@ abstract class SchoolRepository {
     required List<int> studentIds,
   });
   Future<SchoolParent?> findParentByVirtualAccount(String accountNumber);
+  Future<SchoolParent?> findParentByExternalKey(String key);
   Future<void> saveParentVirtualAccount({
     required int parentId,
     required String accountNumber,

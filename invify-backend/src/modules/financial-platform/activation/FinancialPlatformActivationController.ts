@@ -37,7 +37,12 @@ export class FinancialPlatformActivationController {
         return res.status(409).json({ error: error.message });
       }
 
-      return res.status(500).json({ error: 'Failed to activate financial platform', details: error.message });
+      const details =
+        error?.response?.data?.responseMessage ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to activate financial platform';
+      return res.status(500).json({ error: 'Failed to activate financial platform', details });
     }
   }
 }

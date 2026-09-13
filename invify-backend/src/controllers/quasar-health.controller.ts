@@ -137,6 +137,7 @@ export class QuasarHealthController {
 
       // Persist as runtime fallback (applies immediately without restart)
       process.env.QUASAR_WEBHOOK_SIGNING_SECRET = signingSecret;
+      process.env.QUASAR_WEBHOOK_SECRET = signingSecret;
 
       // Persist in Enterprise Integration Vault (survives restarts)
       const { IntegrationVaultService } = await import('../services/integration-vault.service');

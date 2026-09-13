@@ -113,6 +113,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       servicesMaterialsEnabled: Value(settings.servicesMaterialsEnabled),
       servicesLaborEnabled: Value(settings.servicesLaborEnabled),
       servicesDescriptionFormatEnabled: Value(settings.servicesDescriptionFormatEnabled),
+      parentPaymentShareMode: Value(settings.parentPaymentShareMode),
+      hiddenDashboardIcons: Value(jsonEncode(settings.hiddenDashboardIcons)),
     );
 
     if (existing == null) {
@@ -152,6 +154,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
         menuOrder = (jsonDecode(row.menuOrder!) as List).cast<String>();
       } catch (e) {
         menuOrder = [];
+      }
+    }
+
+    List<String> hiddenDashboardIcons = [];
+    if (row.hiddenDashboardIcons != null && row.hiddenDashboardIcons!.isNotEmpty) {
+      try {
+        hiddenDashboardIcons =
+            (jsonDecode(row.hiddenDashboardIcons!) as List).cast<String>();
+      } catch (e) {
+        hiddenDashboardIcons = [];
       }
     }
 
@@ -218,6 +230,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       servicesMaterialsEnabled: row.servicesMaterialsEnabled,
       servicesLaborEnabled: row.servicesLaborEnabled,
       servicesDescriptionFormatEnabled: row.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode: row.parentPaymentShareMode,
+      hiddenDashboardIcons: hiddenDashboardIcons,
     );
   }
 }

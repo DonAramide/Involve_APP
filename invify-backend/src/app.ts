@@ -220,6 +220,24 @@ const verificationLimiter = rateLimit({
 
 app.use(morgan('dev'));
 app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method !== 'POST') return next();
+  const path = String(req.originalUrl || req.url || '');
+  if (!/\/webhooks\/quasar(?:\?|$)/i.test(path) && !/\/webhooks\/quasar$/i.test(req.path || '')) {
+    return next();
+  }
+  const started = Date.now();
+  res.on('finish', () => {
+    const raw = (req as any).rawBody;
+    const bodyLength = Buffer.isBuffer(raw)
+      ? raw.length
+      : Number(req.headers['content-length'] || 0);
+    console.log(
+      `[WebhookAccess] ${req.method} ${path} status=${res.statusCode} bodyLength=${bodyLength} ip=${req.ip} delivery=${req.headers['x-quasar-delivery-id'] || '-'} ms=${Date.now() - started}`,
+    );
+  });
+  next();
+});
+app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith('/socket.io')) return next();
   return globalLimiter(req, res, next);
 });
@@ -708,7 +726,10 @@ app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin']), Re
 app.get('/admin/retention/suggestion', authenticate, RetentionController.getPersonalSuggestion);
 
 // Webhooks (Secret Verification handled internally)
+// Staging nginx `location /api/` strips `/api`, so public URL is
+// https://staging.invify.org/api/webhooks/quasar → Node /webhooks/quasar.
 app.post('/webhooks/quasar', WebhookController.handleQuasarWebhook);
+app.post('/api/webhooks/quasar', WebhookController.handleQuasarWebhook);
 app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
 app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
 app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
@@ -1527,7 +1548,8 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
           );
           if (secret) {
             process.env.QUASAR_WEBHOOK_SIGNING_SECRET = secret;
-            console.log(`[Boot] Hydrated QUASAR_WEBHOOK_SIGNING_SECRET from Integration Vault (${envName})`);
+            process.env.QUASAR_WEBHOOK_SECRET = secret;
+            console.log(`[Boot] Hydrated QUASAR_WEBHOOK_SIGNING_SECRET / QUASAR_WEBHOOK_SECRET from Integration Vault (${envName})`);
             break;
           }
         }

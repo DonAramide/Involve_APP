@@ -28,6 +28,7 @@ import 'package:involve_app/services/socket_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:involve_app/core/utils/nibss_response_codes.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
@@ -50,8 +51,10 @@ class StudentProfilePage extends StatefulWidget {
 class _StudentProfilePageState extends State<StudentProfilePage> {
   bool _awaitingVaProvision = false;
   bool _awaitingPaymentSuccess = false;
+  bool _refreshingAccounts = false;
   MposTransactionData? _pendingPosTx;
   StreamSubscription<Student>? _studentCreditSub;
+  StreamSubscription<SchoolParent>? _parentCreditSub;
 
   @override
   void initState() {
@@ -63,12 +66,70 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       context.read<SchoolBloc>().add(LoadSchoolData());
       context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
     });
+    _parentCreditSub =
+        CustomerWalletCreditService.instance.onParentCredited.listen((parent) {
+      if (!mounted) return;
+      final student = context.read<SchoolBloc>().state.students.firstWhereOrNull(
+            (s) => s.id == widget.studentId,
+          );
+      if (student?.parentId != parent.id) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+    });
   }
 
   @override
   void dispose() {
     _studentCreditSub?.cancel();
+    _parentCreditSub?.cancel();
     super.dispose();
+  }
+
+  SchoolParent? _parentFor(Student student, SchoolState state) {
+    if (student.parentId == null) return null;
+    return state.parents.firstWhereOrNull((p) => p.id == student.parentId);
+  }
+
+  Future<void> _refreshInvifyAndQuasar(Student student) async {
+    if (_refreshingAccounts) return;
+    setState(() => _refreshingAccounts = true);
+    final parent = _parentFor(student, context.read<SchoolBloc>().state);
+    final va = (parent?.virtualAccountNumber ?? student.virtualAccountNumber)?.trim() ?? '';
+    try {
+      final applied = va.isNotEmpty
+          ? await PaymentCatchUpService.instance.refreshVirtualAccount(
+              accountNumber: va,
+            )
+          : await PaymentCatchUpService.instance.runCatchUp(
+              force: true,
+              lookback: const Duration(days: 30),
+              showBanner: false,
+            );
+      if (!mounted) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            applied > 0
+                ? 'Updated from Invify & Quasar · $applied payment${applied == 1 ? '' : 's'} applied'
+                : 'Accounts refreshed. No new Quasar credits found.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyApiError(e, fallback: 'Could not refresh Invify / Quasar.')),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshingAccounts = false);
+    }
   }
 
   @override
@@ -168,6 +229,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Student Profile'),
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh Invify & Quasar',
+                  onPressed: _refreshingAccounts
+                      ? null
+                      : () => _refreshInvifyAndQuasar(student),
+                  icon: _refreshingAccounts
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
+              ],
               bottom: const TabBar(
                 isScrollable: true,
                 tabs: [
@@ -180,7 +256,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ),
             body: Column(
               children: [
-                _buildHeader(context, student, sClass, assignedTeacher, currency, state.studentInvoices),
+                _buildHeader(context, student, sClass, assignedTeacher, currency, state.studentInvoices, _parentFor(student, state)),
                 Expanded(
                   child: TabBarView(
                     children: [
@@ -206,6 +282,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     Teacher? assignedTeacher,
     String currency,
     List<Invoice> studentInvoices,
+    SchoolParent? parent,
   ) {
     final theme = Theme.of(context);
     // Convention: balance > 0 = debt owed. Negative balance is a sync glitch (over-applied).
@@ -301,6 +378,22 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                           'Credit: ${CurrencyFormatter.formatWithSymbol(student.creditBalance, symbol: currency)}',
                           style: TextStyle(
                             color: Colors.teal.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    if ((parent?.creditBalance ?? 0) > 0.001)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Parent credit: ${CurrencyFormatter.formatWithSymbol(parent!.creditBalance, symbol: currency)}',
+                          style: TextStyle(
+                            color: Colors.indigo.shade700,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -1762,6 +1855,28 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'Refresh Invify & Quasar',
+                onPressed: _refreshingAccounts
+                    ? null
+                    : () => _refreshInvifyAndQuasar(student),
+                icon: _refreshingAccounts
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.14),
+                  minimumSize: const Size(36, 36),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(

@@ -9,6 +9,7 @@ import 'package:involve_app/features/school/domain/entities/school_entities.dart
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/school/domain/services/parent_payment_allocator.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
 
 /// Applies VA deposit socket events to local customer wallets and school students.
 class CustomerWalletCreditService {
@@ -22,13 +23,17 @@ class CustomerWalletCreditService {
   IServicesRepository? _repository;
   SchoolRepository? _schoolRepository;
   InvoiceRepository? _invoiceRepository;
+  SettingsRepository? _settingsRepository;
   final StreamController<ServiceCustomer> _credits =
       StreamController<ServiceCustomer>.broadcast();
   final StreamController<Student> _studentCredits =
       StreamController<Student>.broadcast();
+  final StreamController<SchoolParent> _parentCredits =
+      StreamController<SchoolParent>.broadcast();
 
   Stream<ServiceCustomer> get onWalletCredited => _credits.stream;
   Stream<Student> get onStudentCredited => _studentCredits.stream;
+  Stream<SchoolParent> get onParentCredited => _parentCredits.stream;
 
   void bind(IServicesRepository repository) {
     _repository = repository;
@@ -40,6 +45,10 @@ class CustomerWalletCreditService {
 
   void bindInvoices(InvoiceRepository repository) {
     _invoiceRepository = repository;
+  }
+
+  void bindSettings(SettingsRepository repository) {
+    _settingsRepository = repository;
   }
 
   /// Pay open student bills with [amount]; returns unapplied remainder (credit).
@@ -234,37 +243,24 @@ class CustomerWalletCreditService {
           .toString();
       final senderBank =
           (metadata['senderBank'] ?? metadata['bankName'] ?? '').toString();
+      final parentKey = (metadata['parentKey'] ?? '').toString().trim();
+      final paidVia = (metadata['paidVia'] ?? '').toString();
+      final looksLikeParentDeposit = paidVia == 'parent_account' ||
+          (customerId ?? '').startsWith('par-') ||
+          parentKey.startsWith('par-');
 
-      // 1) Retail / service customer wallet
-      final repo = _repository;
-      if (repo != null) {
-        final updated = await repo.creditCustomerWalletFromDeposit(
-          amount: amount,
-          reference: reference,
-          customerId: customerId,
-          virtualAccountNumber: va,
-          senderName: senderName,
-          senderBank: senderBank,
-        );
-
-        if (updated != null) {
-          _credits.add(updated);
-          debugPrint(
-            '[CustomerWalletCredit] Credited ${updated.name} ₦$amount '
-            '(ref=$reference, balance=${updated.balance})',
-          );
-          return true;
-        }
-      } else {
-        debugPrint('[CustomerWalletCredit] Services repository not bound yet');
-      }
-
-      // 2) Parent VA (canonical or legacy). Never treat as a child-owned account.
       final schoolRepo = _schoolRepository;
       if (schoolRepo != null) {
         SchoolParent? parent;
         if (va != null && va.isNotEmpty) {
           parent = await schoolRepo.findParentByVirtualAccount(va);
+        }
+        if (parent == null) {
+          for (final key in [customerId, parentKey]) {
+            if (key == null || key.trim().isEmpty) continue;
+            parent = await schoolRepo.findParentByExternalKey(key.trim());
+            if (parent != null) break;
+          }
         }
 
         Student? matched;
@@ -273,7 +269,8 @@ class CustomerWalletCreditService {
         }
         if (matched == null &&
             admissionNumber != null &&
-            admissionNumber.trim().isNotEmpty) {
+            admissionNumber.trim().isNotEmpty &&
+            !admissionNumber.trim().startsWith('par-')) {
           matched =
               await schoolRepo.getStudentByAdmissionNumber(admissionNumber.trim());
         }
@@ -304,11 +301,9 @@ class CustomerWalletCreditService {
           if (ok) return true;
         }
 
-        // 3) Unlinked student VA (pre-parent migration only)
         Student? student;
         final unlinked = matched;
         if (unlinked != null && unlinked.id != null && unlinked.parentId == null) {
-          // Bills drive the red "Balance" on the Students list — update them first.
           final leftover = await _applyDepositToStudentInvoices(
             studentId: unlinked.id!,
             amount: amount,
@@ -325,7 +320,6 @@ class CustomerWalletCreditService {
               return sum + (owing > 0 ? owing : 0);
             });
           } else {
-            // Fallback: old path against students.balance only
             student = await schoolRepo.creditStudentFromDeposit(
               amount: amount,
               reference: reference,
@@ -342,7 +336,7 @@ class CustomerWalletCreditService {
             );
             await schoolRepo.updateStudent(student);
           }
-        } else if (matched?.parentId == null) {
+        } else if (!looksLikeParentDeposit && matched?.parentId == null) {
           student = await schoolRepo.creditStudentFromDeposit(
             amount: amount,
             reference: reference,
@@ -353,7 +347,6 @@ class CustomerWalletCreditService {
         }
 
         if (student != null) {
-          // Drop any prior notify-only stub so a real credit can be recorded.
           final ledger = await loadLedger();
           ledger.removeWhere(
             (e) =>
@@ -385,6 +378,31 @@ class CustomerWalletCreditService {
         }
       } else {
         debugPrint('[CustomerWalletCredit] School repository not bound yet');
+      }
+
+      if (!looksLikeParentDeposit) {
+        final repo = _repository;
+        if (repo != null) {
+          final updated = await repo.creditCustomerWalletFromDeposit(
+            amount: amount,
+            reference: reference,
+            customerId: customerId,
+            virtualAccountNumber: va,
+            senderName: senderName,
+            senderBank: senderBank,
+          );
+
+          if (updated != null) {
+            _credits.add(updated);
+            debugPrint(
+              '[CustomerWalletCredit] Credited ${updated.name} ₦$amount '
+              '(ref=$reference, balance=${updated.balance})',
+            );
+            return true;
+          }
+        } else {
+          debugPrint('[CustomerWalletCredit] Services repository not bound yet');
+        }
       }
 
       return false;
@@ -436,9 +454,18 @@ class CustomerWalletCreditService {
       ));
     }
 
+    ParentPaymentShareMode shareMode = ParentPaymentShareMode.autoShare;
+    try {
+      shareMode = ParentPaymentShareModeX.fromStorage(
+        (await _settingsRepository?.getSettings())?.parentPaymentShareMode,
+      );
+    } catch (_) {
+      shareMode = ParentPaymentShareMode.autoShare;
+    }
     final result = ParentPaymentAllocator.allocate(
       paymentNaira: amount,
       children: debts,
+      mode: shareMode,
     );
 
     for (final alloc in result.allocations) {
@@ -504,8 +531,12 @@ class CustomerWalletCreditService {
       },
       source: 'parent_wallet',
     );
+    final updated = await schoolRepo.getParentById(parent.id!) ?? parent.copyWith(
+      creditBalance: parent.creditBalance + result.creditNaira,
+    );
+    _parentCredits.add(updated);
     debugPrint(
-      '[CustomerWalletCredit] Parent ${parent.fullName} ₦$amount '
+      '[CustomerWalletCredit] Parent ${updated.fullName} ₦$amount '
       '(applied=${result.appliedNaira}, credit=${result.creditNaira}, ref=$reference)',
     );
     return true;

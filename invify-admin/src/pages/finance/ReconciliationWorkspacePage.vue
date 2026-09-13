@@ -16,15 +16,15 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Recon Health:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.8%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">{{ summaryStats.reconciliationRate }}%</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
-            <q-badge color="green-10" text-color="green-3">Healthy</q-badge>
+            <q-badge color="green-10" text-color="green-3">{{ summaryStats.issues ? 'Exceptions' : 'Healthy' }}</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Active Alerts:</span>
-            <span class="text-amber-4 text-weight-bold">3</span>
+            <span class="text-amber-4 text-weight-bold">{{ summaryStats.issues }}</span>
           </div>
           <q-icon name="monitor_heart" color="green-4" size="sm" />
         </div>
@@ -32,7 +32,7 @@
 
       <!-- Command Bar Actions -->
       <div class="row items-center op-gap-8 no-wrap">
-        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" />
+        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" @click="loadData" />
         <q-btn outline size="xs" color="grey-6" icon="rule" label="Rule Center" class="text-caption text-weight-bold" @click="activeWorkspaceTab = 'rules'" />
         <q-btn-dropdown size="xs" color="amber-4" icon="download" label="Export" class="text-caption text-weight-bold text-black" split>
           <q-list dark class="bg-panel font-mono text-caption border-muted">
@@ -115,18 +115,18 @@
         <q-tab-panel name="queues" class="q-pa-none column no-wrap">
           <div class="bg-subpanel border-bottom">
             <q-tabs v-model="activeQueueTab" dense class="text-grey-5 font-mono text-caption" active-color="cyan-4" align="left" no-caps>
-              <q-tab name="matched" label="Matched (1.2M)" />
-              <q-tab name="pending" label="Pending (4.3K)" />
-              <q-tab name="mismatch" label="Mismatch (42)" />
-              <q-tab name="failed" label="Failed (15)" />
-              <q-tab name="investigations" label="Investigations (8)" />
+              <q-tab name="matched" :label="`Matched (${queueCounts.matched})`" />
+              <q-tab name="pending" :label="`Pending (${queueCounts.pending})`" />
+              <q-tab name="mismatch" :label="`Mismatch (${queueCounts.mismatch})`" />
+              <q-tab name="failed" :label="`Failed (${queueCounts.failed})`" />
+              <q-tab name="investigations" :label="`Investigations (${queueCounts.investigations})`" />
             </q-tabs>
           </div>
           
           <q-table
             class="bg-transparent text-main flex-grow-1 transaction-table"
             flat
-            :rows="reconRecords"
+            :rows="filteredReconRecords"
             :columns="reconCols"
             row-key="id"
             dense
@@ -434,7 +434,7 @@ const { currentCurrency } = useCurrency();
 const $q = useQuasar();
 
 const activeWorkspaceTab = ref('queues')
-const activeQueueTab = ref('mismatch')
+const activeQueueTab = ref('matched')
 const searchQuery = ref('')
 const selectedRecords = ref([])
 

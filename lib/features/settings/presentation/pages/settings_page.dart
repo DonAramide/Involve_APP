@@ -34,6 +34,7 @@ import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 import '../widgets/sync_configuration_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import '../widgets/business_mode_selector.dart';
+import 'package:involve_app/features/school/presentation/widgets/parent_payment_share_mode_picker.dart';
 import 'package:involve_app/core/services/service_locator.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/utils/app_config.dart';
@@ -172,6 +173,29 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildServiceTypesSection(context, settings),
           _buildHalfDayConfigSection(context, settings),
         ],
+        const Divider(),
+      ],
+
+      if (settings.businessMode == 'school' &&
+          _matches('Parent payment sharing', [
+            'parent',
+            'share',
+            'allocation',
+            'credit',
+            'lowest',
+            'highest',
+          ])) ...[
+        _buildSectionHeader(context, 'School parent payments'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: ParentPaymentShareModePicker(
+            value: settings.parentPaymentShareMode,
+            onChanged: (value) => _update(
+              context,
+              settings.copyWith(parentPaymentShareMode: value),
+            ),
+          ),
+        ),
         const Divider(),
       ],
 
@@ -1073,6 +1097,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         'fullName': p.fullName,
                         'phone': p.phone,
                         'email': p.email,
+                        'address': p.address,
                         'virtualAccountNumber': p.virtualAccountNumber,
                         'virtualAccountBank': p.virtualAccountBank,
                         'virtualAccountName': p.virtualAccountName,

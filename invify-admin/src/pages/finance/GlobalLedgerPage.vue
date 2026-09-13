@@ -436,26 +436,27 @@ const parityLabel = computed(() => {
 
 function formatMoney(n) {
   const v = Number(n || 0)
-  if (v >= 1_000_000_000) return B
-  if (v >= 1_000_000) return M
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
   return v.toLocaleString()
 }
 
 function mapLedgerRow(row) {
   const amount = Number(row.amount || row.debit || row.credit || 0)
   const typeRaw = String(row.entry_type || row.type || (row.debit ? 'DEBIT' : 'CREDIT')).toUpperCase()
-  const type = typeRaw.includes('DEB') ? 'DEBIT' : 'CREDIT'
+  const type = ['DEBIT', 'WITHDRAWAL', 'SWEEP'].some((k) => typeRaw.includes(k)) ? 'DEBIT' : 'CREDIT'
+  const account = row.account || row.account_code || row.account_id || null
   const tenantName = row.tenants?.name || row.tenant_name || null
   return {
     id: row.id,
     journalId: row.journal_id || row.reference || row.batch_id || '—',
-    accountId: tenantName || row.account_code || row.account_id || row.tenant_id || '—',
+    accountId: account || tenantName || row.tenant_id || '—',
     type,
     amount,
     timestamp: row.created_at || row.timestamp || null,
     flow: {
-      debit: row.debit_account || row.description || (type === 'DEBIT' ? (tenantName || 'Debit') : '—'),
-      credit: row.credit_account || row.description || (type === 'CREDIT' ? (tenantName || 'Credit') : '—')
+      debit: type === 'DEBIT' ? (account || tenantName || 'Debit') : '—',
+      credit: type === 'CREDIT' ? (account || tenantName || 'Credit') : '—'
     },
     related: {
       txn: row.payment_id || row.transaction_id || row.reference || null,
@@ -491,9 +492,32 @@ async function loadLedger() {
       }
     }
     journals.value = [...byRef.values()]
-    accountBalances.value = []
-    batchExplorer.value = []
-    coaNodes.value = []
+
+    const byAccount = new Map()
+    for (const e of ledgerEntries.value) {
+      const key = e.accountId || 'UNMAPPED'
+      if (!byAccount.has(key)) {
+        byAccount.set(key, { account: key, type: key.includes('WALLET') ? 'ASSET' : 'LIABILITY', opening: 0, movement: 0, closing: 0, color: e.type === 'CREDIT' ? 'text-amber-4' : 'text-cyan-3' })
+      }
+      const bal = byAccount.get(key)
+      const signed = e.type === 'CREDIT' ? Number(e.amount || 0) : -Number(e.amount || 0)
+      bal.movement += signed
+      bal.closing += signed
+    }
+    accountBalances.value = [...byAccount.values()]
+    coaNodes.value = accountBalances.value.map((bal) => ({
+      id: bal.account,
+      label: 'Live ledger account',
+      icon: 'account_balance_wallet',
+      color: bal.type === 'ASSET' ? 'cyan-4' : 'indigo-4',
+      type: bal.type,
+    }))
+    batchExplorer.value = [...byRef.values()].map((j) => {
+      const rows = ledgerEntries.value.filter((e) => e.journalId === j.id)
+      const debits = rows.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + Number(e.amount || 0), 0)
+      const credits = rows.filter((e) => e.type === 'CREDIT').reduce((s, e) => s + Number(e.amount || 0), 0)
+      return { id: j.id, entries: rows.length, debits, credits, status: debits === credits ? 'Balanced' : 'Open' }
+    })
   } catch (e) {
     console.error('[GlobalLedger] load failed:', e)
     ledgerEntries.value = []

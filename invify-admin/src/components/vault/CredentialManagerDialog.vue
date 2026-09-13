@@ -33,7 +33,18 @@
             ]"
             @update:model-value="onEnvironmentChange"
           />
-          <q-btn outline color="cyan-4" icon="add" label="Add New Version" @click="openAddDialog()" />
+          <div class="row items-center q-gutter-sm">
+            <q-btn
+              v-if="isQuasar"
+              outline
+              color="amber-6"
+              icon="wifi_tethering"
+              label="Test all Quasar credentials"
+              :loading="testingPartners"
+              @click="testAllQuasarPartners"
+            />
+            <q-btn outline color="cyan-4" icon="add" label="Add New Version" @click="openAddDialog()" />
+          </div>
         </div>
 
         <!-- Quasar webhook card (same visual language as vault cards) -->
@@ -46,7 +57,7 @@
                     <q-avatar size="md" color="teal-8" text-color="teal-2" icon="webhook" />
                     <div>
                       <div class="text-weight-bold text-subtitle1">Outbound Webhook Signing</div>
-                      <div class="text-caption text-grey-5">QUASAR_WEBHOOK_SIGNING_SECRET</div>
+                      <div class="text-caption text-grey-5">QUASAR_WEBHOOK_SIGNING_SECRET · QUASAR_WEBHOOK_SECRET</div>
                     </div>
                   </div>
                   <q-chip
@@ -66,7 +77,7 @@
                 </div>
                 <div class="row justify-between text-caption text-grey-4 q-mb-sm">
                   <span>Endpoint</span>
-                  <span class="text-white">POST /webhooks/quasar</span>
+                  <span class="text-white">{{ quasarWebhookUrl }}</span>
                 </div>
                 <div class="row justify-between text-caption text-grey-4 q-mb-md">
                   <span>Sources</span>
@@ -414,10 +425,21 @@
 
             <template v-slot:body-cell-actions="props">
               <q-td :props="props" class="text-right">
-                <q-btn flat dense color="cyan-3" label="Test Connection" size="sm" @click="testConnection(props.row)" v-if="props.row.status === 'ACTIVE'" />
+                <q-btn
+                  flat
+                  dense
+                  color="cyan-3"
+                  label="Test Connection"
+                  size="sm"
+                  @click="testConnection(props.row)"
+                  v-if="props.row.status === 'ACTIVE' || isPartnerCredential(props.row)"
+                />
                 <q-btn flat round dense color="grey-5" icon="more_vert" size="sm">
                   <q-menu dark class="bg-panel border-main">
                     <q-list dense style="min-width: 150px">
+                      <q-item clickable v-close-popup v-if="props.row.status !== 'REVOKED'" @click="openEditDialog(props.row)">
+                        <q-item-section>Edit credential</q-item-section>
+                      </q-item>
                       <q-item clickable v-close-popup v-if="props.row.status === 'ACTIVE'" @click="rotateSecret(props.row)">
                         <q-item-section class="text-warning">Rotate Secret</q-item-section>
                       </q-item>
@@ -490,6 +512,43 @@
       </q-card>
     </q-dialog>
 
+    <!-- Dialog for editing an existing credential -->
+    <q-dialog v-model="showEditDialog">
+      <q-card class="bg-panel enterprise-panel text-main border-main" style="width: 500px; max-width: 90vw;">
+        <q-card-section class="border-bottom">
+          <div class="text-h6">Edit Credential</div>
+          <div class="text-caption text-grey-5">{{ editCred.key_name || 'Update this vault row in place' }}</div>
+        </q-card-section>
+        <q-card-section class="q-pt-md column op-gap-16">
+          <q-select outlined dense dark v-model="editCred.type" :options="['API_KEY', 'TOKEN', 'CLIENT_SECRET', 'CERTIFICATE', 'WEBHOOK_SECRET']" label="Credential Type" />
+          <q-input outlined dense dark v-model="editCred.key_name" label="Key Name" autocomplete="off" data-lpignore="true" spellcheck="false" />
+          <q-input
+            outlined
+            dense
+            dark
+            type="password"
+            v-model="editCred.value"
+            label="New secret value"
+            hint="Leave blank to keep the current secret"
+            autocomplete="new-password"
+            data-lpignore="true"
+          />
+          <q-input outlined dense dark type="date" v-model="editCred.expires_at" label="Expiration Date" stack-label />
+          <q-toggle
+            v-if="editCred.status === 'STANDBY'"
+            v-model="editCred.promote"
+            color="positive"
+            label="Promote to Active after save"
+            dark
+          />
+        </q-card-section>
+        <q-card-actions align="right" class="border-top q-pa-md">
+          <q-btn flat label="Cancel" color="grey-5" v-close-popup />
+          <q-btn unelevated color="cyan-6" label="Save changes" :loading="savingEdit" @click="saveEditCredential" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-dialog>
 </template>
 
@@ -511,6 +570,17 @@ watch(isOpen, val => emit('update:modelValue', val));
 
 const activeEnvironment = ref('PRODUCTION');
 const showAddDialog = ref(false);
+const showEditDialog = ref(false);
+const savingEdit = ref(false);
+const editCred = ref({
+  id: '',
+  type: 'API_KEY',
+  key_name: '',
+  value: '',
+  expires_at: '',
+  status: '',
+  promote: false,
+});
 const webhookSecretInput = ref('');
 const revealWebhook = ref(false);
 const savingWebhook = ref(false);
@@ -521,6 +591,7 @@ const adminPasswordInput = ref('');
 const revealAdminPassword = ref(false);
 const savingAdminCreds = ref(false);
 const testingAdminCreds = ref(false);
+const testingPartners = ref(false);
 const adminCredStatus = ref(null);
 const adminLoginPing = ref(null);
 
@@ -554,6 +625,13 @@ const newCred = ref({ type: 'API_KEY', key_name: '', value: '', expires_at: '', 
 const isQuasar = computed(() => {
   const id = String(props.integration?.service_identifier || '').toLowerCase();
   return id === 'quasar' || id === 'quasar_ledger' || id.includes('quasar');
+});
+
+const quasarWebhookUrl = computed(() => {
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (host.includes('staging')) return 'https://staging.invify.org/api/webhooks/quasar';
+  if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3004/webhooks/quasar';
+  return 'https://api.invify.org/webhooks/quasar';
 });
 
 const isMetaWhatsApp = computed(() => {
@@ -809,19 +887,122 @@ function openAddDialog(prefill = {}) {
   if (prefill.rotate) newCred.value.rotate = true;
 }
 
-async function testConnection(cred) {
-  $q.notify({ type: 'info', message: `Pinging ${props.integration?.name}...` });
+function dateInputValue(iso) {
+  if (!iso) return '';
+  const text = String(iso);
+  return text.length >= 10 ? text.slice(0, 10) : '';
+}
+
+function openEditDialog(cred) {
+  editCred.value = {
+    id: cred.id,
+    type: cred.credential_type || 'API_KEY',
+    key_name: cred.key_name || '',
+    value: '',
+    expires_at: dateInputValue(cred.expires_at),
+    status: cred.status || '',
+    promote: false,
+  };
+  showEditDialog.value = true;
+}
+
+async function saveEditCredential() {
+  if (!editCred.value.id) return;
+  if (!editCred.value.key_name) {
+    $q.notify({ type: 'negative', message: 'Key name is required.' });
+    return;
+  }
+  savingEdit.value = true;
   try {
-    const res = await vaultApi.testConnection(props.integration.id, {
-      serviceIdentifier: props.integration.service_identifier,
-      environment: activeEnvironment.value
+    await vaultApi.updateCredential(props.integration.id, editCred.value.id, {
+      credential_type: editCred.value.type,
+      key_name: editCred.value.key_name,
+      expires_at: editCred.value.expires_at || null,
+      plaintext_value: editCred.value.value || undefined,
+      promote: editCred.value.promote,
     });
-    $q.notify({ type: 'positive', message: `Connection successful! Latency: ${res.data.latency_ms}ms` });
+    $q.notify({ type: 'positive', message: 'Credential updated.' });
+    showEditDialog.value = false;
     emit('refresh');
   } catch (err) {
     console.error(err);
-    $q.notify({ type: 'negative', message: 'Connection test failed.' });
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Failed to update credential.',
+    });
+  } finally {
+    savingEdit.value = false;
+  }
+}
+
+function isPartnerCredential(cred) {
+  const key = String(cred?.key_name || '').toUpperCase();
+  return key.includes('INVIFY_SCHOOL')
+    || key.includes('INVIFY_RETAIL')
+    || key.includes('INVIFY_SERVICES')
+    || key === 'QUASAR_CLIENT_ID'
+    || key === 'QUASAR_CLIENT_SECRET';
+}
+
+async function testConnection(cred) {
+  $q.notify({ type: 'info', message: `Testing ${cred.key_name} against Quasar...` });
+  try {
+    const res = await vaultApi.testConnection(props.integration.id, {
+      serviceIdentifier: props.integration.service_identifier,
+      environment: activeEnvironment.value,
+      keyName: cred.key_name,
+    });
+    $q.notify({
+      type: 'positive',
+      message: res.data?.detail
+        ? `${cred.key_name}: ${res.data.detail} (${res.data.latency_ms}ms)`
+        : `Connection successful! Latency: ${res.data.latency_ms}ms`,
+    });
     emit('refresh');
+  } catch (err) {
+    console.error(err);
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.detail || err.response?.data?.error || 'Quasar rejected this credential.',
+    });
+    emit('refresh');
+  }
+}
+
+async function testAllQuasarPartners() {
+  testingPartners.value = true;
+  $q.notify({ type: 'info', message: 'Testing retail, school, and services credentials against Quasar...' });
+  try {
+    const res = await vaultApi.testQuasarPartners(props.integration.id, {
+      environment: activeEnvironment.value,
+    });
+    const lines = (res.data?.results || []).map((r) =>
+      `${r.vertical}: ${r.ok ? 'OK' : 'FAIL'} — ${r.detail || r.source}`
+    );
+    $q.notify({
+      type: res.data?.success ? 'positive' : 'warning',
+      message: lines.join(' | ') || 'No results',
+      timeout: 8000,
+    });
+    emit('refresh');
+  } catch (err) {
+    console.error(err);
+    const results = err.response?.data?.results;
+    if (Array.isArray(results) && results.length) {
+      $q.notify({
+        type: 'negative',
+        message: results.map((r) => `${r.vertical}: ${r.detail}`).join(' | '),
+        timeout: 8000,
+      });
+    } else {
+      $q.notify({
+        type: 'negative',
+        message: err.response?.data?.error || 'Quasar partner tests failed.',
+      });
+    }
+    emit('refresh');
+  } finally {
+    testingPartners.value = false;
   }
 }
 

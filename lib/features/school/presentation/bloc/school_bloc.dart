@@ -18,6 +18,7 @@ import 'package:equatable/equatable.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
 
 part 'school_event.dart';
 
@@ -26,12 +27,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   final ItemRepository itemRepository;
   final InvoiceRepository invoiceRepository;
   final FinanceRepository? financeRepository;
+  final SettingsRepository? settingsRepository;
 
   SchoolBloc({
     required this.repository, 
     required this.itemRepository,
     required this.invoiceRepository,
     this.financeRepository,
+    this.settingsRepository,
   }) : super(const SchoolState()) {
     on<LoadSchoolData>(_onLoadSchoolData, transformer: sequential());
     on<AddAcademicYearEvent>(_onAddAcademicYear, transformer: sequential());
@@ -41,12 +44,15 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<UpdateTermEvent>(_onUpdateTerm, transformer: sequential());
     on<SetActiveTermEvent>(_onSetActiveTerm, transformer: sequential());
     on<AddClassEvent>(_onAddClass, transformer: sequential());
+    on<UpdateClassEvent>(_onUpdateClass, transformer: sequential());
     on<DeleteClassEvent>(_onDeleteClass, transformer: sequential());
     on<AddStudentEvent>(_onAddStudent, transformer: sequential());
     on<ImportStudentsEvent>(_onImportStudents, transformer: sequential());
     on<UpdateStudentEvent>(_onUpdateStudent, transformer: sequential());
+    on<UpdateParentEvent>(_onUpdateParent, transformer: sequential());
     on<DeleteStudentEvent>(_onDeleteStudent, transformer: sequential());
     on<PromoteStudentsEvent>(_onPromoteStudents, transformer: sequential());
+    on<GraduateStudentsEvent>(_onGraduateStudents, transformer: sequential());
     on<LoadStudentRecordsEvent>(_onLoadStudentRecords, transformer: sequential());
     on<LoadSubjectsEvent>(_onLoadSubjects, transformer: sequential());
     on<AddSubjectEvent>(_onAddSubject, transformer: sequential());
@@ -68,6 +74,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
 
     on<MakeStudentPaymentEvent>(_onMakeStudentPayment, transformer: sequential());
     on<MakeParentPaymentEvent>(_onMakeParentPayment, transformer: sequential());
+    on<MapParentCreditEvent>(_onMapParentCredit, transformer: sequential());
     on<ProvisionStudentVirtualAccountEvent>(_onProvisionVirtualAccount, transformer: sequential());
     on<ProvisionParentVirtualAccountEvent>(_onProvisionParentVirtualAccount, transformer: sequential());
     on<ClearStudentDebitEvent>(_onClearStudentDebit, transformer: sequential());
@@ -203,8 +210,23 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onAddClass(AddClassEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
-      final newClass = SchoolClass(name: event.name, description: event.description);
+      final desc = event.description?.trim();
+      final newClass = SchoolClass(
+        name: event.name.trim(),
+        description: desc == null || desc.isEmpty ? null : desc,
+      );
       await repository.addClass(newClass);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onUpdateClass(UpdateClassEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      await repository.updateClass(event.schoolClass);
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
@@ -321,6 +343,38 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     }
   }
 
+  Future<void> _onUpdateParent(UpdateParentEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      await repository.updateParent(event.parent);
+      final parents = [
+        for (final p in state.parents)
+          if (p.id == event.parent.id) event.parent else p,
+      ];
+      final students = [
+        for (final s in state.students)
+          if (s.parentId == event.parent.id)
+            s.copyWith(parentName: event.parent.fullName, parentPhone: event.parent.phone)
+          else
+            s,
+      ];
+      emit(state.copyWith(
+        status: SchoolStatus.success,
+        successMessage: 'Parent details saved.',
+        isLoading: false,
+        parents: parents,
+        students: students,
+      ));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(
+        error: friendlyApiError(e),
+        status: SchoolStatus.failure,
+        isLoading: false,
+      ));
+    }
+  }
+
   Future<void> _onDeleteStudent(DeleteStudentEvent event, Emitter<SchoolState> emit) async {
     try {
       await repository.deleteStudent(event.id);
@@ -337,6 +391,27 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         event.targetClassId,
         academicYearId: state.activeYear?.id,
       );
+      final dest = state.classes.firstWhere(
+        (c) => c.id == event.targetClassId,
+        orElse: () => SchoolClass(id: event.targetClassId, name: 'the next class'),
+      );
+      emit(state.copyWith(
+        successMessage:
+            'Promoted ${event.studentIds.length} student${event.studentIds.length == 1 ? '' : 's'} to ${dest.name}.',
+      ));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(error: friendlyApiError(e)));
+    }
+  }
+
+  Future<void> _onGraduateStudents(GraduateStudentsEvent event, Emitter<SchoolState> emit) async {
+    try {
+      await repository.setStudentsEnrollmentStatus(event.studentIds, 'graduated');
+      emit(state.copyWith(
+        successMessage:
+            'Marked ${event.studentIds.length} student${event.studentIds.length == 1 ? '' : 's'} as graduated.',
+      ));
       add(LoadSchoolData());
     } catch (e) {
       emit(state.copyWith(error: friendlyApiError(e)));
@@ -878,38 +953,20 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         ));
       }
 
+      final shareMode = ParentPaymentShareModeX.fromStorage(
+        (await settingsRepository?.getSettings())?.parentPaymentShareMode,
+      );
       final result = ParentPaymentAllocator.allocate(
         paymentNaira: event.amount,
         children: debts,
+        mode: shareMode,
       );
 
-      for (final alloc in result.allocations) {
-        if (alloc.allocatedKobo <= 0) continue;
-        var remaining = alloc.allocatedNaira;
-        final invoices = await invoiceRepository.getInvoicesByStudentId(alloc.studentId);
-        final unpaid = invoices.where((inv) {
-          if (inv.invoiceNumber.startsWith('PMT-')) return false;
-          return (inv.totalAmount - inv.amountPaid) > 0.001;
-        }).toList()
-          ..sort((a, b) {
-            final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
-            final bBill = b.invoiceNumber.startsWith('BILL-') ? 0 : 1;
-            if (aBill != bBill) return aBill.compareTo(bBill);
-            return a.dateCreated.compareTo(b.dateCreated);
-          });
-        for (final inv in unpaid) {
-          if (remaining <= 0.001 || inv.id == null) continue;
-          final owing = inv.totalAmount - inv.amountPaid;
-          final pay = remaining < owing ? remaining : owing;
-          if (pay <= 0.001) continue;
-          await invoiceRepository.recordPayment(inv.id!, pay, event.method);
-          remaining -= pay;
-        }
-        final child = children.firstWhere((s) => s.id == alloc.studentId);
-        await repository.updateStudent(
-          child.copyWith(balance: alloc.outstandingAfterNaira),
-        );
-      }
+      await _applyChildAllocations(
+        allocations: result.allocations,
+        children: children,
+        method: event.method,
+      );
 
       final source = event.method == 'POS'
           ? 'pos'
@@ -957,6 +1014,156 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         isLoading: false,
         clearLastParentPayment: true,
       ));
+    }
+  }
+
+  Future<void> _onMapParentCredit(MapParentCreditEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      final parent = await repository.getParentById(event.parentId);
+      if (parent == null) {
+        throw Exception('Parent not found. Please refresh and try again.');
+      }
+      final mappings = event.amountsByStudentId.entries
+          .where((e) => e.value > 0.001)
+          .toList();
+      if (mappings.isEmpty) {
+        throw Exception('Enter at least one amount to map.');
+      }
+
+      final mappedKobo = mappings.fold<int>(
+        0,
+        (sum, e) => sum + ParentPaymentAllocator.toKobo(e.value),
+      );
+      final creditKobo = ParentPaymentAllocator.toKobo(parent.creditBalance);
+      if (mappedKobo > creditKobo) {
+        throw Exception('Mapped amounts are more than the parent credit.');
+      }
+
+      final children = (await repository.getStudents())
+          .where((s) => s.parentId == parent.id)
+          .toList();
+      final allocations = <ChildAllocation>[];
+      var parentOutstandingBefore = 0;
+      var parentOutstandingAfter = 0;
+
+      for (final child in children) {
+        if (child.id == null) continue;
+        final invoices = await invoiceRepository.getInvoicesByStudentId(child.id!);
+        final owingKobo = ParentPaymentAllocator.toKobo(_openAcademicDebt(invoices));
+        final fallbackKobo = ParentPaymentAllocator.toKobo(child.balance > 0 ? child.balance : 0);
+        final outstandingKobo = owingKobo > 0 ? owingKobo : fallbackKobo;
+        parentOutstandingBefore += outstandingKobo;
+
+        final requested = mappings
+            .where((e) => e.key == child.id)
+            .fold<double>(0, (sum, e) => sum + e.value);
+        final requestedKobo = ParentPaymentAllocator.toKobo(requested);
+        if (requestedKobo > outstandingKobo) {
+          throw Exception(
+            '${child.fullName} only owes ${ParentPaymentAllocator.toNaira(outstandingKobo).toStringAsFixed(2)}.',
+          );
+        }
+        allocations.add(
+          ChildAllocation(
+            studentId: child.id!,
+            outstandingBeforeKobo: outstandingKobo,
+            allocatedKobo: requestedKobo,
+            outstandingAfterKobo: outstandingKobo - requestedKobo,
+          ),
+        );
+        parentOutstandingAfter += outstandingKobo - requestedKobo;
+      }
+
+      final unknown = mappings.where(
+        (e) => children.every((c) => c.id != e.key),
+      );
+      if (unknown.isNotEmpty) {
+        throw Exception('One of the selected children is not linked to this parent.');
+      }
+
+      await _applyChildAllocations(
+        allocations: allocations,
+        children: children,
+        method: 'Parent Credit',
+      );
+
+      final appliedNaira = ParentPaymentAllocator.toNaira(mappedKobo);
+      final recorded = await repository.recordParentPayment(
+        ParentPaymentRecord(
+          parentId: parent.id!,
+          reference: 'MAP-${DateTime.now().millisecondsSinceEpoch}',
+          amount: appliedNaira,
+          appliedToDebt: appliedNaira,
+          toCredit: 0,
+          parentOutstandingBefore: ParentPaymentAllocator.toNaira(parentOutstandingBefore),
+          parentOutstandingAfter: ParentPaymentAllocator.toNaira(parentOutstandingAfter),
+          parentCreditBefore: parent.creditBalance,
+          parentCreditAfter: ParentPaymentAllocator.toNaira(creditKobo - mappedKobo),
+          source: 'credit_map',
+          createdAt: DateTime.now(),
+          allocations: allocations
+              .where((a) => a.allocatedKobo > 0)
+              .map(
+                (a) => ParentPaymentAllocationRecord(
+                  studentId: a.studentId,
+                  outstandingBefore: a.outstandingBeforeNaira,
+                  allocated: a.allocatedNaira,
+                  outstandingAfter: a.outstandingAfterNaira,
+                ),
+              )
+              .toList(),
+        ),
+      );
+
+      emit(state.copyWith(
+        status: SchoolStatus.success,
+        isLoading: false,
+        error: null,
+        lastParentPayment: recorded,
+      ));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(
+        error: friendlyApiError(e, fallback: 'Could not map parent credit.'),
+        status: SchoolStatus.failure,
+        isLoading: false,
+        clearLastParentPayment: true,
+      ));
+    }
+  }
+
+  Future<void> _applyChildAllocations({
+    required List<ChildAllocation> allocations,
+    required List<Student> children,
+    required String method,
+  }) async {
+    for (final alloc in allocations) {
+      if (alloc.allocatedKobo <= 0) continue;
+      var remaining = alloc.allocatedNaira;
+      final invoices = await invoiceRepository.getInvoicesByStudentId(alloc.studentId);
+      final unpaid = invoices.where((inv) {
+        if (inv.invoiceNumber.startsWith('PMT-')) return false;
+        return (inv.totalAmount - inv.amountPaid) > 0.001;
+      }).toList()
+        ..sort((a, b) {
+          final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          final bBill = b.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          if (aBill != bBill) return aBill.compareTo(bBill);
+          return a.dateCreated.compareTo(b.dateCreated);
+        });
+      for (final inv in unpaid) {
+        if (remaining <= 0.001 || inv.id == null) continue;
+        final owing = inv.totalAmount - inv.amountPaid;
+        final pay = remaining < owing ? remaining : owing;
+        if (pay <= 0.001) continue;
+        await invoiceRepository.recordPayment(inv.id!, pay, method);
+        remaining -= pay;
+      }
+      final child = children.firstWhere((s) => s.id == alloc.studentId);
+      await repository.updateStudent(
+        child.copyWith(balance: alloc.outstandingAfterNaira),
+      );
     }
   }
 

@@ -103,7 +103,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       case 'POS':
         return 'Card (POS Terminal)';
       case 'Transfer':
-        return 'Company Bank Account (Manual)';
+        return 'Company Bank Transfer';
       case 'Cash':
         return 'Cash Settlement';
       default:
@@ -990,6 +990,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
 
     return DropdownButtonFormField<String>(
       value: value,
+      isExpanded: true,
       dropdownColor: isDark ? theme.colorScheme.surfaceContainerHighest : null,
       decoration: InputDecoration(
         border: const OutlineInputBorder(),
@@ -1000,7 +1001,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       items: methods.map((method) {
         return DropdownMenuItem(
           value: method,
-          child: Text(_paymentMethodLabel(method), style: const TextStyle(fontSize: 12)),
+          child: Text(
+            _paymentMethodLabel(method),
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         );
       }).toList(),
       onChanged: (value) {

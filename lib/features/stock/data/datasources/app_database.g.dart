@@ -4860,6 +4860,20 @@ class $SettingsTable extends Settings
           defaultConstraints: GeneratedColumn.constraintIsAlways(
               'CHECK ("services_description_format_enabled" IN (0, 1))'),
           defaultValue: const Constant(true));
+  static const VerificationMeta _parentPaymentShareModeMeta =
+      const VerificationMeta('parentPaymentShareMode');
+  @override
+  late final GeneratedColumn<String> parentPaymentShareMode =
+      GeneratedColumn<String>('parent_payment_share_mode', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant('auto_share'));
+  static const VerificationMeta _hiddenDashboardIconsMeta =
+      const VerificationMeta('hiddenDashboardIcons');
+  @override
+  late final GeneratedColumn<String> hiddenDashboardIcons =
+      GeneratedColumn<String>('hidden_dashboard_icons', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4924,7 +4938,9 @@ class $SettingsTable extends Settings
         allowGiveChange,
         servicesMaterialsEnabled,
         servicesLaborEnabled,
-        servicesDescriptionFormatEnabled
+        servicesDescriptionFormatEnabled,
+        parentPaymentShareMode,
+        hiddenDashboardIcons
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5288,6 +5304,18 @@ class $SettingsTable extends Settings
               data['services_description_format_enabled']!,
               _servicesDescriptionFormatEnabledMeta));
     }
+    if (data.containsKey('parent_payment_share_mode')) {
+      context.handle(
+          _parentPaymentShareModeMeta,
+          parentPaymentShareMode.isAcceptableOrUnknown(
+              data['parent_payment_share_mode']!, _parentPaymentShareModeMeta));
+    }
+    if (data.containsKey('hidden_dashboard_icons')) {
+      context.handle(
+          _hiddenDashboardIconsMeta,
+          hiddenDashboardIcons.isAcceptableOrUnknown(
+              data['hidden_dashboard_icons']!, _hiddenDashboardIconsMeta));
+    }
     return context;
   }
 
@@ -5432,6 +5460,12 @@ class $SettingsTable extends Settings
       servicesDescriptionFormatEnabled: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}services_description_format_enabled'])!,
+      parentPaymentShareMode: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}parent_payment_share_mode'])!,
+      hiddenDashboardIcons: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}hidden_dashboard_icons']),
     );
   }
 
@@ -5505,6 +5539,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool servicesMaterialsEnabled;
   final bool servicesLaborEnabled;
   final bool servicesDescriptionFormatEnabled;
+  final String parentPaymentShareMode;
+
+  /// JSON list of dashboard menu IDs hidden by Admin Control.
+  final String? hiddenDashboardIcons;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -5568,7 +5606,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.allowGiveChange,
       required this.servicesMaterialsEnabled,
       required this.servicesLaborEnabled,
-      required this.servicesDescriptionFormatEnabled});
+      required this.servicesDescriptionFormatEnabled,
+      required this.parentPaymentShareMode,
+      this.hiddenDashboardIcons});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5669,6 +5709,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['services_labor_enabled'] = Variable<bool>(servicesLaborEnabled);
     map['services_description_format_enabled'] =
         Variable<bool>(servicesDescriptionFormatEnabled);
+    map['parent_payment_share_mode'] = Variable<String>(parentPaymentShareMode);
+    if (!nullToAbsent || hiddenDashboardIcons != null) {
+      map['hidden_dashboard_icons'] = Variable<String>(hiddenDashboardIcons);
+    }
     return map;
   }
 
@@ -5763,6 +5807,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       servicesMaterialsEnabled: Value(servicesMaterialsEnabled),
       servicesLaborEnabled: Value(servicesLaborEnabled),
       servicesDescriptionFormatEnabled: Value(servicesDescriptionFormatEnabled),
+      parentPaymentShareMode: Value(parentPaymentShareMode),
+      hiddenDashboardIcons: hiddenDashboardIcons == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hiddenDashboardIcons),
     );
   }
 
@@ -5849,6 +5897,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           serializer.fromJson<bool>(json['servicesLaborEnabled']),
       servicesDescriptionFormatEnabled:
           serializer.fromJson<bool>(json['servicesDescriptionFormatEnabled']),
+      parentPaymentShareMode:
+          serializer.fromJson<String>(json['parentPaymentShareMode']),
+      hiddenDashboardIcons:
+          serializer.fromJson<String?>(json['hiddenDashboardIcons']),
     );
   }
   @override
@@ -5924,6 +5976,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'servicesLaborEnabled': serializer.toJson<bool>(servicesLaborEnabled),
       'servicesDescriptionFormatEnabled':
           serializer.toJson<bool>(servicesDescriptionFormatEnabled),
+      'parentPaymentShareMode':
+          serializer.toJson<String>(parentPaymentShareMode),
+      'hiddenDashboardIcons': serializer.toJson<String?>(hiddenDashboardIcons),
     };
   }
 
@@ -5990,7 +6045,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? allowGiveChange,
           bool? servicesMaterialsEnabled,
           bool? servicesLaborEnabled,
-          bool? servicesDescriptionFormatEnabled}) =>
+          bool? servicesDescriptionFormatEnabled,
+          String? parentPaymentShareMode,
+          Value<String?> hiddenDashboardIcons = const Value.absent()}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -6069,6 +6126,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
         servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
             this.servicesDescriptionFormatEnabled,
+        parentPaymentShareMode:
+            parentPaymentShareMode ?? this.parentPaymentShareMode,
+        hiddenDashboardIcons: hiddenDashboardIcons.present
+            ? hiddenDashboardIcons.value
+            : this.hiddenDashboardIcons,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -6222,6 +6284,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           data.servicesDescriptionFormatEnabled.present
               ? data.servicesDescriptionFormatEnabled.value
               : this.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode: data.parentPaymentShareMode.present
+          ? data.parentPaymentShareMode.value
+          : this.parentPaymentShareMode,
+      hiddenDashboardIcons: data.hiddenDashboardIcons.present
+          ? data.hiddenDashboardIcons.value
+          : this.hiddenDashboardIcons,
     );
   }
 
@@ -6291,7 +6359,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('servicesMaterialsEnabled: $servicesMaterialsEnabled, ')
           ..write('servicesLaborEnabled: $servicesLaborEnabled, ')
           ..write(
-              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled')
+              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled, ')
+          ..write('parentPaymentShareMode: $parentPaymentShareMode, ')
+          ..write('hiddenDashboardIcons: $hiddenDashboardIcons')
           ..write(')'))
         .toString();
   }
@@ -6360,7 +6430,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         allowGiveChange,
         servicesMaterialsEnabled,
         servicesLaborEnabled,
-        servicesDescriptionFormatEnabled
+        servicesDescriptionFormatEnabled,
+        parentPaymentShareMode,
+        hiddenDashboardIcons
       ]);
   @override
   bool operator ==(Object other) =>
@@ -6431,7 +6503,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.servicesMaterialsEnabled == this.servicesMaterialsEnabled &&
           other.servicesLaborEnabled == this.servicesLaborEnabled &&
           other.servicesDescriptionFormatEnabled ==
-              this.servicesDescriptionFormatEnabled);
+              this.servicesDescriptionFormatEnabled &&
+          other.parentPaymentShareMode == this.parentPaymentShareMode &&
+          other.hiddenDashboardIcons == this.hiddenDashboardIcons);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -6498,6 +6572,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> servicesMaterialsEnabled;
   final Value<bool> servicesLaborEnabled;
   final Value<bool> servicesDescriptionFormatEnabled;
+  final Value<String> parentPaymentShareMode;
+  final Value<String?> hiddenDashboardIcons;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -6562,6 +6638,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.servicesMaterialsEnabled = const Value.absent(),
     this.servicesLaborEnabled = const Value.absent(),
     this.servicesDescriptionFormatEnabled = const Value.absent(),
+    this.parentPaymentShareMode = const Value.absent(),
+    this.hiddenDashboardIcons = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -6627,6 +6705,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.servicesMaterialsEnabled = const Value.absent(),
     this.servicesLaborEnabled = const Value.absent(),
     this.servicesDescriptionFormatEnabled = const Value.absent(),
+    this.parentPaymentShareMode = const Value.absent(),
+    this.hiddenDashboardIcons = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -6694,6 +6774,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? servicesMaterialsEnabled,
     Expression<bool>? servicesLaborEnabled,
     Expression<bool>? servicesDescriptionFormatEnabled,
+    Expression<String>? parentPaymentShareMode,
+    Expression<String>? hiddenDashboardIcons,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -6780,6 +6862,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'services_labor_enabled': servicesLaborEnabled,
       if (servicesDescriptionFormatEnabled != null)
         'services_description_format_enabled': servicesDescriptionFormatEnabled,
+      if (parentPaymentShareMode != null)
+        'parent_payment_share_mode': parentPaymentShareMode,
+      if (hiddenDashboardIcons != null)
+        'hidden_dashboard_icons': hiddenDashboardIcons,
     });
   }
 
@@ -6846,7 +6932,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? allowGiveChange,
       Value<bool>? servicesMaterialsEnabled,
       Value<bool>? servicesLaborEnabled,
-      Value<bool>? servicesDescriptionFormatEnabled}) {
+      Value<bool>? servicesDescriptionFormatEnabled,
+      Value<String>? parentPaymentShareMode,
+      Value<String?>? hiddenDashboardIcons}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -6920,6 +7008,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
       servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
           this.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode:
+          parentPaymentShareMode ?? this.parentPaymentShareMode,
+      hiddenDashboardIcons: hiddenDashboardIcons ?? this.hiddenDashboardIcons,
     );
   }
 
@@ -7126,6 +7217,14 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       map['services_description_format_enabled'] =
           Variable<bool>(servicesDescriptionFormatEnabled.value);
     }
+    if (parentPaymentShareMode.present) {
+      map['parent_payment_share_mode'] =
+          Variable<String>(parentPaymentShareMode.value);
+    }
+    if (hiddenDashboardIcons.present) {
+      map['hidden_dashboard_icons'] =
+          Variable<String>(hiddenDashboardIcons.value);
+    }
     return map;
   }
 
@@ -7195,7 +7294,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('servicesMaterialsEnabled: $servicesMaterialsEnabled, ')
           ..write('servicesLaborEnabled: $servicesLaborEnabled, ')
           ..write(
-              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled')
+              'servicesDescriptionFormatEnabled: $servicesDescriptionFormatEnabled, ')
+          ..write('parentPaymentShareMode: $parentPaymentShareMode, ')
+          ..write('hiddenDashboardIcons: $hiddenDashboardIcons')
           ..write(')'))
         .toString();
   }
@@ -12143,6 +12244,12 @@ class $ParentsTable extends Parents with TableInfo<$ParentsTable, ParentTable> {
   late final GeneratedColumn<String> email = GeneratedColumn<String>(
       'email', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _addressMeta =
+      const VerificationMeta('address');
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+      'address', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _virtualAccountNumberMeta =
       const VerificationMeta('virtualAccountNumber');
   @override
@@ -12214,6 +12321,7 @@ class $ParentsTable extends Parents with TableInfo<$ParentsTable, ParentTable> {
         fullName,
         phone,
         email,
+        address,
         virtualAccountNumber,
         virtualAccountBank,
         virtualAccountName,
@@ -12251,6 +12359,10 @@ class $ParentsTable extends Parents with TableInfo<$ParentsTable, ParentTable> {
     if (data.containsKey('email')) {
       context.handle(
           _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
+    }
+    if (data.containsKey('address')) {
+      context.handle(_addressMeta,
+          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
     }
     if (data.containsKey('virtual_account_number')) {
       context.handle(
@@ -12319,6 +12431,8 @@ class $ParentsTable extends Parents with TableInfo<$ParentsTable, ParentTable> {
           .read(DriftSqlType.string, data['${effectivePrefix}phone']),
       email: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}email']),
+      address: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}address']),
       virtualAccountNumber: attachedDatabase.typeMapping.read(
           DriftSqlType.string,
           data['${effectivePrefix}virtual_account_number']),
@@ -12355,6 +12469,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
   final String fullName;
   final String? phone;
   final String? email;
+  final String? address;
   final String? virtualAccountNumber;
   final String? virtualAccountBank;
   final String? virtualAccountName;
@@ -12370,6 +12485,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
       required this.fullName,
       this.phone,
       this.email,
+      this.address,
       this.virtualAccountNumber,
       this.virtualAccountBank,
       this.virtualAccountName,
@@ -12390,6 +12506,9 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
     }
     if (!nullToAbsent || email != null) {
       map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
     }
     if (!nullToAbsent || virtualAccountNumber != null) {
       map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
@@ -12428,6 +12547,9 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
           phone == null && nullToAbsent ? const Value.absent() : Value(phone),
       email:
           email == null && nullToAbsent ? const Value.absent() : Value(email),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
       virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
           ? const Value.absent()
           : Value(virtualAccountNumber),
@@ -12464,6 +12586,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
       fullName: serializer.fromJson<String>(json['fullName']),
       phone: serializer.fromJson<String?>(json['phone']),
       email: serializer.fromJson<String?>(json['email']),
+      address: serializer.fromJson<String?>(json['address']),
       virtualAccountNumber:
           serializer.fromJson<String?>(json['virtualAccountNumber']),
       virtualAccountBank:
@@ -12488,6 +12611,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
       'fullName': serializer.toJson<String>(fullName),
       'phone': serializer.toJson<String?>(phone),
       'email': serializer.toJson<String?>(email),
+      'address': serializer.toJson<String?>(address),
       'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
       'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
       'virtualAccountName': serializer.toJson<String?>(virtualAccountName),
@@ -12506,6 +12630,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
           String? fullName,
           Value<String?> phone = const Value.absent(),
           Value<String?> email = const Value.absent(),
+          Value<String?> address = const Value.absent(),
           Value<String?> virtualAccountNumber = const Value.absent(),
           Value<String?> virtualAccountBank = const Value.absent(),
           Value<String?> virtualAccountName = const Value.absent(),
@@ -12521,6 +12646,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
         fullName: fullName ?? this.fullName,
         phone: phone.present ? phone.value : this.phone,
         email: email.present ? email.value : this.email,
+        address: address.present ? address.value : this.address,
         virtualAccountNumber: virtualAccountNumber.present
             ? virtualAccountNumber.value
             : this.virtualAccountNumber,
@@ -12546,6 +12672,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
       fullName: data.fullName.present ? data.fullName.value : this.fullName,
       phone: data.phone.present ? data.phone.value : this.phone,
       email: data.email.present ? data.email.value : this.email,
+      address: data.address.present ? data.address.value : this.address,
       virtualAccountNumber: data.virtualAccountNumber.present
           ? data.virtualAccountNumber.value
           : this.virtualAccountNumber,
@@ -12576,6 +12703,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
           ..write('fullName: $fullName, ')
           ..write('phone: $phone, ')
           ..write('email: $email, ')
+          ..write('address: $address, ')
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountName: $virtualAccountName, ')
@@ -12596,6 +12724,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
       fullName,
       phone,
       email,
+      address,
       virtualAccountNumber,
       virtualAccountBank,
       virtualAccountName,
@@ -12614,6 +12743,7 @@ class ParentTable extends DataClass implements Insertable<ParentTable> {
           other.fullName == this.fullName &&
           other.phone == this.phone &&
           other.email == this.email &&
+          other.address == this.address &&
           other.virtualAccountNumber == this.virtualAccountNumber &&
           other.virtualAccountBank == this.virtualAccountBank &&
           other.virtualAccountName == this.virtualAccountName &&
@@ -12631,6 +12761,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
   final Value<String> fullName;
   final Value<String?> phone;
   final Value<String?> email;
+  final Value<String?> address;
   final Value<String?> virtualAccountNumber;
   final Value<String?> virtualAccountBank;
   final Value<String?> virtualAccountName;
@@ -12646,6 +12777,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
     this.fullName = const Value.absent(),
     this.phone = const Value.absent(),
     this.email = const Value.absent(),
+    this.address = const Value.absent(),
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountName = const Value.absent(),
@@ -12662,6 +12794,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
     required String fullName,
     this.phone = const Value.absent(),
     this.email = const Value.absent(),
+    this.address = const Value.absent(),
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountName = const Value.absent(),
@@ -12678,6 +12811,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
     Expression<String>? fullName,
     Expression<String>? phone,
     Expression<String>? email,
+    Expression<String>? address,
     Expression<String>? virtualAccountNumber,
     Expression<String>? virtualAccountBank,
     Expression<String>? virtualAccountName,
@@ -12694,6 +12828,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
       if (fullName != null) 'full_name': fullName,
       if (phone != null) 'phone': phone,
       if (email != null) 'email': email,
+      if (address != null) 'address': address,
       if (virtualAccountNumber != null)
         'virtual_account_number': virtualAccountNumber,
       if (virtualAccountBank != null)
@@ -12716,6 +12851,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
       Value<String>? fullName,
       Value<String?>? phone,
       Value<String?>? email,
+      Value<String?>? address,
       Value<String?>? virtualAccountNumber,
       Value<String?>? virtualAccountBank,
       Value<String?>? virtualAccountName,
@@ -12731,6 +12867,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
       fullName: fullName ?? this.fullName,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      address: address ?? this.address,
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountName: virtualAccountName ?? this.virtualAccountName,
@@ -12758,6 +12895,9 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
     }
     if (email.present) {
       map['email'] = Variable<String>(email.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
     }
     if (virtualAccountNumber.present) {
       map['virtual_account_number'] =
@@ -12801,6 +12941,7 @@ class ParentsCompanion extends UpdateCompanion<ParentTable> {
           ..write('fullName: $fullName, ')
           ..write('phone: $phone, ')
           ..write('email: $email, ')
+          ..write('address: $address, ')
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountName: $virtualAccountName, ')
@@ -14227,6 +14368,14 @@ class $StudentsTable extends Students
   late final GeneratedColumn<String> department = GeneratedColumn<String>(
       'department', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _enrollmentStatusMeta =
+      const VerificationMeta('enrollmentStatus');
+  @override
+  late final GeneratedColumn<String> enrollmentStatus = GeneratedColumn<String>(
+      'enrollment_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('active'));
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -14282,6 +14431,7 @@ class $StudentsTable extends Students
         virtualAccountBank,
         virtualAccountStatus,
         department,
+        enrollmentStatus,
         syncId,
         updatedAt,
         createdAt,
@@ -14409,6 +14559,12 @@ class $StudentsTable extends Students
           department.isAcceptableOrUnknown(
               data['department']!, _departmentMeta));
     }
+    if (data.containsKey('enrollment_status')) {
+      context.handle(
+          _enrollmentStatusMeta,
+          enrollmentStatus.isAcceptableOrUnknown(
+              data['enrollment_status']!, _enrollmentStatusMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -14480,6 +14636,8 @@ class $StudentsTable extends Students
           data['${effectivePrefix}virtual_account_status']),
       department: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}department']),
+      enrollmentStatus: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}enrollment_status'])!,
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -14520,6 +14678,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String? virtualAccountBank;
   final String? virtualAccountStatus;
   final String? department;
+
+  /// `active`, `promoted`, or `graduated`.
+  final String enrollmentStatus;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -14546,6 +14707,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.virtualAccountBank,
       this.virtualAccountStatus,
       this.department,
+      required this.enrollmentStatus,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -14598,6 +14760,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     if (!nullToAbsent || department != null) {
       map['department'] = Variable<String>(department);
     }
+    map['enrollment_status'] = Variable<String>(enrollmentStatus);
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
     }
@@ -14658,6 +14821,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       department: department == null && nullToAbsent
           ? const Value.absent()
           : Value(department),
+      enrollmentStatus: Value(enrollmentStatus),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -14700,6 +14864,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       virtualAccountStatus:
           serializer.fromJson<String?>(json['virtualAccountStatus']),
       department: serializer.fromJson<String?>(json['department']),
+      enrollmentStatus: serializer.fromJson<String>(json['enrollmentStatus']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -14731,6 +14896,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
       'virtualAccountStatus': serializer.toJson<String?>(virtualAccountStatus),
       'department': serializer.toJson<String?>(department),
+      'enrollmentStatus': serializer.toJson<String>(enrollmentStatus),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -14760,6 +14926,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<String?> virtualAccountBank = const Value.absent(),
           Value<String?> virtualAccountStatus = const Value.absent(),
           Value<String?> department = const Value.absent(),
+          String? enrollmentStatus,
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -14793,6 +14960,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
             ? virtualAccountStatus.value
             : this.virtualAccountStatus,
         department: department.present ? department.value : this.department,
+        enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -14840,6 +15008,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           : this.virtualAccountStatus,
       department:
           data.department.present ? data.department.value : this.department,
+      enrollmentStatus: data.enrollmentStatus.present
+          ? data.enrollmentStatus.value
+          : this.enrollmentStatus,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -14871,6 +15042,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('department: $department, ')
+          ..write('enrollmentStatus: $enrollmentStatus, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -14902,6 +15074,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         virtualAccountBank,
         virtualAccountStatus,
         department,
+        enrollmentStatus,
         syncId,
         updatedAt,
         createdAt,
@@ -14932,6 +15105,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.virtualAccountBank == this.virtualAccountBank &&
           other.virtualAccountStatus == this.virtualAccountStatus &&
           other.department == this.department &&
+          other.enrollmentStatus == this.enrollmentStatus &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -14960,6 +15134,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String?> virtualAccountBank;
   final Value<String?> virtualAccountStatus;
   final Value<String?> department;
+  final Value<String> enrollmentStatus;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -14986,6 +15161,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountStatus = const Value.absent(),
     this.department = const Value.absent(),
+    this.enrollmentStatus = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -15013,6 +15189,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountStatus = const Value.absent(),
     this.department = const Value.absent(),
+    this.enrollmentStatus = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -15043,6 +15220,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? virtualAccountBank,
     Expression<String>? virtualAccountStatus,
     Expression<String>? department,
+    Expression<String>? enrollmentStatus,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -15073,6 +15251,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (virtualAccountStatus != null)
         'virtual_account_status': virtualAccountStatus,
       if (department != null) 'department': department,
+      if (enrollmentStatus != null) 'enrollment_status': enrollmentStatus,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -15102,6 +15281,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String?>? virtualAccountBank,
       Value<String?>? virtualAccountStatus,
       Value<String?>? department,
+      Value<String>? enrollmentStatus,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -15128,6 +15308,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
       department: department ?? this.department,
+      enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -15201,6 +15382,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     if (department.present) {
       map['department'] = Variable<String>(department.value);
     }
+    if (enrollmentStatus.present) {
+      map['enrollment_status'] = Variable<String>(enrollmentStatus.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -15242,6 +15426,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('department: $department, ')
+          ..write('enrollmentStatus: $enrollmentStatus, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -27551,6 +27736,8 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> servicesMaterialsEnabled,
   Value<bool> servicesLaborEnabled,
   Value<bool> servicesDescriptionFormatEnabled,
+  Value<String> parentPaymentShareMode,
+  Value<String?> hiddenDashboardIcons,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -27616,6 +27803,8 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> servicesMaterialsEnabled,
   Value<bool> servicesLaborEnabled,
   Value<bool> servicesDescriptionFormatEnabled,
+  Value<String> parentPaymentShareMode,
+  Value<String?> hiddenDashboardIcons,
 });
 
 class $$SettingsTableFilterComposer
@@ -27849,6 +28038,14 @@ class $$SettingsTableFilterComposer
       $composableBuilder(
           column: $table.servicesDescriptionFormatEnabled,
           builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentPaymentShareMode => $composableBuilder(
+      column: $table.parentPaymentShareMode,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get hiddenDashboardIcons => $composableBuilder(
+      column: $table.hiddenDashboardIcons,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -28090,6 +28287,14 @@ class $$SettingsTableOrderingComposer
       $composableBuilder(
           column: $table.servicesDescriptionFormatEnabled,
           builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentPaymentShareMode => $composableBuilder(
+      column: $table.parentPaymentShareMode,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get hiddenDashboardIcons => $composableBuilder(
+      column: $table.hiddenDashboardIcons,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -28291,6 +28496,12 @@ class $$SettingsTableAnnotationComposer
       $composableBuilder(
           column: $table.servicesDescriptionFormatEnabled,
           builder: (column) => column);
+
+  GeneratedColumn<String> get parentPaymentShareMode => $composableBuilder(
+      column: $table.parentPaymentShareMode, builder: (column) => column);
+
+  GeneratedColumn<String> get hiddenDashboardIcons => $composableBuilder(
+      column: $table.hiddenDashboardIcons, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -28382,6 +28593,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> servicesMaterialsEnabled = const Value.absent(),
             Value<bool> servicesLaborEnabled = const Value.absent(),
             Value<bool> servicesDescriptionFormatEnabled = const Value.absent(),
+            Value<String> parentPaymentShareMode = const Value.absent(),
+            Value<String?> hiddenDashboardIcons = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -28447,6 +28660,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             servicesMaterialsEnabled: servicesMaterialsEnabled,
             servicesLaborEnabled: servicesLaborEnabled,
             servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled,
+            parentPaymentShareMode: parentPaymentShareMode,
+            hiddenDashboardIcons: hiddenDashboardIcons,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -28512,6 +28727,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> servicesMaterialsEnabled = const Value.absent(),
             Value<bool> servicesLaborEnabled = const Value.absent(),
             Value<bool> servicesDescriptionFormatEnabled = const Value.absent(),
+            Value<String> parentPaymentShareMode = const Value.absent(),
+            Value<String?> hiddenDashboardIcons = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -28577,6 +28794,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             servicesMaterialsEnabled: servicesMaterialsEnabled,
             servicesLaborEnabled: servicesLaborEnabled,
             servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled,
+            parentPaymentShareMode: parentPaymentShareMode,
+            hiddenDashboardIcons: hiddenDashboardIcons,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -32031,6 +32250,7 @@ typedef $$ParentsTableCreateCompanionBuilder = ParentsCompanion Function({
   required String fullName,
   Value<String?> phone,
   Value<String?> email,
+  Value<String?> address,
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountName,
@@ -32047,6 +32267,7 @@ typedef $$ParentsTableUpdateCompanionBuilder = ParentsCompanion Function({
   Value<String> fullName,
   Value<String?> phone,
   Value<String?> email,
+  Value<String?> address,
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountName,
@@ -32132,6 +32353,9 @@ class $$ParentsTableFilterComposer
 
   ColumnFilters<String> get email => $composableBuilder(
       column: $table.email, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
       column: $table.virtualAccountNumber,
@@ -32254,6 +32478,9 @@ class $$ParentsTableOrderingComposer
   ColumnOrderings<String> get email => $composableBuilder(
       column: $table.email, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
       column: $table.virtualAccountNumber,
       builder: (column) => ColumnOrderings(column));
@@ -32310,6 +32537,9 @@ class $$ParentsTableAnnotationComposer
 
   GeneratedColumn<String> get email =>
       $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
 
   GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
       column: $table.virtualAccountNumber, builder: (column) => column);
@@ -32437,6 +32667,7 @@ class $$ParentsTableTableManager extends RootTableManager<
             Value<String> fullName = const Value.absent(),
             Value<String?> phone = const Value.absent(),
             Value<String?> email = const Value.absent(),
+            Value<String?> address = const Value.absent(),
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountName = const Value.absent(),
@@ -32453,6 +32684,7 @@ class $$ParentsTableTableManager extends RootTableManager<
             fullName: fullName,
             phone: phone,
             email: email,
+            address: address,
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountBank: virtualAccountBank,
             virtualAccountName: virtualAccountName,
@@ -32469,6 +32701,7 @@ class $$ParentsTableTableManager extends RootTableManager<
             required String fullName,
             Value<String?> phone = const Value.absent(),
             Value<String?> email = const Value.absent(),
+            Value<String?> address = const Value.absent(),
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountName = const Value.absent(),
@@ -32485,6 +32718,7 @@ class $$ParentsTableTableManager extends RootTableManager<
             fullName: fullName,
             phone: phone,
             email: email,
+            address: address,
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountBank: virtualAccountBank,
             virtualAccountName: virtualAccountName,
@@ -33465,6 +33699,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountStatus,
   Value<String?> department,
+  Value<String> enrollmentStatus,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -33492,6 +33727,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountStatus,
   Value<String?> department,
+  Value<String> enrollmentStatus,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -33645,6 +33881,10 @@ class $$StudentsTableFilterComposer
 
   ColumnFilters<String> get department => $composableBuilder(
       column: $table.department, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get enrollmentStatus => $composableBuilder(
+      column: $table.enrollmentStatus,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -33832,6 +34072,10 @@ class $$StudentsTableOrderingComposer
   ColumnOrderings<String> get department => $composableBuilder(
       column: $table.department, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get enrollmentStatus => $composableBuilder(
+      column: $table.enrollmentStatus,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -33967,6 +34211,9 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<String> get department => $composableBuilder(
       column: $table.department, builder: (column) => column);
+
+  GeneratedColumn<String> get enrollmentStatus => $composableBuilder(
+      column: $table.enrollmentStatus, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -34137,6 +34384,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> department = const Value.absent(),
+            Value<String> enrollmentStatus = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -34164,6 +34412,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountBank: virtualAccountBank,
             virtualAccountStatus: virtualAccountStatus,
             department: department,
+            enrollmentStatus: enrollmentStatus,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -34191,6 +34440,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> department = const Value.absent(),
+            Value<String> enrollmentStatus = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -34218,6 +34468,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountBank: virtualAccountBank,
             virtualAccountStatus: virtualAccountStatus,
             department: department,
+            enrollmentStatus: enrollmentStatus,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,

@@ -1158,12 +1158,14 @@ export class AdminController {
       }
 
       // Parallel fetch for deep insights
-      const [tenantRes, usersRes, walletInfo, usageRes, certRes] = await Promise.all([
+      const [tenantRes, usersRes, walletInfo, usageRes, certRes, walletTx, walletRow] = await Promise.all([
         supabaseAdmin.from('tenants').select('*').eq('id', id).single(),
         supabaseAdmin.from('users').select('*').eq('tenant_id', id),
-        WalletService.getBalance(id), // DERIVED: Sum of ledger entries
+        WalletService.getBalance(id), // USER_WALLET projection, not both sides of double-entry
         supabaseAdmin.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
         supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id),
+        WalletService.getTransactions(id),
+        supabaseAdmin.from('wallets').select('id, balance, updated_at').eq('tenant_id', id).maybeSingle(),
       ]);
 
       if (tenantRes.error) throw tenantRes.error;
@@ -1216,7 +1218,36 @@ export class AdminController {
           phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.phone : null) || null,
           email: u.email || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.owner_email : null) || null,
         })),
-        wallet: { balance: walletInfo.balance }, // Normalized structure for frontend
+        wallet: {
+          balance: walletInfo.balance,
+          updated_at: walletRow.data?.updated_at || walletInfo.timestamp,
+          subAccount: walletRow.data
+            ? {
+                id: walletRow.data.id,
+                balance: walletInfo.balance,
+                walletType: 'SCHOOL_WALLET',
+                ownerType: 'SCHOOL',
+              }
+            : null,
+          transactions: (walletTx || []).map((tx: any) => ({
+            id: tx.id || tx.reference,
+            created_at: tx.created_at,
+            type: WalletService.toSignedAmount(tx) >= 0 ? 'CREDIT' : 'DEBIT',
+            amount: WalletService.toSignedAmount(tx),
+            description: tx.reference || tx.metadata?.description || 'Quasar ledger entry',
+            reference: tx.reference,
+            account: tx.account,
+          })),
+          virtualAccounts: [],
+          allWallets: walletRow.data
+            ? [{
+                id: walletRow.data.id,
+                balance: walletInfo.balance,
+                walletType: 'SCHOOL_WALLET',
+                ownerType: 'SCHOOL',
+              }]
+            : [],
+        },
         recentUsage: usageRes.data,
         certificates,
         registeredDevices
@@ -1528,11 +1559,7 @@ export class AdminController {
           .from('students')
           .select('id', { count: 'exact', head: true })
           .or(`tenant_id.eq.${targetTenantId},school_id.eq.${targetTenantId}`),
-        supabaseAdmin
-          .from('wallets')
-          .select('balance')
-          .eq('tenant_id', targetTenantId)
-          .maybeSingle(),
+        WalletService.getBalance(String(targetTenantId)),
         supabaseAdmin
           .from('transactions_log')
           .select('amount, type')
@@ -1567,7 +1594,7 @@ export class AdminController {
         monthly_revenue: totalRevenue,
         active_students: studentsRes.count || 0,
         pending_invoices: pendingInvoices,
-        internal_wallet: Number(walletRes.data?.balance || 0),
+        internal_wallet: Number(walletRes?.balance || 0),
         cash_on_hand: 0,
         pending_quasar: pendingQuasar,
       };

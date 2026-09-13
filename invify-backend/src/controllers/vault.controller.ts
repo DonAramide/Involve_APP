@@ -87,6 +87,34 @@ export class VaultController {
   }
 
   /**
+   * Updates an existing credential (name, type, expiry, secret).
+   */
+  static async updateCredential(req: Request, res: Response) {
+    try {
+      const { vaultId, credentialId } = req.params;
+      const payload = req.body;
+      const plaintext =
+        payload.plaintext_value ??
+        payload.value ??
+        payload.secret;
+
+      const data = await IntegrationVaultService.updateCredential(vaultId, credentialId, {
+        credential_type: payload.credential_type,
+        key_name: payload.key_name,
+        expires_at: payload.expires_at,
+        plaintext_value: typeof plaintext === 'string' ? plaintext : undefined,
+        promote: Boolean(payload.promote),
+      });
+
+      return res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      console.error('[VaultController] Failed to update credential:', error.message);
+      const status = String(error.message || '').includes('not found') ? 404 : 500;
+      return res.status(status).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Activates a STANDBY credential.
    */
   static async activateCredential(req: Request, res: Response) {
@@ -120,24 +148,60 @@ export class VaultController {
   static async testConnection(req: Request, res: Response) {
     try {
       const { vaultId } = req.params;
-      const { serviceIdentifier, environment } = req.body;
+      const { serviceIdentifier, environment, keyName } = req.body;
+      const sid = String(serviceIdentifier || '').toLowerCase();
+      const isQuasar = sid === 'qip' || sid === 'quasar' || sid.includes('quasar');
 
-      // 1. Fetch decrypted active key
-      const key = await IntegrationVaultService.getDecryptedCredential(serviceIdentifier, environment);
-      if (!key) {
-        return res.status(404).json({ success: false, error: 'No active credential found to test.' });
+      if (isQuasar) {
+        const {
+          testQuasarPartnerVertical,
+          verticalFromKeyName,
+        } = await import('../integrations/quasar/quasar-partner-credentials');
+        const vertical = verticalFromKeyName(keyName);
+        if (!vertical) {
+          return res.status(400).json({
+            success: false,
+            error:
+              'This row is not a Quasar partner key. Use Test all Quasar credentials, or test INVIFY_SCHOOL / RETAIL / SERVICES client id and secret.',
+          });
+        }
+        const result = await testQuasarPartnerVertical(vertical);
+        await IntegrationVaultService.logHealthCheck(
+          vaultId,
+          environment || 'PRODUCTION',
+          result.ok ? 'HEALTHY' : 'DOWN',
+          result.latencyMs,
+          result.ok ? undefined : result.detail,
+        );
+        return res.status(result.ok ? 200 : 502).json({
+          success: result.ok,
+          status: result.ok ? 'HEALTHY' : 'DOWN',
+          latency_ms: result.latencyMs,
+          vertical: result.vertical,
+          source: result.source,
+          detail: result.detail,
+          httpStatus: result.httpStatus,
+        });
       }
 
-      // 2. Perform live network ping (Mocked here)
-      const start = Date.now();
-      // await axios.get(...) using key
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50)); // simulate latency
-      const latency = Date.now() - start;
+      const key = await IntegrationVaultService.getDecryptedCredential(
+        serviceIdentifier,
+        environment,
+        undefined,
+        keyName,
+        { allowStandby: true },
+      );
+      if (!key) {
+        return res.status(404).json({ success: false, error: 'No credential found to test.' });
+      }
 
-      // 3. Log health
-      await IntegrationVaultService.logHealthCheck(vaultId, environment, 'HEALTHY', latency);
-
-      return res.status(200).json({ success: true, status: 'HEALTHY', latency_ms: latency });
+      await IntegrationVaultService.logHealthCheck(vaultId, environment, 'HEALTHY', 0);
+      return res.status(200).json({
+        success: true,
+        status: 'HEALTHY',
+        latency_ms: 0,
+        detail: 'No live probe for this integration type.',
+      });
     } catch (error: any) {
       console.error('[VaultController] Connection test failed:', error.message);
       
@@ -145,6 +209,30 @@ export class VaultController {
         await IntegrationVaultService.logHealthCheck(req.params.vaultId, req.body.environment || 'PRODUCTION', 'DOWN', 0, error.message);
       }
 
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async testQuasarPartners(req: Request, res: Response) {
+    try {
+      const { testAllQuasarPartnerVerticals } = await import(
+        '../integrations/quasar/quasar-partner-credentials'
+      );
+      const results = await testAllQuasarPartnerVerticals();
+      const allOk = results.every((r) => r.ok);
+      if (req.params.vaultId) {
+        const worst = results.find((r) => !r.ok);
+        await IntegrationVaultService.logHealthCheck(
+          req.params.vaultId,
+          req.body?.environment || 'PRODUCTION',
+          allOk ? 'HEALTHY' : 'DOWN',
+          results.reduce((sum, r) => sum + (r.latencyMs || 0), 0),
+          worst?.detail,
+        );
+      }
+      return res.status(allOk ? 200 : 502).json({ success: allOk, results });
+    } catch (error: any) {
+      console.error('[VaultController] Quasar partner tests failed:', error.message);
       return res.status(500).json({ success: false, error: error.message });
     }
   }

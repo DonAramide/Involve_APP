@@ -9,9 +9,11 @@ router.use(authenticate);
 router.get('/integrations', VaultController.listIntegrations);
 router.post('/integrations', VaultController.registerIntegration);
 router.post('/integrations/:vaultId/credentials', VaultController.addCredential);
+router.patch('/integrations/:vaultId/credentials/:credentialId', VaultController.updateCredential);
 router.patch('/integrations/:vaultId/credentials/:credentialId/activate', VaultController.activateCredential);
 router.delete('/integrations/:vaultId/credentials/:credentialId', VaultController.deleteCredential);
 router.post('/integrations/:vaultId/test', VaultController.testConnection);
+router.post('/integrations/:vaultId/test-quasar-partners', VaultController.testQuasarPartners);
 
 // Meta WhatsApp Cloud API (Integration Vault)
 router.put('/meta-whatsapp', VaultController.upsertMetaWhatsApp);

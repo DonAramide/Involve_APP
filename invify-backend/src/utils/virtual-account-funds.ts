@@ -11,6 +11,14 @@ export function roundNaira(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+/** Prefer Quasar's exact naira (2.50) over BIGINT-truncated amount (2). */
+export function transactionAmountNaira(tx: any): number {
+  const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : {};
+  const exact = Number(meta.amountNaira ?? meta.amount_naira ?? meta.amountRaw);
+  if (Number.isFinite(exact) && exact > 0) return roundNaira(exact);
+  return roundNaira(Number(tx?.amount) || 0);
+}
+
 export function extractVaFromMetadata(meta: any): string | null {
   if (!meta || typeof meta !== 'object') return null;
   const candidates = [
@@ -36,7 +44,7 @@ function netByVirtualAccount(txns: any[]): {
   let noVaOutbound = 0;
 
   for (const tx of txns || []) {
-    const amount = Number(tx.amount) || 0;
+    const amount = transactionAmountNaira(tx);
     if (!Number.isFinite(amount) || amount <= 0) continue;
     const type = String(tx.type || '').toUpperCase();
     const isIn = INBOUND.has(type) || type === '';

@@ -56,6 +56,9 @@ class _ActivationPageState extends State<ActivationPage> {
       }
     }
     _loadGlobalConfig();
+    for (var i = 0; i < _focusNodes.length; i++) {
+      _focusNodes[i].onKeyEvent = (node, event) => _onSegmentKey(i, event);
+    }
   }
 
   /// First-time users (no trial started yet) can start a 3-day trial from this page.
@@ -683,8 +686,20 @@ class _ActivationPageState extends State<ActivationPage> {
                   focusNode: _focusNodes[index],
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.characters,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: index < 5 ? TextInputAction.next : TextInputAction.done,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  smartDashesType: SmartDashesType.disabled,
+                  smartQuotesType: SmartQuotesType.disabled,
                   inputFormatters: [
-                    LengthLimitingTextInputFormatter(30), // Allow paste
+                    _ActivationSegmentFormatter(
+                      onOverflow: (full) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _handlePaste(index, full);
+                        });
+                      },
+                    ),
                   ],
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
@@ -702,15 +717,7 @@ class _ActivationPageState extends State<ActivationPage> {
                     filled: true,
                     fillColor: Colors.black.withOpacity(0.3),
                   ),
-                  onChanged: (value) {
-                    if (value.length > 4) {
-                      _handlePaste(index, value);
-                    } else if (value.length == 4 && index < 5) {
-                      _focusNodes[index + 1].requestFocus();
-                    } else if (value.isEmpty && index > 0) {
-                      _focusNodes[index - 1].requestFocus();
-                    }
-                  },
+                  onChanged: (value) => _onSegmentChanged(index, value),
                 ),
               ),
             );
@@ -723,6 +730,38 @@ class _ActivationPageState extends State<ActivationPage> {
         ),
       ],
     );
+  }
+
+  void _onSegmentChanged(int index, String value) {
+    final clean = value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (clean != value) {
+      _segmentControllers[index].value = TextEditingValue(
+        text: clean,
+        selection: TextSelection.collapsed(offset: clean.length),
+      );
+    }
+    if (clean.length >= 4 && index < 5) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNodes[index + 1].requestFocus();
+      });
+    }
+  }
+
+  KeyEventResult _onSegmentKey(int index, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey != LogicalKeyboardKey.backspace) {
+      return KeyEventResult.ignored;
+    }
+    if (_segmentControllers[index].text.isNotEmpty || index == 0) {
+      return KeyEventResult.ignored;
+    }
+    _focusNodes[index - 1].requestFocus();
+    final prev = _segmentControllers[index - 1];
+    if (prev.text.isNotEmpty) {
+      prev.text = prev.text.substring(0, prev.text.length - 1);
+      prev.selection = TextSelection.collapsed(offset: prev.text.length);
+    }
+    return KeyEventResult.handled;
   }
 
   void _handlePaste(int startIndex, String value) {
@@ -1076,5 +1115,27 @@ class _ScannerLaserAnimationState extends State<ScannerLaserAnimation> with Sing
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+}
+
+class _ActivationSegmentFormatter extends TextInputFormatter {
+  final void Function(String overflow) onOverflow;
+
+  _ActivationSegmentFormatter({required this.onOverflow});
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final clean = newValue.text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (clean.length > 4) {
+      onOverflow(clean);
+      return TextEditingValue(
+        text: clean.substring(0, 4),
+        selection: const TextSelection.collapsed(offset: 4),
+      );
+    }
+    return TextEditingValue(
+      text: clean,
+      selection: TextSelection.collapsed(offset: clean.length),
+    );
   }
 }

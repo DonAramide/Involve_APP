@@ -109,5 +109,89 @@ void main() {
       expect(result.creditKobo, 4000);
       expect(result.parentOutstandingAfterKobo, 0);
     });
+
+    test('lowest to highest clears smallest debts first', () {
+      final result = ParentPaymentAllocator.allocate(
+        paymentNaira: 50,
+        children: const [
+          ChildOutstanding(studentId: 1, outstandingNaira: 20),
+          ChildOutstanding(studentId: 2, outstandingNaira: 30),
+          ChildOutstanding(studentId: 3, outstandingNaira: 50),
+        ],
+        mode: ParentPaymentShareMode.lowestToHighest,
+      );
+      expect(result.appliedKobo, 5000);
+      expect(result.creditKobo, 0);
+      expect(
+        result.allocations.map((a) => a.allocatedKobo).toList(),
+        [2000, 3000, 0],
+      );
+    });
+
+    test('highest to lowest clears largest debts first', () {
+      final result = ParentPaymentAllocator.allocate(
+        paymentNaira: 50,
+        children: const [
+          ChildOutstanding(studentId: 1, outstandingNaira: 20),
+          ChildOutstanding(studentId: 2, outstandingNaira: 30),
+          ChildOutstanding(studentId: 3, outstandingNaira: 50),
+        ],
+        mode: ParentPaymentShareMode.highestToLowest,
+      );
+      expect(
+        result.allocations.map((a) => a.allocatedKobo).toList(),
+        [0, 0, 5000],
+      );
+    });
+
+    test('first match applies to the child whose outstanding equals payment', () {
+      final result = ParentPaymentAllocator.allocate(
+        paymentNaira: 30,
+        children: const [
+          ChildOutstanding(studentId: 1, outstandingNaira: 20),
+          ChildOutstanding(studentId: 2, outstandingNaira: 30),
+          ChildOutstanding(studentId: 3, outstandingNaira: 50),
+        ],
+        mode: ParentPaymentShareMode.firstMatchAmount,
+      );
+      expect(result.appliedKobo, 3000);
+      expect(result.creditKobo, 0);
+      expect(
+        result.allocations.map((a) => a.allocatedKobo).toList(),
+        [0, 3000, 0],
+      );
+    });
+
+    test('first match with no equal outstanding keeps parent credit', () {
+      final result = ParentPaymentAllocator.allocate(
+        paymentNaira: 40,
+        children: const [
+          ChildOutstanding(studentId: 1, outstandingNaira: 20),
+          ChildOutstanding(studentId: 2, outstandingNaira: 30),
+        ],
+        mode: ParentPaymentShareMode.firstMatchAmount,
+      );
+      expect(result.appliedKobo, 0);
+      expect(result.creditKobo, 4000);
+      expect(result.parentOutstandingAfterKobo, 5000);
+    });
+
+    test('management decide parks the full payment as parent credit', () {
+      final result = ParentPaymentAllocator.allocate(
+        paymentNaira: 80,
+        children: const [
+          ChildOutstanding(studentId: 1, outstandingNaira: 20),
+          ChildOutstanding(studentId: 2, outstandingNaira: 30),
+        ],
+        mode: ParentPaymentShareMode.managementDecide,
+      );
+      expect(result.appliedKobo, 0);
+      expect(result.creditKobo, 8000);
+      expect(result.parentOutstandingAfterKobo, 5000);
+      expect(
+        result.allocations.every((a) => a.allocatedKobo == 0),
+        isTrue,
+      );
+    });
   });
 }

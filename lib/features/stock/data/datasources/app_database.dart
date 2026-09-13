@@ -68,7 +68,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 95;
+  int get schemaVersion => 99;
 
   @override
   MigrationStrategy get migration {
@@ -486,6 +486,18 @@ class AppDatabase extends _$AppDatabase {
           await _safeCreateTable(m, parentPayments);
           await _safeCreateTable(m, parentPaymentAllocations);
           await _safeAddColumn(m, students, students.parentId);
+        }
+        if (from < 96) {
+          await _safeAddColumn(m, settings, settings.parentPaymentShareMode);
+        }
+        if (from < 97) {
+          await _safeAddColumn(m, parents, parents.address);
+        }
+        if (from < 98) {
+          await _safeAddColumn(m, students, students.enrollmentStatus);
+        }
+        if (from < 99) {
+          await _safeAddColumn(m, settings, settings.hiddenDashboardIcons);
         }
       },
       beforeOpen: (details) async {

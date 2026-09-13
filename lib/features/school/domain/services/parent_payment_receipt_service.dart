@@ -23,6 +23,8 @@ class ParentPaymentReceiptService {
         return 'Cash';
       case 'va_deposit':
         return 'Virtual account';
+      case 'credit_map':
+        return 'Parent credit mapped';
       default:
         return source.replaceAll('_', ' ');
     }

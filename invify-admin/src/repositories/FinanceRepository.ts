@@ -128,15 +128,26 @@ export class FinanceRepository {
       `wallet_transactions_${tenantId}`,
       async () => {
         const { data } = await financeApi.getWalletTransactions();
-        const transactions = (data?.transactions || []).map((tx: any) => ({
-          id: tx.id || tx.reference,
-          amount: tx.amount,
-          entry_type: (tx.type || '').toUpperCase() === 'CREDIT' ? 'CREDIT' : 'DEBIT',
-          status: tx.status,
-          reference: tx.reference,
-          created_at: tx.created_at,
-          desc: tx.metadata?.description || tx.description || tx.source
-        }));
+        const transactions = (data?.transactions || []).map((tx: any) => {
+          const kind = String(tx.entry_type || tx.type || '').toUpperCase();
+          const isCredit = [
+            'CREDIT',
+            'VIRTUAL_ACCOUNT_CREDIT',
+            'DEPOSIT',
+            'INWARD',
+            'INWARD_PAYMENT',
+            'CARD_PAYMENT',
+          ].includes(kind);
+          return {
+            id: tx.id || tx.reference,
+            amount: tx.amount,
+            entry_type: isCredit ? 'CREDIT' : 'DEBIT',
+            status: tx.status,
+            reference: tx.reference,
+            created_at: tx.created_at,
+            desc: tx.metadata?.description || tx.description || tx.reference || tx.source
+          };
+        });
         return { count: transactions.length, transactions };
       },
       options

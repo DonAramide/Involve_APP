@@ -51,6 +51,7 @@ import 'package:involve_app/features/school/presentation/pages/result_entry_page
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/features/dashboard/domain/dashboard_menu_catalog.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
@@ -743,7 +744,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ];
 
     if (isServices) {
-      return [
+      return _visibleMenuItems([
         _DashboardMenuItem(
           id: 'services_dashboard',
           title: 'SERVICES DASHBOARD',
@@ -786,7 +787,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'reconciliation',
           'multi_device',
         ].contains(i.id)),
-      ];
+      ], settings);
     }
 
     if (isSchool) {
@@ -877,23 +878,35 @@ class _DashboardPageState extends State<DashboardPage> {
       ]);
     }
 
+    final visible = _visibleMenuItems(allItems, settings);
+
     // Sort items based on menuOrder settings
     final order = settings?.menuOrder ?? [];
-    if (order.isEmpty) return allItems;
+    if (order.isEmpty) return visible;
 
+    final remaining = List<_DashboardMenuItem>.from(visible);
     final sortedItems = <_DashboardMenuItem>[];
-    // Add items that are in the order list first
     for (final id in order) {
-      final item = allItems.firstWhereOrNull((e) => e.id == id);
+      final item = remaining.firstWhereOrNull((e) => e.id == id);
       if (item != null) {
         sortedItems.add(item);
-        allItems.remove(item);
+        remaining.remove(item);
       }
     }
-    // Add any remaining items (newly added features etc.)
-    sortedItems.addAll(allItems);
-    
+    sortedItems.addAll(remaining);
+
     return sortedItems;
+  }
+
+  List<_DashboardMenuItem> _visibleMenuItems(
+    List<_DashboardMenuItem> items,
+    AppSettings? settings,
+  ) {
+    final hidden = settings?.hiddenDashboardIcons ?? const <String>[];
+    if (hidden.isEmpty) return items;
+    return items
+        .where((item) => DashboardMenuCatalog.isVisibleOnDashboard(item.id, hidden))
+        .toList();
   }
 
 

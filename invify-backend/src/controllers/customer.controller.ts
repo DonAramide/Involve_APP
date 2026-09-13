@@ -562,7 +562,7 @@ function computePendingFundsByVa(txns: any[]): Map<string, number> {
   for (const tx of txns || []) {
     const va = extractVaFromMetadata(tx.metadata);
     if (!va) continue;
-    const amount = Number(tx.amount) || 0;
+    const amount = Number(tx.metadata?.amountNaira ?? tx.metadata?.amount_naira ?? tx.amount) || 0;
     if (!Number.isFinite(amount) || amount <= 0) continue;
     const type = String(tx.type || '').toUpperCase();
     const ref = String(tx.reference || tx.id || '').trim();
@@ -597,6 +597,8 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
     if (!inboundTypes.has(rawType)) return false;
 
     const meta = tx.metadata || {};
+    const digits = (value: any) => String(value || '').replace(/\D/g, '');
+    const want = digits(va);
     const candidates = [
       meta.virtualAccountNumber,
       meta.accountNumber,
@@ -607,7 +609,7 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
     ]
       .filter(Boolean)
       .map((v: any) => String(v).trim());
-    return candidates.includes(va);
+    return candidates.includes(va) || (want.length >= 8 && candidates.some((c) => digits(c) === want));
   });
 
   return matched.map((tx) => {

@@ -132,7 +132,7 @@ export const adminApi = {
   // Legacy alias kept for older builds
   getLedgerLegacy: (params) => api.get('/admin/ledger', { params }),
   getAuditLedger: (params) => api.get('/api/admin/audit/ledger', { params }),
-  getPayments: (params) => api.get('/admin/payments', { params }),
+  getPayments: (params) => api.get('/api/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),
   getAnalytics: () => api.get('/admin/analytics'),
   
@@ -403,9 +403,11 @@ export const vaultApi = {
   listIntegrations: (scope, tenantId) => api.get('/api/vault/integrations', { params: { scope, tenantId } }),
   registerIntegration: (data) => api.post('/api/vault/integrations', data),
   addCredential: (vaultId, data) => api.post(`/api/vault/integrations/${vaultId}/credentials`, data),
+  updateCredential: (vaultId, credentialId, data) => api.patch(`/api/vault/integrations/${vaultId}/credentials/${credentialId}`, data),
   activateCredential: (vaultId, credentialId) => api.patch(`/api/vault/integrations/${vaultId}/credentials/${credentialId}/activate`),
   deleteCredential: (vaultId, credentialId) => api.delete(`/api/vault/integrations/${vaultId}/credentials/${credentialId}`),
   testConnection: (vaultId, data) => api.post(`/api/vault/integrations/${vaultId}/test`, data),
+  testQuasarPartners: (vaultId, data) => api.post(`/api/vault/integrations/${vaultId}/test-quasar-partners`, data),
   saveQipConfig: (environment, data) => api.put('/api/vault/qip-config', { environment, ...data }),
   getQuasarWebhookSecretStatus: (environment = 'PRODUCTION') =>
     api.get('/api/admin/quasar/webhook-secret/status', { params: { environment } }),
