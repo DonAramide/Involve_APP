@@ -8,12 +8,12 @@ services:
   api:
     image: ${PRODUCTION_IMAGE:?PRODUCTION_IMAGE is required}
     ports:
-      - "${PRODUCTION_API_PORT:-3000}:3000"
+      - "${PRODUCTION_API_PORT:-3004}:3004"
     environment:
       - NODE_ENV=production
       - APP_ENV=production
       - BUILD_VARIANT=PROD
-      - PORT=3000
+      - PORT=3004
       - SUPABASE_URL=${PROD_SUPABASE_URL:?PROD_SUPABASE_URL is required}
       - PROD_SUPABASE_URL=${PROD_SUPABASE_URL}
       - PROD_SUPABASE_PUBLISHABLE_KEY=${PROD_SUPABASE_PUBLISHABLE_KEY:?PROD_SUPABASE_PUBLISHABLE_KEY is required}
@@ -35,7 +35,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5

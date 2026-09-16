@@ -7,20 +7,19 @@ import {
 } from '../src/utils/verification-log';
 
 describe('verification log', () => {
-  test('select list includes support OTP columns but maps hashes out of the API row', () => {
+  test('select list excludes plain_code and only includes secure audit columns', () => {
     const cols = verificationLogSelect().split(',').map((c) => c.trim());
-    expect(cols).toContain('plain_code');
+    expect(cols).not.toContain('plain_code');
     expect(cols).toContain('code');
   });
 
-  test('exposes a 6-digit OTP and never a bcrypt hash', () => {
+  test('does not expose bcrypt hashes as OTP codes in API row', () => {
     const hash = '$2b$10$abcdefghijklmnopqrstuv';
     const row = toVerificationLogRow({
       id: 'a',
       email: 'aramyde@gmail.com',
       phone: null,
       code: hash,
-      plain_code: '482913',
       channel: 'EMAIL',
       purpose: 'SIGNUP',
       status: 'PENDING',
@@ -29,7 +28,7 @@ describe('verification log', () => {
       verified_at: null,
       created_at: new Date().toISOString(),
     });
-    expect(row.otp).toBe('482913');
+    expect(row.otp).toBeNull();
     expect(JSON.stringify(row)).not.toContain(hash);
     expect(row).not.toHaveProperty('code');
     expect(row).not.toHaveProperty('plain_code');

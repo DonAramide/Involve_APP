@@ -129,6 +129,10 @@ export const adminApi = {
     api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data),
 
   getLedger: (params) => api.get('/api/admin/ledger', { params }),
+  getTenantPayables: (params) => api.get('/api/admin/tenant-payables', { params }),
+  getVirtualAccounts: (params) => api.get('/api/admin/virtual-accounts', { params }),
+  getVirtualAccountTransactions: (accountNumber) =>
+    api.get(`/api/admin/virtual-accounts/${encodeURIComponent(accountNumber)}/transactions`),
   // Legacy alias kept for older builds
   getLedgerLegacy: (params) => api.get('/admin/ledger', { params }),
   getAuditLedger: (params) => api.get('/api/admin/audit/ledger', { params }),
@@ -179,9 +183,9 @@ export const adminApi = {
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
   resetTenantSystemPassword: (id, data) => api.post(`/api/admin/tenants/${id}/reset-passwords`, data || {}),
 
-  // Virtual Accounts Management
-  getVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),
-  getVirtualAccountTransactions: (accountNumber) => api.get(`/api/finance/virtual-accounts/${accountNumber}/transactions`),
+  // Tenant-scoped virtual accounts (merchant wallet page)
+  getTenantVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),
+  getTenantVirtualAccountTransactions: (accountNumber) => api.get(`/api/finance/virtual-accounts/${accountNumber}/transactions`),
   sweepVirtualAccount: (accountNumber, data) => api.post(`/api/finance/virtual-accounts/${accountNumber}/sweep`, data),
   getQuasarTransactions: (params) => api.get('/api/finance/quasar-transactions', { params }),
 

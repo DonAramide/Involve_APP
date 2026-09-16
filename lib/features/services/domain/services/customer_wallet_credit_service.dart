@@ -128,13 +128,86 @@ class CustomerWalletCreditService {
         .toList();
   }
 
-  Future<bool> hasProcessedReference(String reference) async {
+  Future<double> recordedNairaForVirtualAccount(String accountNumber) async {
+    final va = accountNumber.trim();
+    if (va.isEmpty) return 0;
     final ledger = await loadLedger();
-    // notify-only entries never updated a local balance — allow a real credit retry
-    return ledger.any((e) {
-      if (e['reference']?.toString() != reference) return false;
-      return e['source']?.toString() != 'catchup_notify_only';
+    var sum = 0.0;
+    for (final e in ledger) {
+      if (e['source']?.toString() == 'catchup_notify_only') continue;
+      final meta = e['metadata'] is Map
+          ? Map<String, dynamic>.from(e['metadata'] as Map)
+          : <String, dynamic>{};
+      final rowVa = (meta['virtualAccountNumber'] ??
+              meta['accountNumber'] ??
+              e['virtualAccountNumber'] ??
+              '')
+          .toString()
+          .trim();
+      if (rowVa != va) continue;
+      final n = e['amount'] is num
+          ? (e['amount'] as num).toDouble()
+          : double.tryParse('${e['amount']}') ?? 0;
+      sum += n;
+    }
+    return _roundNaira(sum);
+  }
+
+  Future<int> applyQuasarBalanceGap({
+    required String accountNumber,
+    required double quasarBalance,
+  }) async {
+    final recorded = await recordedNairaForVirtualAccount(accountNumber);
+    final gap = _roundNaira(quasarBalance - recorded);
+    if (gap <= 0.009) return 0;
+    final ok = await applyPaymentSuccess({
+      'type': 'payment.success',
+      'reference':
+          'qfs:${accountNumber.trim()}:reconcile:${quasarBalance.toStringAsFixed(2)}',
+      'amount': gap,
+      'metadata': {
+        'virtualAccountNumber': accountNumber.trim(),
+        'accountNumber': accountNumber.trim(),
+        'amountNaira': gap,
+        'paidVia': 'parent_account',
+        'reconcile': true,
+        'senderName': 'Quasar',
+      },
     });
+    return ok ? 1 : 0;
+  }
+
+  Future<bool> hasProcessedReference(String reference) async {
+    return (await _processedAmount(reference)) > 0.009;
+  }
+
+  double _roundNaira(double value) => (value * 100).round() / 100.0;
+
+  double _nairaFromPayload(Map map, Map metadata) {
+    for (final raw in [
+      metadata['amountNaira'],
+      metadata['amount_naira'],
+      metadata['amountRaw'],
+      map['amount'],
+    ]) {
+      final n = raw is num ? raw.toDouble() : double.tryParse('$raw');
+      if (n != null && n > 0) return _roundNaira(n);
+    }
+    return 0;
+  }
+
+  Future<double> _processedAmount(String reference) async {
+    final ledger = await loadLedger();
+    var sum = 0.0;
+    for (final e in ledger) {
+      if (e['reference']?.toString() != reference) continue;
+      if (e['source']?.toString() == 'catchup_notify_only') continue;
+      final n = e['amount'] is num
+          ? (e['amount'] as num).toDouble()
+          : double.tryParse('${e['amount']}') ?? 0;
+      sum += n;
+    }
+    return _roundNaira(sum);
   }
 
   Future<void> _recordLedgerEntry({
@@ -194,18 +267,35 @@ class CustomerWalletCreditService {
       final map = data is Map
           ? Map<String, dynamic>.from(data as Map)
           : <String, dynamic>{};
-      final amountRaw = map['amount'];
-      final amount = amountRaw is num
-          ? amountRaw.toDouble()
-          : double.tryParse('$amountRaw') ?? 0;
+      Map<String, dynamic> metadataPreview = {};
+      final previewRaw = map['metadata'];
+      if (previewRaw is Map) {
+        metadataPreview = Map<String, dynamic>.from(previewRaw);
+      }
+      final amount = _nairaFromPayload(map, metadataPreview);
       if (amount <= 0) return false;
 
       final reference = (map['reference'] ?? '').toString().trim();
       if (reference.isEmpty) return false;
 
-      if (await hasProcessedReference(reference)) {
-        debugPrint('[CustomerWalletCredit] Duplicate ignored: $reference');
-        return false;
+      final already = await _processedAmount(reference);
+      if (already > 0) {
+        final gap = _roundNaira(amount - already);
+        if (gap <= 0.009) {
+          debugPrint('[CustomerWalletCredit] Duplicate ignored: $reference');
+          return false;
+        }
+        return applyPaymentSuccess({
+          ...map,
+          'reference': '$reference:topup:${gap.toStringAsFixed(2)}',
+          'amount': gap,
+          'metadata': {
+            ...metadataPreview,
+            'amountNaira': gap,
+            'paidVia': metadataPreview['paidVia'] ?? 'parent_account',
+            'reconcile': true,
+          },
+        });
       }
 
       Map<String, dynamic> metadata = {};
@@ -455,12 +545,17 @@ class CustomerWalletCreditService {
     }
 
     ParentPaymentShareMode shareMode = ParentPaymentShareMode.autoShare;
-    try {
-      shareMode = ParentPaymentShareModeX.fromStorage(
-        (await _settingsRepository?.getSettings())?.parentPaymentShareMode,
-      );
-    } catch (_) {
-      shareMode = ParentPaymentShareMode.autoShare;
+    if (metadata['reconcile'] == true) {
+      // Quasar-balance top-up must land on parent credit, not be re-split onto bills.
+      shareMode = ParentPaymentShareMode.managementDecide;
+    } else {
+      try {
+        shareMode = ParentPaymentShareModeX.fromStorage(
+          (await _settingsRepository?.getSettings())?.parentPaymentShareMode,
+        );
+      } catch (_) {
+        shareMode = ParentPaymentShareMode.autoShare;
+      }
     }
     final result = ParentPaymentAllocator.allocate(
       paymentNaira: amount,

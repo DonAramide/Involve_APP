@@ -16,18 +16,15 @@ export type VerificationLogRow = {
 };
 
 const LOG_COLUMNS =
-  'id, tenant_id, email, phone, channel, purpose, status, attempt_count, expires_at, verified_at, created_at, plain_code, code';
-
-const LOG_COLUMNS_WITHOUT_PLAIN =
   'id, tenant_id, email, phone, channel, purpose, status, attempt_count, expires_at, verified_at, created_at, code';
 
-export function verificationLogSelect(includePlainCode = true): string {
-  return includePlainCode ? LOG_COLUMNS : LOG_COLUMNS_WITHOUT_PLAIN;
+export function verificationLogSelect(_includePlainCode = false): string {
+  return LOG_COLUMNS;
 }
 
-/** Only a 6-digit OTP. Never return a bcrypt hash. */
+/** Only a legacy 6-digit OTP string. Never return a bcrypt hash. */
 export function extractSupportOtp(row: any): string | null {
-  const candidates = [row?.plain_code, row?.otp, row?.code];
+  const candidates = [row?.otp, row?.code];
   for (const raw of candidates) {
     const value = String(raw || '').trim();
     if (/^\d{6}$/.test(value)) return value;

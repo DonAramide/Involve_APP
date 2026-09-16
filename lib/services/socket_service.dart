@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:involve_app/services/cloud_realtime_socket.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
@@ -710,6 +711,7 @@ class SocketService {
           'amount': amountNum,
         },
       ));
+      unawaited(DeviceNotificationService.showPayment(message: message));
 
       scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(

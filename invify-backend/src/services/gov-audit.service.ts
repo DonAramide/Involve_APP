@@ -207,9 +207,10 @@ function matchesTenant(entry: AuditEntry, tenantId: string): boolean {
   return false;
 }
 
-function looksLikeDeviceId(value?: string | null): boolean {
-  if (!value) return false;
-  const v = value.trim();
+function looksLikeDeviceId(value?: string | number | null): boolean {
+  if (value == null || value === '') return false;
+  const v = String(value).trim();
+  if (!v) return false;
   if (v.includes('@')) return false;
   if (isUuid(v)) return false;
   // Typical Android / serial style ids (e.g. R52M20L8ZDZ)
@@ -672,18 +673,21 @@ export class GovAuditService {
     }
 
     if (filters.search) {
-      const q = filters.search.toLowerCase();
-      allLogs = allLogs.filter(l =>
-        l.user_email?.toLowerCase().includes(q) ||
-        l.user_name?.toLowerCase().includes(q) ||
-        l.tenant_name?.toLowerCase().includes(q) ||
-        l.action?.toLowerCase().includes(q) ||
-        l.target?.toLowerCase().includes(q) ||
-        l.ip_address?.toLowerCase().includes(q) ||
-        l.location?.toLowerCase().includes(q) ||
-        l.module?.toLowerCase().includes(q) ||
-        JSON.stringify(l.metadata || {}).toLowerCase().includes(q)
-      );
+      const q = String(filters.search ?? '').trim().toLowerCase();
+      if (q) {
+        const hay = (v: unknown) => String(v ?? '').toLowerCase();
+        allLogs = allLogs.filter(l =>
+          hay(l.user_email).includes(q) ||
+          hay(l.user_name).includes(q) ||
+          hay(l.tenant_name).includes(q) ||
+          hay(l.action).includes(q) ||
+          hay(l.target).includes(q) ||
+          hay(l.ip_address).includes(q) ||
+          hay(l.location).includes(q) ||
+          hay(l.module).includes(q) ||
+          JSON.stringify(l.metadata || {}).toLowerCase().includes(q)
+        );
+      }
     }
 
     if (filters.module && filters.module !== 'ALL') {
@@ -691,8 +695,8 @@ export class GovAuditService {
     }
 
     if (filters.status && filters.status !== 'ALL') {
-      const statusFilter = filters.status.toLowerCase();
-      allLogs = allLogs.filter(l => (l.status || '').toLowerCase() === statusFilter);
+      const statusFilter = String(filters.status).toLowerCase();
+      allLogs = allLogs.filter(l => String(l.status || '').toLowerCase() === statusFilter);
     }
 
     const stats = {

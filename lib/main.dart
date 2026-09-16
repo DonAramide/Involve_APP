@@ -24,6 +24,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/core/utils/bloc_observer.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/features/stock/data/repositories/item_repository_impl.dart';
 import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
@@ -182,6 +183,7 @@ void main() async {
   
   // Set up global BLoC observer
   Bloc.observer = SimpleBlocObserver();
+  await DeviceNotificationService.init();
   
   runApp(RestartWidget<AppDependencies>(
     initialize: () => AppDependencies.initialize(),

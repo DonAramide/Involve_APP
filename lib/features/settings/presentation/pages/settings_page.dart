@@ -961,6 +961,9 @@ class _SettingsPageState extends State<SettingsPage> {
             final parentSyncById = {
               for (final p in parentRows) p.id as int: syncKey('parent', p),
             };
+            final parentAddressById = {
+              for (final p in parentRows) p.id as int: (p.address as String?),
+            };
             final termNameById = {
               for (final t in terms) t.id: t.name,
             };
@@ -1078,6 +1081,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         'parentPhone': s.parentPhone,
                         'parentId': s.parentId,
                         'parentSyncId': s.parentId != null ? parentSyncById[s.parentId] : null,
+                        'parentAddress': s.parentId != null ? parentAddressById[s.parentId] : null,
+                        'address': s.parentId != null ? parentAddressById[s.parentId] : null,
                         'balance': s.balance,
                         'creditBalance': s.creditBalance,
                         'gender': s.gender,

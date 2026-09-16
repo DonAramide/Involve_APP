@@ -562,14 +562,21 @@ async function fetchLogs() {
   loading.value = true
   try {
     const token = localStorage.getItem('invify_token')
+    const search = typeof filters.value.search === 'string' ? filters.value.search.trim() : ''
+    const dateFrom = typeof filters.value.dateFrom === 'string'
+      ? filters.value.dateFrom.slice(0, 10)
+      : ''
+    const dateTo = typeof filters.value.dateTo === 'string'
+      ? filters.value.dateTo.slice(0, 10)
+      : ''
     const params = {
       page: page.value,
       limit,
-      ...(filters.value.search && { search: filters.value.search }),
+      ...(search ? { search } : {}),
       ...(filters.value.module !== 'ALL' && { module: filters.value.module }),
       ...(filters.value.status !== 'ALL' && { status: filters.value.status }),
-      ...(filters.value.dateFrom && { dateFrom: filters.value.dateFrom }),
-      ...(filters.value.dateTo && { dateTo: filters.value.dateTo }),
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
     }
     const res = await axios.get(joinApiUrl('/api/admin/audit/ledger'), {
       headers: { Authorization: `Bearer ${token}` },

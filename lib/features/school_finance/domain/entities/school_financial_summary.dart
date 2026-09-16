@@ -7,6 +7,13 @@ class SchoolFinancialSummary extends Equatable {
   final int owingStudentsCount;
   final int totalStudents;
   final DateTime lastUpdated;
+  /// POS / card collected through Quasar.
+  final double cardCollected;
+  /// Virtual-account transfer collected through Quasar.
+  final double vaTransferCollected;
+  final double cashCollected;
+  /// Quasar collective = card + VA transfer.
+  final double quasarCollected;
 
   const SchoolFinancialSummary({
     required this.totalRevenue,
@@ -15,7 +22,14 @@ class SchoolFinancialSummary extends Equatable {
     required this.owingStudentsCount,
     required this.totalStudents,
     required this.lastUpdated,
+    this.cardCollected = 0,
+    this.vaTransferCollected = 0,
+    this.cashCollected = 0,
+    this.quasarCollected = 0,
   });
+
+  double get quasarCardAndTransfer =>
+      quasarCollected > 0.001 ? quasarCollected : cardCollected + vaTransferCollected;
 
   @override
   List<Object?> get props => [
@@ -25,5 +39,9 @@ class SchoolFinancialSummary extends Equatable {
         owingStudentsCount,
         totalStudents,
         lastUpdated,
+        cardCollected,
+        vaTransferCollected,
+        cashCollected,
+        quasarCollected,
       ];
 }

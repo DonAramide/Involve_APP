@@ -35,6 +35,7 @@ const PLATFORM_SCOPE = {
     'create_requests', 'view_finance_queue', 'view_operations_queue',
     'view_deployment_queue', 'view_governance_queue', 'approve_finance',
     'approve_operations', 'approve_deployment', 'approve_governance',
+    'read_observability_staging',
   ],
   ADMIN_FINANCE: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',

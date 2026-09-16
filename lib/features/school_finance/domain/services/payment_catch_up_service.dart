@@ -7,6 +7,7 @@ import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 
@@ -115,18 +116,6 @@ class PaymentCatchUpService {
           newest = created;
         }
 
-        final amount = map['amount'] is num
-            ? (map['amount'] as num).toDouble()
-            : double.tryParse('${map['amount']}') ?? 0;
-        final reference = '${map['reference'] ?? ''}'.trim();
-        if (amount <= 0 || reference.isEmpty) continue;
-
-        // Already processed while online or on a prior catch-up.
-        if (await CustomerWalletCreditService.instance
-            .hasProcessedReference(reference)) {
-          continue;
-        }
-
         Map<String, dynamic> metadata = {};
         final metadataRaw = map['metadata'];
         if (metadataRaw is Map) {
@@ -139,6 +128,10 @@ class PaymentCatchUpService {
             }
           } catch (_) {}
         }
+
+        final amount = _nairaFromRow(map, metadata);
+        final reference = '${map['reference'] ?? ''}'.trim();
+        if (amount <= 0 || reference.isEmpty) continue;
 
         final payload = {
           'type': 'payment.success',
@@ -169,6 +162,13 @@ class PaymentCatchUpService {
             'catchUp': true,
           },
         );
+
+        unawaited(DeviceNotificationService.showPayment(
+          title: credited ? 'Payment received' : 'Payment while offline',
+          message: credited
+              ? '₦$formatted received from $sender (synced)'
+              : '₦$formatted payment while offline · $sender',
+        ));
 
         if (!credited) {
           await CustomerWalletCreditService.instance.markReferenceNotified(
@@ -245,22 +245,18 @@ class PaymentCatchUpService {
           ? body
           : (body is Map && body['data'] is List ? body['data'] as List : const []);
       var applied = 0;
+      var quasarBalance = 0.0;
       for (final raw in rows) {
         if (raw is! Map) continue;
         final map = Map<String, dynamic>.from(raw);
-        final amount = map['amount'] is num
-            ? (map['amount'] as num).toDouble()
-            : double.tryParse('${map['amount']}') ?? 0;
-        final reference = '${map['reference'] ?? ''}'.trim();
-        if (amount <= 0 || reference.isEmpty) continue;
-        if (await CustomerWalletCreditService.instance.hasProcessedReference(reference)) {
-          continue;
-        }
         Map<String, dynamic> metadata = {};
         final metadataRaw = map['metadata'];
         if (metadataRaw is Map) {
           metadata = Map<String, dynamic>.from(metadataRaw);
         }
+        final amount = _nairaFromRow(map, metadata);
+        final reference = '${map['reference'] ?? ''}'.trim();
+        if (amount <= 0 || reference.isEmpty) continue;
         metadata['virtualAccountNumber'] ??= va;
         metadata['accountNumber'] ??= va;
         final credited = await CustomerWalletCreditService.instance.applyPaymentSuccess({
@@ -272,11 +268,34 @@ class PaymentCatchUpService {
           'metadata': metadata,
         });
         if (credited) applied++;
+        final qb = metadata['quasarBalance'];
+        if (qb is num && qb.toDouble() > quasarBalance) {
+          quasarBalance = qb.toDouble();
+        }
+      }
+      if (quasarBalance > 0) {
+        applied += await CustomerWalletCreditService.instance.applyQuasarBalanceGap(
+          accountNumber: va,
+          quasarBalance: quasarBalance,
+        );
       }
       return applied;
     } catch (e) {
       debugPrint('[PaymentCatchUp] VA transaction refresh failed: $e');
       return 0;
     }
+  }
+
+  double _nairaFromRow(Map map, Map metadata) {
+    for (final raw in [
+      metadata['amountNaira'],
+      metadata['amount_naira'],
+      metadata['amountRaw'],
+      map['amount'],
+    ]) {
+      final n = raw is num ? raw.toDouble() : double.tryParse('$raw');
+      if (n != null && n > 0) return (n * 100).round() / 100.0;
+    }
+    return 0;
   }
 }

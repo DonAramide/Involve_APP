@@ -290,9 +290,12 @@
               clickable
               v-ripple
               :to="item.path"
+              exact
+              :active="route.path === item.path"
               active-class="sidebar-item-active"
               class="q-mx-xs rounded-borders text-secondary nav-item column justify-center"
               style="min-height: 30px; padding: 2px 10px;"
+              @click="navigateSidebar(item.path)"
             >
               <div class="row items-center justify-between fit no-wrap">
                 <div class="row items-center op-gap-8 no-wrap overflow-hidden">
@@ -329,6 +332,7 @@
                 anchor="center right" 
                 self="center left" 
                 :offset="[10, 0]"
+                :delay="500"
                 class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24"
                 style="max-width: 260px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;"
               >
@@ -453,11 +457,12 @@
         />
       </div>
 
-      <router-view v-slot="{ Component }">
-        <transition appear enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-          <component :is="Component" :key="$route.path" />
-        </transition>
-      </router-view>
+      <div v-if="pageError" class="q-pa-xl column flex-center" style="min-height: 360px;">
+        <div class="text-h6 text-main q-mb-sm">This workspace page failed to open</div>
+        <div class="text-caption text-muted font-mono q-mb-md">{{ pageError }}</div>
+        <q-btn unelevated color="cyan-4" text-color="dark" label="Retry" @click="retryPage" />
+      </div>
+      <router-view v-else :key="route.fullPath + ':' + pageEpoch" />
     </q-page-container>
 
     <!-- Persistent Right-Side Operational Knowledge Base Drawer -->
@@ -540,7 +545,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, provide, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useTelemetryStream } from '../composables/useTelemetryStream'
@@ -795,31 +800,64 @@ const activeWorkspaceObj = computed(() => {
   return workspaces.value.find(w => w.id === prefs.value.activeWorkspace) || workspaces.value[0]
 })
 
-const switchWorkspace = (id) => {
-  if (prefs.value.activeWorkspace === id) return
-  setActiveWorkspace(id)
+const workspaceHome = {
+  fleet: '/fleet/overview',
+  finance: '/finance/reconciliation',
+  governance: '/governance/compliance',
+  observability: '/observability/streams',
+  ai: '/ai/copilot',
+  deployments: '/deployments/rollouts',
+  apps: '/apps/installed',
+  incidents: '/incidents/active',
+  automation: '/automation/policy',
+  communications: '/communications/broadcast-center',
+  admin: '/admin/settings'
 }
 
-// Watch for workspace changes to handle routing (Single Source of Truth)
-watch(() => prefs.value.activeWorkspace, (newId) => {
-  const targetMap = {
-    fleet: '/fleet/overview',
-    finance: '/finance/reconciliation',
-    governance: '/governance/compliance',
-    observability: '/observability/streams',
-    ai: '/ai/copilot',
-    deployments: '/deployments/rollouts',
-    apps: '/apps/installed',
-    incidents: '/incidents/active',
-    automation: '/automation/policy',
-    communications: '/communications/broadcast-center',
-    admin: '/admin/settings'
-  }
-  
-  if (targetMap[newId]) {
-    router.push(targetMap[newId]).catch(() => {})
+const pageError = ref(null)
+const pageEpoch = ref(0)
+
+watch(() => route.fullPath, () => {
+  pageError.value = null
+  if (route.query._retry != null) {
+    const query = { ...route.query }
+    delete query._retry
+    router.replace({ path: route.path, query }).catch(() => {})
   }
 })
+
+onErrorCaptured((err) => {
+  const message = err?.message || String(err || 'Unknown page render error')
+  console.error('[MainLayout] workspace page failed', err)
+  pageError.value = message
+  return false
+})
+
+const retryPage = () => {
+  pageError.value = null
+  pageEpoch.value += 1
+}
+
+const navigateSidebar = (path) => {
+  if (!path) return
+  pageError.value = null
+  if (route.path === path) {
+    pageEpoch.value += 1
+    return
+  }
+  router.push(path).catch(() => {})
+}
+
+const switchWorkspace = (id) => {
+  if (prefs.value.activeWorkspace !== id) {
+    setActiveWorkspace(id)
+  }
+  const target = workspaceHome[id]
+  if (target && route.path !== target) {
+    pageError.value = null
+    router.push(target).catch(() => {})
+  }
+}
 
 /**
  * FINAL REFINEMENT #4: Stream-Throttled Counter Mechanisms.
@@ -881,6 +919,8 @@ const activeNavigationTree = computed(() => {
         { label: 'Financial Ledger', path: '/finance/ledger', icon: 'account_balance_wallet', color: 'amber-4', badge: 'SOURCE', badgeBg: 'amber-10', badgeColor: 'amber-3' },
         { label: 'Reconciliation', path: '/finance/reconciliation', icon: 'fact_check', color: 'green-4' },
         { label: 'Settlements', path: '/finance/settlements', icon: 'payments', color: 'indigo-4' },
+        { label: 'Tenant Payables', path: '/finance/payables', icon: 'account_balance', color: 'green-4', badge: 'SETTLE', badgeBg: 'green-10', badgeColor: 'green-3' },
+        { label: 'Virtual Accounts', path: '/finance/virtual-accounts', icon: 'pin', color: 'cyan-4', badge: 'NUBAN', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
         { label: 'Refunds & Chargebacks', path: '/finance/refunds-chargebacks', icon: 'gavel', color: 'red-4', badge: '4-EYES', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'School Payments', path: '/finance/school-payments', icon: 'school', color: 'teal-4', badge: 'DISPUTES', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' }
@@ -907,6 +947,7 @@ const activeNavigationTree = computed(() => {
     
     case 'observability':
       return [
+        { label: 'Staging System Health', path: '/observability/system-health', icon: 'monitor_heart', color: 'teal-4', badge: 'LIVE', badgeBg: 'green-10', badgeColor: 'green-2' },
         { label: 'Live Event Streams', path: '/observability/streams', icon: 'stream', color: 'green-4', hasStream: true },
         { label: 'Telemetry Metrics', path: '/observability/metrics', icon: 'analytics', color: 'cyan-3' },
         { label: 'Queue Health Maps', path: '/observability/queues', icon: 'toc', color: 'grey-4' },
@@ -999,6 +1040,7 @@ const getMenuDescription = (label) => {
     'Drift Analysis': 'Trace operational variance, undocumented local configurations, and policy changes to prevent baseline corruption.',
 
     // Observability
+    'Staging System Health': 'Real-time infrastructure operations cockpit monitoring backend service vitals, health probes, traffic telemetry, auth events, and live sanitized application logs.',
     'Live Event Streams': 'Analyze real-time event logs, system operations, and telemetry streams arriving from edge layers globally.',
     'Telemetry Metrics': 'Render aggregated statistical dashboards of general platform capacity, processing speeds, and success rates.',
     'Queue Health Maps': 'Monitor transit brokers, message pipeline loads, and pending task structures to identify operational bottlenecks.',
@@ -1011,6 +1053,8 @@ const getMenuDescription = (label) => {
     'Financial Ledger': 'Double-entry ledger chart of accounts, immutable journal explorer, and posting parity checks.',
     'Reconciliation': 'Settlement matching, exception queue management, and cross-ledger reconciliation rules.',
     'Settlements': 'Batch settlement orchestration, processing queues, and bank gateway clearing status.',
+    'Tenant Payables': 'Live list of every tenant and the amount Invify/Quasar currently holds to settle them.',
+    'Virtual Accounts': 'Every generated Quasar NUBAN by tenant, with account details and the transactions on that account.',
     'Audit Engine': 'Immutable financial action tracing, compliance checks, and operational audit logs.',
 
     // Deployments

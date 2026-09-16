@@ -285,9 +285,14 @@ class SchoolRepositoryImpl implements SchoolRepository {
     required List<int> studentIds,
     required String parentName,
     required String parentPhone,
+    String? parentAddress,
   }) async {
     if (studentIds.isEmpty) return;
-    final parent = await ensureParent(fullName: parentName, phone: parentPhone);
+    final parent = await ensureParent(
+      fullName: parentName,
+      phone: parentPhone,
+      address: parentAddress,
+    );
     await linkStudentsToParent(parentId: parent.id!, studentIds: studentIds);
   }
 
@@ -501,6 +506,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
     required String fullName,
     String? phone,
     String? email,
+    String? address,
   }) async {
     final key = Student.parentIdentity(fullName, phone);
     final existingParents = await getParents();
@@ -512,8 +518,17 @@ class SchoolRepositoryImpl implements SchoolRepository {
       }
     }
     if (match != null) {
+      bool needUpdate = false;
+      var updated = match;
       if ((email ?? '').trim().isNotEmpty && (match.email ?? '').isEmpty) {
-        final updated = match.copyWith(email: email!.trim());
+        updated = updated.copyWith(email: email!.trim());
+        needUpdate = true;
+      }
+      if ((address ?? '').trim().isNotEmpty && (match.address ?? '').trim() != address!.trim()) {
+        updated = updated.copyWith(address: address!.trim());
+        needUpdate = true;
+      }
+      if (needUpdate) {
         await updateParent(updated);
         return updated;
       }
@@ -525,6 +540,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
             fullName: fullName.trim(),
             phone: Value(phone?.trim()),
             email: Value(email?.trim()),
+            address: Value(address?.trim()),
             createdAt: Value(now),
             updatedAt: Value(now),
           ),

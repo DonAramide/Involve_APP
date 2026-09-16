@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/financial_transaction.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
 import '../pages/student_finance_profile.dart';
 
 class GlobalTransactionTile extends StatelessWidget {
@@ -74,6 +75,10 @@ class GlobalTransactionTile extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       _buildChannelTag(transaction.channel),
+                      if (isQuasarPaymentRail(classifyInvoicePaymentRail(transaction.channel))) ...[
+                        const SizedBox(width: 4),
+                        _buildQuasarBadge(),
+                      ],
                     ],
                   ),
                   Text(
@@ -120,18 +125,26 @@ class GlobalTransactionTile extends StatelessWidget {
 
 
   Widget _buildChannelTag(String channel) {
-    Color color;
-    switch (channel.toLowerCase()) {
-      case 'cash':
-        color = Colors.orange;
-        break;
-      case 'pos':
+    final rail = classifyInvoicePaymentRail(channel);
+    final label = paymentRailChannelLabel(channel);
+    final Color color;
+    switch (rail) {
+      case InvoicePaymentRail.card:
         color = Colors.purple;
         break;
-      case 'transfer':
-        color = Colors.blue;
+      case InvoicePaymentRail.vaTransfer:
+        color = Colors.indigo;
         break;
-      default:
+      case InvoicePaymentRail.cash:
+        color = Colors.orange;
+        break;
+      case InvoicePaymentRail.bankTransfer:
+        color = Colors.blueGrey;
+        break;
+      case InvoicePaymentRail.wallet:
+        color = Colors.teal;
+        break;
+      case InvoicePaymentRail.other:
         color = Colors.grey;
     }
 
@@ -143,11 +156,30 @@ class GlobalTransactionTile extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Text(
-        channel.toUpperCase(),
+        label.toUpperCase(),
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.bold,
           color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuasarBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.teal.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.teal.withOpacity(0.25)),
+      ),
+      child: const Text(
+        'QUASAR',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: Colors.teal,
         ),
       ),
     );

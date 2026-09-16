@@ -17,7 +17,7 @@ class TransactionModel extends FinancialTransaction {
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
-    final rawType = json['transaction_type'] ?? json['type'];
+    final rawType = '${json['transaction_type'] ?? json['type'] ?? ''}'.toLowerCase();
     
     // Extract metadata and inject joined student data
     final Map<String, dynamic> metadata = Map<String, dynamic>.from(json['metadata'] ?? {});
@@ -26,21 +26,27 @@ class TransactionModel extends FinancialTransaction {
       metadata['student_name'] = '${json['students']['first_name']} ${json['students']['last_name']}';
     }
 
+    double asNum(dynamic v) {
+      if (v is num) return v.toDouble();
+      return double.tryParse('$v') ?? 0;
+    }
+
     return TransactionModel(
-      id: json['id'],
-      walletId: json['wallet_id'],
-      amount: (json['amount'] as num).toDouble(),
-      type: rawType == 'payment' || rawType == 'credit' 
+      id: '${json['id']}',
+      walletId: '${json['wallet_id'] ?? json['walletId'] ?? ''}',
+      amount: asNum(json['amountNaira'] ?? json['amount_naira'] ?? json['amount']),
+      type: rawType == 'payment' || rawType == 'credit' || rawType == 'deposit'
           ? TransactionType.credit 
           : TransactionType.debit,
-      reference: json['reference'] ?? '',
-      description: json['description'] ?? '',
-      balanceAfter: (json['balance_after'] as num).toDouble(),
-      channel: json['channel'] ?? 'unknown',
-      recordedBy: json['recorded_by'],
-      note: json['note'],
+      reference: '${json['reference'] ?? ''}',
+      description: '${json['description'] ?? ''}',
+      balanceAfter: asNum(json['balance_after'] ?? json['balanceAfter']),
+      channel: '${json['channel'] ?? metadata['paidVia'] ?? 'unknown'}',
+      recordedBy: json['recorded_by']?.toString(),
+      note: json['note']?.toString(),
       metadata: metadata,
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: DateTime.tryParse('${json['created_at'] ?? json['createdAt'] ?? ''}') ??
+          DateTime.now(),
     );
   }
 

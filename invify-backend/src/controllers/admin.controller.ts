@@ -22,6 +22,38 @@ import {
   verificationLogSelect,
 } from '../utils/verification-log';
 import { VerificationService } from '../services/verification.service';
+import {
+  formatVaTransaction,
+  pendingFundsByTenant,
+  pendingFundsByVa,
+  unsettledCardByTenant,
+  virtualAccountMatches,
+} from '../utils/virtual-account-funds';
+
+function isPlatformFinanceOperator(user: any): boolean {
+  const role = String(user?.role || '').toLowerCase()
+  return role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_') || role === 'admin'
+}
+
+function walletBalanceFromLedger(rows: any[], tenantId: string): number | null {
+  const mine = (rows || []).filter((row) => String(row.tenant_id) === String(tenantId))
+  if (!mine.length) return null
+  const hasUserWallet = mine.some((row) => String(row.account || '') === 'USER_WALLET')
+  const usable = hasUserWallet ? mine.filter((row) => String(row.account || '') === 'USER_WALLET') : mine
+  const balance = usable.reduce((current, entry) => {
+    const amt = Number(entry.amount)
+    if (!Number.isFinite(amt)) return current
+    const raw = String(entry.entry_type || entry.type || '').toUpperCase()
+    if (['CREDIT', 'VIRTUAL_ACCOUNT_CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'CARD_PAYMENT'].includes(raw)) {
+      return current + amt
+    }
+    if (['DEBIT', 'WITHDRAWAL', 'SWEEP', 'PAYOUT'].includes(raw)) {
+      return current - amt
+    }
+    return current
+  }, 0)
+  return Number(balance.toFixed(2))
+}
 
 /** Keys stored in global_settings.json. DB upserts must not override or block these. */
 const FILE_BACKED_CONFIG_KEYS = [
@@ -658,10 +690,9 @@ export class AdminController {
       const latestOnly = String(req.query.latest || '1') !== '0';
       const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 200);
 
-      const hasPlain = await VerificationService.ensurePlainCodeColumn();
       let query = supabaseAdmin
         .from('verification_codes')
-        .select(verificationLogSelect(hasPlain))
+        .select(verificationLogSelect())
         .order('created_at', { ascending: false })
         .limit(latestOnly ? 1500 : limit);
 
@@ -681,21 +712,6 @@ export class AdminController {
       }
 
       let { data, error } = await query;
-      if (error && /plain_code/i.test(String(error.message || ''))) {
-        query = supabaseAdmin
-          .from('verification_codes')
-          .select(verificationLogSelect(false))
-          .order('created_at', { ascending: false })
-          .limit(latestOnly ? 1500 : limit);
-        if (q) query = query.or(`email.ilike.%${q}%,phone.ilike.%${q}%`);
-        if (['EMAIL', 'WHATSAPP'].includes(channel)) query = query.eq('channel', channel);
-        if (status === 'EXPIRED') query = query.in('status', ['EXPIRED', 'PENDING']);
-        else if (['PENDING', 'VERIFIED', 'CANCELLED'].includes(status)) query = query.eq('status', status);
-        if (['SIGNUP', 'PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(purpose)) {
-          query = query.eq('purpose', purpose);
-        }
-        ({ data, error } = await query);
-      }
       if (error) throw error;
 
       let rows = (data || []).map((row: any) => toVerificationLogRow(row));
@@ -1451,6 +1467,7 @@ export class AdminController {
   /**
    * GET /admin/ledger
    * Immutable financial history with multi-tenant filtering.
+   * Falls back to transactions_log when ledger_entries is missing or unreadable.
    */
   static async listLedger(req: Request, res: Response) {
     try {
@@ -1458,10 +1475,7 @@ export class AdminController {
       const user = (req as any).user;
       const role = String(user?.role || '').toLowerCase();
       const isSuperAdmin = role === 'super_admin';
-
-      let query = supabaseAdmin
-        .from('ledger_entries')
-        .select('*');
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
 
       if (!isSuperAdmin) {
         if (!user?.tenantId) {
@@ -1470,19 +1484,51 @@ export class AdminController {
         if (tenantId && String(tenantId) !== String(user.tenantId)) {
           return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
         }
-        query = query.eq('tenant_id', user.tenantId);
-      } else if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
       }
 
-      if (reference) query = query.ilike('reference', `%${reference}%`);
-      if (startDate) query = query.gte('created_at', startDate);
-      if (endDate) query = query.lte('created_at', endDate);
+      const scopedTenantId = !isSuperAdmin ? user.tenantId : (tenantId || undefined);
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const applyFilters = (query: any, { allowReference = true } = {}) => {
+        let next = query;
+        if (scopedTenantId) next = next.eq('tenant_id', scopedTenantId);
+        if (allowReference && reference) next = next.ilike('reference', `%${reference}%`);
+        if (startDate) next = next.gte('created_at', startDate);
+        if (endDate) next = next.lte('created_at', endDate);
+        return next.order('created_at', { ascending: false }).limit(limit);
+      };
 
-      if (error) throw error;
-      return res.status(200).json(data);
+      const primary = await applyFilters(
+        supabaseAdmin.from('ledger_entries').select('*'),
+      );
+
+      if (!primary.error) {
+        return res.status(200).json(primary.data || []);
+      }
+
+      console.warn(
+        '[AdminController] listLedger ledger_entries failed, using transactions_log:',
+        primary.error.message,
+      );
+
+      const fallback = await applyFilters(
+        supabaseAdmin.from('transactions_log').select('*'),
+      );
+      if (fallback.error) throw fallback.error;
+
+      const rows = (fallback.data || []).map((row: any) => {
+        const typeRaw = String(row.type || row.entry_type || 'CREDIT').toUpperCase();
+        const isDebit = ['DEBIT', 'WITHDRAWAL', 'SWEEP', 'PAYOUT'].some((k) =>
+          typeRaw.includes(k),
+        );
+        return {
+          ...row,
+          type: isDebit ? 'DEBIT' : 'CREDIT',
+          amount: Number(row.amount || 0),
+          journal_id: row.reference || row.id,
+          account: row.account || row.wallet_id || 'USER_WALLET',
+        };
+      });
+      return res.status(200).json(rows);
     } catch (error: any) {
       console.error('[AdminController] listLedger Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -1529,6 +1575,391 @@ export class AdminController {
     } catch (error: any) {
       console.error('[AdminController] listPayments Error:', error.message);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/admin/tenant-payables
+   * Amount Invify/Quasar currently holds for each tenant (wallet + unswept VAs + unsettled card).
+   */
+  static async listTenantPayables(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' })
+      }
+      const scopedTenantId = isPlatform ? (req.query.tenantId as string | undefined) : user.tenantId
+
+      let tenantQuery = supabaseAdmin
+        .from('tenants')
+        .select('id, name, type, status, virtual_account_number, virtual_account_bank, virtual_account_status, created_at')
+        .order('name', { ascending: true })
+        .limit(500)
+      if (scopedTenantId) tenantQuery = tenantQuery.eq('id', scopedTenantId)
+
+      let walletQuery = supabaseAdmin.from('wallets').select('tenant_id, balance, updated_at').limit(500)
+      if (scopedTenantId) walletQuery = walletQuery.eq('tenant_id', scopedTenantId)
+
+      let ledgerQuery = supabaseAdmin
+        .from('ledger_entries')
+        .select('tenant_id, amount, type, entry_type, account')
+        .limit(5000)
+      if (scopedTenantId) ledgerQuery = ledgerQuery.eq('tenant_id', scopedTenantId)
+
+      let txnQuery = supabaseAdmin
+        .from('transactions_log')
+        .select('tenant_id, amount, type, status, metadata, reference, created_at')
+        .eq('status', 'SUCCESS')
+        .order('created_at', { ascending: false })
+        .limit(2000)
+      if (scopedTenantId) txnQuery = txnQuery.eq('tenant_id', scopedTenantId)
+
+      let posQuery = supabaseAdmin
+        .from('pos_transaction_attempts')
+        .select('tenant_id, amount, status, settlement_status')
+        .limit(3000)
+      if (scopedTenantId) posQuery = posQuery.eq('tenant_id', scopedTenantId)
+
+      const [tenantsRes, walletsRes, ledgerRes, txnRes, posRes] = await Promise.all([
+        tenantQuery,
+        walletQuery,
+        ledgerQuery,
+        txnQuery,
+        posQuery,
+      ])
+      if (tenantsRes.error) throw tenantsRes.error
+
+      const wallets = new Map<string, { balance: number; updated_at: string | null }>()
+      for (const row of walletsRes.data || []) {
+        wallets.set(String(row.tenant_id), {
+          balance: Number(row.balance || 0),
+          updated_at: row.updated_at || null,
+        })
+      }
+      const pendingByTenant = pendingFundsByTenant(txnRes.data || [])
+      const cardByTenant = unsettledCardByTenant({
+        posAttempts: posRes.error ? [] : (posRes.data || []),
+        transactions: txnRes.data || [],
+      })
+      const ledgerRows = ledgerRes.error ? [] : (ledgerRes.data || [])
+
+      const rows = (tenantsRes.data || []).map((tenant: any) => {
+        const stored = wallets.get(String(tenant.id))
+        const ledgerBalance = walletBalanceFromLedger(ledgerRows, tenant.id)
+        const walletBalance = ledgerBalance != null ? ledgerBalance : Number(stored?.balance || 0)
+        const pendingVa = pendingByTenant.get(String(tenant.id)) || 0
+        const unsettledCard = cardByTenant.get(String(tenant.id)) || 0
+        return {
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          type: tenant.type || '—',
+          status: tenant.status || '—',
+          walletBalance,
+          pendingVaBalance: pendingVa,
+          unsettledCardBalance: unsettledCard,
+          totalHeld: Number((walletBalance + pendingVa + unsettledCard).toFixed(2)),
+          virtualAccountNumber: tenant.virtual_account_number || null,
+          virtualAccountBank: tenant.virtual_account_bank || null,
+          virtualAccountStatus: tenant.virtual_account_status || null,
+          walletUpdatedAt: stored?.updated_at || null,
+          createdAt: tenant.created_at || null,
+        }
+      })
+
+      const totals = rows.reduce(
+        (acc, row) => {
+          acc.wallet += Number(row.walletBalance || 0)
+          acc.pendingVa += Number(row.pendingVaBalance || 0)
+          acc.unsettledCard += Number(row.unsettledCardBalance || 0)
+          acc.held += Number(row.totalHeld || 0)
+          if (row.totalHeld > 0) acc.withBalance += 1
+          return acc
+        },
+        { wallet: 0, pendingVa: 0, unsettledCard: 0, held: 0, withBalance: 0 },
+      )
+
+      return res.status(200).json({
+        rows,
+        summary: {
+          tenants: rows.length,
+          withBalance: totals.withBalance,
+          wallet: Number(totals.wallet.toFixed(2)),
+          pendingVa: Number(totals.pendingVa.toFixed(2)),
+          unsettledCard: Number(totals.unsettledCard.toFixed(2)),
+          held: Number(totals.held.toFixed(2)),
+        },
+      })
+    } catch (error: any) {
+      console.error('[AdminController] listTenantPayables Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load tenant payables' })
+    }
+  }
+
+  /**
+   * GET /api/admin/virtual-accounts
+   * Every generated Quasar/Invify NUBAN across tenants.
+   */
+  static async listVirtualAccounts(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' })
+      }
+      const scopedTenantId = isPlatform ? (req.query.tenantId as string | undefined) : user.tenantId
+
+      let customerQuery = supabaseAdmin
+        .from('customers')
+        .select('id, name, phone, email, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let staffQuery = supabaseAdmin
+        .from('users')
+        .select('id, name, phone, email, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let studentQuery = supabaseAdmin
+        .from('students')
+        .select('id, first_name, last_name, admission_number, tenant_id, school_id, virtual_account_number, virtual_account_bank, virtual_account_status')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let tenantQuery = supabaseAdmin
+        .from('tenants')
+        .select('id, name, type, virtual_account_number, virtual_account_bank, virtual_account_name, virtual_account_status')
+        .not('virtual_account_number', 'is', null)
+        .limit(500)
+      let txnQuery = supabaseAdmin
+        .from('transactions_log')
+        .select('tenant_id, amount, type, status, metadata, reference, created_at')
+        .eq('status', 'SUCCESS')
+        .order('created_at', { ascending: false })
+        .limit(2000)
+
+      if (scopedTenantId) {
+        customerQuery = customerQuery.eq('tenant_id', scopedTenantId)
+        staffQuery = staffQuery.eq('tenant_id', scopedTenantId)
+        studentQuery = studentQuery.or(`tenant_id.eq.${scopedTenantId},school_id.eq.${scopedTenantId}`)
+        tenantQuery = tenantQuery.eq('id', scopedTenantId)
+        txnQuery = txnQuery.eq('tenant_id', scopedTenantId)
+      }
+
+      const [customersRes, staffRes, studentsRes, tenantsRes, txnRes, tenantNamesRes] = await Promise.all([
+        customerQuery,
+        staffQuery,
+        studentQuery,
+        tenantQuery,
+        txnQuery,
+        supabaseAdmin.from('tenants').select('id, name, type').limit(500),
+      ])
+
+      const names = new Map<string, { name: string; type: string }>()
+      for (const t of tenantNamesRes.data || []) {
+        names.set(String(t.id), { name: t.name, type: t.type || '—' })
+      }
+      const pending = pendingFundsByVa(txnRes.data || [])
+      const seen = new Set<string>()
+      const rows: any[] = []
+
+      const push = (row: any) => {
+        const accountNumber = String(row.accountNumber || '').trim()
+        if (!accountNumber || seen.has(accountNumber)) return
+        seen.add(accountNumber)
+        rows.push(row)
+      }
+
+      for (const t of tenantsRes.data || []) {
+        push({
+          id: `tenant:${t.id}`,
+          tenantId: t.id,
+          tenantName: t.name,
+          tenantType: t.type || '—',
+          holderType: 'Tenant',
+          holderName: t.name,
+          holderId: t.id,
+          accountNumber: t.virtual_account_number,
+          bankName: t.virtual_account_bank || 'Quasar',
+          accountName: t.virtual_account_name || t.name,
+          status: t.virtual_account_status || 'ACTIVE',
+          balance: pending.get(String(t.virtual_account_number).trim()) || 0,
+        })
+      }
+      for (const c of customersRes.data || []) {
+        const tenant = names.get(String(c.tenant_id))
+        push({
+          id: `customer:${c.id}`,
+          tenantId: c.tenant_id,
+          tenantName: tenant?.name || '—',
+          tenantType: tenant?.type || '—',
+          holderType: 'Customer',
+          holderName: c.name,
+          holderId: c.id,
+          accountNumber: c.virtual_account_number,
+          bankName: c.virtual_account_bank || 'Quasar',
+          accountName: c.virtual_account_name || c.name,
+          status: 'ACTIVE',
+          phone: c.phone || null,
+          email: c.email || null,
+          balance: pending.get(String(c.virtual_account_number).trim()) || 0,
+        })
+      }
+      if (!staffRes.error) {
+        for (const s of staffRes.data || []) {
+          const tenant = names.get(String(s.tenant_id))
+          push({
+            id: `staff:${s.id}`,
+            tenantId: s.tenant_id,
+            tenantName: tenant?.name || '—',
+            tenantType: tenant?.type || '—',
+            holderType: 'Staff',
+            holderName: s.name,
+            holderId: s.id,
+            accountNumber: s.virtual_account_number,
+            bankName: s.virtual_account_bank || 'Quasar',
+            accountName: s.virtual_account_name || `${s.name} (Staff)`,
+            status: 'ACTIVE',
+            phone: s.phone || null,
+            email: s.email || null,
+            balance: pending.get(String(s.virtual_account_number).trim()) || 0,
+          })
+        }
+      }
+      if (!studentsRes.error) {
+        for (const st of studentsRes.data || []) {
+          const tenantId = st.tenant_id || st.school_id
+          const tenant = names.get(String(tenantId))
+          const name = `${st.first_name || ''} ${st.last_name || ''}`.trim() || st.admission_number || 'Student'
+          push({
+            id: `student:${st.id}`,
+            tenantId,
+            tenantName: tenant?.name || '—',
+            tenantType: tenant?.type || 'school',
+            holderType: 'Student',
+            holderName: name,
+            holderId: st.id,
+            accountNumber: st.virtual_account_number,
+            bankName: st.virtual_account_bank || 'Quasar',
+            accountName: name,
+            status: st.virtual_account_status || 'ACTIVE',
+            balance: pending.get(String(st.virtual_account_number).trim()) || 0,
+          })
+        }
+      }
+
+      return res.status(200).json({
+        rows,
+        summary: {
+          accounts: rows.length,
+          withBalance: rows.filter((r) => Number(r.balance) > 0).length,
+          pending: Number(rows.reduce((s, r) => s + Number(r.balance || 0), 0).toFixed(2)),
+        },
+      })
+    } catch (error: any) {
+      console.error('[AdminController] listVirtualAccounts Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load virtual accounts' })
+    }
+  }
+
+  /**
+   * GET /api/admin/virtual-accounts/:accountNumber/transactions
+   */
+  static async getVirtualAccountTransactions(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      const accountNumber = String(req.params.accountNumber || '').trim()
+      if (!accountNumber) return res.status(400).json({ error: 'accountNumber is required' })
+
+      const [customerRes, staffRes, studentRes, tenantRes] = await Promise.all([
+        supabaseAdmin.from('customers').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('users').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('students').select('id, first_name, last_name, tenant_id, school_id, virtual_account_number, virtual_account_bank').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('tenants').select('id, name, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+      ])
+
+      const customer = customerRes.data?.[0]
+      const staff = staffRes.error ? null : staffRes.data?.[0]
+      const student = studentRes.error ? null : studentRes.data?.[0]
+      const tenantOwner = tenantRes.data?.[0]
+
+      const owner = customer
+        ? { holderType: 'Customer', holderName: customer.name, holderId: customer.id, tenantId: customer.tenant_id, bankName: customer.virtual_account_bank, accountName: customer.virtual_account_name || customer.name }
+        : staff
+          ? { holderType: 'Staff', holderName: staff.name, holderId: staff.id, tenantId: staff.tenant_id, bankName: staff.virtual_account_bank, accountName: staff.virtual_account_name || staff.name }
+          : student
+            ? { holderType: 'Student', holderName: `${student.first_name || ''} ${student.last_name || ''}`.trim(), holderId: student.id, tenantId: student.tenant_id || student.school_id, bankName: student.virtual_account_bank, accountName: `${student.first_name || ''} ${student.last_name || ''}`.trim() }
+            : tenantOwner
+              ? { holderType: 'Tenant', holderName: tenantOwner.name, holderId: tenantOwner.id, tenantId: tenantOwner.id, bankName: tenantOwner.virtual_account_bank, accountName: tenantOwner.virtual_account_name || tenantOwner.name }
+              : null
+
+      if (owner?.tenantId && !isPlatform && String(user?.tenantId) !== String(owner.tenantId)) {
+        return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' })
+      }
+
+      const loadTxns = async (tenantId?: string | null) => {
+        // Never request channel/provider — those columns are not on transactions_log.
+        let query = supabaseAdmin
+          .from('transactions_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(800)
+        if (tenantId) query = query.eq('tenant_id', tenantId)
+        const { data, error } = await query
+        if (error) throw error
+        return data || []
+      }
+
+      const scopedTenant = owner?.tenantId || (!isPlatform ? user?.tenantId : null)
+      let rawTxns = await loadTxns(scopedTenant)
+      let matched = rawTxns.filter((tx) => virtualAccountMatches(tx, accountNumber))
+      if (!matched.length && isPlatform && scopedTenant) {
+        rawTxns = await loadTxns(null)
+        matched = rawTxns.filter((tx) => virtualAccountMatches(tx, accountNumber))
+      }
+      if (!matched.length) {
+        const targeted = await supabaseAdmin
+          .from('transactions_log')
+          .select('*')
+          .or(
+            [
+              `reference.ilike.%${accountNumber}%`,
+              `metadata->>virtualAccountNumber.eq.${accountNumber}`,
+              `metadata->>accountNumber.eq.${accountNumber}`,
+              `metadata->>virtual_account_number.eq.${accountNumber}`,
+              `metadata->>account_number.eq.${accountNumber}`,
+            ].join(','),
+          )
+          .order('created_at', { ascending: false })
+          .limit(200)
+        if (!targeted.error) {
+          matched = (targeted.data || []).filter((tx) => !scopedTenant || isPlatform || String(tx.tenant_id) === String(scopedTenant))
+        }
+      }
+      const transactions = matched.map(formatVaTransaction)
+
+      const credits = transactions.filter((t) => t.type === 'CREDIT').reduce((s, t) => s + t.amount, 0)
+      const debits = transactions.filter((t) => t.type === 'DEBIT').reduce((s, t) => s + t.amount, 0)
+      const tenantName = owner?.tenantId
+        ? (await supabaseAdmin.from('tenants').select('name').eq('id', owner.tenantId).maybeSingle()).data?.name
+        : null
+
+      return res.status(200).json({
+        account: {
+          accountNumber,
+          bankName: owner?.bankName || 'Quasar',
+          accountName: owner?.accountName || accountNumber,
+          holderType: owner?.holderType || 'Unknown',
+          holderName: owner?.holderName || '—',
+          holderId: owner?.holderId || null,
+          tenantId: owner?.tenantId || null,
+          tenantName: tenantName || '—',
+          balance: Number((credits - debits).toFixed(2)),
+        },
+        transactions,
+      })
+    } catch (error: any) {
+      console.error('[AdminController] getVirtualAccountTransactions Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load virtual account transactions' })
     }
   }
 

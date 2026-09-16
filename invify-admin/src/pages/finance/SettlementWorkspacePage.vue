@@ -179,7 +179,8 @@
     </div>
 
     <!-- SETTLEMENT INSPECTION DRAWER -->
-    <q-drawer v-model="drawerOpen" side="right" overlay bordered class="bg-panel border-left drawer-shadow" :width="850">
+    <q-dialog v-model="drawerOpen" position="right" full-height>
+      <q-card class="bg-panel text-main column no-wrap" style="width: 850px; max-width: 96vw; height: 100%;">
       <div v-if="selectedSettlement" class="column full-height">
         
         <!-- Drawer Header & Action Center -->
@@ -193,7 +194,7 @@
               </div>
               <div class="text-caption text-muted font-mono">Reference: {{ selectedSettlement.reference }} | Created: {{ selectedSettlement.createdDate }}</div>
             </div>
-            <q-btn flat dense round icon="close" v-close-popup />
+            <q-btn flat dense round icon="close" @click="drawerOpen = false" />
           </div>
 
           <!-- Treasury Action Center -->
@@ -333,7 +334,8 @@
           </q-tab-panels>
         </q-scroll-area>
       </div>
-    </q-drawer>
+      </q-card>
+    </q-dialog>
 
     <CardSettlementUploadDialog
       v-model="uploadDialogOpen"

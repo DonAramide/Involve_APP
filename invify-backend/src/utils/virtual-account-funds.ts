@@ -11,6 +11,27 @@ export function roundNaira(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+/** Quasar sandbox `availableBalance` is kobo when it is an integer string ("450" = ₦4.50). */
+export function sandboxBalanceToNaira(account: any): number {
+  const raw = account?.availableBalance ?? account?.available_balance;
+  if (raw == null || raw === '') {
+    const kobo = Number(account?.balance_kobo);
+    return Number.isFinite(kobo) ? roundNaira(kobo / 100) : 0;
+  }
+  const asNum = Number(raw);
+  if (!Number.isFinite(asNum)) return 0;
+  if (String(raw).includes('.')) return roundNaira(asNum);
+  return roundNaira(asNum / 100);
+}
+
+export function sumQuasarSandboxBalancesNaira(accounts: any[]): number {
+  let total = 0;
+  for (const account of accounts || []) {
+    total += sandboxBalanceToNaira(account);
+  }
+  return roundNaira(total);
+}
+
 /** Prefer Quasar's exact naira (2.50) over BIGINT-truncated amount (2). */
 export function transactionAmountNaira(tx: any): number {
   const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : {};
@@ -122,4 +143,123 @@ export function splitUnsweptVirtualAccountFunds(input: {
     student,
     unmapped,
   };
+}
+
+export function pendingFundsByVa(txns: any[]): Map<string, number> {
+  return netByVirtualAccount(txns).pending
+}
+
+export function isCardPaymentRail(tx: any): boolean {
+  const blob = [
+    tx?.type,
+    tx?.channel,
+    tx?.provider,
+    tx?.metadata?.payment_method,
+    tx?.metadata?.paidVia,
+    tx?.metadata?.channel,
+    tx?.entry_type,
+  ]
+    .join(' ')
+    .toLowerCase()
+  return /card|pos|emv|mpos|kimono|nibss/.test(blob) && !/virtual.?account|va_transfer/.test(blob)
+}
+
+export function isUnsettledCardStatus(value: any): boolean {
+  const s = String(value || '').toLowerCase()
+  if (!s) return true
+  return !['settled', 'paid', 'swept', 'payout', 'cleared'].some((k) => s.includes(k))
+}
+
+export function unsettledCardByTenant(input: {
+  posAttempts?: any[]
+  transactions?: any[]
+}): Map<string, number> {
+  const totals = new Map<string, number>()
+  const add = (tenantId: any, amount: number) => {
+    const id = String(tenantId || '').trim()
+    if (!id || !Number.isFinite(amount) || amount <= 0) return
+    totals.set(id, roundNaira((totals.get(id) || 0) + amount))
+  }
+
+  for (const row of input.posAttempts || []) {
+    const approved = String(row.status || '').toLowerCase() === 'approved'
+    if (!approved || !isUnsettledCardStatus(row.settlement_status)) continue
+    add(row.tenant_id, Number(row.amount || 0))
+  }
+
+  for (const tx of input.transactions || []) {
+    if (!isCardPaymentRail(tx)) continue
+    if (extractVaFromMetadata(tx.metadata)) continue
+    const settlement = tx.settlement_status || tx.metadata?.settlement_status
+    if (!isUnsettledCardStatus(settlement)) continue
+    add(tx.tenant_id, transactionAmountNaira(tx))
+  }
+
+  return totals
+}
+
+export function pendingFundsByTenant(txns: any[]): Map<string, number> {
+  const byTenant = new Map<string, any[]>()
+  for (const tx of txns || []) {
+    const tenantId = String(tx.tenant_id || '').trim()
+    if (!tenantId) continue
+    if (!byTenant.has(tenantId)) byTenant.set(tenantId, [])
+    byTenant.get(tenantId)!.push(tx)
+  }
+  const totals = new Map<string, number>()
+  for (const [tenantId, rows] of byTenant.entries()) {
+    const net = netByVirtualAccount(rows)
+    let sum = net.noVaNet
+    for (const amount of net.pending.values()) sum += amount
+    totals.set(tenantId, roundNaira(sum))
+  }
+  return totals
+}
+
+export function virtualAccountMatches(tx: any, accountNumber: string): boolean {
+  const va = String(accountNumber || '').trim()
+  if (!va) return false
+  const digits = (value: any) => String(value || '').replace(/\D/g, '')
+  const want = digits(va)
+  let meta = tx?.metadata || {}
+  if (typeof meta === 'string') {
+    try { meta = JSON.parse(meta) } catch { meta = {} }
+  }
+  const candidates = [
+    meta.virtualAccountNumber,
+    meta.accountNumber,
+    meta.virtual_account_number,
+    meta.account_number,
+    meta?.metadata?.virtualAccountNumber,
+    meta?.metadata?.accountNumber,
+    extractVaFromMetadata(meta),
+    tx?.reference,
+  ]
+    .filter(Boolean)
+    .map((v: any) => String(v).trim())
+  if (candidates.includes(va) || (want.length >= 8 && candidates.some((c) => digits(c) === want))) {
+    return true
+  }
+  if (want.length >= 8) {
+    const blob = JSON.stringify(meta || {}) + String(tx?.reference || '')
+    if (blob.includes(va) || digits(blob).includes(want)) return true
+  }
+  return false
+}
+
+export function formatVaTransaction(tx: any) {
+  const rawType = String(tx?.type || 'CREDIT').toUpperCase()
+  const type = ['DEBIT', 'SWEEP', 'WITHDRAWAL', 'PAYOUT'].some((k) => rawType.includes(k))
+    ? 'DEBIT'
+    : 'CREDIT'
+  return {
+    id: tx.id,
+    amount: transactionAmountNaira(tx),
+    type,
+    reference: tx.reference || tx.id,
+    status: tx.status || 'SUCCESS',
+    createdAt: tx.created_at || tx.timestamp || null,
+    channel: tx.metadata?.paidVia || tx.metadata?.channel || tx.metadata?.provider || 'Quasar VA',
+    metadata: tx.metadata || {},
+  }
 }

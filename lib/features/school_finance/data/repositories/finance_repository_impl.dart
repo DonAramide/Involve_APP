@@ -69,14 +69,44 @@ class FinanceRepositoryImpl implements IFinanceRepository {
   @override
   Future<SchoolFinancialSummary> getSchoolSummary() async {
     final data = await remoteDataSource.getSchoolSummary();
-    return SchoolFinancialSummary(
-      totalRevenue: (data['totalRevenue'] as num).toDouble(),
-      outstandingFees: (data['outstandingFees'] as num).toDouble(),
-      paidStudentsCount: data['paidStudentsCount'],
-      owingStudentsCount: data['owingStudentsCount'],
-      totalStudents: data['totalStudents'],
-      lastUpdated: DateTime.parse(data['lastUpdated']),
+    final metrics = data['studentMetrics'] is Map
+        ? Map<String, dynamic>.from(data['studentMetrics'] as Map)
+        : <String, dynamic>{};
+    final sales = data['salesSummary'] is Map
+        ? Map<String, dynamic>.from(data['salesSummary'] as Map)
+        : <String, dynamic>{};
+    final card = _n(data['cardCollected'] ?? sales['card']);
+    final va = _n(
+      data['vaTransferCollected'] ??
+          data['pendingVirtualAccountFunds'] ??
+          sales['vaTransfer'],
     );
+    final quasar = _n(data['quasarCollected'] ?? data['totalQuasarCollected']);
+    return SchoolFinancialSummary(
+      totalRevenue: _n(data['totalRevenue'] ?? data['totalCollected']),
+      outstandingFees: _n(
+        data['outstandingFees'] ?? data['outstanding'] ?? sales['totalPending'],
+      ),
+      paidStudentsCount: _i(data['paidStudentsCount'] ?? metrics['paid']),
+      owingStudentsCount: _i(data['owingStudentsCount'] ?? metrics['owing']),
+      totalStudents: _i(data['totalStudents'] ?? metrics['total']),
+      lastUpdated: DateTime.tryParse('${data['lastUpdated'] ?? ''}') ?? DateTime.now(),
+      cardCollected: card,
+      vaTransferCollected: va,
+      cashCollected: _n(data['cashCollected'] ?? sales['cash']),
+      quasarCollected: quasar > 0.001 ? quasar : card + va,
+    );
+  }
+
+  double _n(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v') ?? 0;
+  }
+
+  int _i(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v') ?? 0;
   }
 
   @override

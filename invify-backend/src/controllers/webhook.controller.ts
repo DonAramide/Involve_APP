@@ -40,7 +40,15 @@ function resolveWebhookReference(req: Request, event: any): string | null {
   if (deliveryId) return `qfs:${deliveryId}`;
   const va = event?.data?.accountNumber || event?.data?.virtualAccountNumber;
   if (isSandboxVaCredit(event) && va) {
-    return `qfs:${va}:${event?.data?.reason || 'funded'}`;
+    const amount = event?.data?.amount ?? '';
+    const stamp =
+      event?.data?.id ||
+      event?.timestamp ||
+      req.headers['x-quasar-timestamp'] ||
+      Date.now();
+    const reason = String(event?.data?.reason || 'funded').trim().replace(/\s+/g, '_');
+    // Include amount + stamp so two "Initial Wallet Funding" credits do not collapse.
+    return `qfs:${va}:${reason}:${amount}:${stamp}`;
   }
   return null;
 }

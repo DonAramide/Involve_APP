@@ -386,6 +386,7 @@ const yearColumns = [
 const parentColumns = [
   { name: 'name', label: 'Parent', field: (r) => r.fullName || r.name || '—', align: 'left' },
   { name: 'phone', label: 'Phone', field: (r) => r.phone || '—', align: 'left' },
+  { name: 'address', label: 'Address', field: (r) => r.address || '—', align: 'left' },
   { name: 'children', label: 'Children', field: (r) => r.childCount ?? 0, align: 'right' },
   { name: 'outstanding', label: 'Outstanding', field: (r) => r.outstanding ?? 0, align: 'right' },
   { name: 'credit', label: 'Credit', field: (r) => r.creditBalance ?? 0, align: 'right' },
@@ -534,6 +535,7 @@ const selectedFields = computed(() => {
     push('Email', row.email)
     push('Phone', row.phone || row.parentPhone || row.parent_phone)
     push('Guardian', row.guardianName || row.guardian_name || row.parentName || row.parent_name)
+    push('Address', row.address || row.parentAddress || row.parent_address)
     push('Gender', row.gender)
     push('Department', row.department)
     push('Virtual account', row.virtual_account_number || row.virtualAccountNumber)
@@ -595,6 +597,7 @@ const selectedFields = computed(() => {
     push('Parent', row.fullName || row.name)
     push('Phone', row.phone)
     push('Email', row.email)
+    push('Address', row.address)
     push('Children', row.childCount)
     push('Outstanding', row.outstanding)
     push('Parent credit', row.creditBalance)

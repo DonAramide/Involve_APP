@@ -353,10 +353,15 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
               const SizedBox(height: 8),
               ...children.map((s) {
                 final debt = s.balance > 0 ? s.balance : 0.0;
+                final className = _classNameOf(s, state);
                 return Card(
                   child: ListTile(
                     title: Text(s.fullName),
-                    subtitle: Text(s.admissionNumber),
+                    subtitle: Text(
+                      className.isEmpty
+                          ? s.admissionNumber
+                          : '$className · ${s.admissionNumber}',
+                    ),
                     trailing: Text(
                       CurrencyFormatter.formatWithSymbol(debt),
                       style: TextStyle(
@@ -734,6 +739,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   List<Student> _childrenOf(SchoolState state) {
     return state.students.where((s) => s.parentId == widget.parentId).toList()
       ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+  }
+
+  String _classNameOf(Student student, SchoolState state) {
+    for (final c in state.classes) {
+      if (c.id == student.classId) return c.name;
+    }
+    return '';
   }
 
   Future<void> _showMapCreditDialog(

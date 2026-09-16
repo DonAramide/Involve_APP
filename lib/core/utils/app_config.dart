@@ -107,6 +107,13 @@ class AppConfig {
       }
     } catch (_) {}
 
+    // Production must fail closed — never default to staging or LAN
+    if (isProduction) {
+      throw StateError(
+        'Production API_BASE_URL is not configured. Specify --dart-define=API_BASE_URL=<prod_url>',
+      );
+    }
+
     if (allowsLanApi) {
       return kDebugLaptopApiBaseUrl;
     }
@@ -130,6 +137,14 @@ class AppConfig {
       _assertEnvUrlSafety('SUPABASE_URL', fromEnv);
       return fromEnv;
     }
+
+    // Production must fail closed — never default to staging Supabase
+    if (isProduction) {
+      throw StateError(
+        'Production SUPABASE_URL is not configured. Specify --dart-define=SUPABASE_URL=<prod_supabase_url>',
+      );
+    }
+
     return 'https://rpcjelhacmkhzguljdgi.supabase.co';
   }
 
@@ -142,6 +157,14 @@ class AppConfig {
     if (fromEnv != null && fromEnv.isNotEmpty) {
       return fromEnv;
     }
+
+    // Production must fail closed — never default to staging anon key
+    if (isProduction) {
+      throw StateError(
+        'Production SUPABASE_PUBLISHABLE_KEY is not configured. Specify --dart-define=SUPABASE_PUBLISHABLE_KEY=<prod_key>',
+      );
+    }
+
     return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwY2plbGhhY21raHpndWxqZGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjI1OTYsImV4cCI6MjA5NjIzODU5Nn0.9ncknpcqC-PLOufVr1IWJXweteuOEMm46qXzC25un2k';
   }
 
@@ -169,7 +192,7 @@ class AppConfig {
     // Staging must never silently use a production host pattern without APP_ENV=production
     // Production must never use staging host markers
     final lower = url.toLowerCase();
-    if (isProduction && (lower.contains('staging') || lower.contains('-stage.'))) {
+    if (isProduction && (lower.contains('staging') || lower.contains('-stage.') || lower.contains('rpcjelhacmkhzguljdgi'))) {
       throw StateError('$label appears to be a staging URL while APP_ENV=production');
     }
     if (isStaging && (lower.contains('prod.') || lower.contains('-prod.') || lower.contains('production'))) {
@@ -200,8 +223,13 @@ class AppConfig {
   /// When false, never touch `Supabase.instance` (offline / missing env).
   static bool supabaseInitialized = false;
 
-  static bool get isSupabaseConfigured =>
-      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+  static bool get isSupabaseConfigured {
+    try {
+      return supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
 
   static void hydrateFromDotenv(Map<String, String> values) {
     _dotenvCache

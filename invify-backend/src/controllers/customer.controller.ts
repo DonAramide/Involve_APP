@@ -7,6 +7,8 @@ import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
 import { rejectIfVaBlocked } from '../utils/free-trial-guard';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
+import { roundNaira, sandboxBalanceToNaira, transactionAmountNaira } from '../utils/virtual-account-funds';
 
 function tenantFromRequest(req: Request, res: Response): string | null {
   try {
@@ -436,7 +438,40 @@ export class CustomerController {
         return res.status(500).json({ error: "Failed to fetch transactions" });
       }
 
-      return res.status(200).json(WebHookFormatVaTxns(txns || [], va));
+      const rows = WebHookFormatVaTxns(txns || [], va);
+      const invifyLogged = roundNaira(
+        rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
+      );
+      const quasarBalance = await lookupQuasarVaBalanceNaira(tenantId, va);
+      for (const row of rows) {
+        row.metadata = {
+          ...(row.metadata || {}),
+          quasarBalance,
+          invifyLogged,
+        };
+      }
+      const gap = roundNaira(quasarBalance - invifyLogged);
+      if (gap > 0.009) {
+        rows.unshift({
+          id: `reconcile:${va}`,
+          amount: gap,
+          type: 'CREDIT',
+          reference: `qfs:${va}:reconcile:${quasarBalance.toFixed(2)}`,
+          status: 'SUCCESS',
+          createdAt: new Date().toISOString(),
+          metadata: {
+            virtualAccountNumber: va,
+            accountNumber: va,
+            amountNaira: gap,
+            paidVia: 'parent_account',
+            reconcile: true,
+            senderName: 'Quasar',
+            quasarBalance,
+            invifyLogged,
+          },
+        });
+      }
+      return res.status(200).json(rows);
     } catch (error: any) {
       console.error('[CustomerController] getVirtualAccountTransactions Error:', error.message);
       return res.status(500).json({ error: "Failed to fetch virtual account transactions" });
@@ -522,6 +557,21 @@ export class CustomerController {
       console.error('[CustomerController] sweepVirtualAccountFunds Error:', error.message);
       return res.status(500).json({ error: "Failed to sweep virtual account funds" });
     }
+  }
+}
+
+async function lookupQuasarVaBalanceNaira(tenantId: string, accountNumber: string): Promise<number> {
+  try {
+    const accounts = await QfsQuasarBridgeService.listAccounts(tenantId);
+    const want = String(accountNumber).replace(/\D/g, '');
+    const match = (accounts || []).find((row: any) => {
+      const got = String(row?.account_number || row?.accountNumber || '').replace(/\D/g, '');
+      return got.length >= 8 && got === want;
+    });
+    return match ? sandboxBalanceToNaira(match) : 0;
+  } catch (err: any) {
+    console.warn('[CustomerController] Quasar VA balance lookup failed:', err?.message || err);
+    return 0;
   }
 }
 
@@ -620,7 +670,7 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
         : rawType;
     return {
       id: tx.id,
-      amount: Number(tx.amount),
+      amount: transactionAmountNaira(tx),
       type: normalizedType,
       reference: tx.reference,
       status: tx.status,

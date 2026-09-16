@@ -219,6 +219,36 @@ const verificationLimiter = rateLimit({
 });
 
 app.use(morgan('dev'));
+
+// In-process Observability metrics interceptor
+import { ObservabilityCollectorService } from './services/observability/observability-collector.service';
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const reqPath = String(req.originalUrl || req.path || req.url || '');
+  // Explicitly exclude observability endpoints and health probes from request metrics
+  if (
+    reqPath.startsWith('/api/admin/observability') ||
+    reqPath.startsWith('/admin/observability') ||
+    req.headers['x-monitoring-probe'] === 'true'
+  ) {
+    return next();
+  }
+
+  const start = Date.now();
+  res.on('finish', () => {
+    try {
+      const latency = Date.now() - start;
+      ObservabilityCollectorService.getInstance().recordHttpRequest(
+        req.method,
+        reqPath,
+        res.statusCode,
+        latency,
+      );
+    } catch {
+      // Non-blocking in-memory collector
+    }
+  });
+  next();
+});
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.method !== 'POST') return next();
   const path = String(req.originalUrl || req.url || '');
@@ -485,6 +515,7 @@ import crmRoutes from './routes/crm.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import operationsRoutes from './routes/operations.routes';
 import financialPlatformRoutes from './routes/financial-platform.routes';
+import observabilityRoutes from './routes/observability.routes';
 
 app.use(activationRoutes);
 app.use('/auth', authRoutes);
@@ -501,6 +532,8 @@ app.use('/api/v1/crm', authenticate, crmRoutes);
 app.use('/api/inventory', authenticate, inventoryRoutes);
 app.use('/api/v1', authenticate, operationsRoutes);
 app.use('/api/v1', financialPlatformRoutes);
+app.use('/api/admin/observability', observabilityRoutes);
+app.use('/admin/observability', observabilityRoutes);
 
 
 // Orchestration Endpoints
@@ -680,6 +713,12 @@ app.get('/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff
 app.get('/api/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listLedger);
 app.get('/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
 app.get('/api/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
+app.get('/api/admin/tenant-payables', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listTenantPayables);
+app.get('/admin/tenant-payables', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listTenantPayables);
+app.get('/api/admin/virtual-accounts', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listVirtualAccounts);
+app.get('/admin/virtual-accounts', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listVirtualAccounts);
+app.get('/api/admin/virtual-accounts/:accountNumber/transactions', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.getVirtualAccountTransactions);
+app.get('/admin/virtual-accounts/:accountNumber/transactions', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.getVirtualAccountTransactions);
 
 // Wallet Endpoints (Internal Ledger)
 app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getBalance);
@@ -767,6 +806,9 @@ app.post('/api/payout/resolve-account', authenticate, checkRole(['super_admin', 
 
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSummary);
+app.get('/api/finance/school-dashboard', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolDashboard);
+app.get('/api/finance/daily-revenue', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getDailyRevenue);
+app.get('/api/finance/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolTransactions);
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
 app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);

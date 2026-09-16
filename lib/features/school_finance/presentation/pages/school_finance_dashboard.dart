@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import '../bloc/finance_bloc.dart';
+import '../../domain/entities/school_financial_summary.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../widgets/summary_stat_card.dart';
 import '../widgets/modern_revenue_chart.dart';
@@ -177,6 +178,10 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                     ),
                   ),
 
+                  SliverToBoxAdapter(
+                    child: _buildQuasarStrip(summary, isDark, theme),
+                  ),
+
                   // 2. Revenue Chart Section
                   SliverToBoxAdapter(
                     child: Container(
@@ -251,6 +256,89 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
 
           return const SizedBox.shrink();
         },
+      ),
+    );
+  }
+
+  Widget _buildQuasarStrip(SchoolFinancialSummary summary, bool isDark, ThemeData theme) {
+    Widget cell(String label, double amount, Color color) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              CurrencyFormatter.formatWithSymbol(amount),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? theme.cardColor : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: (isDark ? Colors.indigo.shade200 : Colors.indigo.shade100)
+              .withOpacity(0.6),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quasar',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Card payment + VA transfer, counted together',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              cell('Card', summary.cardCollected, Colors.purple),
+              Container(
+                width: 1,
+                height: 36,
+                color: isDark ? theme.dividerColor : Colors.grey.shade200,
+              ),
+              const SizedBox(width: 12),
+              cell('Transfer', summary.vaTransferCollected, Colors.indigo),
+              Container(
+                width: 1,
+                height: 36,
+                color: isDark ? theme.dividerColor : Colors.grey.shade200,
+              ),
+              const SizedBox(width: 12),
+              cell('Quasar', summary.quasarCardAndTransfer, Colors.teal),
+            ],
+          ),
+        ],
       ),
     );
   }

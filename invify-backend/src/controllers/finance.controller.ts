@@ -4,8 +4,14 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
 import { collectedInvoiceAmount, outstandingInvoiceAmount } from '../utils/invoice-collection';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
-import { splitUnsweptVirtualAccountFunds, transactionAmountNaira } from '../utils/virtual-account-funds';
+import {
+  roundNaira,
+  splitUnsweptVirtualAccountFunds,
+  sumQuasarSandboxBalancesNaira,
+  transactionAmountNaira,
+} from '../utils/virtual-account-funds';
 import { WalletService } from '../services/wallet.service';
+import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
 
 export class ExecutiveFinanceController {
   /**
@@ -163,7 +169,18 @@ export class ExecutiveFinanceController {
         staffVas: (staffVaRes.data || []).map((row: any) => row.virtual_account_number),
         studentVas: (studentVaRes.data || []).map((row: any) => row.virtual_account_number),
       });
-      const pendingVirtualAccountFunds = unsweptVa.total;
+      let pendingVirtualAccountFunds = unsweptVa.total;
+      try {
+        const sandboxAccounts = await QfsQuasarBridgeService.listAccounts(tenantId);
+        const quasarLive = sumQuasarSandboxBalancesNaira(sandboxAccounts || []);
+        // Prefer Quasar's live VA total when Invify's log still has truncated naira (2.50 → 2).
+        if (quasarLive > pendingVirtualAccountFunds + 0.009) {
+          pendingVirtualAccountFunds = quasarLive;
+        }
+      } catch (err: any) {
+        console.warn('[ExecutiveFinance] Quasar live VA total unavailable:', err?.message || err);
+      }
+      pendingVirtualAccountFunds = roundNaira(pendingVirtualAccountFunds);
       // Held = unswept customer/staff VA + card not yet remitted. Own-bank is excluded.
       const pendingQuasarRemittance = Math.max(
         0,
@@ -255,6 +272,211 @@ export class ExecutiveFinanceController {
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] Error:', error.message);
       return res.status(500).json({ error: 'Failed to generate executive summary' });
+    }
+  }
+
+  /**
+   * GET /api/finance/school-dashboard
+   * School Finance Dashboard: total revenue plus Quasar card + VA transfer.
+   */
+  static async getSchoolDashboard(req: Request, res: Response) {
+    let payload: any;
+    const capture = {
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body: any) {
+        payload = body;
+        return this;
+      },
+      statusCode: 200,
+    };
+    await ExecutiveFinanceController.getSummary(req, capture as unknown as Response);
+    if (!payload || payload.error) {
+      return res.status(capture.statusCode || 500).json(payload || { error: 'Failed to load dashboard' });
+    }
+    const sales = payload.salesSummary || {};
+    const card = Number(sales.card || 0);
+    const invoiceVa = Number(sales.vaTransfer || 0);
+    const liveVa = Number(payload.pendingVirtualAccountFunds || 0);
+    const vaTransfer = Math.max(invoiceVa, liveVa);
+    return res.status(200).json({
+      ...payload,
+      totalRevenue: payload.totalCollected,
+      outstandingFees: sales.totalPending || 0,
+      paidStudentsCount: payload.studentMetrics?.paid || 0,
+      owingStudentsCount: payload.studentMetrics?.owing || 0,
+      totalStudents: payload.studentMetrics?.total || 0,
+      lastUpdated: new Date().toISOString(),
+      cardCollected: card,
+      vaTransferCollected: vaTransfer,
+      cashCollected: Number(sales.cash || 0),
+      /** Quasar on this page is collectively card (POS) + VA transfer. */
+      quasarCollected: card + vaTransfer,
+    });
+  }
+
+  /**
+   * GET /api/finance/daily-revenue?days=7
+   * Invoice collections + Quasar VA credits grouped by day.
+   */
+  static async getDailyRevenue(req: Request, res: Response) {
+    const tenantId = resolveTenantScope(req);
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    try {
+      const since = new Date();
+      since.setUTCDate(since.getUTCDate() - (days - 1));
+      since.setUTCHours(0, 0, 0, 0);
+
+      const [invoicesRes, creditsRes] = await Promise.all([
+        supabaseAdmin
+          .from('invoices')
+          .select('amount_paid, payment_status, created_at')
+          .eq('tenant_id', tenantId)
+          .gte('created_at', since.toISOString()),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('amount, type, status, metadata, created_at')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
+          .gte('created_at', since.toISOString()),
+      ]);
+
+      const byDay = new Map<string, number>();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        byDay.set(key, 0);
+      }
+
+      const add = (iso: string | undefined, amount: number) => {
+        if (!(amount > 0) || !iso) return;
+        const key = String(iso).slice(0, 10);
+        if (!byDay.has(key)) return;
+        byDay.set(key, (byDay.get(key) || 0) + amount);
+      };
+
+      for (const inv of invoicesRes.data || []) {
+        add(inv.created_at, collectedInvoiceAmount(inv));
+      }
+      for (const tx of creditsRes.data || []) {
+        add(tx.created_at, transactionAmountNaira(tx));
+      }
+
+      return res.status(200).json(
+        Array.from(byDay.entries()).map(([date, revenue]) => ({
+          date,
+          revenue: roundNaira(revenue),
+        })),
+      );
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getDailyRevenue Error:', error.message);
+      return res.status(500).json({ error: 'Failed to load daily revenue' });
+    }
+  }
+
+  /**
+   * GET /api/finance/transactions
+   * Live school feed: paid invoices (incl. card/POS) + Quasar VA credits.
+   */
+  static async getSchoolTransactions(req: Request, res: Response) {
+    const tenantId = resolveTenantScope(req);
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    try {
+      const [invoicesRes, creditsRes] = await Promise.all([
+        supabaseAdmin
+          .from('invoices')
+          .select(
+            'id, invoice_number, customer_name, amount_paid, payment_method, payment_status, created_at, student_id, customer_id',
+          )
+          .eq('tenant_id', tenantId)
+          .gt('amount_paid', 0)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('id, reference, amount, type, metadata, created_at, wallet_id')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ]);
+
+      const channelForRail = (rail: string) => {
+        if (rail === 'card') return 'Card';
+        if (rail === 'va_transfer') return 'Transfer';
+        if (rail === 'bank_transfer') return 'Bank';
+        if (rail === 'cash') return 'Cash';
+        if (rail === 'wallet') return 'Wallet';
+        return 'Other';
+      };
+
+      const items: any[] = [];
+      for (const inv of invoicesRes.data || []) {
+        const collected = collectedInvoiceAmount(inv);
+        if (!(collected > 0)) continue;
+        const rail = classifyInvoicePaymentMethod(inv.payment_method);
+        items.push({
+          id: inv.id,
+          wallet_id: inv.student_id || inv.customer_id || 'school',
+          amount: collected,
+          type: 'credit',
+          reference: inv.invoice_number,
+          description: `Fee Payment #${inv.invoice_number || inv.id} for ${inv.customer_name || 'Customer'}`,
+          balance_after: 0,
+          channel: channelForRail(rail),
+          created_at: inv.created_at,
+          metadata: {
+            student_id: inv.student_id,
+            student_name: inv.customer_name,
+            payment_method: inv.payment_method,
+            quasar: rail === 'card' || rail === 'va_transfer',
+          },
+        });
+      }
+
+      for (const tx of creditsRes.data || []) {
+        const amount = transactionAmountNaira(tx);
+        if (!(amount > 0)) continue;
+        const meta = tx.metadata || {};
+        const name = meta.senderName || meta.studentName || 'Virtual Account credit';
+        items.push({
+          id: tx.id,
+          wallet_id: tx.wallet_id || 'quasar',
+          amount,
+          type: 'credit',
+          reference: tx.reference || String(tx.id),
+          description: name,
+          balance_after: 0,
+          channel: 'Transfer',
+          created_at: tx.created_at,
+          metadata: {
+            student_name: name,
+            student_id: meta.studentId || meta.student_id || '',
+            virtualAccountNumber:
+              meta.virtualAccountNumber || meta.accountNumber || meta.virtual_account_number || null,
+            quasar: true,
+          },
+        });
+      }
+
+      items.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      return res.status(200).json(items.slice(0, limit));
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getSchoolTransactions Error:', error.message);
+      return res.status(500).json({ error: 'Failed to load transactions' });
     }
   }
 

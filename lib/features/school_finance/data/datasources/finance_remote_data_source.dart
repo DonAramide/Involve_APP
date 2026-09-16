@@ -125,8 +125,13 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> getSchoolSummary() async {
-    final response = await client.get('/api/analytics');
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await client.get('/api/finance/school-dashboard');
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      final response = await client.get('/api/finance/executive-summary');
+      return Map<String, dynamic>.from(response.data as Map);
+    }
   }
 
   @override
@@ -212,8 +217,11 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
 
   List<TransactionModel> _parseTransactionList(dynamic data) {
     if (data == null) return [];
-    return (data as List)
-        .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+    final raw = data is Map ? data['data'] ?? data['transactions'] : data;
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 }

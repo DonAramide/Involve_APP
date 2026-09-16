@@ -16,6 +16,9 @@ import './student_profile_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/validators.dart';
+import 'package:involve_app/features/activation/data/nigeria_states_lgas.dart';
+import 'package:collection/collection.dart';
 
 class StudentListPage extends StatefulWidget {
   final int? initialClassFilter;
@@ -706,6 +709,80 @@ class _StudentListPageState extends State<StudentListPage> {
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
     final schoolState = context.read<SchoolBloc>().state;
+    SchoolParent? initialParent;
+    if (student?.parentId != null) {
+      initialParent = schoolState.parents.firstWhereOrNull((p) => p.id == student!.parentId);
+    }
+    if (initialParent == null && student != null && student.hasParent) {
+      final key = student.parentKey;
+      initialParent = schoolState.parents.firstWhereOrNull(
+        (p) => '${p.fullName.trim()}|${(p.phone ?? '').trim()}' == key || ((p.phone ?? '').trim().isNotEmpty && (p.phone ?? '').trim() == (student.parentPhone ?? '').trim()),
+      );
+    }
+
+    final streetController = TextEditingController();
+    final busStopController = TextEditingController();
+    final stateTextController = TextEditingController();
+    String selectedCountry = 'Nigeria';
+    String? selectedState;
+    String? selectedLga;
+
+    void applyAddressString(String? addressStr) {
+      if (addressStr == null || addressStr.trim().isEmpty) return;
+      var raw = addressStr.trim();
+      String bus = '';
+      String cntry = 'Nigeria';
+      String? st;
+      String? lg;
+
+      final bStopMatch = RegExp(r'(?:B/Stop|Bus Stop|Bus-stop|Landmark):\s*([^,]+)', caseSensitive: false).firstMatch(raw);
+      if (bStopMatch != null) {
+        bus = bStopMatch.group(1)?.trim() ?? '';
+        raw = raw.replaceRange(bStopMatch.start, bStopMatch.end, '').replaceAll(RegExp(r',\s*,'), ',');
+      }
+
+      for (final c in africaCountries) {
+        if (raw.endsWith(c) || raw.contains(', $c') || raw.contains(' $c')) {
+          cntry = c;
+          raw = raw.replaceAll(c, '').replaceAll(RegExp(r',\s*$'), '').trim();
+          break;
+        }
+      }
+
+      if (cntry == 'Nigeria') {
+        for (final item in nigeriaStatesAndLgas) {
+          final sName = item['state'] as String;
+          if (raw.contains(sName)) {
+            st = sName;
+            raw = raw.replaceAll(sName, '').replaceAll(RegExp(r',\s*$'), '').trim();
+            final lgas = List<String>.from(item['lgas'] as List);
+            for (final lga in lgas) {
+              if (raw.contains(lga)) {
+                lg = lga;
+                raw = raw.replaceAll(lga, '').replaceAll(RegExp(r',\s*$'), '').trim();
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      final cleaned = raw.replaceAll(RegExp(r',\s*,'), ',').replaceAll(RegExp(r'^,\s*|,\s*$'), '').trim();
+      streetController.text = cleaned.isNotEmpty ? cleaned : addressStr.trim();
+      busStopController.text = bus;
+      selectedCountry = cntry;
+      selectedState = st;
+      selectedLga = lg;
+      if (cntry != 'Nigeria') {
+        stateTextController.text = st ?? '';
+      }
+    }
+
+    if (initialParent?.address != null) {
+      applyAddressString(initialParent!.address);
+    }
+
     String? selectedExistingParentKey = student != null && student.hasParent
         ? student.parentKey
         : null;
@@ -727,6 +804,7 @@ class _StudentListPageState extends State<StudentListPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
+      useSafeArea: false,
       builder: (ctx) => BlocListener<SchoolBloc, SchoolState>(
         listenWhen: (previous, current) => previous.status != current.status,
         listener: (context, state) {
@@ -735,293 +813,527 @@ class _StudentListPageState extends State<StudentListPage> {
           }
         },
         child: StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Text(student == null ? 'Add Student' : 'Edit Student'),
-            content: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        final source = await showModalBottomSheet<ImageSource>(
-                          context: context,
-                          builder: (ctx) => SafeArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ListTile(
-                                  leading: const Icon(Icons.camera_alt),
-                                  title: const Text('Take Photo'),
-                                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          builder: (context, setDialogState) {
+            final stateList = nigeriaStatesAndLgas.map((s) => s['state'] as String).toList()..sort();
+            List<String> lgaList = [];
+            if (selectedState != null) {
+              final match = nigeriaStatesAndLgas.firstWhereOrNull((s) => s['state'] == selectedState);
+              if (match != null && match['lgas'] != null) {
+                lgaList = List<String>.from(match['lgas'] as List)..sort();
+              }
+            }
+            return Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                title: Text(student == null ? 'Register Student' : 'Edit Student'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final source = await showModalBottomSheet<ImageSource>(
+                                context: context,
+                                builder: (ctx) => SafeArea(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.camera_alt),
+                                        title: const Text('Take Photo'),
+                                        onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.photo_library),
+                                        title: const Text('Choose from Gallery'),
+                                        onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                ListTile(
-                                  leading: const Icon(Icons.photo_library),
-                                  title: const Text('Choose from Gallery'),
-                                  onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                        if (source != null) {
-                          final XFile? image = await picker.pickImage(source: source, imageQuality: 50);
-                          if (image != null) {
-                            final bytes = await image.readAsBytes();
-                            final resizedBytes = await _resizeImage(bytes);
-                            setDialogState(() => selectedImage = resizedBytes);
-                          }
-                        }
-                      },
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: selectedImage != null ? MemoryImage(selectedImage!) : null,
-                        child: selectedImage == null ? const Icon(Icons.camera_alt, size: 30, color: Colors.grey) : null,
-                      ),
-                    ),
-                    const Text('Tap to set photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: firstNameController, 
-                      decoration: const InputDecoration(labelText: 'First Name *'),
-                      validator: (val) => val == null || val.isEmpty ? 'First Name is required' : null,
-                    ),
-                    TextFormField(
-                      controller: middleNameController,
-                      decoration: const InputDecoration(labelText: 'Middle Name'),
-                    ),
-                    TextFormField(
-                      controller: lastNameController, 
-                      decoration: const InputDecoration(labelText: 'Last Name *'),
-                      validator: (val) => val == null || val.isEmpty ? 'Last Name is required' : null,
-                    ),
-                    TextFormField(
-                      controller: admissionController, 
-                      decoration: const InputDecoration(labelText: 'Admission Number'),
-                    ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Date of Birth'),
-                      subtitle: Text(selectedDob == null ? 'Not Set' : DateFormat('dd MMM yyyy').format(selectedDob!)),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDob ?? DateTime(2015),
-                          firstDate: DateTime(1990),
-                          lastDate: DateTime.now(),
-                        );
-                        if (date != null) setDialogState(() => selectedDob = date);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: selectedGender,
-                      decoration: const InputDecoration(labelText: 'Gender'),
-                      items: ['Male', 'Female', 'Other']
-                          .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                          .toList(),
-                      onChanged: (val) => setDialogState(() => selectedGender = val),
-                    ),
-                    const SizedBox(height: 16),
-                    BlocBuilder<SchoolBloc, SchoolState>(
-                      builder: (context, state) {
-                        return Column(
-                          children: [
-                            DropdownButtonFormField<int>(
-                              value: selectedClassId,
-                              decoration: const InputDecoration(labelText: 'Class *'),
-                              items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
-                              onChanged: (val) => setDialogState(() => selectedClassId = val),
-                              validator: (val) => val == null ? 'Please select a class' : null,
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<String>(
-                              value: selectedDepartment,
-                              decoration: const InputDecoration(labelText: 'Department (Science/Art/Commerce)'),
-                              items: [
-                                const DropdownMenuItem<String>(value: null, child: Text('None')),
-                                ...['Science', 'Art', 'Commerce']
-                                    .map((d) => DropdownMenuItem(value: d, child: Text(d))),
-                              ],
-                              onChanged: (val) => setDialogState(() => selectedDepartment = val),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    BlocBuilder<SchoolBloc, SchoolState>(
-                      builder: (context, state) {
-                        final parents = _uniqueParents(state.students);
-                        return DropdownButtonFormField<String>(
-                          value: parents.any((p) => p.key == selectedExistingParentKey)
-                              ? selectedExistingParentKey
-                              : null,
-                          decoration: const InputDecoration(
-                            labelText: 'Existing parent / guardian',
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('New parent (type below)'),
-                            ),
-                            ...parents.map(
-                              (p) => DropdownMenuItem<String>(
-                                value: p.key,
-                                child: Text(
-                                  '${p.name} · ${p.phone} (${p.childCount})',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
-                          onChanged: (val) {
-                            setDialogState(() {
-                              selectedExistingParentKey = val;
-                              if (val == null) return;
-                              _ExistingParent? match;
-                              for (final p in parents) {
-                                if (p.key == val) {
-                                  match = p;
-                                  break;
+                              );
+                              if (source != null) {
+                                final XFile? image = await picker.pickImage(source: source, imageQuality: 50);
+                                if (image != null) {
+                                  final bytes = await image.readAsBytes();
+                                  final resizedBytes = await _resizeImage(bytes);
+                                  setDialogState(() => selectedImage = resizedBytes);
                                 }
                               }
-                              if (match == null) return;
-                              parentNameController.text = match.name;
-                              parentPhoneController.text = match.phone;
-                              alsoAssignIds
-                                ..clear()
-                                ..addAll(
-                                  state.students
-                                      .where((s) =>
-                                          s.id != student?.id &&
-                                          s.parentKey == val)
-                                      .map((s) => s.id!)
-                                      .whereType<int>(),
-                                );
+                            },
+                            child: CircleAvatar(
+                              radius: 44,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: selectedImage != null ? MemoryImage(selectedImage!) : null,
+                              child: selectedImage == null ? const Icon(Icons.camera_alt, size: 32, color: Colors.grey) : null,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Center(
+                          child: Text('Tap to set photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: firstNameController, 
+                          decoration: const InputDecoration(labelText: 'First Name *', border: OutlineInputBorder()),
+                          validator: (val) => val == null || val.isEmpty ? 'First Name is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: middleNameController,
+                          decoration: const InputDecoration(labelText: 'Middle Name', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: lastNameController, 
+                          decoration: const InputDecoration(labelText: 'Last Name *', border: OutlineInputBorder()),
+                          validator: (val) => val == null || val.isEmpty ? 'Last Name is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: admissionController, 
+                          decoration: const InputDecoration(labelText: 'Admission Number', border: OutlineInputBorder()),
+                        ),
+                        const SizedBox(height: 12),
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          title: const Text('Date of Birth'),
+                          subtitle: Text(selectedDob == null ? 'Not Set' : DateFormat('dd MMM yyyy').format(selectedDob!)),
+                          trailing: const Icon(Icons.calendar_today),
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDob ?? DateTime(2015),
+                              firstDate: DateTime(1990),
+                              lastDate: DateTime.now(),
+                            );
+                            if (date != null) setDialogState(() => selectedDob = date);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedGender,
+                          decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+                          items: ['Male', 'Female', 'Other']
+                              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => selectedGender = val),
+                        ),
+                        const SizedBox(height: 12),
+                        BlocBuilder<SchoolBloc, SchoolState>(
+                          builder: (context, state) {
+                            return Column(
+                              children: [
+                                DropdownButtonFormField<int>(
+                                  value: selectedClassId,
+                                  decoration: const InputDecoration(labelText: 'Class *', border: OutlineInputBorder()),
+                                  items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
+                                  onChanged: (val) => setDialogState(() => selectedClassId = val),
+                                  validator: (val) => val == null ? 'Please select a class' : null,
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedDepartment,
+                                  decoration: const InputDecoration(labelText: 'Department (Science/Art/Commerce)', border: OutlineInputBorder()),
+                                  items: [
+                                    const DropdownMenuItem<String>(value: null, child: Text('None')),
+                                    ...['Science', 'Art', 'Commerce']
+                                        .map((d) => DropdownMenuItem(value: d, child: Text(d))),
+                                  ],
+                                  onChanged: (val) => setDialogState(() => selectedDepartment = val),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        BlocBuilder<SchoolBloc, SchoolState>(
+                          builder: (context, state) {
+                            final parents = _uniqueParents(state.students, state.parents);
+                            return DropdownButtonFormField<String>(
+                              value: parents.any((p) => p.key == selectedExistingParentKey)
+                                  ? selectedExistingParentKey
+                                  : null,
+                              decoration: const InputDecoration(
+                                labelText: 'Existing parent / guardian',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('New parent (type below)'),
+                                ),
+                                ...parents.map(
+                                  (p) => DropdownMenuItem<String>(
+                                    value: p.key,
+                                    child: Text(
+                                      '${p.name} · ${p.phone} (${p.childCount})',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  selectedExistingParentKey = val;
+                                  if (val == null) return;
+                                  _ExistingParent? match;
+                                  for (final p in parents) {
+                                    if (p.key == val) {
+                                      match = p;
+                                      break;
+                                    }
+                                  }
+                                  if (match == null) return;
+                                  parentNameController.text = match.name;
+                                  parentPhoneController.text = match.phone;
+                                  if (match.address != null && match.address!.trim().isNotEmpty) {
+                                    applyAddressString(match.address);
+                                  }
+                                  alsoAssignIds
+                                    ..clear()
+                                    ..addAll(
+                                      state.students
+                                          .where((s) =>
+                                              s.id != student?.id &&
+                                              s.parentKey == val)
+                                          .map((s) => s.id!)
+                                          .whereType<int>(),
+                                    );
+                                });
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: parentNameController, 
+                          decoration: const InputDecoration(labelText: 'Parent/Guardian Name *', border: OutlineInputBorder()),
+                          validator: (val) => val == null || val.isEmpty ? 'Parent Name is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: parentPhoneController, 
+                          decoration: const InputDecoration(labelText: 'Parent Phone *', border: OutlineInputBorder()),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: PhoneNumberInput.formatters,
+                          maxLength: PhoneNumberInput.maxDigits,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            return PhoneNumberInput.validate(v, required: true, minDigits: 11);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        BlocBuilder<SchoolBloc, SchoolState>(
+                          builder: (context, state) {
+                            final others = state.students
+                                .where((s) => s.id != student?.id)
+                                .toList()
+                              ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+                            final names = others
+                                .where((s) => alsoAssignIds.contains(s.id))
+                                .map((s) => s.fullName)
+                                .join(', ');
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              shape: RoundedRectangleBorder(
+                                side: BorderSide(color: Colors.grey.shade400),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              title: const Text('Also parent of'),
+                              subtitle: Text(
+                                alsoAssignIds.isEmpty
+                                    ? 'This student only'
+                                    : names,
+                              ),
+                              trailing: const Icon(Icons.arrow_drop_down),
+                              onTap: others.isEmpty
+                                  ? null
+                                  : () => _showSiblingPicker(
+                                        context,
+                                        others: others,
+                                        classes: state.classes,
+                                        selectedIds: alsoAssignIds,
+                                        onChanged: () => setDialogState(() {}),
+                                      ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.home_outlined, size: 20, color: Theme.of(context).primaryColor),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Residential Address',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: streetController,
+                          builder: (context, val, _) {
+                            final text = val.text.trim();
+                            final checkError = InputValidator.validateStreetAddress(text);
+                            final isValid = text.isNotEmpty && checkError == null;
+                            return TextFormField(
+                              controller: streetController,
+                              decoration: InputDecoration(
+                                labelText: 'Street Address *',
+                                hintText: 'e.g. 12 Adeola Street, Ikeja',
+                                helperText: isValid
+                                    ? '✓ Address verified'
+                                    : 'Min. 9 characters, at least 3 words (e.g. 12 Adeola Street)',
+                                helperStyle: TextStyle(
+                                  color: isValid ? Colors.green.shade700 : Colors.grey.shade600,
+                                  fontSize: 11,
+                                  fontWeight: isValid ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                prefixIcon: const Icon(Icons.location_on_outlined),
+                                suffixIcon: text.isEmpty
+                                    ? null
+                                    : Padding(
+                                        padding: const EdgeInsets.only(right: 8.0),
+                                        child: Icon(
+                                          isValid ? Icons.check_circle : Icons.error_outline,
+                                          color: isValid ? Colors.green : Colors.orange,
+                                          size: 22,
+                                        ),
+                                      ),
+                                border: const OutlineInputBorder(),
+                              ),
+                              validator: (v) => InputValidator.validateStreetAddress(v),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: busStopController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nearest Bus Stop / Landmark',
+                            hintText: 'e.g. Palmgrove Bus Stop',
+                            prefixIcon: Icon(Icons.directions_bus_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: africaCountries.contains(selectedCountry) ? selectedCountry : 'Nigeria',
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Country *',
+                            prefixIcon: Icon(Icons.public),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: africaCountries
+                              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                              .toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedCountry = val ?? 'Nigeria';
+                              if (selectedCountry != 'Nigeria') {
+                                selectedState = null;
+                                selectedLga = null;
+                              }
                             });
                           },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: parentNameController, 
-                      decoration: const InputDecoration(labelText: 'Parent/Guardian Name *'),
-                      validator: (val) => val == null || val.isEmpty ? 'Parent Name is required' : null,
-                    ),
-                    TextFormField(
-                      controller: parentPhoneController, 
-                      decoration: const InputDecoration(labelText: 'Parent Phone *'),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: PhoneNumberInput.formatters,
-                      maxLength: PhoneNumberInput.maxDigits,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        return PhoneNumberInput.validate(v, required: true, minDigits: 11);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    BlocBuilder<SchoolBloc, SchoolState>(
-                      builder: (context, state) {
-                        final others = state.students
-                            .where((s) => s.id != student?.id)
-                            .toList()
-                          ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
-                        final names = others
-                            .where((s) => alsoAssignIds.contains(s.id))
-                            .map((s) => s.fullName)
-                            .join(', ');
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Also parent of'),
-                          subtitle: Text(
-                            alsoAssignIds.isEmpty
-                                ? 'This student only'
-                                : names,
-                          ),
-                          trailing: const Icon(Icons.arrow_drop_down),
-                          onTap: others.isEmpty
-                              ? null
-                              : () => _showSiblingPicker(
-                                    context,
-                                    others: others,
-                                    classes: state.classes,
-                                    selectedIds: alsoAssignIds,
-                                    onChanged: () => setDialogState(() {}),
+                        ),
+                        const SizedBox(height: 12),
+                        if (selectedCountry == 'Nigeria') ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: stateList.contains(selectedState) ? selectedState : null,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'State *',
+                                    prefixIcon: Icon(Icons.map_outlined),
+                                    border: OutlineInputBorder(),
                                   ),
-                        );
-                      },
+                                  items: stateList
+                                      .map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis)))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      selectedState = val;
+                                      selectedLga = null;
+                                    });
+                                  },
+                                  validator: (val) => (selectedCountry == 'Nigeria' && (val == null || val.isEmpty)) ? 'Select State' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: lgaList.contains(selectedLga) ? selectedLga : null,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'LGA *',
+                                    prefixIcon: const Icon(Icons.location_city_outlined),
+                                    border: const OutlineInputBorder(),
+                                    hintText: selectedState == null ? 'Select state first' : 'Select LGA',
+                                  ),
+                                  items: lgaList
+                                      .map((l) => DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis)))
+                                      .toList(),
+                                  onChanged: selectedState == null
+                                      ? null
+                                      : (val) {
+                                          setDialogState(() {
+                                            selectedLga = val;
+                                          });
+                                        },
+                                  validator: (val) => (selectedCountry == 'Nigeria' && (val == null || val.isEmpty)) ? 'Select LGA' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: stateTextController,
+                            decoration: const InputDecoration(
+                              labelText: 'State / Region *',
+                              prefixIcon: Icon(Icons.map_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (val) => (selectedCountry != 'Nigeria' && (val == null || val.trim().isEmpty)) ? 'State/Region is required' : null,
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              final middleName = middleNameController.text.trim();
+                              final newStudent = student?.copyWith(
+                                    firstName: firstNameController.text,
+                                    middleName: middleName,
+                                    lastName: lastNameController.text,
+                                    admissionNumber: admissionController.text,
+                                    parentName: parentNameController.text,
+                                    parentPhone: parentPhoneController.text,
+                                    classId: selectedClassId,
+                                    image: selectedImage,
+                                    dateOfBirth: selectedDob,
+                                    gender: selectedGender,
+                                    department: selectedDepartment,
+                                  ) ??
+                                  Student(
+                                    firstName: firstNameController.text,
+                                    middleName: middleName.isEmpty ? null : middleName,
+                                    lastName: lastNameController.text,
+                                    admissionNumber: admissionController.text,
+                                    parentName: parentNameController.text,
+                                    parentPhone: parentPhoneController.text,
+                                    classId: selectedClassId!,
+                                    image: selectedImage,
+                                    dateOfBirth: selectedDob,
+                                    gender: selectedGender,
+                                    registrationDate: DateTime.now(),
+                                    department: selectedDepartment,
+                                  );
+
+                              final street = streetController.text.trim();
+                              final busStop = busStopController.text.trim();
+                              final country = selectedCountry;
+                              final state = country == 'Nigeria' ? (selectedState ?? '') : stateTextController.text.trim();
+                              final lga = country == 'Nigeria' ? (selectedLga ?? '') : '';
+
+                              final addressParts = <String>[];
+                              if (street.isNotEmpty) addressParts.add(street);
+                              if (busStop.isNotEmpty) addressParts.add('B/Stop: $busStop');
+                              if (lga.isNotEmpty) addressParts.add(lga);
+                              if (state.isNotEmpty) addressParts.add(state);
+                              if (country.isNotEmpty) addressParts.add(country);
+
+                              final fullAddress = addressParts.join(', ');
+                              final parentAddress = fullAddress.isEmpty ? null : fullAddress;
+
+                              if (student == null) {
+                                context.read<SchoolBloc>().add(AddStudentEvent(
+                                      newStudent,
+                                      alsoAssignStudentIds: alsoAssignIds.toList(),
+                                      parentAddress: parentAddress,
+                                    ));
+                              } else {
+                                context.read<SchoolBloc>().add(UpdateStudentEvent(
+                                      newStudent,
+                                      alsoAssignStudentIds: alsoAssignIds.toList(),
+                                      parentAddress: parentAddress,
+                                    ));
+                              }
+                            }
+                          },
+                          child: BlocBuilder<SchoolBloc, SchoolState>(
+                            builder: (context, state) {
+                              if (state.isLoading && state.status == SchoolStatus.loading) {
+                                return const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                );
+                              }
+                              return Text(
+                                student == null ? 'Register Student' : 'Save Changes',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final middleName = middleNameController.text.trim();
-                    final newStudent = student?.copyWith(
-                          firstName: firstNameController.text,
-                          middleName: middleName,
-                          lastName: lastNameController.text,
-                          admissionNumber: admissionController.text,
-                          parentName: parentNameController.text,
-                          parentPhone: parentPhoneController.text,
-                          classId: selectedClassId,
-                          image: selectedImage,
-                          dateOfBirth: selectedDob,
-                          gender: selectedGender,
-                          department: selectedDepartment,
-                        ) ??
-                        Student(
-                          firstName: firstNameController.text,
-                          middleName: middleName.isEmpty ? null : middleName,
-                          lastName: lastNameController.text,
-                          admissionNumber: admissionController.text,
-                          parentName: parentNameController.text,
-                          parentPhone: parentPhoneController.text,
-                          classId: selectedClassId!,
-                          image: selectedImage,
-                          dateOfBirth: selectedDob,
-                          gender: selectedGender,
-                          registrationDate: DateTime.now(),
-                          department: selectedDepartment,
-                        );
-
-                    if (student == null) {
-                      context.read<SchoolBloc>().add(AddStudentEvent(
-                            newStudent,
-                            alsoAssignStudentIds: alsoAssignIds.toList(),
-                          ));
-                    } else {
-                      context.read<SchoolBloc>().add(UpdateStudentEvent(
-                            newStudent,
-                            alsoAssignStudentIds: alsoAssignIds.toList(),
-                          ));
-                    }
-                  }
-                },
-                child: BlocBuilder<SchoolBloc, SchoolState>(
-                  builder: (context, state) {
-                    if (state.isLoading && state.status == SchoolStatus.loading) {
-                      return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
-                    }
-                    return Text(student == null ? 'Add' : 'Save');
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+          );
+        },
       ),
-    );
+    ),
+  );
   }
 
   Future<Uint8List> _resizeImage(Uint8List bytes) async {
@@ -1060,20 +1372,39 @@ class _StudentListPageState extends State<StudentListPage> {
     );
   }
 
-  List<_ExistingParent> _uniqueParents(List<Student> students) {
+  List<_ExistingParent> _uniqueParents(List<Student> students, [List<SchoolParent> schoolParents = const []]) {
+    final parentAddressMap = <String, String>{};
+    for (final p in schoolParents) {
+      if (p.address != null && p.address!.trim().isNotEmpty) {
+        final name = p.fullName.trim();
+        final phone = (p.phone ?? '').trim();
+        final key = '$name|$phone';
+        parentAddressMap[key] = p.address!.trim();
+        if (phone.isNotEmpty) {
+          parentAddressMap[phone] = p.address!.trim();
+        }
+      }
+    }
+
     final byKey = <String, _ExistingParent>{};
     for (final s in students) {
       if (!s.hasParent) continue;
       final existing = byKey[s.parentKey];
+      final addr = parentAddressMap[s.parentKey] ??
+          (s.parentPhone != null ? parentAddressMap[s.parentPhone!.trim()] : null);
       if (existing == null) {
         byKey[s.parentKey] = _ExistingParent(
           key: s.parentKey,
           name: s.parentName!.trim(),
           phone: (s.parentPhone ?? '').trim(),
+          address: addr,
           childCount: 1,
         );
       } else {
-        byKey[s.parentKey] = existing.copyWith(childCount: existing.childCount + 1);
+        byKey[s.parentKey] = existing.copyWith(
+          childCount: existing.childCount + 1,
+          address: existing.address ?? addr,
+        );
       }
     }
     final list = byKey.values.toList()
@@ -1145,20 +1476,23 @@ class _ExistingParent {
   final String key;
   final String name;
   final String phone;
+  final String? address;
   final int childCount;
 
   const _ExistingParent({
     required this.key,
     required this.name,
     required this.phone,
+    this.address,
     required this.childCount,
   });
 
-  _ExistingParent copyWith({int? childCount}) {
+  _ExistingParent copyWith({int? childCount, String? address}) {
     return _ExistingParent(
       key: key,
       name: name,
       phone: phone,
+      address: address ?? this.address,
       childCount: childCount ?? this.childCount,
     );
   }

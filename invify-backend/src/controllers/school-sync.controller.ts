@@ -248,6 +248,7 @@ export class SchoolSyncController {
             last_name: row.last_name || extra.lastName,
             parent_name: row.parent_name || extra.parentName || extra.parent_name,
             parent_phone: row.parent_phone || extra.parentPhone || extra.parent_phone,
+            address: extra.address || extra.parentAddress || row.address || null,
             gender: row.gender || extra.gender,
             department: row.department || extra.department,
             className: row.current_class || extra.className,

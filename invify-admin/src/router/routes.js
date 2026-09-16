@@ -338,6 +338,11 @@ const routes = [
         component: () => import('pages/DashboardPage.vue'),
         meta: { title: 'Ingestion Pipelines', workspace: 'observability', permission: 'read_streams', requiresAuth: true }
       },
+      { 
+        path: 'observability/system-health', 
+        component: () => import('../pages/observability/StagingObservabilityPage.vue'),
+        meta: { title: 'Staging System Health', workspace: 'observability', permission: 'read_observability_staging', requiresAuth: true }
+      },
 
       // ==========================================
       // PRIORITY WORKSPACE 4: AI OPERATIONAL INTELLIGENCE

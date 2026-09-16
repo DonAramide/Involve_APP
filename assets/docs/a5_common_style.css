@@ -1,0 +1,421 @@
+:root {
+    --primary: #15803d;
+    --primary-dark: #166534;
+    --primary-light: #22c55e;
+    --secondary: #1e1b4b;
+    --secondary-light: #312e81;
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --info: #0284c7;
+    --warning: #ea580c;
+    --danger: #dc2626;
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --bg-light: #f8fafc;
+    --card-bg: #ffffff;
+    --border-color: #cbd5e1;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+@page {
+    size: A5 portrait;
+    margin: 8mm 8mm 10mm 8mm;
+    @bottom-right {
+        content: counter(page);
+        font-size: 7.5pt;
+        color: #64748b;
+        font-weight: bold;
+    }
+    @bottom-left {
+        content: "Invify Operations Manual · A5 Standard";
+        font-size: 7pt;
+        color: #94a3b8;
+    }
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text-main);
+    background-color: #ffffff;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
+    font-size: 9pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    background: #ffffff;
+}
+
+header {
+    position: relative;
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 45%, #166534 100%);
+    color: #ffffff;
+    text-align: left;
+    overflow: hidden;
+    border-bottom: 3px solid var(--accent);
+    margin-bottom: 6px;
+}
+
+header img.header-img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    opacity: 0.85;
+    display: block;
+}
+
+.header-content {
+    padding: 10px 14px 12px;
+    background: linear-gradient(transparent, rgba(15, 23, 42, 0.95));
+}
+
+.header-brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.invify-main-logo {
+    height: 52px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+    flex-shrink: 0;
+}
+
+.header-text-block {
+    flex-grow: 1;
+}
+
+.badge-header {
+    display: inline-block;
+    background: var(--accent);
+    color: #0f172a;
+    font-size: 6.8pt;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-bottom: 3px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.header-content h1 {
+    margin: 0;
+    font-size: 14pt;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.header-content p {
+    margin: 3px 0 0;
+    font-size: 8pt;
+    color: #e2e8f0;
+    line-height: 1.3;
+}
+
+.content {
+    padding: 6px 10px 16px;
+}
+
+h2 {
+    border-left: 3.5px solid var(--primary);
+    padding-left: 8px;
+    color: var(--secondary);
+    margin-top: 14px;
+    margin-bottom: 6px;
+    font-size: 11pt;
+    font-weight: 800;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h3 {
+    color: var(--primary-dark);
+    margin: 10px 0 4px;
+    font-size: 9.6pt;
+    font-weight: 700;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+h4 {
+    color: var(--secondary-light);
+    margin: 7px 0 3px;
+    font-size: 8.8pt;
+    font-weight: 700;
+    page-break-after: avoid;
+    break-after: avoid;
+}
+
+p {
+    margin: 0 0 6px;
+    font-size: 8.8pt;
+}
+
+.section-intro {
+    color: var(--text-muted);
+    margin: 0 0 8px;
+    font-size: 8.5pt;
+    line-height: 1.35;
+}
+
+.toc {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0 12px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.toc-title {
+    font-weight: 800;
+    color: var(--secondary);
+    font-size: 9pt;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 12px;
+    padding-left: 12px;
+    margin: 0;
+}
+
+.toc li {
+    margin: 1px 0;
+    color: var(--text-muted);
+    font-size: 7.8pt;
+}
+
+.toc a {
+    color: var(--primary-dark);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 9px;
+}
+
+.feature-card {
+    display: flex;
+    align-items: flex-start;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.icon-box {
+    min-width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.feature-details {
+    flex-grow: 1;
+}
+
+.feature-details h3 {
+    margin: 0 0 2px;
+    color: var(--secondary);
+    font-size: 9pt;
+}
+
+.feature-details p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 8.2pt;
+    line-height: 1.35;
+}
+
+.feature-details ul {
+    margin: 2px 0 0;
+    padding-left: 12px;
+}
+
+.feature-details li {
+    margin: 1px 0;
+    color: var(--text-main);
+    font-size: 8pt;
+}
+
+/* SCREENSHOT LAYOUT - COMPACT, CENTERED, NO BLACK OVERFLOW */
+.screenshot-figure {
+    margin: 8px auto 10px;
+    max-width: 100%;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    text-align: center;
+}
+
+.device-bezel {
+    display: inline-block;
+    border: 1.5px solid #94a3b8;
+    border-radius: 7px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    background: #ffffff; /* NEVER black background */
+    padding: 0;
+    margin: 0 auto;
+}
+
+.device-bezel img.app-screenshot {
+    display: block;
+    max-width: 65mm;
+    max-height: 82mm;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 5px;
+    margin: 0 auto;
+}
+
+.screenshot-caption {
+    max-width: 80mm;
+    margin: 4px auto 0;
+    padding: 3px 7px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 7.2pt;
+    color: #475569;
+    line-height: 1.3;
+    text-align: center;
+}
+
+/* TABLES - ALLOW FLOWING ACROSS PAGES TO PREVENT GIANT WHITE VOIDS */
+table.menu-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 10px;
+    font-size: 8pt;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    page-break-inside: auto;
+    break-inside: auto;
+}
+
+table.menu-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+table.menu-table th {
+    background: #f1f5f9;
+    color: var(--secondary);
+    text-align: left;
+    padding: 4px 6px;
+    font-weight: 700;
+    border-bottom: 2px solid #cbd5e1;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+}
+
+table.menu-table td {
+    padding: 3.5px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+}
+
+table.menu-table tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.pill {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 6.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.pill-active { background: #dcfce7; color: #15803d; }
+.pill-pending { background: #fef3c7; color: #b45309; }
+.pill-auth { background: #e0e7ff; color: #3730a3; }
+.pill-danger { background: #fee2e2; color: #b91c1c; }
+
+.callout {
+    border-left: 3.5px solid;
+    padding: 6px 10px;
+    border-radius: 0 5px 5px 0;
+    margin: 6px 0 9px;
+    font-size: 8.2pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.callout-info { border-color: var(--info); background: #f0f9ff; color: #0369a1; }
+.callout-warning { border-color: var(--warning); background: #fff7ed; color: #c2410c; }
+.callout-success { border-color: var(--primary-light); background: #f0fdf4; color: #15803d; }
+.callout-danger { border-color: var(--danger); background: #fef2f2; color: #b91c1c; }
+
+.callout strong {
+    display: block;
+    margin-bottom: 1px;
+    font-size: 8.5pt;
+}
+
+.step-box {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin: 6px 0 9px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.step-box ol {
+    margin: 4px 0 0;
+    padding-left: 14px;
+}
+
+.step-box li {
+    margin: 2px 0;
+    font-size: 8.2pt;
+}
+
+/* PAGE BREAK MANAGEMENT - NATURAL FLOW TO PREVENT EMPTY PAGES */
+.page-break {
+    page-break-before: auto;
+    break-before: auto;
+}
+
+.force-page-break {
+    page-break-before: always;
+    break-before: always;
+}

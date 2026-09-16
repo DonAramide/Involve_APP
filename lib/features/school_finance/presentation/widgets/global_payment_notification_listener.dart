@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../../core/services/payment_alert_sound.dart';
+import '../../../../core/services/device_notification_service.dart';
 import '../../../dashboard/presentation/widgets/notification_bell.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../data/datasources/finance_realtime_data_source.dart';
@@ -124,6 +125,7 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
       type: 'payment',
       extra: {'reference': reference},
     ));
+    unawaited(DeviceNotificationService.showPayment(message: message));
     widget.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text('₦$amount received from $studentName!'),
