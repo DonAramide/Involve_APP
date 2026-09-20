@@ -42,6 +42,10 @@ const DEFAULT_SPLIT_THRESHOLD_NAIRA = 50_000;
 export class PosService {
   // P0-5A: CONFIG_FILE_PATH removed — config persisted to Supabase pos_routing_configs table
 
+  /** key_version=1: plaintext-era rows. key_version=2+: field-level AES via POS_ENCRYPTION_KEY. */
+  static readonly CURRENT_KEY_VERSION = 2;
+  static readonly SECRET_MASK = '[SECRET_MASKED]';
+
   /**
    * AES-256-CBC encryption key derived from POS_ENCRYPTION_KEY env var.
    * Throws at access time if env var is not set — fail fast.
@@ -57,21 +61,34 @@ export class PosService {
   }
   private static IV_LENGTH = 16;
 
+  private static isEncryptedSecretFormat(text: string): boolean {
+    return /^[0-9a-f]+:[0-9a-f]+$/i.test(String(text || '').trim());
+  }
+
   private static encryptSecret(text: string): string {
     if (!text) return '';
+    if (text === this.SECRET_MASK) {
+      throw new Error('[POS Service] Refusing to encrypt UI placeholder secret value.');
+    }
+    // Idempotent: already encrypted (ivHex:cipherHex)
+    if (this.isEncryptedSecretFormat(text)) return text;
     try {
       const iv = crypto.randomBytes(this.IV_LENGTH);
       const cipher = crypto.createCipheriv('aes-256-cbc', this.ENCRYPTION_KEY, iv);
       let encrypted = cipher.update(text, 'utf8', 'hex');
       encrypted += cipher.final('hex');
       return iv.toString('hex') + ':' + encrypted;
-    } catch (_) {
-      return text;
+    } catch (err: any) {
+      throw new Error(
+        `[POS Service] Failed to encrypt secret (fail-closed): ${err?.message || 'unknown error'}`,
+      );
     }
   }
 
   private static decryptSecret(text: string): string {
-    if (!text || !text.includes(':')) return text;
+    if (!text) return '';
+    // key_version=1 / plaintext-era compatibility: values without iv:cipher stay as-is
+    if (!text.includes(':')) return text;
     try {
       const parts = text.split(':');
       const iv = Buffer.from(parts.shift()!, 'hex');
@@ -80,8 +97,10 @@ export class PosService {
       let decrypted = decipher.update(encryptedText, undefined, 'utf8') as string;
       decrypted += decipher.final('utf8');
       return decrypted;
-    } catch (_) {
-      return text;
+    } catch (err: any) {
+      throw new Error(
+        `[POS Service] Failed to decrypt secret (fail-closed): ${err?.message || 'unknown error'}`,
+      );
     }
   }
 
@@ -103,7 +122,31 @@ export class PosService {
         if (h.kimonoFallbackParameters && h.kimonoFallbackParameters.token) {
           h.kimonoFallbackParameters.token = mode === 'encrypt' ? this.encryptSecret(h.kimonoFallbackParameters.token) : this.decryptSecret(h.kimonoFallbackParameters.token);
         }
+        if (h.nibssConfig?.ctmk) {
+          h.nibssConfig.ctmk =
+            mode === 'encrypt' ? this.encryptSecret(h.nibssConfig.ctmk) : this.decryptSecret(h.nibssConfig.ctmk);
+        }
       }
+    }
+    return cloned;
+  }
+
+  /**
+   * Server-side redaction for API responses. Never returns decrypted secrets to clients.
+   * Does not mutate the in-memory routingConfig used by POS internals.
+   */
+  static sanitizeRoutingConfigForClient(config: PosRoutingConfig): PosRoutingConfig {
+    const cloned: PosRoutingConfig = JSON.parse(JSON.stringify(config));
+    const mask = this.SECRET_MASK;
+    for (const h of cloned.hosts || []) {
+      if (h.authToken) h.authToken = mask;
+      if (h.kimonoKeys) {
+        if (h.kimonoKeys.masterKey) h.kimonoKeys.masterKey = mask;
+        if (h.kimonoKeys.pinKey) h.kimonoKeys.pinKey = mask;
+        if ((h.kimonoKeys as any).ctmk) (h.kimonoKeys as any).ctmk = mask;
+      }
+      if (h.kimonoFallbackParameters?.token) h.kimonoFallbackParameters.token = mask;
+      if (h.nibssConfig?.ctmk) h.nibssConfig.ctmk = mask;
     }
     return cloned;
   }
@@ -160,7 +203,7 @@ export class PosService {
           institutionCode: '',
           terminalId: '',
           merchantId: '',
-          ctmk: '66D4AF3321D8564E9F6F35411755E730',
+          ctmk: '',
           ptspCode: ''
         }
       }
@@ -342,14 +385,15 @@ export class PosService {
 
       const { error } = await supabase.from('pos_routing_configs').insert({
         config_blob: JSON.stringify(encrypted),
-        key_version: 1,              // Increment when POS_ENCRYPTION_KEY is rotated
+        // key_version=1 retained for historical plaintext-era rows; new encrypted writes use CURRENT_KEY_VERSION (2+)
+        key_version: this.CURRENT_KEY_VERSION,
         config_version: nextConfigVersion,  // Increments on every config update
         updated_by: updatedBy,
         updated_at: new Date().toISOString()
       });
       if (error) throw error;
       this.configVersion = nextConfigVersion;
-      console.log(`[POS Service] Config encrypted and saved to Supabase (config_version=${nextConfigVersion})`);
+      console.log(`[POS Service] Config encrypted and saved to Supabase (config_version=${nextConfigVersion}, key_version=${this.CURRENT_KEY_VERSION})`);
       this.mirrorConfigToLegacyJson();
       return nextConfigVersion;
     } catch (e: any) {
@@ -366,13 +410,17 @@ export class PosService {
     }
   }
 
-  /** Keep pos_routing_config.json aligned with in-memory routing (dev/hydrate safety). */
+  /**
+   * Keep pos_routing_config.json aligned with routing structure for hydrate/compat.
+   * Never persists decrypted secrets — secrets are masked before write.
+   */
   static mirrorConfigToLegacyJson(): void {
     try {
       const fs = require('fs');
       const path = require('path');
       const legacyPath = path.join(process.cwd(), 'pos_routing_config.json');
-      fs.writeFileSync(legacyPath, JSON.stringify(this.routingConfig, null, 2), 'utf8');
+      const safe = this.sanitizeRoutingConfigForClient(this.routingConfig);
+      fs.writeFileSync(legacyPath, JSON.stringify(safe, null, 2), 'utf8');
     } catch (e: any) {
       console.warn('[POS Service] Legacy JSON mirror skipped:', e.message);
     }
