@@ -863,34 +863,67 @@ export class PosService {
     return this.routingConfig;
   }
 
+  /**
+   * Resolve an incoming secret field for update.
+   * - `[SECRET_MASKED]` or empty/missing → keep existing (never persist the placeholder)
+   * - any other value → treat as intentional replacement
+   * Only apply to known secret fields (ctmk / authToken / kimono keys / fallback token).
+   */
+  private static resolveIncomingSecret(
+    incoming: string | undefined | null,
+    existing: string | undefined | null,
+  ): string {
+    const next = incoming == null ? '' : String(incoming);
+    const prev = existing == null ? '' : String(existing);
+    if (!next || next === this.SECRET_MASK) {
+      return prev && prev !== this.SECRET_MASK ? prev : '';
+    }
+    return next;
+  }
+
   static async updateRoutingConfig(newConfig: any, adminId = 'Admin', reason = 'Updated POS routing configuration') {
-    // Preserve secrets that were stripped by the frontend
+    // Preserve secrets that were stripped/masked by the frontend (never persist [SECRET_MASKED])
     if (newConfig.hosts) {
       for (const newHost of newConfig.hosts) {
         const oldHost = this.routingConfig.hosts.find(h => h.hostCode === newHost.hostCode);
         if (oldHost) {
-          if (oldHost.authToken && !newHost.authToken) newHost.authToken = oldHost.authToken;
-          if (oldHost.kimonoKeys && oldHost.kimonoKeys.masterKey && (!newHost.kimonoKeys || !newHost.kimonoKeys.masterKey)) {
-            newHost.kimonoKeys = { ...newHost.kimonoKeys, masterKey: oldHost.kimonoKeys.masterKey };
+          newHost.authToken = this.resolveIncomingSecret(newHost.authToken, oldHost.authToken);
+
+          if (newHost.kimonoKeys || oldHost.kimonoKeys) {
+            newHost.kimonoKeys = {
+              ...(oldHost.kimonoKeys || {}),
+              ...(newHost.kimonoKeys || {}),
+              masterKey: this.resolveIncomingSecret(
+                newHost.kimonoKeys?.masterKey,
+                oldHost.kimonoKeys?.masterKey,
+              ),
+              pinKey: this.resolveIncomingSecret(
+                newHost.kimonoKeys?.pinKey,
+                oldHost.kimonoKeys?.pinKey,
+              ),
+            };
           }
-          if (oldHost.kimonoKeys && oldHost.kimonoKeys.pinKey && (!newHost.kimonoKeys || !newHost.kimonoKeys.pinKey)) {
-            newHost.kimonoKeys = { ...newHost.kimonoKeys, pinKey: oldHost.kimonoKeys.pinKey };
+
+          if (newHost.kimonoFallbackParameters || oldHost.kimonoFallbackParameters) {
+            newHost.kimonoFallbackParameters = {
+              ...(oldHost.kimonoFallbackParameters || {}),
+              ...(newHost.kimonoFallbackParameters || {}),
+              token: this.resolveIncomingSecret(
+                newHost.kimonoFallbackParameters?.token,
+                oldHost.kimonoFallbackParameters?.token,
+              ),
+            };
           }
-          if (oldHost.kimonoFallbackParameters && oldHost.kimonoFallbackParameters.token && (!newHost.kimonoFallbackParameters || !newHost.kimonoFallbackParameters.token)) {
-            newHost.kimonoFallbackParameters = { ...newHost.kimonoFallbackParameters, token: oldHost.kimonoFallbackParameters.token };
-          }
-          if (oldHost.nibssConfig && oldHost.nibssConfig.ctmk && (!newHost.nibssConfig || !newHost.nibssConfig.ctmk)) {
-            newHost.nibssConfig = { ...newHost.nibssConfig, ctmk: oldHost.nibssConfig.ctmk };
-          }
-          // Never persist UI placeholder secrets
-          if (newHost.nibssConfig?.ctmk === '[SECRET_MASKED]') {
-            newHost.nibssConfig.ctmk =
-              oldHost.nibssConfig?.ctmk && oldHost.nibssConfig.ctmk !== '[SECRET_MASKED]'
-                ? oldHost.nibssConfig.ctmk
-                : '';
-          }
-          if (newHost.authToken === '[SECRET_MASKED]') {
-            newHost.authToken = oldHost.authToken || '';
+
+          if (newHost.nibssConfig || oldHost.nibssConfig) {
+            newHost.nibssConfig = {
+              ...(oldHost.nibssConfig || {}),
+              ...(newHost.nibssConfig || {}),
+              ctmk: this.resolveIncomingSecret(
+                newHost.nibssConfig?.ctmk,
+                oldHost.nibssConfig?.ctmk,
+              ),
+            };
           }
         }
       }
