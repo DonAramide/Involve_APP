@@ -7,10 +7,10 @@ import {
 } from '../src/utils/verification-log';
 
 describe('verification log', () => {
-  test('select list excludes plain_code and only includes secure audit columns', () => {
+  test('select list includes plain_code for support OTP display', () => {
     const cols = verificationLogSelect().split(',').map((c) => c.trim());
-    expect(cols).not.toContain('plain_code');
-    expect(cols).toContain('code');
+    expect(cols).toContain('plain_code');
+    expect(cols).not.toContain('code');
   });
 
   test('does not expose bcrypt hashes as OTP codes in API row', () => {
@@ -20,6 +20,7 @@ describe('verification log', () => {
       email: 'aramyde@gmail.com',
       phone: null,
       code: hash,
+      plain_code: null,
       channel: 'EMAIL',
       purpose: 'SIGNUP',
       status: 'PENDING',
@@ -34,9 +35,26 @@ describe('verification log', () => {
     expect(row).not.toHaveProperty('plain_code');
   });
 
+  test('exposes support plain_code as otp', () => {
+    const row = toVerificationLogRow({
+      id: 'a',
+      email: 'aramyde@gmail.com',
+      plain_code: '482913',
+      code: '$2b$10$abcdefghijklmnopqrstuv',
+      channel: 'EMAIL',
+      purpose: 'SIGNUP',
+      status: 'PENDING',
+      attempt_count: 0,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      created_at: new Date().toISOString(),
+    });
+    expect(row.otp).toBe('482913');
+  });
+
   test('recovers a legacy plaintext code stored in the hash column', () => {
     expect(extractSupportOtp({ code: '119204' })).toBe('119204');
     expect(extractSupportOtp({ code: '$2b$10$not-an-otp' })).toBeNull();
+    expect(extractSupportOtp({ plain_code: '119204', code: '$2b$10$x' })).toBe('119204');
   });
 
   test('marks overdue pending rows as expired without mutating storage', () => {

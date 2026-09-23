@@ -17,6 +17,7 @@ export class OTPService {
     const payload = {
       phone,
       code: hashedCode,
+      plain_code: code,
       expires_at: expiresAt.toISOString(),
       used: false,
       attempt_count: 0,
@@ -74,7 +75,7 @@ export class OTPService {
     if (isExpired) {
       await supabase
         .from('verification_codes')
-        .update({ used: true, status: 'EXPIRED' })
+        .update({ used: true, status: 'EXPIRED', plain_code: null })
         .eq('id', data.id);
       return { ok: false, error: 'Verification code has expired' };
     }
@@ -83,7 +84,7 @@ export class OTPService {
     if (currentAttempts >= MAX_OTP_ATTEMPTS) {
       await supabase
         .from('verification_codes')
-        .update({ used: true, status: 'CANCELLED' })
+        .update({ used: true, status: 'CANCELLED', plain_code: null })
         .eq('id', data.id);
       return {
         ok: false,
@@ -115,7 +116,7 @@ export class OTPService {
       if (newAttempts >= MAX_OTP_ATTEMPTS) {
         await supabase
           .from('verification_codes')
-          .update({ used: true, status: 'CANCELLED' })
+          .update({ used: true, status: 'CANCELLED', plain_code: null })
           .eq('id', data.id);
         return {
           ok: false,
@@ -133,6 +134,7 @@ export class OTPService {
         used: true,
         status: 'VERIFIED',
         verified_at: new Date().toISOString(),
+        plain_code: null,
       })
       .eq('id', data.id);
 

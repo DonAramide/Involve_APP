@@ -5,7 +5,7 @@
       <div class="col">
         <h1 class="text-h5 q-my-none text-weight-bold">Verification Log</h1>
         <div class="text-caption text-grey-4">
-          Latest email and WhatsApp OTP sends. Older rows stay blank if the code was only stored as a hash.
+          Latest email and WhatsApp OTP sends. Pending codes are shown for support; cleared after verify, expire, or cancel.
         </div>
       </div>
       <div class="col-auto">

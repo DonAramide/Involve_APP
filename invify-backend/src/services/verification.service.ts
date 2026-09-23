@@ -74,6 +74,8 @@ export class VerificationService {
       email,
       phone,
       code: hashedOtp,
+      // Support-only plaintext for Verification Log (cleared on verify/expire/cancel).
+      plain_code: rawOtp,
       channel,
       purpose: safePurpose,
       status: 'PENDING',
@@ -111,7 +113,7 @@ export class VerificationService {
     if (!sent) {
       await supabase
         .from('verification_codes')
-        .update({ status: 'CANCELLED' })
+        .update({ status: 'CANCELLED', plain_code: null })
         .eq('id', inserted.id);
       throw new Error(
         channel === 'EMAIL'
@@ -122,7 +124,7 @@ export class VerificationService {
 
     await supabase
       .from('verification_codes')
-      .update({ status: 'CANCELLED' })
+      .update({ status: 'CANCELLED', plain_code: null })
       .match({
         channel,
         purpose: safePurpose,
@@ -186,13 +188,19 @@ export class VerificationService {
     // Check expiry
     const now = new Date();
     if (new Date(record.expires_at) < now) {
-      await supabase.from('verification_codes').update({ status: 'EXPIRED' }).eq('id', record.id);
+      await supabase
+        .from('verification_codes')
+        .update({ status: 'EXPIRED', plain_code: null })
+        .eq('id', record.id);
       return { ok: false, error: 'Code expired. Tap Resend OTP for a new one.' };
     }
 
     // Check attempt limit
     if (record.attempt_count >= this.MAX_RETRIES) {
-      await supabase.from('verification_codes').update({ status: 'CANCELLED' }).eq('id', record.id);
+      await supabase
+        .from('verification_codes')
+        .update({ status: 'CANCELLED', plain_code: null })
+        .eq('id', record.id);
       return { ok: false, error: 'Too many attempts. Tap Resend OTP for a new code.' };
     }
 
@@ -219,6 +227,7 @@ export class VerificationService {
         .update({
           status: 'VERIFIED',
           verified_at: new Date().toISOString(),
+          plain_code: null,
         })
         .eq('id', record.id);
 
@@ -230,7 +239,7 @@ export class VerificationService {
         );
         const { error: fallbackError } = await supabase
           .from('verification_codes')
-          .update({ status: 'VERIFIED' })
+          .update({ status: 'VERIFIED', plain_code: null })
           .eq('id', record.id);
         if (fallbackError) {
           console.warn(
