@@ -577,21 +577,6 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                                 const SizedBox(height: 12),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () =>
-                                        Navigator.pushNamed(context, '/nibss_cert'),
-                                    icon: const Icon(Icons.verified_user_outlined, size: 18),
-                                    label: const Text('NIBSS CERT'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.teal.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
                                   child: OutlinedButton.icon(
                                     onPressed: disableBalance ? null : _checkCardBalance,
                                     icon: _isCheckingBalance

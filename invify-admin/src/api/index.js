@@ -144,6 +144,7 @@ export const adminApi = {
   getUsers: (params) => api.get('/api/admin/users', { params }),
   createUser: (data) => api.post('/api/admin/users', data),
   updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
+  resetUserMfa: (id) => api.post(`/api/admin/users/${id}/reset-mfa`),
   sendInvite: (data) => api.post('/admin/invites', data),
   getProfile: () => api.get('/api/admin/profile'),
   updateProfile: (data) => api.patch('/api/admin/profile', data),
@@ -238,11 +239,13 @@ export const deviceApi = {
   generateTenantLinkQr: () => api.post('/api/tenant/devices/link-qr'),
   getDevices: () => api.get('/api/devices'),
   getConnectedPresence: () => api.get('/api/devices/connected'),
-  getActivations: () => api.get('/devices/activations'),
-  createActivation: (data) => api.post('/devices/activations', data),
-  validateCode: (data) => api.post('/devices/validate', data),
-  updateDevice: (id, data) => api.patch(`/devices/${id}`, data),
-  resetActivation: (code, data) => api.patch(`/devices/activations/${code}/reset`, data),
+  // Prefer /api/* so same-origin nginx (app.invify.org) proxies to the backend.
+  // Bare /devices/* is not proxied on production and returns HTTP 405 from the SPA host.
+  getActivations: () => api.get('/api/devices/activations'),
+  createActivation: (data) => api.post('/api/devices/activations', data),
+  validateCode: (data) => api.post('/api/devices/validate', data),
+  updateDevice: (id, data) => api.patch(`/api/devices/${id}`, data),
+  resetActivation: (code, data) => api.patch(`/api/devices/activations/${code}/reset`, data),
 
   // Telemetry & Fleet Visibility
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),

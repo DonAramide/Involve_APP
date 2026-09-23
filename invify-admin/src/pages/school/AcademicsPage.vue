@@ -536,6 +536,7 @@ const selectedFields = computed(() => {
     push('Phone', row.phone || row.parentPhone || row.parent_phone)
     push('Guardian', row.guardianName || row.guardian_name || row.parentName || row.parent_name)
     push('Address', row.address || row.parentAddress || row.parent_address)
+    push('Health condition / Notes', row.notes || row.health_condition || row.healthCondition)
     push('Gender', row.gender)
     push('Department', row.department)
     push('Virtual account', row.virtual_account_number || row.virtualAccountNumber)

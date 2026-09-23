@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
 import { AuditArchiveService } from '../services/audit-archive.service';
+import { BuildVariantService } from '../config/build-variant';
 
 
 
@@ -143,7 +144,9 @@ export class UserController {
       try {
         const { emailService } = require('../services/email.service');
         const { verificationService } = require('../services/verification.service');
-        const loginUrl = isPlatform ? 'https://staging.invify.org/admin/login' : 'https://staging.invify.org/tenant/login';
+        const loginUrl = BuildVariantService.getInstance().getLoginUrl(
+          isPlatform ? 'admin' : 'tenant',
+        );
 
         Promise.allSettled([
           emailService.sendWelcomeEmail(email.trim().toLowerCase(), {
@@ -200,8 +203,11 @@ export class UserController {
    */
   static async updateUser(req: Request, res: Response) {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...(req.body || {}) };
     const currentUser = (req as any).user;
+    const resetMfa = updates.reset_mfa === true || updates.resetMfa === true;
+    delete updates.reset_mfa;
+    delete updates.resetMfa;
 
     // Ensure no tenant-override if not super_admin
     if (currentUser.role !== 'super_admin') {
@@ -264,6 +270,14 @@ export class UserController {
 
       if (error) throw error;
 
+      if (resetMfa) {
+        const { error: mfaErr } = await supabaseAdmin
+          .from('users')
+          .update({ mfa_enabled: false, mfa_secret: null })
+          .eq('id', id);
+        if (mfaErr) throw mfaErr;
+      }
+
       // Generate default temporary password for updated user access
       const defaultPassword = req.body.password || `Invify@${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -298,7 +312,9 @@ export class UserController {
             'internal_staff'
           ].includes(data.role);
 
-          const loginUrl = isPlatformRole ? 'https://staging.invify.org/admin/login' : 'https://staging.invify.org/tenant/login';
+          const loginUrl = BuildVariantService.getInstance().getLoginUrl(
+            isPlatformRole ? 'admin' : 'tenant',
+          );
 
           Promise.allSettled([
             emailService.sendProfileUpdateEmail(data.email, {
@@ -338,16 +354,91 @@ export class UserController {
             updated_user_id: id,
             updated_fields: updates,
             new_role: data.role,
-            is_active: data.is_active
+            is_active: data.is_active,
+            reset_mfa: resetMfa,
           }
         }).catch((auditErr: any) => console.warn('[UserController] updateUser audit log error:', auditErr.message));
       } catch (auditErr: any) {
         console.warn('[UserController] updateUser audit log failed:', auditErr.message);
       }
 
-      return res.status(200).json(data);
+      return res.status(200).json({ ...data, mfa_reset: resetMfa });
     } catch (error: any) {
       console.error('[UserController] updateUser Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/users/:id/reset-mfa
+   * Clears TOTP enrollment so the user must re-enroll 2FA on next login.
+   */
+  static async resetUserMfa(req: Request, res: Response) {
+    const { id } = req.params;
+    const currentUser = (req as any).user;
+
+    try {
+      if (!id) {
+        return res.status(400).json({ error: 'User id is required' });
+      }
+
+      let targetQuery = supabaseAdmin
+        .from('users')
+        .select('id, email, name, tenant_id, mfa_enabled, role')
+        .eq('id', id);
+
+      if (currentUser.role !== 'super_admin') {
+        if (!currentUser.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        targetQuery = targetQuery.eq('tenant_id', currentUser.tenantId);
+      }
+
+      const { data: target, error: targetErr } = await targetQuery.maybeSingle();
+      if (targetErr) {
+        return res.status(500).json({ error: targetErr.message });
+      }
+      if (!target) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const { error: mfaErr } = await supabaseAdmin
+        .from('users')
+        .update({ mfa_enabled: false, mfa_secret: null })
+        .eq('id', id);
+      if (mfaErr) throw mfaErr;
+
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+        GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'USER_MGMT',
+          action: 'USER_MFA_RESET',
+          user_email: currentUser?.email || 'system',
+          user_name: currentUser?.name || currentUser?.email?.split('@')[0] || 'Admin Operator',
+          ip_address: String(ip),
+          target: target.email || id,
+          status: 'success',
+          tenant_id: target.tenant_id,
+          metadata: {
+            updated_user_id: id,
+            previous_mfa_enabled: !!target.mfa_enabled,
+            target_role: target.role,
+          },
+        }).catch((auditErr: any) => console.warn('[UserController] resetUserMfa audit log error:', auditErr.message));
+      } catch (auditErr: any) {
+        console.warn('[UserController] resetUserMfa audit log failed:', auditErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: '2FA has been reset. User must re-enroll on next login.',
+        userId: id,
+      });
+    } catch (error: any) {
+      console.error('[UserController] resetUserMfa Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

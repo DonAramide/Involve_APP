@@ -1,11 +1,12 @@
-# Resolves Flutter dart-define files for local LAN, USB, or staging.
+# Resolves Flutter dart-define files for local LAN, USB, staging, or production.
 #   .\scripts\select-app-target.ps1 -Target local
 #   .\scripts\select-app-target.ps1 -Target usb
 #   .\scripts\select-app-target.ps1 -Target staging
+#   .\scripts\select-app-target.ps1 -Target production
 #   .\scripts\select-app-target.ps1 -Target local -ApiUrl http://192.168.1.50:3004
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('local', 'usb', 'staging')]
+    [ValidateSet('local', 'usb', 'staging', 'production')]
     [string]$Target,
 
     [string]$ApiUrl = '',
@@ -19,6 +20,8 @@ Set-Location $repoRoot
 
 $targetDir = Join-Path $repoRoot 'config\app_targets'
 $stagingFile = Join-Path $targetDir 'staging.json'
+$productionFile = Join-Path $targetDir 'production.json'
+$productionLocalFile = Join-Path $targetDir 'production.local.json'
 $localFile = Join-Path $targetDir 'local.json'
 $usbFile = Join-Path $targetDir 'usb.json'
 $localExample = Join-Path $targetDir 'local.example.json'
@@ -52,16 +55,85 @@ function Write-JsonTarget([string]$path, [string]$appEnv, [string]$apiTarget, [s
     [System.IO.File]::WriteAllText($path, $json + "`n", [System.Text.UTF8Encoding]::new($false))
 }
 
+if ($Target -eq 'production') {
+    # Prefer gitignored local file that includes SUPABASE_PUBLISHABLE_KEY when present.
+    $chosen = $productionFile
+    if (Test-Path $productionLocalFile) {
+        $chosen = $productionLocalFile
+    }
+    if (-not (Test-Path $chosen)) {
+        throw "Missing $chosen - create config/app_targets/production.json (or production.local.json from production.local.example.json)"
+    }
+    $parsed = Get-Content $chosen -Raw | ConvertFrom-Json
+    if ([string]$parsed.APP_ENV -ne 'production') {
+        throw "Production target file must set APP_ENV=production ($chosen)"
+    }
+    if ([string]$parsed.API_BASE_URL -notmatch 'api\.invify\.org') {
+        throw "Production target API_BASE_URL must be https://api.invify.org ($chosen)"
+    }
+    if ($parsed.PSObject.Properties.Name -contains 'SUPABASE_URL') {
+        if ([string]$parsed.SUPABASE_URL -notmatch 'jjixrywfnaijvahmvcwj') {
+            throw "Production SUPABASE_URL must reference project jjixrywfnaijvahmvcwj ($chosen)"
+        }
+        if ([string]$parsed.SUPABASE_URL -match 'rpcjelhacmkhzguljdgi') {
+            throw "Production target must not reference staging Supabase ($chosen)"
+        }
+    }
+    if (-not $Quiet) {
+        Write-Host "API target : production" -ForegroundColor Cyan
+        Write-Host "Define file: $chosen" -ForegroundColor Gray
+        Write-Host "API URL    : $([string]$parsed.API_BASE_URL)" -ForegroundColor Yellow
+        if (-not ($parsed.PSObject.Properties.Name -contains 'SUPABASE_PUBLISHABLE_KEY') -or
+            [string]::IsNullOrWhiteSpace([string]$parsed.SUPABASE_PUBLISHABLE_KEY) -or
+            [string]$parsed.SUPABASE_PUBLISHABLE_KEY -match '^<.+>$') {
+            Write-Host "NOTE: SUPABASE_PUBLISHABLE_KEY not set in define file - pass via env/CI or production.local.json" -ForegroundColor Yellow
+        }
+    }
+    Write-Output $chosen
+    return
+}
+
 if ($Target -eq 'staging') {
-    if (-not (Test-Path $stagingFile)) {
-        throw "Missing $stagingFile"
+    $stagingLocalFile = Join-Path $targetDir 'staging.local.json'
+    # Prefer gitignored local file that includes SUPABASE_PUBLISHABLE_KEY when present.
+    $chosen = $stagingFile
+    if (Test-Path $stagingLocalFile) {
+        $chosen = $stagingLocalFile
+    }
+    if (-not (Test-Path $chosen)) {
+        throw "Missing $chosen - create config/app_targets/staging.json (or staging.local.json from staging.local.example.json)"
+    }
+    $parsed = Get-Content $chosen -Raw | ConvertFrom-Json
+    if ([string]$parsed.APP_ENV -ne 'staging') {
+        throw "Staging target file must set APP_ENV=staging ($chosen)"
+    }
+    if ([string]$parsed.API_BASE_URL -notmatch '^https://staging\.invify\.org/?$') {
+        throw "Staging target API_BASE_URL must be exactly https://staging.invify.org ($chosen)"
+    }
+    if ([string]$parsed.API_BASE_URL -match 'api\.invify\.org|app\.invify\.org|jjixrywfnaijvahmvcwj') {
+        throw "Staging target must not reference production API/Supabase ($chosen)"
+    }
+    if (-not ($parsed.PSObject.Properties.Name -contains 'SUPABASE_URL') -or
+        [string]::IsNullOrWhiteSpace([string]$parsed.SUPABASE_URL)) {
+        throw "Staging target must include SUPABASE_URL ($chosen)"
+    }
+    if ([string]$parsed.SUPABASE_URL -notmatch 'rpcjelhacmkhzguljdgi') {
+        throw "Staging SUPABASE_URL must reference project rpcjelhacmkhzguljdgi ($chosen)"
+    }
+    if ([string]$parsed.SUPABASE_URL -match 'jjixrywfnaijvahmvcwj') {
+        throw "Staging target must not reference production Supabase ($chosen)"
     }
     if (-not $Quiet) {
         Write-Host "API target : staging" -ForegroundColor Cyan
-        Write-Host "Define file: $stagingFile" -ForegroundColor Gray
-        Write-Host "API URL    : https://staging.invify.org" -ForegroundColor Yellow
+        Write-Host "Define file: $chosen" -ForegroundColor Gray
+        Write-Host "API URL    : $([string]$parsed.API_BASE_URL)" -ForegroundColor Yellow
+        if (-not ($parsed.PSObject.Properties.Name -contains 'SUPABASE_PUBLISHABLE_KEY') -or
+            [string]::IsNullOrWhiteSpace([string]$parsed.SUPABASE_PUBLISHABLE_KEY) -or
+            [string]$parsed.SUPABASE_PUBLISHABLE_KEY -match '^<.+>$') {
+            Write-Host "NOTE: SUPABASE_PUBLISHABLE_KEY not set in define file - pass via env/CI or staging.local.json" -ForegroundColor Yellow
+        }
     }
-    Write-Output $stagingFile
+    Write-Output $chosen
     return
 }
 

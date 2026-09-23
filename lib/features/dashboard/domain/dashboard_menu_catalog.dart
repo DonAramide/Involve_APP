@@ -27,11 +27,6 @@ class DashboardMenuCatalog {
       modes: ['retail', 'school'],
     ),
     DashboardMenuOption(id: 'printer', label: 'Printer & mPOS'),
-    DashboardMenuOption(
-      id: 'nibss_cert',
-      label: 'NIBSS Cert',
-      modes: ['retail', 'school'],
-    ),
     DashboardMenuOption(id: 'sales_records', label: 'Sales / Billing Records'),
     DashboardMenuOption(id: 'transaction_history', label: 'Transaction History'),
     DashboardMenuOption(id: 'calculator', label: 'Calculator'),

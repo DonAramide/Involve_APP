@@ -1,5 +1,44 @@
 import { Request, Response } from 'express';
 import { agentService } from '../services/agent.service';
+import { AgentSchemaUnavailableError } from '../repositories/agent.repository';
+
+function mapAgentRow(row: any) {
+  if (!row) return null;
+  const profile = Array.isArray(row.agent_profiles)
+    ? row.agent_profiles[0]
+    : (row.agent_profiles || {});
+  return {
+    id: row.id,
+    agentCode: row.agent_code,
+    name: row.full_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    kycStatus: profile?.kyc_status || 'PENDING',
+    profileStatus: profile?.profile_status || row.status || 'PENDING',
+    commissions: row.lifetime_commissions ?? 0,
+    territoryId: row.territory_id,
+    roleId: row.role_id,
+    createdAt: row.created_at,
+    raw: row,
+  };
+}
+
+function handleAgentError(res: Response, err: any) {
+  if (err instanceof AgentSchemaUnavailableError || err?.code === 'AGENT_SCHEMA_UNAVAILABLE') {
+    return res.status(200).json({
+      success: true,
+      agents: [],
+      data: [],
+      schemaAvailable: false,
+      message: 'Agent portal schema is not provisioned on this database yet',
+    });
+  }
+  console.error('[AdminAgentController]', err?.message || err);
+  return res.status(500).json({ success: false, message: err?.message || 'Agent operation failed' });
+}
 
 export class AdminAgentController {
   
@@ -24,9 +63,17 @@ export class AdminAgentController {
       return res.status(201).json({
         success: true,
         message: 'Agent successfully onboarded and invitation dispatched',
-        data: newAgent
+        data: mapAgentRow(newAgent),
+        agent: mapAgentRow(newAgent),
       });
     } catch (err: any) {
+      if (err instanceof AgentSchemaUnavailableError || err?.code === 'AGENT_SCHEMA_UNAVAILABLE') {
+        return res.status(503).json({
+          success: false,
+          schemaAvailable: false,
+          message: 'Cannot provision agents until the agent portal schema is applied to this database',
+        });
+      }
       console.error('[AdminAgentController] Error onboarding agent:', err);
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -43,10 +90,16 @@ export class AdminAgentController {
         status: status as string,
         territory_id: territory_id as string
       });
+      const mapped = (agents || []).map(mapAgentRow);
 
-      return res.status(200).json({ success: true, data: agents });
+      return res.status(200).json({
+        success: true,
+        schemaAvailable: true,
+        agents: mapped,
+        data: mapped,
+      });
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
+      return handleAgentError(res, err);
     }
   }
 
@@ -63,9 +116,15 @@ export class AdminAgentController {
         return res.status(404).json({ success: false, message: 'Agent not found' });
       }
 
-      return res.status(200).json({ success: true, data: agent });
+      const mapped = mapAgentRow(agent);
+      return res.status(200).json({
+        success: true,
+        data: mapped,
+        agent: mapped,
+        tenants: [],
+      });
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
+      return handleAgentError(res, err);
     }
   }
 

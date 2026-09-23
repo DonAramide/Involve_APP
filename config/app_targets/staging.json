@@ -1,5 +1,6 @@
 {
   "APP_ENV": "staging",
   "API_TARGET": "staging",
-  "API_BASE_URL": "https://staging.invify.org"
+  "API_BASE_URL": "https://staging.invify.org",
+  "SUPABASE_URL": "https://rpcjelhacmkhzguljdgi.supabase.co"
 }

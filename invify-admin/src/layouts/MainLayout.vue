@@ -903,7 +903,9 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'Fleet Overview', path: '/fleet/overview', icon: 'speed', color: 'cyan-4', count: `${throttledCounters.value.fleetDevices}/18`, hasStream: true },
         // Tenant scope-aware routing construction mapping natively to the router profiles
-        { label: 'Device Explorer', path: `${tScope}/fleet/devices`, icon: 'devices', color: 'cyan-3', badge: `${throttledCounters.value.fleetDevices} Edge`, badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        // Always use the MainLayout fleet route. Tenant-scoped `/tenant/:id/fleet/devices`
+        // collides with TenantLayout isolation for platform staff and appears "dead" on click.
+        { label: 'Device Explorer', path: '/fleet/devices', icon: 'devices', color: 'cyan-3', badge: `${throttledCounters.value.fleetDevices} Edge`, badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
         { label: 'Terminal Management', path: '/fleet/terminals', icon: 'point_of_sale', color: 'teal-3', badge: 'POS', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Device Activation Hub', path: '/devices', icon: 'vpn_key', color: 'amber-4', badge: 'ACTIVATOR', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Live Presence Map', path: '/fleet/presence', icon: 'radar', color: 'cyan-4', hasStream: true },

@@ -13,9 +13,12 @@
         <div class="panel-header bg-panel-darker q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
           <span class="text-operator-title text-weight-bold">Active Agent Roster</span>
           <div class="row items-center op-gap-8">
-            <q-btn dense outline color="cyan-3" label="PROVISION NEW AGENT" size="sm" @click="showProvisionDialog = true" class="text-weight-bold q-px-sm" />
+            <q-btn dense outline color="cyan-3" label="PROVISION NEW AGENT" size="sm" @click="showProvisionDialog = true" class="text-weight-bold q-px-sm" :disable="!schemaAvailable" />
             <q-btn dense flat size="sm" color="cyan-3" icon="refresh" @click="fetchAgents" :loading="loadingList" />
           </div>
+        </div>
+        <div v-if="schemaNotice" class="q-px-sm q-py-xs bg-amber-10 text-amber-2 text-caption border-bottom">
+          {{ schemaNotice }}
         </div>
         <div class="col overflow-auto custom-scrollbar">
           <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
@@ -295,6 +298,8 @@ const { currentCurrency } = useCurrency()
 const agents = ref([])
 const loading = ref(false)
 const loadingList = ref(false)
+const schemaAvailable = ref(true)
+const schemaNotice = ref('')
 
 const showProvisionDialog = ref(false)
 const showProfileDialog = ref(false)
@@ -379,15 +384,28 @@ const generateCode = () => {
 
 const fetchAgents = async () => {
   loadingList.value = true
+  schemaNotice.value = ''
   try {
-    const token = localStorage.getItem('invify_access_token')
+    const token = localStorage.getItem('invify_token') || localStorage.getItem('invify_access_token')
     const res = await axios.get('/api/admin/agents', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    agents.value = res.data.agents || []
+    const payload = res.data || {}
+    agents.value = payload.agents || payload.data || []
+    schemaAvailable.value = payload.schemaAvailable !== false
+    if (payload.schemaAvailable === false) {
+      schemaNotice.value = payload.message || 'Agent portal database tables are not provisioned on production yet. Listing is empty until the schema is applied.'
+    }
   } catch (err) {
     const msg = err.response?.data?.message || err.message
-    $q.notify({ type: 'negative', message: `Failed to fetch agents: ${msg}`, position: 'top-right' })
+    schemaAvailable.value = err.response?.data?.schemaAvailable !== false
+    if (String(msg).includes('public.agents') || String(msg).includes('schema cache')) {
+      agents.value = []
+      schemaAvailable.value = false
+      schemaNotice.value = 'Agent portal schema is not provisioned on this database yet.'
+    } else {
+      $q.notify({ type: 'negative', message: `Failed to fetch agents: ${msg}`, position: 'top-right' })
+    }
   } finally {
     loadingList.value = false
   }
@@ -444,12 +462,12 @@ const openAgentProfile = async (id) => {
   selectedAgentTenants.value = []
   
   try {
-    const token = localStorage.getItem('invify_access_token')
+    const token = localStorage.getItem('invify_token') || localStorage.getItem('invify_access_token')
     const res = await axios.get(`/api/admin/agents/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    selectedAgent.value = res.data.agent
-    selectedAgentTenants.value = res.data.tenants
+    selectedAgent.value = res.data.agent || res.data.data
+    selectedAgentTenants.value = res.data.tenants || []
   } catch (err) {
     $q.notify({ type: 'negative', message: `Failed to load profile: ${err.message}`, position: 'top-right' })
     showProfileDialog.value = false

@@ -1,5 +1,25 @@
 import { supabase } from '../../../db/supabase';
 
+function isMissingRelationError(error: any): boolean {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '');
+  return (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    /Could not find the table ['"]?public\.agents/i.test(message) ||
+    /schema cache/i.test(message) ||
+    /relation ['"]?public\.agents['"]? does not exist/i.test(message)
+  );
+}
+
+export class AgentSchemaUnavailableError extends Error {
+  readonly code = 'AGENT_SCHEMA_UNAVAILABLE';
+  constructor(message = 'Agent portal schema is not provisioned in this environment') {
+    super(message);
+    this.name = 'AgentSchemaUnavailableError';
+  }
+}
+
 export class AgentRepository {
   /**
    * Retrieves all agents with their territories and roles
@@ -9,9 +29,7 @@ export class AgentRepository {
       .from('agents')
       .select(`
         *,
-        agent_profiles (*),
-        agent_territories (*),
-        agent_roles (*)
+        agent_profiles (*)
       `)
       .is('deleted_at', null);
 
@@ -23,7 +41,23 @@ export class AgentRepository {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        throw new AgentSchemaUnavailableError(error.message);
+      }
+      // Fallback without embeds if related tables are absent
+      if (/agent_profiles|Could not find the/i.test(String(error.message || ''))) {
+        const plain = await supabase.from('agents').select('*').is('deleted_at', null);
+        if (plain.error) {
+          if (isMissingRelationError(plain.error)) {
+            throw new AgentSchemaUnavailableError(plain.error.message);
+          }
+          throw plain.error;
+        }
+        return plain.data;
+      }
+      throw error;
+    }
     return data;
   }
 
@@ -35,15 +69,18 @@ export class AgentRepository {
       .from('agents')
       .select(`
         *,
-        agent_profiles (*),
-        agent_territories (*),
-        agent_roles (*)
+        agent_profiles (*)
       `)
       .eq('id', id)
       .is('deleted_at', null)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        throw new AgentSchemaUnavailableError(error.message);
+      }
+      throw error;
+    }
     return data;
   }
 
@@ -60,7 +97,12 @@ export class AgentRepository {
       .select()
       .single();
 
-    if (agentError) throw agentError;
+    if (agentError) {
+      if (isMissingRelationError(agentError)) {
+        throw new AgentSchemaUnavailableError(agentError.message);
+      }
+      throw agentError;
+    }
 
     // Insert Profile
     const { error: profileError } = await supabase
@@ -73,6 +115,9 @@ export class AgentRepository {
     if (profileError) {
       // Manual rollback
       await supabase.from('agents').delete().eq('id', agent.id);
+      if (isMissingRelationError(profileError)) {
+        throw new AgentSchemaUnavailableError(profileError.message);
+      }
       throw profileError;
     }
 

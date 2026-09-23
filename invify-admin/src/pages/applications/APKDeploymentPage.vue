@@ -286,17 +286,17 @@
             />
             <q-select
               v-model="tenantFilter"
-              :options="['ALL TENANTS', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
+              :options="tenantFilterOptions"
               dense filled options-dense class="text-caption bg-subpanel" style="width: 120px;"
             />
             <q-select
               v-model="planFilter"
-              :options="['ALL PLANS', 'BASIC', 'PRO']"
+              :options="planFilterOptions"
               dense filled options-dense class="text-caption bg-subpanel" style="width: 100px;"
             />
             <q-select
               v-model="modeFilter"
-              :options="['ALL MODES', 'RETAIL', 'SERVICE', 'SCHOOL']"
+              :options="modeFilterOptions"
               dense filled options-dense class="text-caption bg-subpanel" style="width: 110px;"
             />
           </div>
@@ -478,16 +478,30 @@ onMounted(async () => {
   try {
     const { data: termData } = await api.get('/api/admin/inventory/tablets')
     if (termData && termData.data) {
-      devices.value = termData.data.map(d => ({
-        id: d.device_id || d.serial_number || d.id,
-        model: d.model || 'Unknown Tablet',
-        tenant: d.tenant || 'N/A',
-        plan: 'PRO',
-        mode: 'RETAIL',
-        android: 'Android 11',
-        status: 'ONLINE',
-        lastSync: 'just now'
-      }))
+      devices.value = termData.data.map(d => {
+        const statusRaw = String(d.online_state || d.status || '').toUpperCase()
+        const status =
+          statusRaw === 'ONLINE' || statusRaw === 'ACTIVE' ? 'ONLINE'
+            : statusRaw === 'SYNCING' ? 'SYNCING'
+              : 'OFFLINE'
+        return {
+          id: d.device_id || d.serial_number || d.id,
+          model: d.model || d.device_name || 'Unknown Tablet',
+          tenant: d.tenant || d.tenant_name || 'N/A',
+          plan: (d.plan || '—').toString().toUpperCase(),
+          mode: (d.mode || '—').toString().toUpperCase(),
+          android: d.android || d.os_version || '—',
+          status,
+          lastSync: d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'
+        }
+      })
+      // Build tenant filter options from live data
+      const tenantNames = Array.from(new Set(devices.value.map(d => d.tenant).filter(t => t && t !== 'N/A'))).sort()
+      tenantFilterOptions.value = ['ALL TENANTS', ...tenantNames]
+      const planNames = Array.from(new Set(devices.value.map(d => d.plan).filter(p => p && p !== '—'))).sort()
+      planFilterOptions.value = ['ALL PLANS', ...planNames]
+      const modeNames = Array.from(new Set(devices.value.map(d => d.mode).filter(m => m && m !== '—'))).sort()
+      modeFilterOptions.value = ['ALL MODES', ...modeNames]
     }
   } catch (error) {
     Notify.create({ type: 'negative', message: 'Failed to load target devices', position: 'bottom-right' })
@@ -730,6 +744,9 @@ const statusFilter = ref('ALL')
 const tenantFilter = ref('ALL TENANTS')
 const planFilter = ref('ALL PLANS')
 const modeFilter = ref('ALL MODES')
+const tenantFilterOptions = ref(['ALL TENANTS'])
+const planFilterOptions = ref(['ALL PLANS'])
+const modeFilterOptions = ref(['ALL MODES'])
 const selectedDevices = ref([])
 
 const devices = ref([])

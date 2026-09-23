@@ -1,10 +1,11 @@
-﻿# PowerShell script to build Invify APK with automatic version & date tagging
+# PowerShell script to build Invify APK with automatic version & date tagging
 #   .\build-apk.ps1 -Target local
 #   .\build-apk.ps1 -Target staging
+#   .\build-apk.ps1 -Target production
 #   .\build-apk.ps1 -Target local -ApiUrl http://192.168.1.50:3004
 #   .\build-apk.ps1 -Target local -BuildMode debug
 param (
-    [ValidateSet('local', 'usb', 'staging')]
+    [ValidateSet('local', 'usb', 'staging', 'production')]
     [string]$Target = 'staging',
     [string]$ApiUrl = '',
     [string]$BuildMode = 'release',
@@ -86,7 +87,41 @@ $dateStr = Get-Date -Format "yyyy-MM-dd"
 
 $selectScript = Join-Path $PSScriptRoot 'scripts\select-app-target.ps1'
 $defineFile = & $selectScript -Target $Target -ApiUrl $ApiUrl | Select-Object -Last 1
-$definesArg = "--dart-define-from-file=$defineFile"
+$extraKeyDefine = $null
+
+if ($Target -eq 'production' -or $Target -eq 'staging') {
+    $parsed = Get-Content $defineFile -Raw | ConvertFrom-Json
+    $hasKey = ($parsed.PSObject.Properties.Name -contains 'SUPABASE_PUBLISHABLE_KEY') -and
+        -not [string]::IsNullOrWhiteSpace([string]$parsed.SUPABASE_PUBLISHABLE_KEY) -and
+        ([string]$parsed.SUPABASE_PUBLISHABLE_KEY -notmatch '^<.+>$')
+    $envKeyName = if ($Target -eq 'production') { 'INVIFY_PROD_SUPABASE_PUBLISHABLE_KEY' } else { 'INVIFY_STAGING_SUPABASE_PUBLISHABLE_KEY' }
+    $envKey = [Environment]::GetEnvironmentVariable($envKeyName)
+    if (-not $hasKey -and [string]::IsNullOrWhiteSpace($envKey)) {
+        Write-Host "$Target APK requires SUPABASE_PUBLISHABLE_KEY via config/app_targets/$Target.local.json" -ForegroundColor Red
+        Write-Host "or env $envKeyName. See $Target.local.example.json." -ForegroundColor Red
+        exit 2
+    }
+    if (-not $hasKey -and -not [string]::IsNullOrWhiteSpace($envKey)) {
+        $extraKeyDefine = $envKey
+    }
+    # Hard gate: refuse cross-environment target files at build time.
+    if ($Target -eq 'staging') {
+        if ([string]$parsed.APP_ENV -ne 'staging') { Write-Host 'Refuse: APP_ENV must be staging' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.API_BASE_URL -notmatch '^https://staging\.invify\.org/?$') { Write-Host 'Refuse: staging API_BASE_URL mismatch' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.SUPABASE_URL -notmatch 'rpcjelhacmkhzguljdgi') { Write-Host 'Refuse: staging SUPABASE_URL mismatch' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.API_BASE_URL -match 'api\.invify\.org' -or [string]$parsed.SUPABASE_URL -match 'jjixrywfnaijvahmvcwj') {
+            Write-Host 'Refuse: staging target contains production markers' -ForegroundColor Red; exit 2
+        }
+    }
+    if ($Target -eq 'production') {
+        if ([string]$parsed.APP_ENV -ne 'production') { Write-Host 'Refuse: APP_ENV must be production' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.API_BASE_URL -notmatch 'api\.invify\.org') { Write-Host 'Refuse: production API_BASE_URL mismatch' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.SUPABASE_URL -notmatch 'jjixrywfnaijvahmvcwj') { Write-Host 'Refuse: production SUPABASE_URL mismatch' -ForegroundColor Red; exit 2 }
+        if ([string]$parsed.API_BASE_URL -match 'staging\.invify\.org' -or [string]$parsed.SUPABASE_URL -match 'rpcjelhacmkhzguljdgi') {
+            Write-Host 'Refuse: production target contains staging markers' -ForegroundColor Red; exit 2
+        }
+    }
+}
 
 Write-Host "• App Version : $versionName" -ForegroundColor Yellow
 Write-Host "• Build Date  : $dateStr" -ForegroundColor Yellow
@@ -99,9 +134,12 @@ if ($Unsigned) {
     $env:BUILD_UNSIGNED = "true"
 }
 
-$buildCmd = "flutter build apk --$BuildMode $definesArg"
-Write-Host "Executing: $buildCmd" -ForegroundColor Gray
-Invoke-Expression $buildCmd
+Write-Host "Executing: flutter build apk --$BuildMode --dart-define-from-file=<target>$(if ($extraKeyDefine) { ' + SUPABASE_PUBLISHABLE_KEY via env (redacted)' })" -ForegroundColor Gray
+if ($null -ne $extraKeyDefine) {
+    flutter build apk --$BuildMode --dart-define-from-file=$defineFile --dart-define=SUPABASE_PUBLISHABLE_KEY=$extraKeyDefine
+} else {
+    flutter build apk --$BuildMode --dart-define-from-file=$defineFile
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed." -ForegroundColor Red

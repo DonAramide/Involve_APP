@@ -369,7 +369,6 @@ import EnterpriseContextHint from '../../components/contextual/EnterpriseContext
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { deviceApi } from '../../api'
-import { supabase } from '../../supabase'
 import { useQuasar } from 'quasar'
 import { userFacingApiError } from '../../utils/userFacingApiError'
 
@@ -689,8 +688,10 @@ onMounted(async () => {
     $q.notify({ type: 'negative', message: userFacingApiError(err, 'Failed to load device explorer') })
   }
 
-  // Setup Supabase Realtime Subscription for the public devices table with a unique mount channel name
+  // Setup Supabase Realtime Subscription for the public devices table with a unique mount channel name.
+  // Dynamic import so a missing browser Supabase key cannot block the REST-backed explorer grid.
   try {
+  const { supabase } = await import('../../supabase')
   const channelName = `public:devices:${Math.random().toString(36).substring(7)}`;
   realtimeChannel = supabase.channel(channelName)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {

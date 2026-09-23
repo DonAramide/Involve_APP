@@ -183,6 +183,24 @@ export class EmailService {
     `;
   }
 
+  /**
+   * Resolve portal login URL from explicit option or BuildVariantService.
+   * Production never falls back to staging.
+   */
+  private resolveLoginUrl(explicit?: string, portal: 'admin' | 'tenant' = 'admin'): string {
+    const trimmed = (explicit || '').trim();
+    if (trimmed) {
+      const variant = BuildVariantService.getInstance();
+      if (variant.isProd() && /staging\.invify\.org|rpcjelhacmkhzguljdgi/i.test(trimmed)) {
+        throw new Error(
+          '[EmailService] Refusing to send production email with a staging login URL',
+        );
+      }
+      return trimmed;
+    }
+    return BuildVariantService.getInstance().getLoginUrl(portal);
+  }
+
   public async sendWelcomeEmail(
     to: string,
     options?: {
@@ -199,7 +217,7 @@ export class EmailService {
     const name = options?.name || to.split('@')[0];
     const role = options?.role ? options.role.replace(/_/g, ' ').toUpperCase() : 'STAFF';
     const defaultPassword = options?.defaultPassword;
-    const loginUrl = options?.loginUrl || 'https://staging.invify.org/admin/login';
+    const loginUrl = this.resolveLoginUrl(options?.loginUrl);
     const pdfPath = this.resolveUserManualPdf();
 
     let credentialsBlock = '';
@@ -278,7 +296,7 @@ export class EmailService {
     const subject = 'Invify Account Update - Your Profile & Access Level Have Been Updated';
     const name = options?.name || to.split('@')[0];
     const role = options?.role ? options.role.replace(/_/g, ' ').toUpperCase() : 'STAFF';
-    const loginUrl = options?.loginUrl || 'https://staging.invify.org/admin/login';
+    const loginUrl = this.resolveLoginUrl(options?.loginUrl);
     const statusText = options?.isActive !== false ? 'ACTIVE' : 'SUSPENDED';
     const defaultPassword = options?.defaultPassword;
     const pdfPath = this.resolveUserManualPdf();

@@ -562,18 +562,50 @@ export class AdminController {
 
       if (error) throw error;
 
+      // Fallback: tenants may have fleet rows in `devices` without a device_registrations row
+      // (e.g. DON MARS / Akwaja Daniel). Use those so the matrix does not show UNASSIGNED.
+      const tenantsNeedingDevice = (data || []).filter(
+        (t: any) => !Array.isArray(t.device_registrations) || t.device_registrations.length === 0,
+      );
+      const fallbackByTenant = new Map<string, any>();
+      if (tenantsNeedingDevice.length > 0) {
+        const ids = tenantsNeedingDevice.map((t: any) => t.id);
+        const { data: deviceRows } = await supabaseAdmin
+          .from('devices')
+          .select('device_id, tenant_id, device_name, status, last_seen, device_info')
+          .in('tenant_id', ids)
+          .order('last_seen', { ascending: false });
+        for (const row of deviceRows || []) {
+          const tid = String(row.tenant_id || '');
+          if (!tid || fallbackByTenant.has(tid)) continue;
+          fallbackByTenant.set(tid, row);
+        }
+      }
+
       // Flatten: pull the primary device (device_number=1) fields up to the tenant row
       const enriched = (data || []).map((tenant: any) => {
         const devices: any[] = tenant.device_registrations || [];
         // Sort by device_number so device #1 is primary
         devices.sort((a: any, b: any) => (a.device_number || 1) - (b.device_number || 1));
-        const primary = devices[0];
+        let primary = devices[0];
+        const fallback = fallbackByTenant.get(String(tenant.id));
+        if (!primary && fallback) {
+          primary = {
+            device_id: fallback.device_id,
+            agent_code: fallback.device_info?.agent_code ?? null,
+            location: fallback.device_info?.location ?? tenant.location ?? null,
+            device_number: 1,
+            status: fallback.status,
+            device_name: fallback.device_name,
+          };
+          devices.push(primary);
+        }
         return {
           ...tenant,
           device_id: displayableDeviceId(primary?.device_id),
           agent_code: primary?.agent_code ?? null,
           location: primary?.location || tenant.location || null,
-          device_count: tenant.device_count || devices.length || 1,
+          device_count: tenant.device_count || devices.length || (primary ? 1 : 0),
           // Keep raw array for potential future use
           device_registrations: devices,
         };

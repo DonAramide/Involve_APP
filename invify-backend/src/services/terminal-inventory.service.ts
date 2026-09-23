@@ -28,13 +28,50 @@ export class TerminalInventoryService {
   static async getTablets() {
     const { data, error } = await db().from('devices').select('*').order('created_at', { ascending: false });
     if (error) throw error;
+
+    const tenantIds = Array.from(
+      new Set((data || []).map((d: any) => d.tenant_id).filter(Boolean).map(String)),
+    );
+    const tenantsMap = new Map<string, { name: string; plan: string | null; type: string | null }>();
+    if (tenantIds.length > 0) {
+      const { data: tenants, error: tenErr } = await db()
+        .from('tenants')
+        .select('id, name, plan, type')
+        .in('id', tenantIds);
+      if (!tenErr && tenants) {
+        for (const t of tenants) {
+          tenantsMap.set(String(t.id), {
+            name: t.name,
+            plan: t.plan || null,
+            type: t.type || null,
+          });
+        }
+      }
+    }
+
     const mapped = (data || []).map((d: any) => {
       const info = typeof d.device_info === 'object' && d.device_info ? d.device_info : {};
+      const tenant = d.tenant_id ? tenantsMap.get(String(d.tenant_id)) : null;
+      const osVersion =
+        d.os_version ||
+        info.os_version ||
+        info.android_version ||
+        info.androidVersion ||
+        null;
+      const modeRaw = tenant?.type || info.mode || info.service_mode || null;
       return {
         ...d,
         device_id: d.device_id || d.id,
         model: info.model || d.model || d.device_name || '',
         serial_number: d.serial_number || d.device_id || '',
+        tenant: tenant?.name || null,
+        tenant_name: tenant?.name || null,
+        plan: tenant?.plan || info.plan || null,
+        mode: modeRaw ? String(modeRaw).toUpperCase() : null,
+        android: osVersion
+          ? (/android/i.test(String(osVersion)) ? String(osVersion) : `Android ${osVersion}`)
+          : null,
+        online_state: info.online_state || (d.status === 'ACTIVE' ? 'ONLINE' : 'OFFLINE'),
       };
     });
     return { data: mapped };

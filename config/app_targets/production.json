@@ -1,0 +1,6 @@
+{
+  "APP_ENV": "production",
+  "API_TARGET": "production",
+  "API_BASE_URL": "https://api.invify.org",
+  "SUPABASE_URL": "https://jjixrywfnaijvahmvcwj.supabase.co"
+}

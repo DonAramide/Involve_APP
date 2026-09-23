@@ -677,6 +677,14 @@ app.post('/devices/validate', DeviceController.validateCode);
 app.post('/devices/onboard', authenticate, DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 app.patch('/devices/activations/:code/reset', authenticate, checkRole(['super_admin']), DeviceController.resetActivation);
+// Same-origin admin (app.invify.org) only proxies /api/* — keep /api aliases so
+// activation generate/list do not hit the SPA host (HTTP 405).
+app.get('/api/devices/activations', authenticate, DeviceController.getActivations);
+app.post('/api/devices/activations', authenticate, DeviceController.createActivation);
+app.post('/api/devices/validate', DeviceController.validateCode);
+app.post('/api/devices/onboard', authenticate, DeviceController.onboardDevice);
+app.patch('/api/devices/:id', authenticate, DeviceController.updateDevice);
+app.patch('/api/devices/activations/:code/reset', authenticate, checkRole(['super_admin']), DeviceController.resetActivation);
 
 // ─── DEVICE TELEMETRY & FLEET VISIBILITY ──────────────────────────────────────
 app.get('/api/devices/:deviceId/status', authenticate, DeviceController.getDeviceStatus);
@@ -728,6 +736,7 @@ app.get('/api/v1/wallet/transactions', authenticate, checkTenantAccess, WalletCo
 registerCollisionAdmin('get', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.listUsers);
 registerCollisionAdmin('post', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.createUser);
 registerCollisionAdmin('patch', '/users/:id', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.updateUser);
+registerCollisionAdmin('post', '/users/:id/reset-mfa', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.resetUserMfa);
 app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner']), InviteController.sendInvite);
 
 // Curriculum System

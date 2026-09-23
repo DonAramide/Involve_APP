@@ -127,20 +127,18 @@ class SocketService {
             ? 'mock'
             : 'jwt';
 
-    // Android can HTTP to this PC (/livez, TerminalSync) but ws://:3004 times out.
-    // socket_io_client on VM has no real polling transport — use ours for http://.
-    if (!kIsWeb && serverUrl.toLowerCase().startsWith('http://')) {
+    // Flutter socket_io_client on Android only implements WebSocket reliably.
+    // Hosted production (api.invify.org) rejects the WS upgrade with HTTP 400;
+    // LAN ws:// often times out. Engine.IO HTTP polling works for both.
+    if (!kIsWeb) {
       debugPrint('[SocketService] Connecting $serverUrl via HTTP polling auth=$tokenKind');
       final polling = EngineIoPollingClient(serverUrl);
       polling.auth = _authPayload(token, tenantId);
       _socket = polling;
     } else {
-      final transports = kIsWeb
-          ? <String>['polling', 'websocket']
-          : <String>['websocket'];
-      debugPrint('[SocketService] Connecting $serverUrl via ${transports.join(",")} auth=$tokenKind');
+      debugPrint('[SocketService] Connecting $serverUrl via polling,websocket auth=$tokenKind');
       final io = IO.io(serverUrl, IO.OptionBuilder()
-        .setTransports(transports)
+        .setTransports(['polling', 'websocket'])
         .setUpgrade(false)
         .disableReconnection()
         .setPath('/socket.io')

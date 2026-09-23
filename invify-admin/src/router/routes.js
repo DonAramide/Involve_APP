@@ -295,7 +295,7 @@ const routes = [
         meta: { title: 'SLA Command Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
-        path: 'automation/workflows', 
+        path: 'governance/workflows', 
         component: () => import('pages/governance/WorkflowAutomationCenter.vue'),
         meta: { title: 'Workflow Automation', workspace: 'governance', permission: 'admin_deploy', requiresAuth: true }
       },
@@ -362,6 +362,8 @@ const routes = [
       { path: 'finance/ledger', component: () => import('pages/finance/GlobalLedgerPage.vue'), meta: { workspace: 'finance', title: 'Financial Ledger', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/reconciliation', component: () => import('pages/finance/ReconciliationWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Reconciliation Engine', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/settlements', component: () => import('pages/finance/SettlementWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Settlement Engine', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'finance/payables', component: () => import('pages/finance/TenantPayablesPage.vue'), meta: { workspace: 'finance', title: 'Tenant Payables', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'finance/virtual-accounts', component: () => import('pages/finance/VirtualAccountsPage.vue'), meta: { workspace: 'finance', title: 'Virtual Accounts', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/audit', component: () => import('pages/finance/AuditWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Audit Engine', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/wallets', component: () => import('pages/finance/WalletOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Wallet Operations', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/cards', component: () => import('pages/finance/CardOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Card Operations', permission: 'admin_deploy', requiresAuth: true } },

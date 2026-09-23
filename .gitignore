@@ -116,3 +116,5 @@ invify-backend/scripts/phase4_*.ts
 invify-backend/activate_vault.js
 invify-backend/audit-phase4.js
 invify-production-audit-v2.ps1
+config/app_targets/production.local.json
+config/app_targets/staging.local.json

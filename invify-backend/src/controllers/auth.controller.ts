@@ -254,7 +254,7 @@ function dispatchLoginSecurityAlert(req: Request, user: { name?: string; email: 
     } else if (Array.isArray(forwarded) && forwarded.length > 0) {
       ip = forwarded[0].trim();
     } else {
-      ip = (req.headers['x-real-ip'] as string) || req.socket.remoteAddress || req.ip || '127.0.0.1';
+      ip = (req.headers && (req.headers['x-real-ip'] as string)) || req.socket?.remoteAddress || req.ip || '127.0.0.1';
     }
 
     if (ip === '::1' || ip === '::ffff:127.0.0.1') {
@@ -1228,8 +1228,8 @@ export class AuthController {
       const cleanToken = String(tokenCode).trim();
       if (!authenticator.verify({ token: cleanToken, secret })) {
         return res.status(400).json({
-          message: 'Invalid or expired OTP',
-          error: 'Invalid or expired OTP',
+          message: 'Invalid or expired 2FA code',
+          error: 'Invalid or expired 2FA code',
         });
       }
 

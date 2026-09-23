@@ -118,6 +118,9 @@
           <q-btn flat round dense color="amber-4" icon="lock_reset" @click="forceResetPassword(props.row)">
             <q-tooltip class="bg-indigo-10 text-white">Direct Admin Passphrase Reset (No OTP)</q-tooltip>
           </q-btn>
+          <q-btn flat round dense color="deep-orange-4" icon="phonelink_lock" @click="forceResetMfa(props.row)">
+            <q-tooltip class="bg-indigo-10 text-white">Reset 2FA / MFA enrollment</q-tooltip>
+          </q-btn>
           <q-btn flat round dense color="indigo-3" icon="edit" @click="openModal(props.row)" />
           <q-btn 
             flat round dense 
@@ -166,6 +169,18 @@
                    :disable="isPlatformRole(form.role)"
                  />
              </div>
+          </div>
+
+          <q-toggle
+            v-if="isEditing"
+            v-model="form.resetMfa"
+            color="deep-orange-4"
+            label="Also reset 2FA"
+            dark
+            dense
+          />
+          <div v-if="isEditing && form.resetMfa" class="text-caption text-grey-5">
+            Clears the user's authenticator enrollment. They must set up 2FA again on next login.
           </div>
         </q-card-section>
 
@@ -226,7 +241,7 @@ const inviteEmail = ref('')
 const sending = ref(false)
 const lastInviteLink = ref('')
 
-const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null })
+const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null, resetMfa: true })
 
 const isPlatformRole = (role) => {
   if (!role) return false;
@@ -405,11 +420,12 @@ const openModal = (user = null) => {
     form.value = { 
       ...user,
       role: user.role ? user.role.toLowerCase() : 'staff',
-      tenantId: user.tenant_id || null
+      tenantId: user.tenant_id || null,
+      resetMfa: true,
     }
   } else {
     isEditing.value = false
-    form.value = { id: '', name: '', email: '', role: 'staff', tenantId: null }
+    form.value = { id: '', name: '', email: '', role: 'staff', tenantId: null, resetMfa: false }
   }
   modalVisible.value = true
 }
@@ -436,9 +452,15 @@ const saveUser = async () => {
       await adminApi.updateUser(form.value.id, { 
         name: form.value.name.trim(), 
         role: form.value.role, 
-        tenant_id: isPlatform ? null : form.value.tenantId 
+        tenant_id: isPlatform ? null : form.value.tenantId,
+        reset_mfa: !!form.value.resetMfa,
       })
-      $q.notify({ type: 'positive', message: 'User updated successfully.' })
+      $q.notify({
+        type: 'positive',
+        message: form.value.resetMfa
+          ? 'User updated and 2FA reset. They must re-enroll on next login.'
+          : 'User updated successfully.',
+      })
     } else {
       await adminApi.createUser(payload)
       $q.notify({ type: 'positive', message: 'User access created successfully.' })
@@ -488,6 +510,28 @@ const forceResetPassword = (user) => {
       $q.notify({ type: 'positive', message: `Password for ${user.name} has been successfully force-reset.` })
     } catch (err) {
       $q.notify({ type: 'negative', message: 'Failed to reset passphrase directly.' })
+    }
+  })
+}
+
+const forceResetMfa = (user) => {
+  $q.dialog({
+    title: 'Reset 2FA',
+    message: `Clear authenticator enrollment for ${user.name} (${user.email})? They will be required to set up 2FA again on next login.`,
+    cancel: true,
+    dark: true,
+    persistent: true,
+    ok: { label: 'Reset 2FA', color: 'deep-orange-6' },
+  }).onOk(async () => {
+    try {
+      await adminApi.resetUserMfa(user.id)
+      $q.notify({
+        type: 'positive',
+        message: `2FA reset for ${user.name}. They must re-enroll on next login.`,
+      })
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to reset 2FA.'
+      $q.notify({ type: 'negative', message: msg })
     }
   })
 }

@@ -859,120 +859,200 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   }
 
   void _exportReport(BuildContext context) async {
-    final historyState = context.read<HistoryBloc>().state;
     final settingsState = context.read<SettingsBloc>().state;
-    
-    if (historyState is HistoryLoaded && settingsState.settings != null) {
-      if (historyState.invoices.isEmpty) {
+
+    if (settingsState.settings == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for settings to load before exporting.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Export Report'),
+        content: Text(
+          _selectedRange != null
+              ? 'Exports the full sales history for the selected period (ignores search and list filters).'
+              : 'Exports the full sales history (all invoices; ignores search and list filters).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _exportSalesCSV(context);
+            },
+            child: const Text('CSV (SALES)'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _generateReport(context, reports.ReportType.standard);
+            },
+            child: const Text('PDF (SALES)'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _generateReport(context, reports.ReportType.activity);
+            },
+            child: const Text('PDF (ACTIVITY)'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fresh DB read for export: full invoice set for the selected period (or all-time),
+  /// healed/reconciled, with stock returns linked to those invoices — not the filtered UI slice.
+  Future<_SalesExportDataset?> _loadFullSalesExportDataset(BuildContext context) async {
+    final settings = context.read<SettingsBloc>().state.settings;
+    if (settings == null) return null;
+
+    final getHistory = context.read<HistoryBloc>().getHistory;
+    final repo = getHistory.repository;
+    final start = _selectedRange?.start;
+    final end = _selectedRange?.end;
+
+    try {
+      await repo.healSettledPartialInvoices();
+    } catch (_) {}
+
+    var invoices = await getHistory(start: start, end: end);
+
+    var healed = false;
+    final studentIds = invoices
+        .where((inv) => inv.studentId != null)
+        .map((inv) => inv.studentId!)
+        .toSet();
+    for (final studentId in studentIds) {
+      try {
+        if (await repo.reconcileStudentCarryForwardSettlements(studentId)) {
+          healed = true;
+        }
+      } catch (_) {}
+    }
+    if (healed) {
+      invoices = await getHistory(start: start, end: end);
+    }
+
+    // Include returns for exported invoices even if the return date is outside the period.
+    final allReturns = await repo.getStockReturnsByDateRange(
+      DateTime(2000),
+      DateTime.now().add(const Duration(days: 365)),
+    );
+    final invoiceIds = invoices.map((i) => i.id).whereType<int>().toSet();
+    final stockReturns =
+        allReturns.where((r) => invoiceIds.contains(r.invoiceId)).toList();
+
+    return _SalesExportDataset(
+      invoices: invoices,
+      stockReturns: stockReturns,
+      settings: settings,
+      dateRange: _selectedRange != null
+          ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
+          : null,
+    );
+  }
+
+  Future<void> _exportSalesCSV(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: InvifyLoadingIndicator(message: 'LOADING FULL SALES DATA...'),
+      ),
+    );
+
+    try {
+      final dataset = await _loadFullSalesExportDataset(context);
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (dataset == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please wait for settings to load before exporting.')),
+        );
+        return;
+      }
+      if (dataset.invoices.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No sales records to export.')),
         );
         return;
       }
 
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Export Report'),
-          content: const Text('Choose the type of report you want to generate:'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _exportSalesCSV(context);
-              },
-              child: const Text('CSV (SALES)'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _generateReport(context, reports.ReportType.standard);
-              },
-              child: const Text('PDF (SALES)'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _generateReport(context, reports.ReportType.activity);
-              },
-              child: const Text('PDF (ACTIVITY)'),
-            ),
-          ],
-        ),
+      await reports.ReportGenerator.exportSalesCSV(
+        invoices: dataset.invoices,
+        settings: dataset.settings,
+        dateRange: dataset.dateRange,
+        stockReturns: dataset.stockReturns,
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait for data to load before exporting.')),
-      );
-    }
-  }
-
-  void _exportSalesCSV(BuildContext context) async {
-    final historyState = context.read<HistoryBloc>().state;
-    final settingsState = context.read<SettingsBloc>().state;
-    
-    if (historyState is HistoryLoaded && settingsState.settings != null) {
-      try {
-        final repo = context.read<HistoryBloc>().getHistory.repository;
-        final start = _selectedRange?.start ?? DateTime(2020);
-        final end = _selectedRange?.end ?? DateTime.now();
-        final stockReturns = await repo.getStockReturnsByDateRange(start, end);
-
-        if (!context.mounted) return;
-
-        await reports.ReportGenerator.exportSalesCSV(
-          invoices: historyState.invoices,
-          settings: settingsState.settings!,
-          dateRange: _selectedRange != null 
-            ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
-            : null,
-          stockReturns: stockReturns,
-        );
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: ${e.toString()}')),
-          );
+    } catch (e) {
+      if (context.mounted) {
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
         }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: ${e.toString()}')),
+        );
       }
     }
   }
 
-  void _generateReport(BuildContext context, reports.ReportType type) async {
-    final historyState = context.read<HistoryBloc>().state;
-    final settingsState = context.read<SettingsBloc>().state;
+  Future<void> _generateReport(BuildContext context, reports.ReportType type) async {
     final staffState = context.read<StaffBloc>().state;
-    
-    if (historyState is HistoryLoaded && settingsState.settings != null) {
-      try {
-        final repo = context.read<HistoryBloc>().getHistory.repository;
-        final start = _selectedRange?.start ?? DateTime(2020);
-        final end = _selectedRange?.end ?? DateTime.now();
-        final stockReturns = await repo.getStockReturnsByDateRange(start, end);
 
-        if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: InvifyLoadingIndicator(message: 'LOADING FULL SALES DATA...'),
+      ),
+    );
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReportPreviewPage(
-              invoices: historyState.invoices,
-              settings: settingsState.settings!,
-              dateRange: _selectedRange != null 
-                ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
-                : null,
-              stockReturns: stockReturns,
-              staffList: staffState.staffList,
-              reportType: type,
-            ),
-          ),
+    try {
+      final dataset = await _loadFullSalesExportDataset(context);
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (dataset == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please wait for settings to load before exporting.')),
         );
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: ${e.toString()}')),
-          );
+        return;
+      }
+      if (dataset.invoices.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No sales records to export.')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReportPreviewPage(
+            invoices: dataset.invoices,
+            settings: dataset.settings,
+            dateRange: dataset.dateRange,
+            stockReturns: dataset.stockReturns,
+            staffList: staffState.staffList,
+            reportType: type,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
         }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: ${e.toString()}')),
+        );
       }
     }
   }
@@ -3270,4 +3350,18 @@ class _ReconciliationEmptyState extends StatelessWidget {
       },
     );
   }
+}
+
+class _SalesExportDataset {
+  final List<Invoice> invoices;
+  final List<StockReturn> stockReturns;
+  final AppSettings settings;
+  final InvReportDateRange? dateRange;
+
+  const _SalesExportDataset({
+    required this.invoices,
+    required this.stockReturns,
+    required this.settings,
+    this.dateRange,
+  });
 }
