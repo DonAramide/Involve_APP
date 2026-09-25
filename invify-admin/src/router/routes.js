@@ -414,6 +414,7 @@ const routes = [
       { path: 'admin/ecs-workspace', component: () => import('pages/admin/EnterpriseConfigurationWorkspace.vue'), meta: { workspace: 'admin', title: 'Enterprise Configuration Workspace', permission: 'admin_deploy', requiresAuth: true, keywords: ['ecs', 'configuration', 'workspace', 'providers'] } },
       { path: 'admin/settings/authentication', component: () => import('pages/admin/AuthenticationSettingsPage.vue'), meta: { workspace: 'admin', title: 'Authentication Settings', permission: 'admin_deploy', requiresAuth: true, keywords: ['settings', 'authentication', 'onboarding', 'verification'] } },
       { path: 'admin/settings/verification-log', component: () => import('pages/admin/VerificationLogPage.vue'), meta: { workspace: 'admin', title: 'Verification Log', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['otp', 'email', 'verification', 'code', 'onboarding', 'whatsapp'] } },
+      { path: 'admin/production-env', component: () => import('pages/admin/ProductionEnvGovernancePage.vue'), meta: { workspace: 'admin', title: 'Production Env Governance', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['production env', 'feature flags', 'real money payouts', 'maker checker'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
 
       // ==========================================

@@ -940,6 +940,12 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         throw Exception('Payment amount must be greater than zero.');
       }
 
+      final source = event.method == 'POS'
+          ? 'pos'
+          : event.method == 'Company Account'
+              ? 'company_account'
+              : event.method.toLowerCase().replaceAll(' ', '_');
+
       final children = (await repository.getStudents())
           .where((s) => s.parentId == parent.id)
           .toList();
@@ -954,7 +960,40 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           if (owing > 0) debt += owing;
         }
         if (debt > 0.001) return debt;
+        // Trust paid invoices over a stale student.balance leftover.
+        final hasAcademicBills =
+            invoices.any((inv) => !inv.invoiceNumber.startsWith('PMT-'));
+        if (hasAcademicBills) return 0;
         return s.balance > 0 ? s.balance : 0.0;
+      }
+
+      if (event.creditOnly) {
+        final creditBefore = parent.creditBalance;
+        final creditAfter = await repository.addParentCredit(parent.id!, event.amount);
+        final recorded = await repository.recordParentPayment(
+          ParentPaymentRecord(
+            parentId: parent.id!,
+            reference: 'PAR-${DateTime.now().millisecondsSinceEpoch}',
+            amount: event.amount,
+            appliedToDebt: 0,
+            toCredit: event.amount,
+            parentOutstandingBefore: 0,
+            parentOutstandingAfter: 0,
+            parentCreditBefore: creditBefore,
+            parentCreditAfter: creditAfter,
+            source: source,
+            createdAt: DateTime.now(),
+            allocations: const [],
+          ),
+        );
+        emit(state.copyWith(
+          status: SchoolStatus.success,
+          isLoading: false,
+          error: null,
+          lastParentPayment: recorded,
+        ));
+        add(LoadSchoolData());
+        return;
       }
 
       final debts = <ChildOutstanding>[];
@@ -980,11 +1019,10 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         method: event.method,
       );
 
-      final source = event.method == 'POS'
-          ? 'pos'
-          : event.method == 'Company Account'
-              ? 'company_account'
-              : event.method.toLowerCase().replaceAll(' ', '_');
+      final creditBefore = parent.creditBalance;
+      final creditAfter = result.creditNaira > 0.001
+          ? await repository.addParentCredit(parent.id!, result.creditNaira)
+          : creditBefore;
 
       final recorded = await repository.recordParentPayment(
         ParentPaymentRecord(
@@ -995,8 +1033,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           toCredit: result.creditNaira,
           parentOutstandingBefore: result.parentOutstandingBeforeNaira,
           parentOutstandingAfter: result.parentOutstandingAfterNaira,
-          parentCreditBefore: parent.creditBalance,
-          parentCreditAfter: parent.creditBalance + result.creditNaira,
+          parentCreditBefore: creditBefore,
+          parentCreditAfter: creditAfter,
           source: source,
           createdAt: DateTime.now(),
           allocations: result.allocations

@@ -45,7 +45,12 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
     final settings = context.read<SettingsBloc>().state.settings;
     final memberLabel = settings?.customerLabel ?? 'Customer';
 
-    return Scaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) return;
+        context.read<FinanceBloc>().add(LoadSchoolDashboard());
+      },
+      child: Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text('$memberLabel Ledger', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -195,6 +200,7 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
         },
       ),
       bottomSheet: _buildActionPanel(context),
+    ),
     );
   }
 

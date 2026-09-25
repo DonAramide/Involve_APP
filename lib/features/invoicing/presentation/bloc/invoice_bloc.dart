@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'invoice_state.dart';
 import '../../domain/entities/invoice.dart';
+import '../../../stock/domain/entities/item.dart';
 import '../../domain/services/invoice_calculation_service.dart';
 import '../../domain/repositories/invoice_repository.dart';
 
@@ -45,22 +46,59 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     }
   }
 
-  void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
-    final updatedItems = List<InvoiceItem>.from(state.items);
-    
-    // Find existing item with same ID AND matching service booking dates
-    final existingIndex = updatedItems.indexWhere((i) {
-      if (i.item.id != event.item.id) return false;
-      if (i.serviceMeta == event.serviceMeta) return true;
-      if (i.serviceMeta == null || event.serviceMeta == null) return false;
-      try {
-        final Map<String, dynamic> map1 = jsonDecode(i.serviceMeta!);
-        final Map<String, dynamic> map2 = jsonDecode(event.serviceMeta!);
-        return map1['startDate'] == map2['startDate'] && 
-               map1['endDate'] == map2['endDate'];
-      } catch (_) {
-        return false;
+  bool _sameCatalogItem(Item a, Item b) {
+    if (a.id != null && b.id != null) return a.id == b.id;
+    if ((a.syncId ?? '').isNotEmpty && a.syncId == b.syncId) return true;
+    return a.name == b.name && a.price == b.price && a.type == b.type;
+  }
+
+  bool _serviceMetaCompatible(String? existing, String? incoming) {
+    if (incoming == null || incoming.isEmpty) return true;
+    if (existing == null || existing.isEmpty) return true;
+    if (existing == incoming) return true;
+    try {
+      final map1 = jsonDecode(existing) as Map<String, dynamic>;
+      final map2 = jsonDecode(incoming) as Map<String, dynamic>;
+      return map1['startDate'] == map2['startDate'] &&
+          map1['endDate'] == map2['endDate'];
+    } catch (_) {
+      return false;
+    }
+  }
+
+  List<InvoiceItem> _collapseDuplicateLines(List<InvoiceItem> source) {
+    final out = <InvoiceItem>[];
+    for (final line in source) {
+      final idx = out.indexWhere((i) =>
+          _sameCatalogItem(i.item, line.item) &&
+          _serviceMetaCompatible(i.serviceMeta, line.serviceMeta) &&
+          _serviceMetaCompatible(line.serviceMeta, i.serviceMeta));
+      if (idx < 0) {
+        out.add(line);
+        continue;
       }
+      final existing = out[idx];
+      final newQuantity = existing.quantity + line.quantity;
+      var newServiceMeta = existing.serviceMeta ?? line.serviceMeta;
+      if (newServiceMeta != null) {
+        try {
+          final map = jsonDecode(newServiceMeta) as Map<String, dynamic>;
+          map['quantity'] = newQuantity;
+          map['total'] = newQuantity * existing.unitPrice;
+          newServiceMeta = jsonEncode(map);
+        } catch (_) {}
+      }
+      out[idx] = existing.copyWith(quantity: newQuantity, serviceMeta: newServiceMeta);
+    }
+    return out;
+  }
+
+  void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
+    final updatedItems = _collapseDuplicateLines(List<InvoiceItem>.from(state.items));
+
+    final existingIndex = updatedItems.indexWhere((i) {
+      if (!_sameCatalogItem(i.item, event.item)) return false;
+      return _serviceMetaCompatible(i.serviceMeta, event.serviceMeta);
     });
 
     if (existingIndex >= 0) {

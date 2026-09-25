@@ -1,6 +1,16 @@
 import { Request, Response } from 'express';
 import { InventoryService } from '../services/inventory.service';
 import { AuditService } from '../services/audit.service';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+
+function tenantFromRequest(req: Request, res: Response): string | null {
+  try {
+    return resolveAuthoritativeTenantId(req);
+  } catch (err: any) {
+    res.status(err?.status || 403).json({ error: err?.message || 'Forbidden' });
+    return null;
+  }
+}
 
 export class InventoryController {
   
@@ -46,7 +56,8 @@ export class InventoryController {
    */
   static async bulkSyncItems(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const { items } = req.body as { items: any[] };
 
       if (!Array.isArray(items) || items.length === 0) {

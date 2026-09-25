@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../features/settings/domain/services/security_service.dart';
+import '../utils/device_info_service.dart';
 import '../license/storage_service.dart';
 import '../license/license_validator.dart';
 import '../license/license_model.dart';
@@ -77,6 +78,20 @@ class TenantInterceptor extends Interceptor {
     if (tenantId != null && tenantId.isNotEmpty && tenantId != 'undefined' && tenantId != 'null') {
       options.headers['X-Tenant-ID'] = tenantId;
     }
+    super.onRequest(options, handler);
+  }
+}
+
+/// Sends the hardware id so /api/v1/sync/outbox can pass device trust.
+class DeviceInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (DeviceInfoService.isUsableDeviceId(deviceId)) {
+        options.headers['X-Device-ID'] = deviceId;
+      }
+    } catch (_) {}
     super.onRequest(options, handler);
   }
 }
@@ -340,6 +355,7 @@ class FinanceApiClient {
     _dio.interceptors.addAll([
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
+      DeviceInterceptor(),
       PlanGatingInterceptor(),
       ErrorInterceptor(),
       _VaTrafficLogInterceptor(),

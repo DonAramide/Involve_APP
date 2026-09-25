@@ -38,6 +38,8 @@ abstract class SchoolRepository {
   });
   Future<List<SchoolParent>> getParents();
   Future<SchoolParent?> getParentById(int id);
+  /// Parent wallet for a roster student: linked parentId, else same guardian phone.
+  Future<SchoolParent?> findParentForStudent(Student student);
   Future<SchoolParent> ensureParent({
     required String fullName,
     String? phone,
@@ -60,6 +62,8 @@ abstract class SchoolRepository {
   Future<void> updateParent(SchoolParent parent);
   Future<bool> parentPaymentExists(String reference);
   Future<ParentPaymentRecord> recordParentPayment(ParentPaymentRecord payment);
+  /// Atomically increase parent credit. Returns the new credit balance.
+  Future<double> addParentCredit(int parentId, double amount);
   Future<List<ParentPaymentRecord>> getParentPayments(int parentId);
   Future<void> backfillParentsFromStudents();
   Future<String?> getLastAdmissionNumber();

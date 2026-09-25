@@ -181,7 +181,8 @@ export class FinanceRepository {
       `finance_invoices_${tenantId}`,
       async () => {
         const { data } = await financeApi.getInvoices();
-        return data?.data || [];
+        const rows = data?.data ?? data?.invoices ?? data;
+        return Array.isArray(rows) ? rows : [];
       },
       options
     );

@@ -51,25 +51,91 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     await db.transaction(() async {
       String? finalCustomerId = invoice.customerId;
 
-      // Wallet/credit payments require sufficient customer credit before save.
-      // Convention: balance < 0 means credit available (= -balance).
+      // Wallet/credit payments require sufficient credit before save.
+      // School roster invoices debit parent (or student) creditBalance.
+      // Retail/services: customers.balance < 0 means credit available (= -balance).
       if (invoice.paymentMethod == 'Wallet') {
-        if (finalCustomerId == null || finalCustomerId.isEmpty) {
-          throw Exception(
-              'Customer Wallet payment requires a selected customer.');
-        }
-        final customer = await (db.select(db.customers)
-              ..where((t) => t.id.equals(finalCustomerId!)))
-            .getSingleOrNull();
-        if (customer == null) {
-          throw Exception('Selected customer was not found.');
-        }
-        final availableCredit =
-            customer.balance < 0 ? -customer.balance : 0.0;
-        if (availableCredit + 1e-9 < invoice.totalAmount) {
-          throw Exception(
-              'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
-              'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+        if (invoice.studentId != null) {
+          final student = await (db.select(db.students)
+                ..where((t) => t.id.equals(invoice.studentId!)))
+              .getSingleOrNull();
+          if (student == null) {
+            throw Exception('Selected student was not found.');
+          }
+          String phoneKey(String? raw) {
+            final d = (raw ?? '').replaceAll(RegExp(r'\D'), '');
+            if (d.length >= 10) return d.substring(d.length - 10);
+            return d;
+          }
+          var parentRow;
+          if (student.parentId != null) {
+            parentRow = await (db.select(db.parents)
+                  ..where((t) => t.id.equals(student.parentId!)))
+                .getSingleOrNull();
+          }
+          if (parentRow == null) {
+            final key = phoneKey(student.parentPhone);
+            if (key.length >= 10) {
+              final parents = await db.select(db.parents).get();
+              for (final p in parents) {
+                if (!p.isDeleted && phoneKey(p.phone) == key) {
+                  parentRow = p;
+                  break;
+                }
+              }
+            }
+          }
+          if (parentRow != null) {
+            if (invoice.invoiceNumber.startsWith('PMT-')) {
+              // Payment slips must not take parent credit; funding already credited the wallet.
+            } else {
+            final available = parentRow.creditBalance;
+            if (available + 1e-9 < invoice.totalAmount) {
+              throw Exception(
+                  'Insufficient parent wallet credit. Available: ₦${available.toStringAsFixed(2)}, '
+                  'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+            }
+            await (db.update(db.parents)..where((t) => t.id.equals(parentRow!.id)))
+                .write(ParentsCompanion(
+              creditBalance: Value(
+                CurrencyFormatter.roundMoney(available - invoice.totalAmount),
+              ),
+              updatedAt: Value(now),
+            ));
+            }
+          } else if (!invoice.invoiceNumber.startsWith('PMT-')) {
+            final available = student.creditBalance;
+            if (available + 1e-9 < invoice.totalAmount) {
+              throw Exception(
+                  'Insufficient student credit. Available: ₦${available.toStringAsFixed(2)}, '
+                  'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+            }
+            await (db.update(db.students)..where((t) => t.id.equals(student.id)))
+                .write(StudentsCompanion(
+              creditBalance: Value(
+                CurrencyFormatter.roundMoney(available - invoice.totalAmount),
+              ),
+              updatedAt: Value(now),
+            ));
+          }
+        } else {
+          if (finalCustomerId == null || finalCustomerId.isEmpty) {
+            throw Exception(
+                'Customer Wallet payment requires a selected customer.');
+          }
+          final customer = await (db.select(db.customers)
+                ..where((t) => t.id.equals(finalCustomerId!)))
+              .getSingleOrNull();
+          if (customer == null) {
+            throw Exception('Selected customer was not found.');
+          }
+          final availableCredit =
+              customer.balance < 0 ? -customer.balance : 0.0;
+          if (availableCredit + 1e-9 < invoice.totalAmount) {
+            throw Exception(
+                'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
+                'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+          }
         }
       }
 
@@ -264,7 +330,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       }
 
       // 4. Update Customer Balance if customer is associated with invoice
-      if (finalCustomerId != null) {
+      // School Wallet already debited parents/students.credit_balance above.
+      if (finalCustomerId != null &&
+          !(invoice.paymentMethod == 'Wallet' && invoice.studentId != null)) {
         final double balanceChange;
         
         if (invoice.invoiceNumber.startsWith('PMT-')) {

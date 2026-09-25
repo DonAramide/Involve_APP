@@ -27,11 +27,18 @@ export function classifyInvoicePaymentMethod(raw?: string | null): InvoiceRail {
     method === 'virtualaccount' ||
     method === 'virtual_account' ||
     method === 'va' ||
-    method === 'va_transfer'
+    method === 'va_transfer' ||
+    method === 'parent_account' ||
+    method === 'parent_transfer'
   ) {
     return 'va_transfer';
   }
-  if (method === 'transfer' || method === 'bank_transfer' || method === 'company_bank') {
+  if (
+    method === 'transfer' ||
+    method === 'bank_transfer' ||
+    method === 'company_bank' ||
+    method === 'company_account'
+  ) {
     return 'bank_transfer';
   }
   return 'other';

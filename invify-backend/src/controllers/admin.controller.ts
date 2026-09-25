@@ -15,6 +15,8 @@ import {
 } from '../utils/sanitize-tenant-updates';
 import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { displayableDeviceId } from '../utils/device-identity';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
 import {
   sanitizeVerificationSearch,
   toVerificationLogRow,
@@ -2570,20 +2572,75 @@ export class AdminController {
         return res.status(400).json({ error: 'No CAC document uploaded.' });
       }
 
-      const { tenantId } = (req as any).user;
-      const fileUrl = `/uploads/cac/${file.filename}`;
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const bucket = resolveContaboBucket();
+      if (!bucket) {
+        return res.status(503).json({ error: 'Object storage is not configured (CONTABO_BUCKET is missing).' });
+      }
 
-      const { error } = await supabaseAdmin
+      const original = String(file.originalname || 'cac_document.jpg');
+      const ext = (original.includes('.') ? original.slice(original.lastIndexOf('.')) : '.jpg').toLowerCase();
+      const objectKey = `tenants/${tenantId}/cac/${Date.now()}${ext || '.jpg'}`;
+      const body = file.buffer;
+      if (!body || !body.length) {
+        return res.status(400).json({ error: 'CAC document file was empty.' });
+      }
+
+      await putContaboObject({
+        bucket,
+        key: objectKey,
+        body,
+        contentType: file.mimetype || 'image/jpeg',
+      });
+
+      let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
+      let fileUrl = '';
+      if (baseUrl) {
+        if (!baseUrl.endsWith('/')) baseUrl += '/';
+        fileUrl = `${baseUrl}${objectKey}`;
+      } else {
+        let endpointUrl = resolveContaboEndpoint();
+        if (!endpointUrl.endsWith('/')) endpointUrl += '/';
+        const storageTenant = (process.env.CONTABO_TENANT_ID || process.env.CONTABO_CUSTOMER_ID || '').trim();
+        const bucketPath = storageTenant && !bucket.includes(':') ? `${storageTenant}:${bucket}` : bucket;
+        fileUrl = `${endpointUrl}${bucketPath}/${objectKey}`;
+      }
+
+      const { data: tenant, error: readError } = await supabaseAdmin
         .from('tenants')
-        .update({ cac_document_url: fileUrl })
-        .eq('id', tenantId);
+        .select('settings')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (readError) throw readError;
 
-      if (error) throw error;
+      const existingSettings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {};
+      const { error: saveError } = await supabaseAdmin
+        .from('tenants')
+        .update({
+          settings: {
+            ...existingSettings,
+            cac_document_url: fileUrl,
+            cac_uploaded_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenantId);
+      if (saveError) throw saveError;
+
+      await supabaseAdmin.from('tenant_kyc_documents').insert({
+        tenant_id: tenantId,
+        document_type: 'CAC',
+        document_url: fileUrl,
+        status: 'PENDING',
+      }).then(({ error }) => {
+        if (error) console.warn('[AdminController] tenant_kyc_documents skip:', error.message);
+      });
 
       return res.status(200).json({ message: 'CAC document uploaded successfully', url: fileUrl });
     } catch (error: any) {
+      const status = error.status || 500;
       console.error('[AdminController] uploadCacDocument Error:', error.message);
-      return res.status(500).json({ error: error.message });
+      return res.status(status).json({ error: error.message || 'Failed to upload CAC document' });
     }
   }
 

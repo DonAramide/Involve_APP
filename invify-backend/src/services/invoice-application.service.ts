@@ -4,6 +4,7 @@ import { InvoiceRepository } from '../repositories/invoice.repository';
 import { InvoiceItemRepository } from '../repositories/invoice-item.repository';
 import { LedgerService, LedgerEntry } from './ledger.service';
 import { supabaseAdmin } from '../db/supabase';
+import { asUuid, toStableUuid } from '../utils/stable-uuid';
 
 export class InvoiceApplicationService {
   /**
@@ -11,13 +12,26 @@ export class InvoiceApplicationService {
    * Leverages repositories for DML and delegates accounting logic to LedgerService.
    */
   static async processOfflineInvoice(payload: any, context: { tenantId: string; deviceId?: string }, idempotencyKey: string, correlationId?: string) {
+    const invoiceId = toStableUuid(
+      context.tenantId,
+      'invoice',
+      String(payload.syncId || payload.id || payload.invoiceNumber || idempotencyKey),
+    );
+    const customerId =
+      asUuid(payload.customerId) ||
+      asUuid(payload.studentSyncId) ||
+      asUuid(payload.student_id) ||
+      null;
+    payload.syncId = invoiceId;
+    payload.customerId = customerId;
+
     if (!process.env.DATABASE_URL) {
       console.log('[InvoiceApplicationService] DATABASE_URL not set. Falling back to Supabase REST client.');
       
       // 1. Upsert Customer (if provided)
-      if (payload.customerId && payload.customerName) {
+      if (customerId && payload.customerName) {
         const { error } = await supabaseAdmin.from('customers').upsert({
-          id: payload.customerId,
+          id: customerId,
           tenant_id: context.tenantId,
           name: payload.customerName,
           phone: payload.customerPhone || null,
@@ -27,8 +41,6 @@ export class InvoiceApplicationService {
         });
         if (error) throw new Error(`Customer upsert failed: ${error.message}`);
       }
-
-      const invoiceId = payload.syncId;
       const { data: existingRow } = await supabaseAdmin
         .from('invoices')
         .select('id')
@@ -42,7 +54,7 @@ export class InvoiceApplicationService {
         id: invoiceId,
         tenant_id: context.tenantId,
         invoice_number: payload.invoiceNumber,
-        customer_id: payload.customerId || null,
+        customer_id: customerId,
         subtotal: payload.subtotal || 0,
         tax_amount: payload.taxAmount || 0,
         discount_amount: payload.discountAmount || 0,
@@ -68,22 +80,33 @@ export class InvoiceApplicationService {
 
       // 3. Upsert Invoice Items
       if (payload.items && Array.isArray(payload.items)) {
-        const itemsToInsert = payload.items.map((item: any) => {
-          const itemId = item.productSyncId || item.itemId;
-          const invoiceItemId = item.invoiceItemSyncId || item.syncId;
-          return {
-            id: invoiceItemId,
-            invoice_id: payload.syncId,
-            item_id: itemId,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            type: item.type || 'product',
-            created_at: payload.dateCreated,
-            updated_at: new Date().toISOString()
-          };
-        });
-        const { error: itemsErr } = await supabaseAdmin.from('invoice_items').upsert(itemsToInsert);
-        if (itemsErr) throw new Error(`Invoice items upsert failed: ${itemsErr.message}`);
+        const itemsToInsert = payload.items
+          .map((item: any) => {
+            const itemId = asUuid(item.productSyncId) || asUuid(item.itemId);
+            if (!itemId) return null;
+            const invoiceItemId = toStableUuid(
+              context.tenantId,
+              'invoice_item',
+              String(item.invoiceItemSyncId || item.syncId || `${invoiceId}:${itemId}`),
+            );
+            return {
+              id: invoiceItemId,
+              invoice_id: invoiceId,
+              item_id: itemId,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              type: item.type || 'product',
+              created_at: payload.dateCreated,
+              updated_at: new Date().toISOString()
+            };
+          })
+          .filter(Boolean);
+        if (itemsToInsert.length) {
+          const { error: itemsErr } = await supabaseAdmin.from('invoice_items').upsert(itemsToInsert);
+          if (itemsErr) {
+            console.warn('[InvoiceApplicationService] Invoice items skipped:', itemsErr.message);
+          }
+        }
       }
 
       // 4. Double-Entry Accounting (create only — updates must not double-post)
@@ -116,7 +139,7 @@ export class InvoiceApplicationService {
           console.warn('[InvoiceApplicationService] Ledger recording skipped (non-critical):', ledgerErr.message);
         }
       }
-      return;
+      return { alreadyExists, invoiceId };
     }
 
     const client = await getClient();
@@ -124,9 +147,9 @@ export class InvoiceApplicationService {
       await client.query('BEGIN');
 
       // 1. Upsert Customer (if provided)
-      if (payload.customerId && payload.customerName) {
+      if (customerId && payload.customerName) {
         await CustomerRepository.upsert(client, {
-          id: payload.customerId,
+          id: customerId,
           tenantId: context.tenantId,
           name: payload.customerName,
           phone: payload.customerPhone,
@@ -137,16 +160,16 @@ export class InvoiceApplicationService {
 
       const existingPg = await client.query(
         'SELECT 1 FROM invoices WHERE id = $1 AND tenant_id = $2 LIMIT 1',
-        [payload.syncId, context.tenantId]
+        [invoiceId, context.tenantId]
       );
       const alreadyExists = (existingPg.rowCount || 0) > 0;
 
       // 2. Upsert Invoice
       await InvoiceRepository.upsert(client, {
-        id: payload.syncId,
+        id: invoiceId,
         tenantId: context.tenantId,
         invoiceNumber: payload.invoiceNumber,
-        customerId: payload.customerId,
+        customerId: customerId || undefined,
         subtotal: payload.subtotal || 0,
         taxAmount: payload.taxAmount || 0,
         discountAmount: payload.discountAmount || 0,
@@ -160,21 +183,32 @@ export class InvoiceApplicationService {
 
       // 3. Upsert Invoice Items
       if (payload.items && Array.isArray(payload.items)) {
-        const itemsToInsert = payload.items.map((item: any) => {
-          // Use explicitly mapped names
-          const itemId = item.productSyncId || item.itemId;
-          const invoiceItemId = item.invoiceItemSyncId || item.syncId;
-          return {
-            id: invoiceItemId,
-            invoiceId: payload.syncId,
-            itemId: itemId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            type: item.type
-          };
-        });
+        const itemsToInsert = payload.items
+          .map((item: any) => {
+            const itemId = asUuid(item.productSyncId) || asUuid(item.itemId);
+            if (!itemId) return null;
+            return {
+              id: toStableUuid(
+                context.tenantId,
+                'invoice_item',
+                String(item.invoiceItemSyncId || item.syncId || `${invoiceId}:${itemId}`),
+              ),
+              invoiceId,
+              itemId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              type: item.type
+            };
+          })
+          .filter((row: any) => !!row);
         
-        await InvoiceItemRepository.bulkUpsert(client, itemsToInsert);
+        if (itemsToInsert.length) {
+          try {
+            await InvoiceItemRepository.bulkUpsert(client, itemsToInsert);
+          } catch (itemErr: any) {
+            console.warn('[InvoiceApplicationService] Invoice items skipped:', itemErr?.message || itemErr);
+          }
+        }
       }
 
       // 4. Double-Entry Accounting (create only — updates must not double-post)
@@ -192,7 +226,7 @@ export class InvoiceApplicationService {
         await LedgerService.createDoubleEntry({
           idempotencyKey: idempotencyKey,
           tenantId: context.tenantId,
-          reference: payload.syncId, // Use Invoice UUID as reference
+          reference: invoiceId,
           entries,
           correlationId: correlationId,
           metadata: {
@@ -204,6 +238,7 @@ export class InvoiceApplicationService {
       }
 
       await client.query('COMMIT');
+      return { alreadyExists, invoiceId };
 
     } catch (error) {
       await client.query('ROLLBACK');

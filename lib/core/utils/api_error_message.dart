@@ -84,7 +84,7 @@ String? _mapNetworkish(String text) {
       t.contains('route not found') ||
       t.contains('cannot get') ||
       t.contains('cannot post')) {
-    return 'This service is currently unavailable or pending profile completion on the web portal.';
+    return 'This finance endpoint is not available on the server yet. Pull to refresh, or open the student from the school list.';
   }
   return null;
 }

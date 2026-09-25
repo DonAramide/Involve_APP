@@ -123,6 +123,7 @@ class _ParentListPageState extends State<ParentListPage> {
                             0,
                             (sum, s) => sum + (s.balance > 0 ? s.balance : 0),
                           );
+                          final credit = parent.creditBalance;
                           final classNames = children
                               .map((s) {
                                 for (final c in state.classes) {
@@ -133,32 +134,94 @@ class _ParentListPageState extends State<ParentListPage> {
                               .where((n) => n.isNotEmpty)
                               .toSet()
                               .join(', ');
-                          return ListTile(
-                            leading: CircleAvatar(
-                              child: Text(
-                                parent.fullName.isEmpty
-                                    ? '?'
-                                    : parent.fullName.trim()[0].toUpperCase(),
-                              ),
-                            ),
-                            title: Text(parent.fullName),
-                            subtitle: Text(
-                              '${children.length} child${children.length == 1 ? '' : 'ren'}'
-                              '${classNames.isEmpty ? '' : ' · $classNames'}'
-                              '${parent.phone != null && parent.phone!.isNotEmpty ? ' · ${parent.phone}' : ''}'
-                              '${parent.hasCanonicalVa ? ' · VA' : ''}',
-                            ),
-                            trailing: Text(
-                              CurrencyFormatter.formatWithSymbol(outstanding),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: outstanding > 0 ? Colors.red.shade700 : Colors.green.shade700,
-                              ),
-                            ),
+                          return InkWell(
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => ParentProfilePage(parentId: parent.id!),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    child: Text(
+                                      parent.fullName.isEmpty
+                                          ? '?'
+                                          : parent.fullName.trim()[0].toUpperCase(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          parent.fullName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${children.length} child${children.length == 1 ? '' : 'ren'}'
+                                          '${classNames.isEmpty ? '' : ' · $classNames'}'
+                                          '${parent.phone != null && parent.phone!.isNotEmpty ? ' · ${parent.phone}' : ''}'
+                                          '${parent.hasCanonicalVa ? ' · VA' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.blueGrey.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Outstanding',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blueGrey.shade600,
+                                        ),
+                                      ),
+                                      Text(
+                                        CurrencyFormatter.formatWithSymbol(outstanding),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          color: outstanding > 0.001
+                                              ? Colors.red.shade700
+                                              : Colors.green.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Credit',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blueGrey.shade600,
+                                        ),
+                                      ),
+                                      Text(
+                                        CurrencyFormatter.formatWithSymbol(credit),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          color: credit > 0.001
+                                              ? Colors.teal.shade700
+                                              : Colors.blueGrey.shade500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           );

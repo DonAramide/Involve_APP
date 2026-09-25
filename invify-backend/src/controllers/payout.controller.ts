@@ -7,6 +7,69 @@ import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const BANK_CODES: Array<{ name: string; code: string }> = [
+  { name: 'Access Bank', code: '044' },
+  { name: 'First Bank of Nigeria', code: '011' },
+  { name: 'Guaranty Trust Bank (GTBank)', code: '058' },
+  { name: 'Guaranty Trust Bank', code: '058' },
+  { name: 'GTBank', code: '058' },
+  { name: 'United Bank for Africa (UBA)', code: '033' },
+  { name: 'United Bank for Africa', code: '033' },
+  { name: 'UBA', code: '033' },
+  { name: 'Zenith Bank', code: '057' },
+  { name: 'Fidelity Bank', code: '070' },
+  { name: 'Sterling Bank', code: '232' },
+  { name: 'Polaris Bank', code: '076' },
+  { name: 'Wema Bank', code: '035' },
+  { name: 'Wema Bank (ALAT)', code: '035' },
+  { name: 'Keystone Bank', code: '082' },
+  { name: 'Union Bank', code: '032' },
+  { name: 'Union Bank of Nigeria', code: '032' },
+  { name: 'Stanbic IBTC Bank', code: '221' },
+  { name: 'First City Monument Bank (FCMB)', code: '214' },
+  { name: 'FCMB', code: '214' },
+  { name: 'Ecobank Nigeria', code: '050' },
+  { name: 'Heritage Bank', code: '030' },
+  { name: 'Kuda Bank', code: '50211' },
+  { name: 'Opay', code: '999992' },
+  { name: 'OPay Digital Services', code: '999992' },
+  { name: 'Palmpay', code: '999991' },
+  { name: 'PalmPay', code: '999991' },
+  { name: 'Moniepoint', code: '50515' },
+  { name: 'Moniepoint MFB', code: '50515' },
+  { name: 'VFD Microfinance Bank', code: '566' },
+];
+
+function normalizeBankKey(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function bankCodeFromName(bankName: string): string {
+  const want = normalizeBankKey(bankName);
+  if (!want) return '';
+  const exact = BANK_CODES.find((b) => normalizeBankKey(b.name) === want);
+  if (exact) return exact.code;
+  const partial = BANK_CODES.find(
+    (b) => normalizeBankKey(b.name).includes(want) || want.includes(normalizeBankKey(b.name)),
+  );
+  return partial?.code || '';
+}
+
+function normalizePayoutBody(body: any) {
+  const account_number = String(body?.account_number || body?.accountNumber || '').trim();
+  const account_name = String(body?.account_name || body?.accountName || '').trim();
+  const bank_name = String(body?.bank_name || body?.bankName || '').trim();
+  let bank_code = String(body?.bank_code || body?.bankCode || '').trim();
+  if (!bank_code) bank_code = bankCodeFromName(bank_name);
+  return { account_number, account_name, bank_name, bank_code };
+}
+
+function hasPayoutAccount(row: any): boolean {
+  return Boolean(String(row?.account_number || row?.accountNumber || '').trim());
+}
+
 export class PayoutController {
   private static getLocalSettingsPath() {
     return path.join(process.cwd(), 'tenant_payout_settings.json');
@@ -59,7 +122,20 @@ export class PayoutController {
         .maybeSingle();
 
       if (error) throw error;
-      return res.status(200).json(data || {});
+      if (hasPayoutAccount(data)) return res.status(200).json(data);
+
+      const { data: tenant } = await supabaseAdmin
+        .from('tenants')
+        .select('settings')
+        .eq('id', tenantId)
+        .maybeSingle();
+      const fromTenant = (tenant?.settings as any)?.payout;
+      if (hasPayoutAccount(fromTenant)) return res.status(200).json(fromTenant);
+
+      const localData = PayoutController.getLocalTenantSettings(tenantId);
+      if (hasPayoutAccount(localData)) return res.status(200).json(localData);
+
+      return res.status(200).json({});
     } catch (error: any) {
       const status = error.status || 500;
       if (status !== 500) return res.status(status).json({ error: error.message });
@@ -67,7 +143,7 @@ export class PayoutController {
       try {
         const tenantId = resolveAuthoritativeTenantId(req);
         const localData = PayoutController.getLocalTenantSettings(tenantId);
-        if (localData) return res.status(200).json(localData);
+        if (hasPayoutAccount(localData)) return res.status(200).json(localData);
       } catch (_) { /* ignore */ }
       return res.status(200).json({});
     }
@@ -79,10 +155,13 @@ export class PayoutController {
   static async saveSettings(req: Request, res: Response) {
     try {
       const tenantId = resolveAuthoritativeTenantId(req);
-      const { account_number, bank_code, bank_name, account_name } = req.body;
+      const { account_number, bank_code, bank_name, account_name } = normalizePayoutBody(req.body);
 
-      if (!account_number || !bank_code || !account_name) {
+      if (!account_number || !account_name || (!bank_code && !bank_name)) {
         return res.status(400).json({ error: 'Missing required fields' });
+      }
+      if (!bank_code) {
+        return res.status(400).json({ error: 'Could not resolve bank code. Pick the bank from the list and save again.' });
       }
 
       const payload = {
@@ -95,13 +174,30 @@ export class PayoutController {
       PayoutController.saveLocalTenantSettings(tenantId, payload);
 
       try {
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('settings')
+          .eq('id', tenantId)
+          .maybeSingle();
+        const existingSettings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {};
+        await supabaseAdmin
+          .from('tenants')
+          .update({
+            settings: { ...existingSettings, payout: payload },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tenantId);
+      } catch (settingsErr: any) {
+        console.warn('[PayoutController] tenants.settings payout backup skipped:', settingsErr?.message || settingsErr);
+      }
+
+      try {
         const { data, error } = await supabaseAdmin
           .from('payout_settings')
           .upsert({
             tenant_id: tenantId,
             account_number,
             bank_code,
-            bank_name,
             account_name,
             updated_at: new Date().toISOString()
           }, { onConflict: 'tenant_id' })
@@ -109,9 +205,12 @@ export class PayoutController {
           .single();
 
         if (error) throw error;
-        return res.status(200).json({ success: true, settings: data });
+        return res.status(200).json({
+          success: true,
+          settings: { ...(data || {}), bank_name },
+        });
       } catch (error: any) {
-        console.warn('[PayoutController] Supabase saveSettings failed. Saved to local cache only:', error.message);
+        console.warn('[PayoutController] Supabase saveSettings failed. Saved to tenant settings / local cache:', error.message);
         return res.status(200).json({
           success: true,
           settings: {

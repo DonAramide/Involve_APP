@@ -14,15 +14,29 @@ InvoicePaymentRail classifyInvoicePaymentRail(String? raw) {
       .toLowerCase()
       .replaceAll(RegExp(r'[\s-]+'), '_');
   if (method.isEmpty) return InvoicePaymentRail.other;
-  if (method == 'wallet' || method == 'customer_wallet') {
-    return InvoicePaymentRail.wallet;
+  if (method == 'wallet' ||
+      method == 'customer_wallet' ||
+      method.endsWith('_wallet') ||
+      method.contains('wallet')) {
+    if (method == 'wallet' ||
+        method == 'customer_wallet' ||
+        method.contains('deferred') ||
+        (!method.contains('cash') &&
+            !method.contains('pos') &&
+            !method.contains('card') &&
+            !method.contains('transfer') &&
+            !method.contains('virtual'))) {
+      return InvoicePaymentRail.wallet;
+    }
   }
   if (method == 'cash') return InvoicePaymentRail.cash;
   if (method == 'card' || method == 'pos') return InvoicePaymentRail.card;
   if (method == 'virtualaccount' ||
       method == 'virtual_account' ||
       method == 'va' ||
-      method == 'va_transfer') {
+      method == 'va_transfer' ||
+      method == 'parent_account' ||
+      method == 'parent_transfer') {
     return InvoicePaymentRail.vaTransfer;
   }
   if (method == 'transfer' ||

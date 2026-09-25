@@ -33,6 +33,8 @@ import 'package:involve_app/core/pos/nibss_geo.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -45,6 +47,8 @@ class InvoicePreviewDialog extends StatefulWidget {
 
 class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   late TextEditingController _amountReceivedController;
+  late final String _previewInvoiceNumber;
+  late final DateTime _previewDate;
   bool _isInitialized = false;
   TerminalConfig? _terminalConfig;
   bool _isProcessingPos = false;
@@ -54,6 +58,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   @override
   void initState() {
     super.initState();
+    _previewDate = DateTime.now();
+    _previewInvoiceNumber =
+        widget.invoiceBloc.calculationService.generateInvoiceNumber(at: _previewDate);
     _amountReceivedController = TextEditingController();
     _amountReceivedController.addListener(_onAmountChanged);
     _loadTerminalConfig();
@@ -70,6 +77,47 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   /// Credit available for wallet pay = abs(negative balance). Owing (positive) = 0 credit.
   double _creditFromBalance(double balance) =>
       balance < 0 ? -balance : 0.0;
+
+  bool _isSchoolWallet(InvoiceState state, AppSettings? settings) {
+    final mode = (settings?.businessMode ?? state.businessMode).toLowerCase();
+    return state.studentId != null || mode == 'school';
+  }
+
+  String _walletPaymentLabel(bool isSchool) =>
+      isSchool ? 'Parent Wallet/Credit' : 'Customer Wallet/Credit';
+
+  Future<void> _ensureWalletCredit(InvoiceState state, {AppSettings? settings}) async {
+    if (_isSchoolWallet(state, settings) && state.studentId != null) {
+      await _ensureParentWalletCredit(state.studentId!);
+    } else if (!_isSchoolWallet(state, settings)) {
+      await _ensureCustomerWalletCredit(state.customerId);
+    }
+  }
+
+  Future<void> _ensureParentWalletCredit(int studentId) async {
+    final key = 'parent-stu-$studentId';
+    try {
+      final schoolRepo = context.read<SchoolRepository>();
+      final student = await schoolRepo.getStudentById(studentId);
+      if (!mounted) return;
+      double credit = 0;
+      if (student != null) {
+        final parent = await schoolRepo.findParentForStudent(student);
+        credit = parent?.creditBalance ?? student.creditBalance;
+      }
+      if (!mounted) return;
+      setState(() {
+        _loadedWalletCustomerId = key;
+        _customerWalletCredit = credit;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadedWalletCustomerId = key;
+        _customerWalletCredit = 0.0;
+      });
+    }
+  }
 
   Future<void> _ensureCustomerWalletCredit(String? customerId) async {
     if (customerId == null || customerId.isEmpty) {
@@ -104,6 +152,27 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
   Future<bool> _validateWalletBalance(
       BuildContext context, InvoiceState invoiceState) async {
+    final settings = context.read<SettingsBloc>().state.settings;
+    if (_isSchoolWallet(invoiceState, settings) && invoiceState.studentId != null) {
+      return _validateParentWalletBalance(context, invoiceState);
+    }
+
+    if (_isSchoolWallet(invoiceState, settings) && invoiceState.studentId == null) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Student Required'),
+          content: const Text(
+              'Assign a student before paying with Parent Wallet/Credit.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+
     final customerId = invoiceState.customerId;
     if (customerId == null || customerId.isEmpty) {
       await showDialog(
@@ -170,6 +239,80 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     return true;
   }
 
+  Future<bool> _validateParentWalletBalance(
+      BuildContext context, InvoiceState invoiceState) async {
+    final studentId = invoiceState.studentId;
+    if (studentId == null) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Student Required'),
+          content: const Text(
+              'Assign a student before paying with Parent Wallet/Credit.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+
+    final schoolRepo = context.read<SchoolRepository>();
+    final student = await schoolRepo.getStudentById(studentId);
+    if (!mounted) return false;
+
+    if (student == null) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Student Not Found'),
+          content: const Text(
+              'Could not load this student’s parent credit. Re-assign the student and try again.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+
+    SchoolParent? parent;
+    double availableCredit = student.creditBalance;
+    parent = await schoolRepo.findParentForStudent(student);
+    if (!mounted) return false;
+    if (parent != null) {
+      availableCredit = parent.creditBalance;
+    }
+
+    setState(() {
+      _loadedWalletCustomerId = 'parent-stu-$studentId';
+      _customerWalletCredit = availableCredit;
+    });
+
+    if (availableCredit + 1e-9 < invoiceState.total) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Insufficient Parent Credit'),
+          content: Text(
+            'There is not enough parent wallet credit for this invoice.\n\n'
+            'Available credit: ₦${availableCredit.toStringAsFixed(2)}\n'
+            'Invoice total: ₦${invoiceState.total.toStringAsFixed(2)}\n\n'
+            'Fund the parent account first, or choose another payment method.',
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
   void _onAmountChanged() {
     setState(() {});
   }
@@ -191,9 +334,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             builder: (context, settingsState) {
               final settings = settingsState.settings;
 
-              if (invoiceState.customerId != null) {
+              if (invoiceState.customerId != null || invoiceState.studentId != null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _ensureCustomerWalletCredit(invoiceState.customerId);
+                  _ensureWalletCredit(invoiceState, settings: settings);
                 });
               }
 
@@ -243,13 +386,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         const Divider(),
                         Center(
                           child: Text(
-                            'Invoice #INV-${DateTime.now().millisecondsSinceEpoch}',
+                            'Invoice #$_previewInvoiceNumber',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Center(
                           child: Text(
-                            'Date: ${DateTime.now().toIso8601String().split('T')[0]}',
+                            'Date: ${_previewDate.toIso8601String().split('T')[0]}',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
@@ -945,8 +1088,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         }
       }
 
-      final invoiceNumber =
-          widget.invoiceBloc.calculationService.generateInvoiceNumber();
+      final invoiceNumber = _previewInvoiceNumber;
       final status = (invoiceState.paymentMethod == 'Transfer' ||
               invoiceState.paymentMethod == 'VirtualAccount')
           ? 'Pending'
@@ -1122,6 +1264,17 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     final staffList = context.read<StaffBloc>().state.staffList;
     final hasConfiguredVa = staffList.any((s) => s.virtualAccountNumber != null && s.virtualAccountNumber!.trim().isNotEmpty);
     final isVaEnabled = isPro && hasConfiguredVa;
+    final settings = context.read<SettingsBloc>().state.settings;
+    final isSchoolWallet = _isSchoolWallet(state, settings);
+    final walletLabel = _walletPaymentLabel(isSchoolWallet);
+    final walletAssigneeReady =
+        isSchoolWallet ? state.studentId != null : state.customerId != null;
+    final walletCreditKey = isSchoolWallet && state.studentId != null
+        ? 'parent-stu-${state.studentId}'
+        : state.customerId;
+    final walletSelectable = walletAssigneeReady &&
+        (_customerWalletCredit == null ||
+            _customerWalletCredit! + 1e-9 >= state.total);
 
     return Column(
       children: [
@@ -1231,29 +1384,33 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             onChanged: null,
           ),
         RadioListTile<String>(
-          title: const Text('Customer Wallet/Credit',
-              style:
-                  TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+          title: Text(walletLabel,
+              style: const TextStyle(
+                  color: Colors.purple, fontWeight: FontWeight.bold)),
           value: 'Wallet',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          onChanged: state.customerId != null &&
-                  (_customerWalletCredit == null ||
-                      _customerWalletCredit! + 1e-9 >= state.total)
+          onChanged: walletSelectable
               ? (val) {
                   context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
                   _amountReceivedController.text =
                       CurrencyFormatter.format(state.total);
                 }
               : null,
-          subtitle: state.customerId == null
-              ? const Text('Please select a customer first.',
-                  style: TextStyle(fontSize: 10, color: Colors.grey))
+          subtitle: !walletAssigneeReady
+              ? Text(
+                  isSchoolWallet
+                      ? 'Please assign a student first.'
+                      : 'Please select a customer first.',
+                  style: const TextStyle(fontSize: 10, color: Colors.grey))
               : (_customerWalletCredit == null ||
-                      _loadedWalletCustomerId != state.customerId)
-                  ? const Text('Checking wallet credit…',
-                      style: TextStyle(fontSize: 10, color: Colors.grey))
+                      _loadedWalletCustomerId != walletCreditKey)
+                  ? Text(
+                      isSchoolWallet
+                          ? 'Checking parent credit…'
+                          : 'Checking wallet credit…',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey))
                   : Text(
                       _customerWalletCredit! + 1e-9 >= state.total
                           ? 'Credit available: ₦${_customerWalletCredit!.toStringAsFixed(2)}'

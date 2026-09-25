@@ -506,6 +506,27 @@ class SchoolRepositoryImpl implements SchoolRepository {
     return _mapParent(row, await _vasForParent(id));
   }
 
+  static String _phoneKey(String? raw) {
+    final d = (raw ?? '').replaceAll(RegExp(r'\D'), '');
+    if (d.length >= 10) return d.substring(d.length - 10);
+    return d;
+  }
+
+  @override
+  Future<SchoolParent?> findParentForStudent(Student student) async {
+    if (student.parentId != null) {
+      final linked = await getParentById(student.parentId!);
+      if (linked != null) return linked;
+    }
+    final phoneKey = _phoneKey(student.parentPhone);
+    if (phoneKey.length < 10) return null;
+    final parents = await getParents();
+    for (final parent in parents) {
+      if (_phoneKey(parent.phone) == phoneKey) return parent;
+    }
+    return null;
+  }
+
   @override
   Future<SchoolParent> ensureParent({
     required String fullName,
@@ -783,6 +804,24 @@ class SchoolRepositoryImpl implements SchoolRepository {
       updatedAt: Value(DateTime.now()),
     ));
     return payment;
+  }
+
+  @override
+  Future<double> addParentCredit(int parentId, double amount) async {
+    final now = DateTime.now();
+    await database.customUpdate(
+      'UPDATE parents SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?',
+      variables: [
+        Variable.withReal(amount),
+        Variable.withDateTime(now),
+        Variable.withInt(parentId),
+      ],
+      updates: {database.parents},
+    );
+    final row = await (database.select(database.parents)
+          ..where((t) => t.id.equals(parentId)))
+        .getSingleOrNull();
+    return row?.creditBalance ?? 0;
   }
 
   @override

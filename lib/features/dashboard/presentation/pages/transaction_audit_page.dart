@@ -39,6 +39,9 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   int _page = 1;
   static const int _pageSize = 25;
+  DateTime? _fromDateTime;
+  DateTime? _toDateTime;
+  String _datePreset = 'All';
 
   static const _methodFilters = [
     'All',
@@ -449,6 +452,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
 
       if (_methodFilter != 'All' && method != _methodFilter) return false;
       if (_statusFilter != 'All' && status != _statusFilter) return false;
+      if (_fromDateTime != null && tx.date.isBefore(_fromDateTime!)) return false;
+      if (_toDateTime != null && tx.date.isAfter(_toDateTime!)) return false;
 
       if (q.isEmpty) return true;
       final hay = [
@@ -476,6 +481,112 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     final n = _filtered.length;
     if (n == 0) return 1;
     return ((n + _pageSize - 1) / _pageSize).floor();
+  }
+
+  double get _filteredTotal =>
+      _filtered.fold<double>(0, (sum, row) => sum + row.audit.amount);
+
+  double get _filteredCollected => _filtered.fold<double>(0, (sum, row) {
+        final status = _effectiveStatus(row.audit);
+        if (status == 'Failed' ||
+            status == 'Payment Pending' ||
+            status == 'Customer Debit') {
+          return sum;
+        }
+        return sum + row.audit.amount;
+      });
+
+  void _applyDatePreset(String preset) {
+    final now = DateTime.now();
+    setState(() {
+      _datePreset = preset;
+      _page = 1;
+      switch (preset) {
+        case 'Today':
+          _fromDateTime = DateTime(now.year, now.month, now.day);
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case '7D':
+          _fromDateTime = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case 'Month':
+          _fromDateTime = DateTime(now.year, now.month, 1);
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case 'Custom':
+          break;
+        default:
+          _fromDateTime = null;
+          _toDateTime = null;
+      }
+    });
+  }
+
+  Future<DateTime?> _pickDateTime({
+    required DateTime initial,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (date == null || !mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return date;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _pickFrom() async {
+    final now = DateTime.now();
+    final picked = await _pickDateTime(
+      initial: _fromDateTime ?? DateTime(now.year, now.month, now.day),
+      firstDate: DateTime(now.year - 5),
+      lastDate: _toDateTime ?? now,
+    );
+    if (picked == null) return;
+    setState(() {
+      _datePreset = 'Custom';
+      _fromDateTime = picked;
+      _page = 1;
+      if (_toDateTime != null && _toDateTime!.isBefore(picked)) {
+        _toDateTime = picked.add(const Duration(hours: 1));
+      }
+    });
+  }
+
+  Future<void> _pickTo() async {
+    final now = DateTime.now();
+    final picked = await _pickDateTime(
+      initial: _toDateTime ?? now,
+      firstDate: _fromDateTime ?? DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 1),
+    );
+    if (picked == null) return;
+    setState(() {
+      _datePreset = 'Custom';
+      _toDateTime = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        picked.hour,
+        picked.minute,
+        59,
+        999,
+      );
+      _page = 1;
+    });
+  }
+
+  String _rangeLabel(DateTime? value, {required bool isEnd}) {
+    if (value == null) return isEnd ? 'To date & time' : 'From date & time';
+    return DateFormat('dd MMM yyyy · HH:mm').format(value);
   }
 
   void _showDetails(_TxRow row) {
@@ -714,6 +825,61 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     );
   }
 
+  Widget _buildTotalsBar(int count) {
+    final theme = Theme.of(context);
+    final collected = _filteredCollected;
+    final totalAmount = _filteredTotal;
+    final pending = totalAmount - collected;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            CurrencyFormatter.formatWithSymbol(totalAmount),
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            count == 0
+                ? 'No payments in this range'
+                : '$count payment${count == 1 ? '' : 's'} in the selected range',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Collected ${CurrencyFormatter.formatWithSymbol(collected)}',
+                  style: TextStyle(
+                    color: Colors.green.shade800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              Text(
+                'Other ${CurrencyFormatter.formatWithSymbol(pending < 0 ? 0 : pending)}',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _chipRow({
     required List<String> options,
     required String selected,
@@ -790,6 +956,60 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: _chipRow(
+                        options: const ['All', 'Today', '7D', 'Month', 'Custom'],
+                        selected: _datePreset,
+                        onSelected: (v) {
+                          if (v == 'Custom') {
+                            _pickFrom();
+                          } else {
+                            _applyDatePreset(v);
+                          }
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickFrom,
+                              icon: const Icon(Icons.event, size: 16),
+                              label: Text(
+                                _rangeLabel(_fromDateTime, isEnd: false),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickTo,
+                              icon: const Icon(Icons.schedule, size: 16),
+                              label: Text(
+                                _rangeLabel(_toDateTime, isEnd: true),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ),
+                          if (_fromDateTime != null || _toDateTime != null)
+                            IconButton(
+                              tooltip: 'Clear dates',
+                              onPressed: () => _applyDatePreset('All'),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: _buildTotalsBar(total),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),

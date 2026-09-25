@@ -5,8 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import '../../domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
@@ -167,6 +171,77 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
     return list;
   }
 
+  Future<List<Map<String, dynamic>>> _subtractWalletFees(
+    List<Map<String, dynamic>> accounts,
+  ) async {
+    if (accounts.isEmpty) return accounts;
+    try {
+      var invoices = <Invoice>[];
+      try {
+        invoices = await context.read<InvoiceRepository>().getAllInvoices();
+      } catch (_) {
+        invoices = List<Invoice>.from(context.read<SchoolBloc>().state.studentInvoices);
+      }
+      if (invoices.isEmpty) return accounts;
+
+      final schoolRepo = context.read<SchoolRepository>();
+      final students = await schoolRepo.getStudents();
+      final parents = await schoolRepo.getParents();
+      final vaByStudentId = <int, String>{};
+      final vasByParentId = <int, Set<String>>{};
+      for (final s in students) {
+        final va = (s.virtualAccountNumber ?? '').trim();
+        if (s.id != null && va.isNotEmpty) vaByStudentId[s.id!] = va;
+        final parentId = s.parentId;
+        if (parentId == null) continue;
+        vasByParentId.putIfAbsent(parentId, () => <String>{});
+        if (va.isNotEmpty) vasByParentId[parentId]!.add(va);
+      }
+      for (final p in parents) {
+        final va = (p.virtualAccountNumber ?? '').trim();
+        if (p.id == null || va.isEmpty) continue;
+        vasByParentId.putIfAbsent(p.id!, () => <String>{});
+        vasByParentId[p.id!]!.add(va);
+      }
+
+      final appliedByVa = <String, double>{};
+      for (final inv in invoices) {
+        if (inv.invoiceNumber.startsWith('PMT-')) continue;
+        if (classifyInvoicePaymentRail(inv.paymentMethod) != InvoicePaymentRail.wallet) {
+          continue;
+        }
+        final collected = inv.amountPaid;
+        if (collected <= 0) continue;
+        final targets = <String>{};
+        final studentVa = vaByStudentId[inv.studentId];
+        if (studentVa != null) targets.add(studentVa);
+        for (final s in students) {
+          if (s.id == inv.studentId && s.parentId != null) {
+            targets.addAll(vasByParentId[s.parentId!] ?? const <String>{});
+            break;
+          }
+        }
+        for (final va in targets) {
+          appliedByVa[va] = (appliedByVa[va] ?? 0) + collected;
+        }
+      }
+
+      return accounts.map((acc) {
+        final va = (acc['accountNumber'] ?? '').toString().trim();
+        final applied = appliedByVa[va] ?? 0;
+        if (applied <= 0) return acc;
+        final current = (acc['balance'] as num?)?.toDouble() ?? 0;
+        return {
+          ...acc,
+          'balance': current > applied ? current - applied : 0.0,
+          'appliedToFees': applied,
+        };
+      }).toList();
+    } catch (_) {
+      return accounts;
+    }
+  }
+
   Future<void> _fetchAccounts() async {
     final hadData = _accounts.isNotEmpty;
     if (!hadData) {
@@ -182,7 +257,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
     }
 
     // 1) Offline-first: paint local VAs immediately (no network wait).
-    final local = await _buildLocalAccounts();
+    final local = await _subtractWalletFees(await _buildLocalAccounts());
     if (!mounted) return;
     setState(() {
       _accounts = local;
@@ -196,8 +271,10 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
         timeout: const Duration(seconds: 6),
       );
       if (!mounted) return;
+      final merged = await _subtractWalletFees(_mergeRemote(local, remote));
+      if (!mounted) return;
       setState(() {
-        _accounts = _mergeRemote(local, remote);
+        _accounts = merged;
         _isSyncing = false;
         _statusBanner = null;
       });
@@ -653,7 +730,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  'Pending Balance',
+                                                  'Unspent after fees',
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     color:

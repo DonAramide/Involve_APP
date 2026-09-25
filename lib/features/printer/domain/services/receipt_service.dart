@@ -70,7 +70,7 @@ class ReceiptService {
     return await PdfGoogleFonts.notoSansBold();
   }
 
-  String _paymentMethodLabel(String? method) {
+  String _paymentMethodLabel(String? method, {bool school = false}) {
     switch ((method ?? '').trim()) {
       case 'VirtualAccount':
         return 'VA Transfer (Quasar)';
@@ -81,7 +81,7 @@ class ReceiptService {
       case 'Cash':
         return 'Cash';
       case 'Wallet':
-        return 'Customer Wallet';
+        return school ? 'Parent Wallet' : 'Customer Wallet';
       case '':
         return 'N/A';
       default:
@@ -238,7 +238,7 @@ class ReceiptService {
                   pw.Text(dateFormat.format(invoice.dateCreated)),
                 ],
               ),
-              pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}')),
+              pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)}')),
               if (invoice.staffName != null && (template == 'classic' || template == 'professional'))
                 pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Sold By: ${invoice.staffName!.toUpperCase()}')),
               pw.Divider(),
@@ -438,7 +438,7 @@ class ReceiptService {
                       pw.SizedBox(height: 20),
                       pw.Text('INVOICE No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('DATE: ${dateFormat.format(invoice.dateCreated)}'),
-                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}'),
+                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)}'),
                       if (logoImage != null)
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(top: 10),
@@ -719,7 +719,7 @@ class ReceiptService {
                       pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}'),
                       if (invoice.termName != null) pw.Text('Term: ${invoice.termName}'),
                       if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}'),
-                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -789,7 +789,7 @@ class ReceiptService {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text('Payment Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                      pw.Text(_paymentMethodLabel(invoice.paymentMethod)),
+                      pw.Text(_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)),
                        if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                          pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                          pw.Text('Bank: ${settings.bankName}'),
@@ -1015,7 +1015,7 @@ class ReceiptService {
                         pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: pw.TextStyle(fontSize: 11)),
                         if (invoice.termName != null) pw.Text('Term: ${invoice.termName}', style: pw.TextStyle(fontSize: 11)),
                         if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}', style: pw.TextStyle(fontSize: 11)),
-                        pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Payment Method: ${_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                       ],
                     ),
                  ],
@@ -1086,7 +1086,7 @@ class ReceiptService {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text('Payment Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                      pw.Text(_paymentMethodLabel(invoice.paymentMethod)),
+                      pw.Text(_paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)),
                       pw.SizedBox(height: 10),
                        if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                          pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
@@ -1265,7 +1265,7 @@ class ReceiptService {
                         _academicInfoRow('NAME:', invoice.customerName?.toUpperCase() ?? 'N/A'),
                         _academicInfoRow('CLASS:', invoice.className?.toUpperCase() ?? 'N/A'),
                         if (invoice.termName != null) _academicInfoRow('TERM:', invoice.termName!.toUpperCase()),
-                        _academicInfoRow('PAYMENT:', _paymentMethodLabel(invoice.paymentMethod).toUpperCase()),
+                        _academicInfoRow('PAYMENT:', _paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null).toUpperCase()),
                       ],
                     ),
                   ),
@@ -1549,7 +1549,7 @@ class ReceiptService {
                       
                       _voucherRow('Received from', invoice.customerName?.toUpperCase() ?? 'N/A'),
                       _voucherRow('Student ID', _studentIdLabel(invoice)),
-                      _voucherRow('Payment Method', _paymentMethodLabel(invoice.paymentMethod)),
+                      _voucherRow('Payment Method', _paymentMethodLabel(invoice.paymentMethod, school: invoice.studentId != null)),
                        _voucherRow('The sum of', NumberToWords.convert(
                         _pdfDisplayTotal(invoice, useCustomPrices),
                         currency: settings.currencyName,

@@ -20,6 +20,7 @@ const POS_LIVE_SCOPES = [
   'integration:read',
   'pos:icc:write',
   'pos:card:execute',
+  'financial_routing:read',
 ];
 
 function keyPrefix(sk: string): string {

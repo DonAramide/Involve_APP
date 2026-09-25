@@ -53,7 +53,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   }
 
   Future<void> _onLoadStudentProfile(LoadStudentProfile event, Emitter<FinanceState> emit) async {
-    emit(FinanceLoading());
+    // Keep the school dashboard in memory so Back / Withdraw still work.
+    if (state is! FinanceLoading) {
+      emit(FinanceLoading());
+    }
     try {
       // Fetch in parallel for performance
       final results = await Future.wait([
@@ -320,7 +323,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   }
 
   Future<void> _onRefreshDashboard(RefreshDashboardSummary event, Emitter<FinanceState> emit) async {
-    if (state is! FinanceDashboardLoaded) return;
+    if (state is! FinanceDashboardLoaded) {
+      await _onLoadDashboard(LoadSchoolDashboard(), emit);
+      return;
+    }
     final currentState = state as FinanceDashboardLoaded;
 
     SchoolFinancialSummary? remoteSummary;

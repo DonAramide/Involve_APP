@@ -57,7 +57,8 @@ export class TerminalAuditService {
   }
 
   static async getAuditLog(filters: any = {}) {
-    let query = supabase.from('terminal_audit_log').select('*', { count: 'exact' });
+    let query = supabaseAdmin.from('terminal_audit_log').select('*', { count: 'exact' });
+    if (filters.tenantId) query = query.eq('tenant_id', filters.tenantId);
     if (filters.terminalId) query = query.eq('terminal_id', filters.terminalId);
     if (filters.actionType) query = query.eq('action_type', filters.actionType);
     const page = parseInt(filters.page || '1');

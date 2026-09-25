@@ -148,12 +148,23 @@ export class UserController {
           isPlatform ? 'admin' : 'tenant',
         );
 
+        let businessMode: string | undefined;
+        if (!isPlatform && tenantId) {
+          const { data: tenantRow } = await supabaseAdmin
+            .from('tenants')
+            .select('type')
+            .eq('id', tenantId)
+            .maybeSingle();
+          businessMode = tenantRow?.type;
+        }
+
         Promise.allSettled([
           emailService.sendWelcomeEmail(email.trim().toLowerCase(), {
             name: name || email.split('@')[0],
             role,
             defaultPassword,
-            loginUrl
+            loginUrl,
+            businessMode,
           }),
           verificationService.sendOTP(email.trim().toLowerCase(), 'EMAIL', 'PASSWORD_RESET')
         ]).then(() => {

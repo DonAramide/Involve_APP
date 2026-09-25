@@ -2,8 +2,50 @@ import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import { PosService } from '../services/pos.service';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { GovAuditService } from '../services/gov-audit.service';
 
 export class AuditController {
+  /**
+   * GET /api/admin/audit-logs
+   * Tenant-scoped system audit (financial + terminal + device + governance).
+   */
+  static async getSystemAuditLogs(req: Request, res: Response) {
+    try {
+      const user = (req as any).user || {};
+      const role = String(user.role || '').toLowerCase();
+      const platform = ['super_admin', 'internal_staff'].includes(role);
+      const tenantId = platform
+        ? String(req.query.tenantId || req.headers['x-tenant-id'] || user.tenantId || '').trim()
+        : resolveTenantScope(req);
+
+      const result = await GovAuditService.getLedger({
+        tenantId: tenantId || undefined,
+        page: String(req.query.page || '1'),
+        limit: String(req.query.limit || '100'),
+      });
+
+      const data = (result.data || []).map((entry) => ({
+        ...entry,
+        action_type: entry.action,
+        created_at: entry.timestamp,
+        details: entry.metadata || null,
+        terminal_id: entry.module === 'TERMINAL' ? entry.target : null,
+        status: entry.status,
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data,
+        total: result.total,
+        stats: result.stats,
+      });
+    } catch (error: any) {
+      console.error('[AuditController] getSystemAuditLogs Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to load audit logs' });
+    }
+  }
+
   static async getTransactionLedger(req: Request, res: Response) {
     try {
       let tenantId: string;

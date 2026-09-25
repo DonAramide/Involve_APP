@@ -72,7 +72,7 @@ export class InvoiceController {
           const correlationId = invoice.correlationId || randomUUID();
           await InvoiceFacade.createInvoice(
             invoice,
-            { tenantId, deviceId },
+            { tenantId, deviceId, skipTenantEmail: true },
             idempotencyKey,
             correlationId
           );
@@ -81,6 +81,12 @@ export class InvoiceController {
           console.error(`[InvoiceController.bulkSyncInvoices] Failed for invoice ${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
           errors.push(`${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
         }
+      }
+
+      if (synced > 0) {
+        const { TenantAlertService } = require('../services/tenant-alert.service');
+        const total = invoices.reduce((sum: number, inv: any) => sum + Number(inv.totalAmount || inv.total_amount || 0), 0);
+        TenantAlertService.notifyTransaction(tenantId, { count: synced, amount: total });
       }
 
       return res.status(200).json({

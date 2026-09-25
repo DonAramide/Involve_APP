@@ -3,25 +3,8 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { AuditService } from '../services/audit.service';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { UUID_RE, toStableUuid } from '../utils/stable-uuid';
 import crypto from 'crypto';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/** Deterministic UUID so local-1 / local-2 re-sync stably into UUID PKs. */
-function toStableUuid(tenantId: string, entityType: string, raw: string): string {
-  const key = String(raw || '').trim();
-  if (UUID_RE.test(key)) return key.toLowerCase();
-  const hash = crypto
-    .createHash('sha1')
-    .update(`invify-school:${tenantId}:${entityType}:${key || crypto.randomUUID()}`)
-    .digest();
-  const bytes = Buffer.from(hash.subarray(0, 16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x50; // version 5
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = bytes.toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
 
 /** execute_sql wraps input as a subquery — close early, run DDL, comment trailer. */
 function ddlInject(sql: string): string {
@@ -39,8 +22,7 @@ export class SchoolSyncController {
    */
   static async bulkSync(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }

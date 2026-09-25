@@ -1,4 +1,5 @@
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
 
 abstract class SessionContext {
   Future<String?> getTenantId();
@@ -19,10 +20,7 @@ class SessionContextImpl implements SessionContext {
 
   @override
   Future<String?> getDeviceId() async {
-    // In a real implementation, this might read from flutter_secure_storage or device_info_plus
-    // For now, we delegate to SecurityService or return a placeholder if not implemented there
-    // Assuming SecurityService has a method or we fallback
-    return 'device-uuid-placeholder';
+    return DeviceInfoService.getDeviceSuffix();
   }
 
   @override

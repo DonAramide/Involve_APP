@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { getClient } from '../db/pg';
 import { LedgerService } from '../services/ledger.service';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
+import { TenantAlertService } from '../services/tenant-alert.service';
 import { presentInvoice } from '../utils/present-invoice';
 
 export class InvoiceFacade {
@@ -15,12 +16,9 @@ export class InvoiceFacade {
    * The canonical entry point for creating an invoice, shared by REST and Sync.
    * Delegates the actual ACID transaction to InvoiceApplicationService.
    */
-  static async createInvoice(payload: any, context: { tenantId: string; deviceId?: string }, idempotencyKey: string, correlationId?: string) {
-    // 1. Delegate business logic (reusing offline engine)
-    await InvoiceApplicationService.processOfflineInvoice(payload, context, idempotencyKey, correlationId);
+  static async createInvoice(payload: any, context: { tenantId: string; deviceId?: string; skipTenantEmail?: boolean }, idempotencyKey: string, correlationId?: string) {
+    const processed = await InvoiceApplicationService.processOfflineInvoice(payload, context, idempotencyKey, correlationId);
     
-    // 2. We do NOT duplicate ledger or audit logic here because processOfflineInvoice already handles it.
-    // We only trigger transport-agnostic realtime events that the dashboard might rely on.
     io.to(`tenant:${context.tenantId}`).emit('finance.invoice.created', payload);
 
     // 3. WhatsApp invoice notification (non-fatal — never rolls back invoice persistence)
@@ -40,6 +38,14 @@ export class InvoiceFacade {
     } catch (e: any) {
       console.error('[InvoiceFacade] WhatsApp invoice notify failed (non-fatal):', e?.message || e);
     }
+
+    if (!context.skipTenantEmail && !processed?.alreadyExists) {
+      TenantAlertService.notifyTransaction(context.tenantId, {
+        invoiceNumber: payload.invoiceNumber || payload.localInvoiceNumber,
+        amount: Number(payload.totalAmount ?? payload.total_amount ?? payload.amountPaid ?? 0),
+        customerName: payload.customerName || payload.customer_name,
+      });
+    }
     
     return { success: true, syncId: payload.syncId };
   }
@@ -50,8 +56,15 @@ export class InvoiceFacade {
     if (filters.status) query = query.eq('payment_status', filters.status);
     if (filters.limit) query = query.limit(filters.limit);
     
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
+    let { data, error } = await query.order('created_at', { ascending: false });
+    if (error) {
+      let fallback = supabaseAdmin.from('invoices').select('*').eq('tenant_id', tenantId);
+      if (filters.status) fallback = fallback.eq('payment_status', filters.status);
+      if (filters.limit) fallback = fallback.limit(filters.limit);
+      const retry = await fallback.order('created_at', { ascending: false });
+      if (retry.error) throw new Error(error.message);
+      data = retry.data;
+    }
 
     return (data || []).map((row: any) => InvoiceFacade.presentInvoice(row));
   }

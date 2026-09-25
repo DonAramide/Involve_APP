@@ -23,6 +23,7 @@ import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import '../../pages/receipt_preview_page.dart';
 import '../../pages/invoice_success_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
 import 'package:involve_app/features/invoicing/domain/services/report_generator.dart' as reports hide DateTimeRange;
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'report_preview_page.dart';
@@ -1315,22 +1316,44 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   double totalTransfer = 0;
                   double totalVaTransfer = 0;
                   double totalCash = 0;
-                  
+                  double totalWallet = 0;
+
                   for (final inv in state.invoices) {
                     final collected = inv.collectedAmount;
                     if (collected <= 0) continue;
-                    final method = (inv.paymentMethod ?? '').toLowerCase().trim();
-                    if (method == 'pos' || method == 'card') {
-                      totalCard += collected;
-                    } else if (method == 'virtualaccount' ||
-                        method == 'va transfer' ||
-                        method.contains('virtual')) {
-                      totalVaTransfer += collected;
-                    } else if (method == 'transfer' ||
-                        method.startsWith('transfer')) {
-                      totalTransfer += collected;
-                    } else if (method == 'cash') {
-                      totalCash += collected;
+                    switch (classifyInvoicePaymentRail(inv.paymentMethod)) {
+                      case InvoicePaymentRail.card:
+                        totalCard += collected;
+                        break;
+                      case InvoicePaymentRail.vaTransfer:
+                        totalVaTransfer += collected;
+                        break;
+                      case InvoicePaymentRail.bankTransfer:
+                        totalTransfer += collected;
+                        break;
+                      case InvoicePaymentRail.cash:
+                        totalCash += collected;
+                        break;
+                      case InvoicePaymentRail.wallet:
+                        totalWallet += collected;
+                        break;
+                      case InvoicePaymentRail.other:
+                        final method = (inv.paymentMethod ?? '').toLowerCase();
+                        if (method.contains('wallet')) {
+                          totalWallet += collected;
+                        } else if (method.contains('cash')) {
+                          totalCash += collected;
+                        } else if (method.contains('pos') || method.contains('card')) {
+                          totalCard += collected;
+                        } else if (method.contains('virtual') ||
+                            method.contains('va transfer')) {
+                          totalVaTransfer += collected;
+                        } else if (method.contains('transfer')) {
+                          totalTransfer += collected;
+                        } else {
+                          totalWallet += collected;
+                        }
+                        break;
                     }
                   }
 
@@ -1372,6 +1395,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                           metric('VA TRANSFER', totalVaTransfer, Colors.indigo),
                           Container(height: 28, width: 1, color: dividerColor),
                           metric('CASH', totalCash, Colors.teal),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          metric('WALLET', totalWallet, Colors.blueGrey),
+                          const Expanded(child: SizedBox()),
+                          const Expanded(child: SizedBox()),
+                          const Expanded(child: SizedBox()),
                         ],
                       ),
                     ],

@@ -183,6 +183,10 @@ export const adminApi = {
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
   resetTenantSystemPassword: (id, data) => api.post(`/api/admin/tenants/${id}/reset-passwords`, data || {}),
+  getProductionEnv: () => api.get('/api/admin/production-env'),
+  proposeProductionEnv: (data) => api.post('/api/admin/production-env/propose', data),
+  approveProductionEnv: (data) => api.post('/api/admin/production-env/approve', data),
+  rejectProductionEnv: (data) => api.post('/api/admin/production-env/reject', data),
 
   // Tenant-scoped virtual accounts (merchant wallet page)
   getTenantVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),

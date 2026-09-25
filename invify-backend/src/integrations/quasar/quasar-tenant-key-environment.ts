@@ -22,13 +22,14 @@ const LIVE_SCOPES = [
   'integration:read',
   'pos:icc:write',
   'pos:card:execute',
+  // Required for Settlement Destination bank list + account name enquiry
+  'financial_routing:read',
 ];
 
 const TEST_SCOPES = [
   ...LIVE_SCOPES,
   'sandbox:read',
   'sandbox:write',
-  'financial_routing:read',
 ];
 
 export function resolveQuasarTenantKeyEnvironment(): QuasarTenantKeyEnvironment {

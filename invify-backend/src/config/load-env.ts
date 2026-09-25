@@ -60,6 +60,21 @@ function loadFileIfPresent(envPath: string, allowedKeys?: string[]): boolean {
   return true;
 }
 
+function applyGovernorOverlay() {
+  const cwd = process.cwd();
+  const overlayPaths = [
+    '/srv/invify/shared/production-env-overrides.env',
+    path.resolve(cwd, 'production-env-overrides.env'),
+  ];
+  for (const overlayPath of overlayPaths) {
+    if (!fs.existsSync(overlayPath)) continue;
+    const parsed = dotenv.parse(fs.readFileSync(overlayPath));
+    for (const [key, value] of Object.entries(parsed)) {
+      if (String(value || '').trim()) process.env[key] = String(value);
+    }
+  }
+}
+
 function applySecretAliases() {
   const copies: Array<[string, string]> = [
     ['STAGING_JWT_SECRET', 'JWT_SECRET'],
@@ -105,6 +120,7 @@ export function loadEnv(): string {
       loadFileIfPresent(path.resolve(cwd, '.env'), CONTABO_KEYS);
     }
     applySecretAliases();
+    applyGovernorOverlay();
     loadedFile = envFile;
     if (envFile === 'env.staging') {
       console.warn('[env] Loaded env.staging. Rename it to .env.staging so it stays gitignored.');
@@ -122,6 +138,7 @@ export function loadEnv(): string {
   const fallback = dotenv.config();
   applyParsedIfEmpty(fallback.parsed);
   applySecretAliases();
+  applyGovernorOverlay();
   loadedFile = '.env';
   return loadedFile;
 }

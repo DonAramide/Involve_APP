@@ -1200,7 +1200,14 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
       }, message: 'Uploading CAC Document...');
     } catch (e) {
       if (mounted) {
-        _showToast('Error uploading document: $e');
+        String message = e.toString();
+        try {
+          final data = (e as dynamic).response?.data;
+          if (data is Map && data['error'] != null) {
+            message = data['error'].toString();
+          }
+        } catch (_) {}
+        _showToast('Error uploading document: $message');
       }
     }
   }

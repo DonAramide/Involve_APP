@@ -30,8 +30,14 @@ class InvoiceCalculationService {
     return CurrencyFormatter.roundMoney((subtotal + tax) - discountAmount);
   }
 
-  String generateInvoiceNumber() {
-    final now = DateTime.now();
-    return 'INV-${now.year}${now.month}${now.day}-${now.millisecond}';
+  String generateInvoiceNumber({DateTime? at}) {
+    final now = at ?? DateTime.now();
+    final y = now.year.toString();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    final h = now.hour.toString().padLeft(2, '0');
+    final min = now.minute.toString().padLeft(2, '0');
+    final s = now.second.toString().padLeft(2, '0');
+    return 'INV-$y$m$d-$h$min$s';
   }
 }

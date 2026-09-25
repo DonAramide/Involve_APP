@@ -71,10 +71,13 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
       _banks = mapped.isNotEmpty ? mapped : kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
 
       if (settings.isNotEmpty) {
-        _accountNumberController.text = settings['account_number'] ?? '';
-        _accountNameController.text = settings['account_name'] ?? '';
-        _bankNameController.text = settings['bank_name'] ?? '';
-        _bankCodeController.text = settings['bank_code'] ?? '';
+        final row = settings['settings'] is Map
+            ? Map<String, dynamic>.from(settings['settings'] as Map)
+            : settings;
+        _accountNumberController.text = (row['account_number'] ?? row['accountNumber'] ?? '').toString();
+        _accountNameController.text = (row['account_name'] ?? row['accountName'] ?? '').toString();
+        _bankNameController.text = (row['bank_name'] ?? row['bankName'] ?? '').toString();
+        _bankCodeController.text = (row['bank_code'] ?? row['bankCode'] ?? '').toString();
         _selectedBankCode = _bankCodeController.text.isNotEmpty ? _bankCodeController.text : null;
       }
     } catch (e) {

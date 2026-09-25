@@ -928,7 +928,7 @@ const notifications = ref(
     acc[item.key + '_sms'] = false;
     acc[item.key + '_push'] = true;
     return acc;
-  }, { digestFrequency: 'daily' })
+  }, { digestFrequency: 'realtime' })
 );
 
 const digestOptions = [
@@ -940,9 +940,24 @@ const digestOptions = [
 
 const saveNotifications = async () => {
   saving.value.notifications = true;
-  await new Promise(r => setTimeout(r, 800));
-  saving.value.notifications = false;
-  $q.notify({ type: 'positive', message: 'Notification preferences saved.', icon: 'notifications' });
+  try {
+    const { data } = await api.put('/api/notifications/preferences', { prefs: notifications.value });
+    if (data?.prefs) Object.assign(notifications.value, data.prefs);
+    localStorage.setItem('tenant_notification_prefs', JSON.stringify(notifications.value));
+    $q.notify({
+      type: 'positive',
+      message: 'Notification preferences saved. A confirmation email was sent to ' + (profile.value.email || 'your account email') + '.',
+      icon: 'notifications',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Could not save notification preferences.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.notifications = false;
+  }
 };
 
 // ── Bank account state ─────────────────────────────────
@@ -972,6 +987,79 @@ const bank = ref({
   resolving: false,
   savedAccount: savedRaw ? JSON.parse(savedRaw) : null,
 });
+
+const applySavedBank = (row) => {
+  if (!row) return;
+  const accountNumber = String(row.accountNumber || row.account_number || '').trim();
+  if (!accountNumber) return;
+  const saved = {
+    bankName: row.bankName || row.bank_name || '',
+    accountNumber,
+    accountName: row.accountName || row.account_name || '',
+    bankCode: row.bankCode || row.bank_code || '',
+  };
+  bank.value.savedAccount = saved;
+  bank.value.bankName = saved.bankName;
+  bank.value.accountNumber = saved.accountNumber;
+  bank.value.accountName = saved.accountName;
+  localStorage.setItem('tenant_bank_account', JSON.stringify(saved));
+};
+
+const persistBankToApi = async (saved) => {
+  const res = await adminApi.saveTenantPayoutSettings({
+    account_number: saved.accountNumber,
+    bank_name: saved.bankName,
+    account_name: saved.accountName,
+    bank_code: saved.bankCode || undefined,
+  });
+  const row = res.data?.settings || res.data;
+  if (row?.account_number || row?.accountNumber) applySavedBank(row);
+};
+
+const loadBankAccount = async () => {
+  try {
+    const { data } = await adminApi.getTenantPayoutSettings();
+    const row = data?.settings || data;
+    if (row?.account_number || row?.accountNumber) {
+      applySavedBank(row);
+      return;
+    }
+  } catch {
+    /* fall through to browser copy */
+  }
+  if (bank.value.savedAccount?.accountNumber) {
+    try {
+      await persistBankToApi(bank.value.savedAccount);
+    } catch {
+      /* keep local copy until API is reachable */
+    }
+  }
+};
+
+const saveBankAccount = async () => {
+  saving.value.bank = true;
+  try {
+    const saved = {
+      bankName: bank.value.bankName,
+      accountNumber: bank.value.accountNumber,
+      accountName: bank.value.accountName,
+    };
+    await persistBankToApi(saved);
+    $q.notify({
+      type: 'positive',
+      message: 'Bank account saved. The school app can use this account for withdrawals.',
+      icon: 'account_balance',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Could not save bank account.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.bank = false;
+  }
+};
 
 let resolveTimer = null;
 const resolveAccountName = (val) => {
@@ -1005,19 +1093,6 @@ const resolveAccountName = (val) => {
   }
 };
 
-const saveBankAccount = async () => {
-  saving.value.bank = true;
-  await new Promise(r => setTimeout(r, 1000));
-  bank.value.savedAccount = {
-    bankName: bank.value.bankName,
-    accountNumber: bank.value.accountNumber,
-    accountName: bank.value.accountName,
-  };
-  localStorage.setItem('tenant_bank_account', JSON.stringify(bank.value.savedAccount));
-  saving.value.bank = false;
-  $q.notify({ type: 'positive', message: 'Bank account saved. Payout verification will begin within 24 hours.', icon: 'account_balance' });
-};
-
 const clearBankForm = () => {
   bank.value.bankName = '';
   bank.value.accountNumber = '';
@@ -1025,13 +1100,13 @@ const clearBankForm = () => {
   bank.value.bvn = '';
 };
 
-const payoutInfo = [
+const payoutInfo = computed(() => [
   { label: 'Payout Cycle', value: '—' },
   { label: 'Minimum Payout', value: '—' },
   { label: 'Processing Fee', value: '—' },
   { label: 'Next Scheduled Payout', value: '—', valueClass: 'text-grey-5' },
   { label: 'Account Status', value: bank.value.savedAccount ? 'Saved' : 'Not Configured', valueClass: bank.value.savedAccount ? 'text-green-3' : 'text-amber-3' },
-];
+]);
 
 const notifyComingSoon = (feature) => {
   $q.notify({ type: 'info', message: `${feature} — Coming soon.`, icon: 'schedule' });
@@ -1039,11 +1114,16 @@ const notifyComingSoon = (feature) => {
 
 onMounted(async () => {
   await loadProfile();
+  await loadBankAccount();
 
-  // Load saved notification prefs from localStorage
-  const saved = localStorage.getItem('tenant_notification_prefs');
-  if (saved) {
-    try { Object.assign(notifications.value, JSON.parse(saved)); } catch {}
+  try {
+    const { data } = await api.get('/api/notifications/preferences');
+    if (data?.prefs) Object.assign(notifications.value, data.prefs);
+  } catch {
+    const saved = localStorage.getItem('tenant_notification_prefs');
+    if (saved) {
+      try { Object.assign(notifications.value, JSON.parse(saved)); } catch {}
+    }
   }
 
   // Load real login history from backend audit logs

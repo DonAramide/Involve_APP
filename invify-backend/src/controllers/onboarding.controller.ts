@@ -249,6 +249,17 @@ export class OnboardingController {
 
       console.log(`[TELEMETRY] Tenant Provisioned. ID: ${tenant.id}. Industry: ${industry}. Plan: ${plan}.`);
 
+      try {
+        const { emailService } = require('../services/email.service');
+        await emailService.sendWelcomeEmail(email, {
+          name: `${businessName} Owner`,
+          role: 'owner',
+          businessMode: industry,
+        });
+      } catch (emailErr: any) {
+        console.warn('[OnboardingController] Welcome email failed (non-fatal):', emailErr.message);
+      }
+
       // ── Quasar Platform Provisioning (async — non-blocking) ───────────────
       // Runs after the local tenant is committed. Failures are logged but
       // do NOT roll back the Invify tenant, keeping onboarding atomic.
@@ -936,7 +947,13 @@ export class OnboardingController {
 
       try {
         const { emailService } = require('../services/email.service');
-        if (isNewTenant) await emailService.sendWelcomeEmail(email);
+        if (isNewTenant) {
+          await emailService.sendWelcomeEmail(email, {
+            name: `${firstName || ''} ${lastName || ''}`.trim() || undefined,
+            role: 'owner',
+            businessMode: normalizedType,
+          });
+        }
       } catch (emailErr: any) {
         console.warn('[OnboardingController] Welcome email failed (non-fatal):', emailErr.message);
       }

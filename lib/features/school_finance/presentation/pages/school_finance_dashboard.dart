@@ -25,6 +25,7 @@ class SchoolFinanceDashboardPage extends StatefulWidget {
 
 class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage> {
   int _chartFilterDays = 7;
+  FinanceDashboardLoaded? _lastDashboard;
 
   @override
   void initState() {
@@ -85,11 +86,15 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       ),
       body: BlocBuilder<FinanceBloc, FinanceState>(
         builder: (context, state) {
-          if (state is FinanceLoading) {
+          if (state is FinanceDashboardLoaded) {
+            _lastDashboard = state;
+          }
+
+          if (state is FinanceLoading && _lastDashboard == null) {
             return const InvifyLoadingIndicator(message: 'GATHERING FINANCE LEDGERS...');
           }
 
-          if (state is FinanceError) {
+          if (state is FinanceError && _lastDashboard == null) {
             final isNetwork = state.message.toLowerCase().contains('connection') || state.message.toLowerCase().contains('internet');
             return Center(
               child: Padding(
@@ -129,8 +134,9 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
             );
           }
 
-          if (state is FinanceDashboardLoaded) {
-            final summary = state.summary;
+          final dashboard = state is FinanceDashboardLoaded ? state : _lastDashboard;
+          if (dashboard != null) {
+            final summary = dashboard.summary;
             return RefreshIndicator(
               onRefresh: () async {
                 context.read<FinanceBloc>().add(RefreshDashboardSummary());
@@ -206,8 +212,8 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                           ),
                           const SizedBox(height: 24),
                           ModernRevenueChart(
-                            data: state.chartData,
-                            isLoading: state.isRefreshing,
+                            data: dashboard.chartData,
+                            isLoading: dashboard.isRefreshing,
                           ),
                         ],
                       ),
@@ -240,10 +246,10 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final tx = state.transactions[index];
+                          final tx = dashboard.transactions[index];
                           return GlobalTransactionTile(transaction: tx);
                         },
-                        childCount: state.transactions.length,
+                        childCount: dashboard.transactions.length,
                       ),
                     ),
                   ),
@@ -415,11 +421,26 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
 
     try {
       final settings = await repo.getPayoutSettings();
-      final summary = (context.read<FinanceBloc>().state as FinanceDashboardLoaded).summary;
-      
-      if (mounted) Navigator.pop(context); 
+      final blocState = context.read<FinanceBloc>().state;
+      final summary = blocState is FinanceDashboardLoaded
+          ? blocState.summary
+          : _lastDashboard?.summary;
+      if (blocState is! FinanceDashboardLoaded) {
+        context.read<FinanceBloc>().add(LoadSchoolDashboard());
+      }
 
-      if (settings.isEmpty) {
+      if (mounted) Navigator.pop(context);
+
+      if (summary == null) {
+        _showError('Could not load wallet totals. Please refresh and try again.');
+        return;
+      } 
+
+      final payout = settings['settings'] is Map
+          ? Map<String, dynamic>.from(settings['settings'] as Map)
+          : settings;
+      final accountNumber = (payout['account_number'] ?? payout['accountNumber'] ?? '').toString().trim();
+      if (accountNumber.isEmpty) {
         _showError('No bank account configured. Please set one up in Settings.');
         return;
       }
@@ -447,7 +468,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                 children: [
                   const Text('Initiate Withdrawal', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
                   const SizedBox(height: 8),
-                  Text('Funds will be sent to ${settings['bank_name']}', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
+                  Text('Funds will be sent to ${payout['bank_name'] ?? payout['bankName'] ?? 'your saved bank'}', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
                   const SizedBox(height: 24),
                   
                   Container(
@@ -463,8 +484,8 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(settings['account_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text('${settings['account_number']} • ${settings['bank_name']}', style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
+                            Text(payout['account_name'] ?? payout['accountName'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('${payout['account_number'] ?? payout['accountNumber']} • ${payout['bank_name'] ?? payout['bankName'] ?? ''}', style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
                           ],
                         ),
                       ],

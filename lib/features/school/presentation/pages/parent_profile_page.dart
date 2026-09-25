@@ -27,6 +27,7 @@ import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/settings/domain/entities/user_plan.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 
@@ -953,9 +954,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     var processing = false;
     String? status;
 
-    final canUseCard = (context.read<SettingsBloc>().state.userPlan?.hasOnlineAccess ?? false);
+    final plan = context.read<SettingsBloc>().state.userPlan;
+    final licensed = await LicenseService.hasOnlinePlanAccess(
+      businessName: settings?.organizationName,
+    );
+    final canUseCard = licensed || plan?.hasOnlineAccess == true;
     final methods = <String>['Cash'];
-    if (canUseCard && posReady) methods.add('POS');
+    if (canUseCard) methods.add('POS');
     methods.add('Company Account');
 
     await showDialog<void>(
@@ -998,6 +1003,14 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                           child: Text(
                             'Card payments require a Standard or Premium plan.',
                             style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                          ),
+                        )
+                      else if (!posReady)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Card (POS) is available on this plan. Sync the school terminal if a charge fails.',
+                            style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade700),
                           ),
                         ),
                       DropdownButtonFormField<String>(
@@ -1091,7 +1104,19 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                           }
 
                           if (method == 'POS') {
-                            if (config == null) return;
+                            if (config == null ||
+                                (config.posSerialNumber ?? '').trim().isEmpty) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'No POS terminal is assigned to this device. Sync the terminal, then try card again.',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
                             final net = await Connectivity().checkConnectivity();
                             if (net.contains(ConnectivityResult.none) || net.isEmpty) {
                               if (context.mounted) {
@@ -1144,6 +1169,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                                       amount: amount,
                                       method: 'POS',
                                       remarks: remarksController.text,
+                                      creditOnly: outstanding <= 0.001,
                                     ),
                                   );
                               Navigator.pop(ctx);
@@ -1175,6 +1201,7 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                                   amount: amount,
                                   method: method,
                                   remarks: remarksController.text,
+                                  creditOnly: outstanding <= 0.001,
                                 ),
                               );
                           Navigator.pop(ctx);

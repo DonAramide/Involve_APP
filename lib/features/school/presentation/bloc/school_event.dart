@@ -295,14 +295,17 @@ class MakeParentPaymentEvent extends SchoolEvent {
   final double amount;
   final String method;
   final String? remarks;
+  /// When true, the full amount is added to parent credit. Children are not billed.
+  final bool creditOnly;
   const MakeParentPaymentEvent({
     required this.parentId,
     required this.amount,
     required this.method,
     this.remarks,
+    this.creditOnly = false,
   });
   @override
-  List<Object?> get props => [parentId, amount, method, remarks];
+  List<Object?> get props => [parentId, amount, method, remarks, creditOnly];
 }
 
 class MapParentCreditEvent extends SchoolEvent {

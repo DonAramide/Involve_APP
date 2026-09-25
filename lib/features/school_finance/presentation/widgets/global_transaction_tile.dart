@@ -22,13 +22,29 @@ class GlobalTransactionTile extends StatelessWidget {
     
     return GestureDetector(
       onTap: () {
+        final metaId = '${transaction.metadata['student_id'] ?? transaction.metadata['studentId'] ?? ''}'.trim();
+        final walletId = transaction.walletId.trim();
+        final studentId = metaId.isNotEmpty
+            ? metaId
+            : (walletId.isNotEmpty && walletId != 'school' && walletId != 'quasar')
+                ? walletId
+                : '';
+        if (studentId.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No student linked to this payment yet.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => StudentFinanceProfilePage(
-              studentId: transaction.metadata['student_id'] ?? '', 
+              studentId: studentId,
               studentName: studentName,
-              walletId: transaction.walletId,
+              walletId: walletId.isNotEmpty ? walletId : studentId,
             ),
           ),
         );

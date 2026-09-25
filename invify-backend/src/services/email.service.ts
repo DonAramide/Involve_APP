@@ -132,37 +132,68 @@ export class EmailService {
     return this.sendMail(to, subject, body);
   }
 
-  private resolveUserManualPdf(): string | null {
+  private resolveManualPdf(kind: 'school' | 'default'): { path: string; filename: string } | null {
     const fs = require('fs');
     const path = require('path');
-    const envPath = String(process.env.INVIFY_USER_MANUAL_PDF || '').trim();
-    const candidates = [
+    const envKey = kind === 'school' ? 'INVIFY_SCHOOL_MANUAL_PDF' : 'INVIFY_USER_MANUAL_PDF';
+    const envPath = String(process.env[envKey] || '').trim();
+    const filenames =
+      kind === 'school'
+        ? ['InvifySchoolManual.pdf', 'INVIFY_MANUAL_SCHOOL_MODE.pdf']
+        : ['Invify_User_Manual.pdf', 'INVIFY_MASTER_MANUAL.pdf'];
+    const roots = [
       envPath,
-      path.join(process.cwd(), 'dist', 'assets', 'Invify_User_Manual.pdf'),
-      path.join(process.cwd(), 'assets', 'Invify_User_Manual.pdf'),
-      path.resolve(__dirname, '../assets/Invify_User_Manual.pdf'),
-      path.resolve(__dirname, '../../assets/Invify_User_Manual.pdf'),
-      path.resolve(__dirname, '../../../assets/docs/Invify_User_Manual.pdf'),
-      path.resolve(__dirname, '../../../invify-admin/src/assets/Invify_User_Manual.pdf'),
+      ...filenames.flatMap((name) => [
+        path.join(process.cwd(), 'dist', 'assets', name),
+        path.join(process.cwd(), 'assets', name),
+        path.resolve(__dirname, '../assets', name),
+        path.resolve(__dirname, '../../assets', name),
+        path.resolve(__dirname, '../../../assets/docs', name),
+        path.resolve(__dirname, '../../../invify-admin/src/assets', name),
+      ]),
     ].filter(Boolean);
 
-    for (const candidate of candidates) {
+    for (const candidate of roots) {
       try {
-        if (candidate && fs.existsSync(candidate)) return candidate;
+        if (candidate && fs.existsSync(candidate)) {
+          const filename = path.basename(candidate);
+          return { path: candidate, filename };
+        }
       } catch {
         /* ignore unreadable path */
       }
     }
-    console.warn('[EmailService] Invify_User_Manual.pdf not found; sending without the user-manual attachment');
+    console.warn(
+      `[EmailService] ${kind === 'school' ? 'InvifySchoolManual.pdf' : 'Invify_User_Manual.pdf'} not found; sending without that attachment`,
+    );
     return null;
   }
 
-  private userManualAttachment(pdfPath: string | null): any[] {
-    if (!pdfPath) return [];
-    return [{ filename: 'Invify_User_Manual.pdf', path: pdfPath }];
+  private resolveUserManualPdf(): string | null {
+    return this.resolveManualPdf('default')?.path || null;
   }
 
-  private userManualHtml(hasAttachment: boolean): string {
+  private isSchoolMode(mode?: string): boolean {
+    const m = String(mode || '').toLowerCase().trim();
+    return m === 'school' || m === 'academy' || m.includes('school');
+  }
+
+  private userManualAttachment(pdfPath: string | null, filename = 'Invify_User_Manual.pdf'): any[] {
+    if (!pdfPath) return [];
+    return [{ filename, path: pdfPath }];
+  }
+
+  private userManualHtml(hasAttachment: boolean, school = false): string {
+    if (hasAttachment && school) {
+      return `
+        <div style="background-color: #fdfbf7; border-left: 4px solid #ff9800; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
+          <h4 style="margin: 0 0 6px 0; color: #e65100; font-size: 14px;">📘 Attached: Invify School Mode Manual</h4>
+          <p style="margin: 0; font-size: 13px; color: #666;">
+            We have attached the <strong>Invify School Manual (PDF)</strong> for your academy. It covers system setup, term billing, student records, receipts, and daily school operations.
+          </p>
+        </div>
+      `;
+    }
     if (hasAttachment) {
       return `
         <div style="background-color: #fdfbf7; border-left: 4px solid #ff9800; padding: 14px 18px; margin: 20px 0; border-radius: 0 6px 6px 0;">
@@ -208,6 +239,7 @@ export class EmailService {
       role?: string;
       defaultPassword?: string;
       loginUrl?: string;
+      businessMode?: string;
     }
   ): Promise<boolean> {
     const subject = options?.defaultPassword
@@ -218,7 +250,10 @@ export class EmailService {
     const role = options?.role ? options.role.replace(/_/g, ' ').toUpperCase() : 'STAFF';
     const defaultPassword = options?.defaultPassword;
     const loginUrl = this.resolveLoginUrl(options?.loginUrl);
-    const pdfPath = this.resolveUserManualPdf();
+    const school = this.isSchoolMode(options?.businessMode);
+    const manual = this.resolveManualPdf(school ? 'school' : 'default');
+    const pdfPath = manual?.path || null;
+    const pdfName = manual?.filename || (school ? 'InvifySchoolManual.pdf' : 'Invify_User_Manual.pdf');
 
     let credentialsBlock = '';
     if (defaultPassword) {
@@ -265,7 +300,7 @@ export class EmailService {
 
         ${credentialsBlock}
 
-        ${this.userManualHtml(!!pdfPath)}
+        ${this.userManualHtml(!!pdfPath, school)}
 
         <p style="font-size: 14px; color: #666; margin-top: 30px;">
           If you have any questions or need technical support, reach out to your system administrator or email <a href="mailto:support@invify.org" style="color: #3949ab;">support@invify.org</a>.
@@ -279,7 +314,7 @@ export class EmailService {
       </div>
     `;
 
-    return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath));
+    return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath, pdfName));
   }
 
   public async sendProfileUpdateEmail(
@@ -373,6 +408,24 @@ export class EmailService {
     `;
 
     return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath));
+  }
+
+  public async sendTenantAlertEmail(
+    to: string,
+    details: { name?: string; title: string; body: string },
+  ): Promise<boolean> {
+    const name = details.name || to.split('@')[0];
+    const subject = `Invify alert: ${details.title}`;
+    const body = `
+      <p>Hello <strong>${name}</strong>,</p>
+      <h2 style="color: #1a237e; font-size: 20px;">${details.title}</h2>
+      <p style="font-size: 15px; color: #444;">${details.body}</p>
+      <p style="font-size: 13px; color: #888; margin-top: 24px;">
+        You can change these alerts under <strong>My Profile &amp; Security → Alert Notifications</strong> in the tenant portal.
+      </p>
+      <p>Thank you,<br/>Invify Support<br/>support@invify.org</p>
+    `;
+    return this.sendMail(to, subject, body);
   }
 
   public async sendLoginAlertEmail(

@@ -163,11 +163,29 @@ export class ExecutiveFinanceController {
       }
 
       const totalQuasarRemitted = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+      let parentEntities: any[] = [];
+      try {
+        const parentVaRes = await supabaseAdmin
+          .from('school_entities')
+          .select('payload')
+          .eq('tenant_id', tenantId)
+          .in('entity_type', ['parent_virtual_account', 'parent']);
+        parentEntities = parentVaRes.data || [];
+      } catch {
+        parentEntities = [];
+      }
+      const parentVas = parentEntities
+        .map((row: any) => {
+          const p = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+          return String(p.accountNumber || p.virtualAccountNumber || p.virtual_account_number || '').trim();
+        })
+        .filter(Boolean);
       const unsweptVa = splitUnsweptVirtualAccountFunds({
         transactions: [...(quasarCredits || []), ...(quasarSweeps || [])],
         customerVas: (customerVaRes.data || []).map((row: any) => row.virtual_account_number),
         staffVas: (staffVaRes.data || []).map((row: any) => row.virtual_account_number),
         studentVas: (studentVaRes.data || []).map((row: any) => row.virtual_account_number),
+        parentVas,
       });
       let pendingVirtualAccountFunds = unsweptVa.total;
       try {
@@ -181,10 +199,22 @@ export class ExecutiveFinanceController {
         console.warn('[ExecutiveFinance] Quasar live VA total unavailable:', err?.message || err);
       }
       pendingVirtualAccountFunds = roundNaira(pendingVirtualAccountFunds);
-      // Held = unswept customer/staff VA + card not yet remitted. Own-bank is excluded.
+      const parentVaDeposits = roundNaira(
+        (quasarCredits || []).reduce((sum, tx) => {
+          const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : {};
+          const via = String(meta.paidVia || meta.paid_via || '').toLowerCase();
+          if (!via.includes('parent')) return sum;
+          const amount = transactionAmountNaira(tx);
+          return amount > 0 ? sum + amount : sum;
+        }, 0),
+      );
+      // Held = unswept customer/staff/parent VA + card not yet remitted. Own-bank is excluded.
+      // Parent transfers sit with Quasar until payout even after they credit the tenant wallet.
       const pendingQuasarRemittance = Math.max(
         0,
         pendingVirtualAccountFunds + totalQuasarFromCardInvoices - totalQuasarRemitted,
+        parentVaDeposits + totalQuasarFromCardInvoices - totalQuasarRemitted,
+        totalQuasarFromDeposits + totalQuasarFromCardInvoices - totalQuasarRemitted,
       );
       const totalQuasarCollected = pendingQuasarRemittance + totalQuasarRemitted;
 
@@ -244,6 +274,7 @@ export class ExecutiveFinanceController {
           customer: unsweptVa.customer,
           staff: unsweptVa.staff,
           student: unsweptVa.student,
+          parent: unsweptVa.parent,
           unmapped: unsweptVa.unmapped,
         },
         salesSummary: {
@@ -450,15 +481,18 @@ export class ExecutiveFinanceController {
         if (!(amount > 0)) continue;
         const meta = tx.metadata || {};
         const name = meta.senderName || meta.studentName || 'Virtual Account credit';
+        const parentOwned = String(meta.paidVia || meta.paid_via || '').toLowerCase().includes('parent');
         items.push({
           id: tx.id,
           wallet_id: tx.wallet_id || 'quasar',
           amount,
           type: 'credit',
           reference: tx.reference || String(tx.id),
-          description: name,
+          description: parentOwned
+            ? `Parent transfer (Quasar) · ${name}`
+            : `Quasar VA credit · ${name}`,
           balance_after: 0,
-          channel: 'Transfer',
+          channel: 'Quasar',
           created_at: tx.created_at,
           metadata: {
             student_name: name,
@@ -466,6 +500,7 @@ export class ExecutiveFinanceController {
             virtualAccountNumber:
               meta.virtualAccountNumber || meta.accountNumber || meta.virtual_account_number || null,
             quasar: true,
+            parentTransfer: parentOwned,
           },
         });
       }
@@ -565,42 +600,49 @@ export class ExecutiveFinanceController {
     if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
 
     try {
-      // Fetch distinct settlement operations from the ledger for this tenant
+      // p10 ledger_entries columns: id, ledger_id, tenant_id, account, type, amount, currency, created_at
       const { data, error } = await supabaseAdmin
         .from('ledger_entries')
-        .select('id, entry_type, amount, status, created_at, metadata, reference')
+        .select('id, account, type, amount, created_at')
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('[ExecutiveFinanceController] getSettlementPhases ledger skip:', error.message);
+        return res.status(200).json([]);
+      }
 
       const phasesMap = new Map<string, any>();
-      
-      data?.forEach(entry => {
-        // derive operational phase from metadata, reference prefix, or type
-        let phaseCode = 'SYSTEM';
-        if (entry.metadata && entry.metadata.source) phaseCode = entry.metadata.source;
-        else if (entry.reference && entry.reference.startsWith('QS-TX')) phaseCode = 'QUASAR_POS';
-        else if (entry.reference && entry.reference.startsWith('QS-PO')) phaseCode = 'TREASURY_PAYOUT';
-        else phaseCode = entry.entry_type || 'UNKNOWN';
+
+      data?.forEach((entry: any) => {
+        const account = String(entry.account || 'SYSTEM');
+        const phaseCode =
+          account === 'QUASAR_CLEARING' ? 'QUASAR_POS'
+          : account === 'EXTERNAL_BANK' ? 'TREASURY_PAYOUT'
+          : account === 'USER_WALLET' ? 'CUSTOMER_WALLET'
+          : account;
 
         if (!phasesMap.has(phaseCode)) {
+          const kobo = Number(entry.amount || 0);
+          const naira = kobo >= 1000 ? kobo / 100 : kobo;
           phasesMap.set(phaseCode, {
             title: phaseCode.toUpperCase().replace(/_/g, ' ') + ' BATCHING',
-            desc: `Aggregating ${phaseCode} events. Last amount: N${entry.amount}`,
-            active: entry.status === 'completed',
-            timestamp: entry.created_at
+            desc: `Last ${entry.type || 'ENTRY'}: ₦${naira.toFixed(2)}`,
+            active: true,
+            timestamp: entry.created_at,
           });
         }
       });
 
-      const phases = Array.from(phasesMap.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const phases = Array.from(phasesMap.values()).sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      );
 
       return res.status(200).json(phases);
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] getSettlementPhases Error:', error.message);
-      return res.status(500).json({ error: 'Failed to fetch settlement phases' });
+      return res.status(200).json([]);
     }
   }
 
@@ -722,6 +764,166 @@ export class ExecutiveFinanceController {
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] getMissedPayments Error:', error.message);
       return res.status(500).json({ error: 'Failed to fetch missed payments' });
+    }
+  }
+
+  /**
+   * GET /api/finance/student/:studentId/summary
+   * School-mode ledger summary for one student / parent key.
+   */
+  static async getStudentSummary(req: Request, res: Response) {
+    const tenantId = resolveTenantScope(req);
+    const studentId = String(req.params.studentId || '').trim();
+    if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+    if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
+
+    try {
+      const { data: invoices, error } = await supabaseAdmin
+        .from('invoices')
+        .select('amount_paid, total_amount, balance_due, payment_status, student_id, customer_id')
+        .eq('tenant_id', tenantId)
+        .or(`student_id.eq.${studentId},customer_id.eq.${studentId}`);
+      if (error) throw error;
+
+      let totalPaid = 0;
+      let outstandingBalance = 0;
+      for (const inv of invoices || []) {
+        totalPaid += collectedInvoiceAmount(inv);
+        outstandingBalance += outstandingInvoiceAmount(inv);
+      }
+      totalPaid = roundNaira(totalPaid);
+      outstandingBalance = roundNaira(Math.max(0, outstandingBalance));
+      const totalFees = roundNaira(totalPaid + outstandingBalance);
+
+      let currentBalance = 0;
+      try {
+        const { data: customer } = await supabaseAdmin
+          .from('customers')
+          .select('wallet_balance, balance')
+          .eq('tenant_id', tenantId)
+          .or(`id.eq.${studentId},external_id.eq.${studentId}`)
+          .maybeSingle();
+        currentBalance = roundNaira(
+          Number(customer?.wallet_balance ?? customer?.balance ?? 0),
+        );
+      } catch {
+        currentBalance = 0;
+      }
+
+      return res.status(200).json({
+        totalFees,
+        totalPaid,
+        outstandingBalance,
+        currentBalance,
+        studentId,
+      });
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getStudentSummary Error:', error.message);
+      return res.status(500).json({ error: 'Failed to load student summary' });
+    }
+  }
+
+  /**
+   * GET /api/finance/student/:studentId/transactions
+   */
+  static async getStudentTransactions(req: Request, res: Response) {
+    const tenantId = resolveTenantScope(req);
+    const studentId = String(req.params.studentId || '').trim();
+    if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+    if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    try {
+      const [invoicesRes, creditsRes] = await Promise.all([
+        supabaseAdmin
+          .from('invoices')
+          .select(
+            'id, invoice_number, customer_name, amount_paid, payment_method, payment_status, created_at, student_id, customer_id',
+          )
+          .eq('tenant_id', tenantId)
+          .or(`student_id.eq.${studentId},customer_id.eq.${studentId}`)
+          .gt('amount_paid', 0)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('id, reference, amount, type, metadata, created_at, wallet_id')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
+          .order('created_at', { ascending: false })
+          .limit(limit * 2),
+      ]);
+
+      const channelForRail = (rail: string) => {
+        if (rail === 'card') return 'Card';
+        if (rail === 'va_transfer') return 'Transfer';
+        if (rail === 'bank_transfer') return 'Bank';
+        if (rail === 'cash') return 'Cash';
+        if (rail === 'wallet') return 'Wallet';
+        return 'Other';
+      };
+
+      const items: any[] = [];
+      for (const inv of invoicesRes.data || []) {
+        const collected = collectedInvoiceAmount(inv);
+        if (!(collected > 0)) continue;
+        const rail = classifyInvoicePaymentMethod(inv.payment_method);
+        items.push({
+          id: inv.id,
+          wallet_id: inv.student_id || inv.customer_id || studentId,
+          amount: collected,
+          type: 'credit',
+          reference: inv.invoice_number,
+          description: `Fee Payment #${inv.invoice_number || inv.id} for ${inv.customer_name || 'Customer'}`,
+          balance_after: 0,
+          channel: channelForRail(rail),
+          created_at: inv.created_at,
+          metadata: {
+            student_id: inv.student_id || studentId,
+            student_name: inv.customer_name,
+            payment_method: inv.payment_method,
+          },
+        });
+      }
+
+      for (const tx of creditsRes.data || []) {
+        const meta = tx.metadata || {};
+        const metaStudent =
+          meta.studentId || meta.student_id || meta.customerId || meta.customer_id || meta.parentKey || '';
+        const walletMatch = String(tx.wallet_id || '') === studentId;
+        const metaMatch = String(metaStudent) === studentId;
+        if (!walletMatch && !metaMatch) continue;
+        const amount = transactionAmountNaira(tx);
+        if (!(amount > 0)) continue;
+        const name = meta.senderName || meta.studentName || 'Virtual Account credit';
+        items.push({
+          id: tx.id,
+          wallet_id: tx.wallet_id || studentId,
+          amount,
+          type: 'credit',
+          reference: tx.reference || String(tx.id),
+          description: name,
+          balance_after: 0,
+          channel: 'Transfer',
+          created_at: tx.created_at,
+          metadata: {
+            student_name: name,
+            student_id: metaStudent || studentId,
+            virtualAccountNumber:
+              meta.virtualAccountNumber || meta.accountNumber || meta.virtual_account_number || null,
+            quasar: true,
+          },
+        });
+      }
+
+      items.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      return res.status(200).json(items.slice(0, limit));
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getStudentTransactions Error:', error.message);
+      return res.status(500).json({ error: 'Failed to load student transactions' });
     }
   }
 }

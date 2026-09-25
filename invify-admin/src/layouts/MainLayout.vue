@@ -1000,6 +1000,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Platform Configuration', path: '/admin/config', icon: 'tune', color: 'cyan-4' },
         { label: 'Authentication Settings', path: '/admin/settings/authentication', icon: 'security', color: 'indigo-4', badge: 'Onboarding', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
         { label: 'Verification Log', path: '/admin/settings/verification-log', icon: 'mark_email_unread', color: 'indigo-3', badge: 'OTP', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
+        { label: 'Production Env', path: '/admin/production-env', icon: 'vpn_key', color: 'red-4', badge: 'Governor', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'Integration Vault', path: '/admin/vault', icon: 'lock', color: 'orange-4', badge: 'Secrets', badgeBg: 'orange-10', badgeColor: 'orange-2' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },

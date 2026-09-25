@@ -1,10 +1,10 @@
 // lib/features/admin/presentation/pages/admin_finance_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import '../bloc/admin_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
@@ -12,6 +12,9 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 class AdminFinanceDashboardPage extends StatefulWidget {
   const AdminFinanceDashboardPage({super.key});
@@ -21,11 +24,123 @@ class AdminFinanceDashboardPage extends StatefulWidget {
 }
 
 class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
+  Map<String, dynamic>? _exec;
+  List<Map<String, dynamic>> _cloudEntries = [];
+  List<double> _weekBars = const [0, 0, 0, 0, 0, 0, 0, 0];
+  double _weekChangePct = 0;
+
   @override
   void initState() {
     super.initState();
     context.read<HistoryBloc>().add(LoadHistory());
     context.read<AdminBloc>().add(LoadAdminDashboard());
+    _loadQuasarLedger();
+  }
+
+  double _n(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v') ?? 0;
+  }
+
+  Future<void> _loadQuasarLedger() async {
+    try {
+      final sl = GetIt.instance;
+      Map<String, dynamic> summary = {};
+      List<Map<String, dynamic>> entries = [];
+      List<Map<String, dynamic>> days = [];
+      if (sl.isRegistered<FinanceRepository>()) {
+        final repo = sl<FinanceRepository>();
+        summary = await repo.getExecutiveSummary();
+        try {
+          days = await repo.apiClient.get('/api/finance/daily-revenue', queryParameters: {'days': 28}).then((r) {
+            final raw = r.data;
+            if (raw is List) {
+              return raw
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList();
+            }
+            return <Map<String, dynamic>>[];
+          });
+        } catch (_) {}
+        try {
+          final res = await repo.apiClient.get(
+            '/api/finance/transactions',
+            queryParameters: {'limit': 30},
+          );
+          if (res.data is List) {
+            entries = (res.data as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+        } catch (_) {}
+      } else if (sl.isRegistered<FinanceApiClient>()) {
+        final client = sl<FinanceApiClient>();
+        summary = Map<String, dynamic>.from(
+          (await client.get('/api/finance/executive-summary')).data as Map,
+        );
+        try {
+          final res = await client.get('/api/finance/transactions', queryParameters: {'limit': 30});
+          if (res.data is List) {
+            entries = (res.data as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() {
+        _exec = summary;
+        _cloudEntries = entries;
+        if (days.isNotEmpty) {
+          _weekBars = _barsFromDaily(days);
+          _weekChangePct = _changeFromDaily(days);
+        }
+      });
+    } catch (e) {
+      debugPrint('[InternalLedger] executive summary unavailable: $e');
+    }
+  }
+
+  List<double> _barsFromDaily(List<Map<String, dynamic>> days) {
+    final values = days.map((d) => _n(d['revenue'])).toList();
+    if (values.length < 8) {
+      while (values.length < 8) {
+        values.insert(0, 0);
+      }
+      return values;
+    }
+    final chunk = (values.length / 8).ceil();
+    final bars = <double>[];
+    for (var i = 0; i < 8; i++) {
+      final start = i * chunk;
+      final end = (start + chunk).clamp(0, values.length);
+      var sum = 0.0;
+      for (var j = start; j < end; j++) {
+        sum += values[j];
+      }
+      bars.add(sum);
+    }
+    return bars;
+  }
+
+  double _changeFromDaily(List<Map<String, dynamic>> days) {
+    if (days.length < 14) return 0;
+    final half = days.length ~/ 2;
+    var prev = 0.0;
+    var next = 0.0;
+    for (var i = 0; i < days.length; i++) {
+      final v = _n(days[i]['revenue']);
+      if (i < half) {
+        prev += v;
+      } else {
+        next += v;
+      }
+    }
+    if (prev <= 0.001) return next > 0 ? 100 : 0;
+    return ((next - prev) / prev) * 100;
   }
 
   @override
@@ -35,37 +150,69 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
         return BlocBuilder<HistoryBloc, HistoryState>(
           builder: (context, historyState) {
             final invoices = historyState is HistoryLoaded ? historyState.invoices : <Invoice>[];
-            
+
             double totalWallet = 0.0;
             double cashOnHand = 0.0;
-            double pendingQuasar = 0.0;
+            double pendingQuasarLocal = 0.0;
 
             for (final inv in invoices) {
-              final method = inv.paymentMethod?.toLowerCase() ?? 'cash';
+              final rail = classifyInvoicePaymentRail(inv.paymentMethod);
               final amount = inv.amountPaid;
-              if (method == 'cash') {
-                cashOnHand += amount;
-              } else {
-                totalWallet += amount;
-              }
-              if (inv.paymentStatus != 'Paid') {
-                pendingQuasar += inv.balanceAmount;
+              switch (rail) {
+                case InvoicePaymentRail.cash:
+                  cashOnHand += amount;
+                  break;
+                case InvoicePaymentRail.wallet:
+                  totalWallet += amount;
+                  break;
+                case InvoicePaymentRail.card:
+                case InvoicePaymentRail.vaTransfer:
+                  pendingQuasarLocal += amount;
+                  break;
+                case InvoicePaymentRail.bankTransfer:
+                case InvoicePaymentRail.other:
+                  break;
               }
             }
 
+            final sales = _exec?['salesSummary'] is Map
+                ? Map<String, dynamic>.from(_exec!['salesSummary'] as Map)
+                : const <String, dynamic>{};
+            final apiWallet = _n(_exec?['walletBalance'] ?? adminState.metrics['internal_wallet']);
+            if (apiWallet > totalWallet) totalWallet = apiWallet;
+            final apiCash = _n(sales['cash']);
+            if (apiCash > cashOnHand) cashOnHand = apiCash;
+            final pendingQuasar = [
+              _n(_exec?['pendingQuasarRemittance']),
+              _n(_exec?['pendingVirtualAccountFunds']),
+              _n(_exec?['unsweptVirtualAccount'] is Map
+                  ? (_exec!['unsweptVirtualAccount'] as Map)['parent']
+                  : 0),
+              pendingQuasarLocal,
+              _n(adminState.metrics['pending_quasar']),
+            ].fold<double>(0, (m, v) => v > m ? v : m);
+
             return Scaffold(
               appBar: AppBar(title: const Text('Internal Ledger Analytics')),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildBalanceOverview(context, totalWallet, cashOnHand, pendingQuasar),
-                    const SizedBox(height: 24),
-                    _buildRevenueStreamChart(context),
-                    const SizedBox(height: 24),
-                    _buildRecentTransactions(context),
-                  ],
+              body: RefreshIndicator(
+                onRefresh: () async {
+                  context.read<HistoryBloc>().add(LoadHistory());
+                  context.read<AdminBloc>().add(LoadAdminDashboard());
+                  await _loadQuasarLedger();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildBalanceOverview(context, totalWallet, cashOnHand, pendingQuasar),
+                      const SizedBox(height: 24),
+                      _buildRevenueStreamChart(context),
+                      const SizedBox(height: 24),
+                      _buildRecentTransactions(context, invoices),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -128,24 +275,31 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            '+18.4% vs previous cycle',
-            style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 20),
+          Text(
+            _weekChangePct.abs() < 0.05
+                ? 'No change vs previous cycle'
+                : '${_weekChangePct >= 0 ? '+' : ''}${_weekChangePct.toStringAsFixed(1)}% vs previous cycle',
+            style: TextStyle(
+              color: _weekChangePct >= 0 ? Colors.greenAccent : Colors.orangeAccent,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
           ),
           const SizedBox(height: 24),
-          // Beautiful visual bars simulating dynamic volume
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(8, (index) {
-              final heights = [40.0, 65.0, 50.0, 90.0, 70.0, 110.0, 85.0, 125.0];
+              final raw = _weekBars.length > index ? _weekBars[index] : 0.0;
+              final maxBar = _weekBars.fold<double>(0, (m, v) => v > m ? v : m);
+              final height = maxBar <= 0 ? 12.0 : (12 + (raw / maxBar) * 113);
               final labels = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'Now'];
               final isCurrent = index == 7;
               return Column(
                 children: [
                   Container(
                     width: 24,
-                    height: heights[index],
+                    height: height,
                     decoration: BoxDecoration(
                       color: isCurrent ? Colors.amberAccent : Colors.white.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(6),
@@ -162,7 +316,7 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
     );
   }
 
-  Widget _buildRecentTransactions(BuildContext context) {
+  Widget _buildRecentTransactions(BuildContext context, List<Invoice> invoices) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -195,26 +349,61 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
                   return const InvifyLoadingIndicator(message: 'FETCHING LEDGER ENTRIES...');
                 }
                 
-                final invoices = historyState is HistoryLoaded ? historyState.invoices : [];
-                if (invoices.isEmpty) {
+                final invoices = historyState is HistoryLoaded ? historyState.invoices : <Invoice>[];
+                if (invoices.isEmpty && _cloudEntries.isEmpty) {
                   return Container(
                     padding: const EdgeInsets.all(24),
                     alignment: Alignment.center,
                     child: const Text('No ledger entries recorded yet.', style: TextStyle(color: Colors.grey)),
                   );
                 }
-                
+
+                final recentCloud = _cloudEntries.take(10).toList();
                 final recentInvoices = invoices.take(10).toList();
-                
+                final useCloud = recentCloud.isNotEmpty;
+
                 return ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: recentInvoices.length,
+                  itemCount: useCloud ? recentCloud.length : recentInvoices.length,
                   separatorBuilder: (_, __) => const Divider(),
                   itemBuilder: (context, index) {
+                    if (useCloud) {
+                      final row = recentCloud[index];
+                      final amount = _n(row['amount']);
+                      final title = (row['description'] ?? row['reference'] ?? 'Ledger entry').toString();
+                      final method = (row['channel'] ?? 'Quasar').toString();
+                      DateTime? when;
+                      try {
+                        when = DateTime.tryParse('${row['created_at'] ?? ''}');
+                      } catch (_) {}
+                      final dateStr = when != null
+                          ? DateFormat('MMM dd, hh:mm a').format(when.toLocal())
+                          : '';
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.orange.withOpacity(0.12),
+                          child: Icon(
+                            method.toLowerCase().contains('quasar') ||
+                                    title.toLowerCase().contains('parent transfer')
+                                ? Icons.account_balance
+                                : Icons.receipt_long,
+                            color: Colors.orange.shade800,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+                        subtitle: Text('$method • $dateStr', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        trailing: Text(
+                          '+${formatter.format(amount)}',
+                          style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      );
+                    }
+
                     final invoice = recentInvoices[index];
                     final dateStr = DateFormat('MMM dd, hh:mm a').format(invoice.dateCreated);
-                    final method = invoice.paymentMethod ?? 'Cash';
+                    final method = paymentRailChannelLabel(invoice.paymentMethod);
                     
                     return ListTile(
                       leading: CircleAvatar(

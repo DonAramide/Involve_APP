@@ -92,6 +92,7 @@ import { InvestigationQueueService } from './modules/financial-platform/reconcil
 import { QuasarConnector } from './modules/financial-platform/infrastructure/QuasarConnector';
 import { HealthController } from './controllers/health.controller';
 import { FinancialDisputeController } from './controllers/financial-dispute.controller';
+import { ProductionEnvController, requireProductionEnvGovernor } from './controllers/production-env.controller';
 
 import { authenticate, optionalAuthenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
@@ -364,6 +365,10 @@ registerCollisionAdmin('post', '/tenants', authenticate, checkRole(['super_admin
 registerCollisionAdmin('post', '/tenants/ping-missing-identity', authenticate, checkRole(['super_admin']), AdminController.pingMissingTenantIdentities);
 registerCollisionAdmin('post', '/tenants/:id/ping-identity', authenticate, checkRole(['super_admin']), AdminController.pingTenantIdentity);
 registerCollisionAdmin('get', '/verification-log', authenticate, checkRole(['super_admin']), AdminController.listVerificationLog);
+registerCollisionAdmin('get', '/production-env', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.getSnapshot);
+registerCollisionAdmin('post', '/production-env/propose', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.propose);
+registerCollisionAdmin('post', '/production-env/approve', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.approve);
+registerCollisionAdmin('post', '/production-env/reject', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.reject);
 registerCollisionAdmin('patch', '/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 registerCollisionAdmin('patch', '/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
 registerCollisionAdmin('post', '/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
@@ -549,7 +554,7 @@ app.get('/v1/runtime/config', authenticate, RuntimeController.getConfig);
 // Admin Operations
 app.post('/api/admin/master-mode/enter', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.enterMasterMode);
 registerCollisionAdmin('get', '/dashboard-stats', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.getDashboardStats);
-app.get('/api/admin/audit-logs', authenticate, checkRole(['super_admin', 'admin', 'owner']), TerminalController.getAuditLog);
+app.get('/api/admin/audit-logs', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'owner', 'tenant_admin', 'finance_staff', 'staff']), AuditController.getSystemAuditLogs);
 app.get('/admin/profile', authenticate, AdminController.getProfile);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 app.get('/api/admin/profile', authenticate, AdminController.getProfile);
@@ -581,7 +586,7 @@ const storage = multer.diskStorage({
 
 const localUpload = multer({ storage: storage });
 
-app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('cac_document'), AdminController.uploadCacDocument);
+app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), upload.single('cac_document'), AdminController.uploadCacDocument);
 app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('backup_file'), AdminController.uploadClaudeBackup);
 app.post('/api/admin/virtual-account/init', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.initVirtualAccountEngine);
 
@@ -818,6 +823,8 @@ app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin'
 app.get('/api/finance/school-dashboard', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolDashboard);
 app.get('/api/finance/daily-revenue', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getDailyRevenue);
 app.get('/api/finance/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolTransactions);
+app.get('/api/finance/student/:studentId/summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getStudentSummary);
+app.get('/api/finance/student/:studentId/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getStudentTransactions);
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
 app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
@@ -967,10 +974,14 @@ app.post('/api/finance/integrity/recompute', authenticate, IntegrityController.r
 app.get('/api/notifications', authenticate, NotificationController.getNotifications);
 app.post('/api/notifications/:id/read', authenticate, NotificationController.markAsRead);
 app.post('/api/notifications/read-all', authenticate, NotificationController.markAllAsRead);
+app.get('/api/notifications/preferences', authenticate, NotificationController.getPreferences);
+app.put('/api/notifications/preferences', authenticate, NotificationController.savePreferences);
 // Compat aliases used by admin NotificationEngine (historical /api/v1 path)
 app.get('/api/v1/notifications', authenticate, NotificationController.getNotifications);
 app.post('/api/v1/notifications/:id/read', authenticate, NotificationController.markAsRead);
 app.post('/api/v1/notifications/read-all', authenticate, NotificationController.markAllAsRead);
+app.get('/api/v1/notifications/preferences', authenticate, NotificationController.getPreferences);
+app.put('/api/v1/notifications/preferences', authenticate, NotificationController.savePreferences);
 
 // Student & Finance Core
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);

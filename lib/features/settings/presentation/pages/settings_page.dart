@@ -762,6 +762,33 @@ class _SettingsPageState extends State<SettingsPage> {
           final localInvoices = await db.select(db.invoices).get();
           if (localInvoices.isNotEmpty) {
             final List<Map<String, dynamic>> invoicePayloads = [];
+            Map<int, dynamic> studentsById = {};
+            try {
+              final localStudents = await db.select(db.students).get();
+              studentsById = {for (final s in localStudents) s.id: s};
+            } catch (_) {}
+
+            String studentCloudId(dynamic row) {
+              final existing = row.syncId?.toString() ?? '';
+              if (existing.isNotEmpty &&
+                  !existing.startsWith('local-') &&
+                  RegExp(
+                    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+                  ).hasMatch(existing)) {
+                return existing;
+              }
+              final admission = row.admissionNumber?.toString().trim() ?? '';
+              if (admission.isNotEmpty) {
+                return const Uuid().v5(
+                  '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                  'invify-school-student-admission-$admission',
+                );
+              }
+              return const Uuid().v5(
+                '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                'invify-school-student-${row.id}',
+              );
+            }
 
             for (final inv in localInvoices) {
               final itemsForInv = await (db.select(db.invoiceItems)..where((ii) => ii.invoiceId.equals(inv.id))).get();
@@ -782,10 +809,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 }
               }
 
+              final studentRow = inv.studentId != null ? studentsById[inv.studentId!] : null;
+              final studentSyncId = studentRow != null ? studentCloudId(studentRow) : null;
               invoicePayloads.add({
                 'syncId': inv.syncId ?? 'INV-${inv.id}-${DateTime.now().millisecondsSinceEpoch}',
                 'invoiceNumber': inv.invoiceNumber,
                 'customerId': inv.customerId,
+                'studentSyncId': studentSyncId,
                 'customerName': inv.customerName,
                 'customerPhone': null,
                 'customerAddress': inv.customerAddress,
@@ -817,8 +847,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 data: {'invoices': invoicePayloads},
               );
               debugPrint('Bulk invoice sync result: synced=${invResult.data?['synced']}, errors=${invResult.data?['errors']}');
+              final invErrors = invResult.data?['errors'];
+              if (invErrors is List && invErrors.isNotEmpty) {
+                throw Exception(invErrors.first.toString());
+              }
             } catch (invErr) {
               debugPrint('Bulk invoice sync error: $invErr');
+              rethrow;
             }
           }
 

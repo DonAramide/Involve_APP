@@ -1,6 +1,8 @@
 // src/controllers/notification.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { TenantAlertService } from '../services/tenant-alert.service';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 export class NotificationController {
   /**
@@ -72,6 +74,35 @@ export class NotificationController {
       return res.status(200).json({ success: true });
     } catch (error: any) {
       return res.status(500).json({ error: 'Failed to update notifications' });
+    }
+  }
+
+  static async getPreferences(req: Request, res: Response) {
+    try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const prefs = await TenantAlertService.getPrefs(tenantId);
+      return res.status(200).json({ success: true, prefs });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: err?.message || 'Failed to load preferences' });
+    }
+  }
+
+  static async savePreferences(req: Request, res: Response) {
+    try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const prefs = await TenantAlertService.savePrefs(tenantId, req.body?.prefs || req.body || {});
+      const userEmail = String((req as any).user?.email || '').trim();
+      if (userEmail.includes('@')) {
+        const { emailService } = require('../services/email.service');
+        void emailService.sendTenantAlertEmail(userEmail, {
+          name: (req as any).user?.name || userEmail.split('@')[0],
+          title: 'Notification preferences saved',
+          body: 'Your tenant alert preferences were saved. You will get email for the events you enabled (sales, withdrawals, low balance, and security).',
+        });
+      }
+      return res.status(200).json({ success: true, prefs });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: err?.message || 'Failed to save preferences' });
     }
   }
 }

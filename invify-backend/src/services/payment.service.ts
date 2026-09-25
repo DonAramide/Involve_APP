@@ -292,6 +292,13 @@ export class PaymentService {
       },
     });
 
+    try {
+      const { TenantAlertService } = require('./tenant-alert.service');
+      TenantAlertService.notifyWithdrawal(tenantId, { amount, reference });
+    } catch (alertErr: any) {
+      console.warn('[PaymentService] Tenant withdrawal alert skipped:', alertErr?.message || alertErr);
+    }
+
     return {
       reference,
       status: 'PENDING',

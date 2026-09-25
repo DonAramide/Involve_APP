@@ -7,6 +7,11 @@ describe('classifyInvoicePaymentMethod', () => {
     expect(isQuasarInvoiceRail('bank_transfer')).toBe(false);
   });
 
+  test('maps parent VA transfer to the Quasar VA rail', () => {
+    expect(classifyInvoicePaymentMethod('parent_account')).toBe('va_transfer');
+    expect(classifyInvoicePaymentMethod('Parent Transfer')).toBe('va_transfer');
+  });
+
   test('maps virtual account to the Quasar VA rail', () => {
     expect(classifyInvoicePaymentMethod('VirtualAccount')).toBe('va_transfer');
     expect(classifyInvoicePaymentMethod('virtual_account')).toBe('va_transfer');
@@ -39,6 +44,7 @@ describe('splitUnsweptVirtualAccountFunds', () => {
     expect(split.customer).toBe(4000);
     expect(split.staff).toBe(3000);
     expect(split.unmapped).toBe(0);
+    expect(split.parent).toBe(0);
     expect(split.total).toBe(7000);
   });
 
@@ -68,5 +74,19 @@ describe('splitUnsweptVirtualAccountFunds', () => {
     });
     expect(split.customer).toBe(4.5);
     expect(split.total).toBe(4.5);
+  });
+
+  test('counts parent virtual accounts as Quasar-held funds', () => {
+    const split = splitUnsweptVirtualAccountFunds({
+      customerVas: [],
+      staffVas: [],
+      parentVas: ['900111'],
+      transactions: [
+        { type: 'CREDIT', amount: 6.9, reference: 'p1', metadata: { accountNumber: '900111' } },
+      ],
+    });
+    expect(split.parent).toBe(6.9);
+    expect(split.total).toBe(6.9);
+    expect(split.unmapped).toBe(0);
   });
 });

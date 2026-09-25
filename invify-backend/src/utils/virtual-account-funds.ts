@@ -111,36 +111,41 @@ export function splitUnsweptVirtualAccountFunds(input: {
   customerVas: string[];
   staffVas: string[];
   studentVas?: string[];
+  parentVas?: string[];
 }): {
   total: number;
   customer: number;
   staff: number;
   student: number;
+  parent: number;
   unmapped: number;
 } {
   const { pending, noVaNet } = netByVirtualAccount(input.transactions);
   const customerVas = new Set((input.customerVas || []).map((v) => String(v).trim()).filter(Boolean));
   const staffVas = new Set((input.staffVas || []).map((v) => String(v).trim()).filter(Boolean));
   const studentVas = new Set((input.studentVas || []).map((v) => String(v).trim()).filter(Boolean));
+  const parentVas = new Set((input.parentVas || []).map((v) => String(v).trim()).filter(Boolean));
 
   const customer = sumForOwners(pending, customerVas);
   const staff = sumForOwners(pending, staffVas);
   const student = sumForOwners(pending, studentVas);
+  const parent = sumForOwners(pending, parentVas);
 
   let orphanVa = 0;
   for (const [va, amount] of pending.entries()) {
-    if (customerVas.has(va) || staffVas.has(va) || studentVas.has(va)) continue;
+    if (customerVas.has(va) || staffVas.has(va) || studentVas.has(va) || parentVas.has(va)) continue;
     orphanVa += amount;
   }
 
   const unmapped = roundNaira(orphanVa + noVaNet);
-  const total = roundNaira(customer + staff + student + unmapped);
+  const total = roundNaira(customer + staff + student + parent + unmapped);
 
   return {
     total,
     customer,
     staff,
     student,
+    parent,
     unmapped,
   };
 }

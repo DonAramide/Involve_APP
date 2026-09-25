@@ -122,6 +122,9 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
               if (state.isSaved) {
                 // 1. Reload stock (since items were sold)
                 context.read<StockBloc>().add(LoadItems());
+                try {
+                  context.read<SchoolBloc>().add(LoadSchoolData());
+                } catch (_) {}
 
                 // 2. Reset flow for next transaction
                 context.read<InvoiceBloc>().add(ResetInvoice());
@@ -415,7 +418,11 @@ class _ItemSelectorState extends State<_ItemSelector> {
                                   item: item,
                                   quantity: quantity,
                                   onAdd: () => _handleItemAdd(context, item, settings),
-                                  onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
+                                  onRemove: quantity > 0
+                                      ? () => context.read<InvoiceBloc>().add(
+                                            AddItemToInvoice(item, -1, serviceMeta: cartItem?.serviceMeta),
+                                          )
+                                      : null,
                                   settings: settings,
                                 );
                             },
@@ -774,7 +781,7 @@ class _CartSummary extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final item = state.items[index];
                     return Dismissible(
-                      key: ValueKey(item.item.id),
+                      key: ValueKey('${item.item.id}-${item.item.name}-$index-${item.serviceMeta}'),
                       direction: DismissDirection.endToStart,
                       background: Container(
                         alignment: Alignment.centerRight,
@@ -872,7 +879,9 @@ class _CartSummary extends StatelessWidget {
                                       _QuickBtn(
                                         icon: Icons.remove,
                                         color: Colors.red[700]!,
-                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
+                                        onTap: () => context.read<InvoiceBloc>().add(
+                                          AddItemToInvoice(item.item, -1, serviceMeta: item.serviceMeta),
+                                        ),
                                       ),
                                       GestureDetector(
                                         onLongPress: () => _showQuantityDialog(context, item),
@@ -888,7 +897,9 @@ class _CartSummary extends StatelessWidget {
                                       _QuickBtn(
                                         icon: Icons.add,
                                         color: Colors.green[700]!,
-                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, 1)),
+                                        onTap: () => context.read<InvoiceBloc>().add(
+                                          AddItemToInvoice(item.item, 1, serviceMeta: item.serviceMeta),
+                                        ),
                                       ),
                                     ],
                                   ),

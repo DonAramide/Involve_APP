@@ -2084,12 +2084,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     void Function(dynamic)? socketCallback;
 
     final canUseOnlinePay =
-        context.read<SettingsBloc>().state.userPlan?.hasOnlineAccess == true;
+        context.read<SettingsBloc>().state.userPlan?.hasOnlineAccess == true ||
+            await LicenseService.hasOnlinePlanAccess();
     final List<String> methods = ['Cash'];
-    if (canUseOnlinePay && isPosConfigured) {
-      methods.add('POS');
-    }
     if (canUseOnlinePay) {
+      methods.add('POS');
       methods.add('Transfer');
     }
 
