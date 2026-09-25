@@ -17,7 +17,7 @@
         <span class="v-hide-xs">Policy Scope:</span>
         <q-select
           v-model="activePolicyScope"
-          :options="['global', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
+          :options="['global']"
           dense :dark="prefs.isDarkMode" filled options-dense
           class="bg-panel text-caption"
           style="width: 140px;"
@@ -110,8 +110,8 @@
             <!-- Exception item A -->
             <div class="bg-subpanel q-pa-sm rounded-borders border-left-amber column op-gap-2">
               <div class="row justify-between text-caption text-main">
-                <span class="text-weight-bold" style="font-size: 11px;">Target Scope: [tenant-alpha]</span>
-                <span class="text-metric-mono" :class="prefs.isDarkMode ? 'text-amber-3' : 'text-amber-9'" style="font-size: 10px;">1 Exemption Flagged</span>
+                <span class="text-weight-bold" style="font-size: 11px;">Target Scope: [none]</span>
+                <span class="text-metric-mono" :class="prefs.isDarkMode ? 'text-amber-3' : 'text-amber-9'" style="font-size: 10px;">0 Exemption Flagged</span>
               </div>
               <div class="text-secondary" style="font-size: 10px;">
                 Permitted Package: <span class="text-main font-mono text-weight-bold">com.invify.hw.serial.debug</span>

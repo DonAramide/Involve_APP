@@ -52,7 +52,7 @@ class PredictiveIncidentEngine {
         consensusVector: consensusObj.contributions
       },
       predictionHorizon: horizon,
-      impactedTenants: ['global', 'tenant-alpha'],
+      impactedTenants: ['global'],
       affectedSystems: ['OperationalEventBus', 'RealtimeConnectionManager'],
       remediationSuggestions,
       replayTraceRef: replayRef

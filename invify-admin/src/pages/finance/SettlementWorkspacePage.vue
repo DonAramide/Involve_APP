@@ -293,7 +293,7 @@
             <!-- BANK PROCESSING -->
             <q-tab-panel name="bank" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">NIP Reference:</span><span class="text-cyan-4">NIP/00020/260531/XYZ</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">NIP Reference:</span><span class="text-cyan-4">—</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transfer Status:</span><span class="text-green-4">SUCCESS</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Response Code:</span><span class="text-main">00</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Response Message:</span><span class="text-main">Approved or completed successfully</span></div>

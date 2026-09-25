@@ -228,12 +228,7 @@ const apiForm = ref({
   targetTenantId: 'tenant-default-01'
 })
 
-const activeSessionsList = ref([
-  { tokenKey: 'token:jti-uuid-alpha-001', userId: 'superadmin@invify.org', tenantId: 'global-platform', fingerprint: 'Mozilla/5.0 SFOS Hub Desktop', isMasterMode: true, isImpersonating: false, expiresInSeconds: 840 },
-  { tokenKey: 'token:jti-uuid-beta-002', userId: 'staff-terminal-node', tenantId: 'global-platform', fingerprint: 'Invify Native Flutter POS Bridge', isMasterMode: false, isImpersonating: false, expiresInSeconds: 6120 },
-  { tokenKey: 'token:jti-uuid-gamma-003', userId: 'superadmin@invify.org', tenantId: 'tenant-omega', fingerprint: 'Impersonation Stream Channel Overrider', isMasterMode: false, isImpersonating: true, expiresInSeconds: 780 },
-  { tokenKey: 'token:jti-uuid-delta-004', userId: 'kiosk-agent@fintech-alpha.dev', tenantId: 'tenant-alpha', fingerprint: 'Android Embedded Kiosk Core App', isMasterMode: false, isImpersonating: false, expiresInSeconds: 3420 }
-])
+const activeSessionsList = ref([])
 
 onMounted(() => {
   fetchLiveSessions()
@@ -247,7 +242,7 @@ const fetchLiveSessions = async () => {
     if (res.data?.sessions && Array.isArray(res.data.sessions)) {
       // Merge live backend sessions dynamically if populated
       if (res.data.sessions.length > 0) {
-        activeSessionsList.value = [...res.data.sessions, ...activeSessionsList.value]
+        activeSessionsList.value = res.data.sessions
       }
     }
   } catch (err) {
@@ -287,7 +282,7 @@ const executeApiKeyProvision = async () => {
     }
   } catch (err) {
     // Render working backup visualization string natively
-    lastApiKeyPlaintext.value = `inv_live_a8f9c1e2d4b5a6c7e8f9a0b1c2d3e4f5`
+    lastApiKeyPlaintext.value = ''
     apiForm.value.label = ''
   } finally {
     loadingApi.value = false

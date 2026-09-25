@@ -860,6 +860,11 @@ async function loadBanksList() {
     }
   } catch (err) {
     console.error('Failed to load banks from Quasar:', err)
+    const msg =
+      err?.response?.data?.error ||
+      err?.message ||
+      'Failed to load payout banks from Quasar'
+    $q.notify({ type: 'negative', message: msg, timeout: 6000 })
   } finally {
     loadingBanks.value = false
   }

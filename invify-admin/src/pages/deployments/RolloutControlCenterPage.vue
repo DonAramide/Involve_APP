@@ -450,12 +450,7 @@ onMounted(async () => {
 })
 
 // 1. Staged Cohorts Array
-const stagedCohortsList = ref([
-  { cohortId: 'coh-alpha', cohortName: 'Alpha Subfleet Kiosks', state: 'ACTIVE', pacingRate: '120 nodes/hr', targetNodes: 2450, convergencePercent: 84, assignmentFilter: 'tenant-alpha' },
-  { cohortId: 'coh-canary', cohortName: 'Canary Retail Group A', state: 'PAUSED', pacingRate: '10 nodes/hr', targetNodes: 150, convergencePercent: 12, assignmentFilter: 'retail_sector' },
-  { cohortId: 'coh-omega', cohortName: 'Global POS Core Fleet', state: 'STAGED', pacingRate: '500 nodes/hr', targetNodes: 82000, convergencePercent: 0, assignmentFilter: 'global_all' },
-  { cohortId: 'coh-beta', cohortName: 'Warehouse Scanner Sector', state: 'COMPLETED', pacingRate: '250 nodes/hr', targetNodes: 4100, convergencePercent: 100, assignmentFilter: 'tenant-beta' }
-])
+const stagedCohortsList = ref([])
 
 const activeRolloutGroupsCount = computed(() => stagedCohortsList.value.filter(c => c.state === 'ACTIVE').length)
 

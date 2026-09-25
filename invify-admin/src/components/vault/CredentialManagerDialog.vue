@@ -479,10 +479,10 @@
             <q-card flat class="bg-subpanel border-main q-pa-md">
               <div class="text-subtitle2 text-grey-4 q-mb-md">Latest Health Check</div>
               <div class="row items-center op-gap-8">
-                <q-icon name="monitor_heart" size="md" color="green-4" />
+                <q-icon name="monitor_heart" size="md" :color="latestHealth.ok ? 'green-4' : 'grey-5'" />
                 <div>
-                  <div class="text-h6">Healthy</div>
-                  <div class="text-caption text-grey-5">Latency: 112ms • Tested 2 mins ago</div>
+                  <div class="text-h6">{{ latestHealth.label }}</div>
+                  <div class="text-caption text-grey-5">{{ latestHealth.detail }}</div>
                 </div>
               </div>
             </q-card>
@@ -659,6 +659,26 @@ const columns = [
 const credentialsForEnv = computed(() => {
   const creds = props.integration?.integration_credentials || [];
   return creds.filter(c => c.environment === activeEnvironment.value);
+});
+
+const latestHealth = computed(() => {
+  const checks = props.integration?.integration_health_checks || props.integration?.health_checks || [];
+  const last = Array.isArray(checks) && checks.length
+    ? [...checks].sort((a, b) => new Date(b.checked_at || b.created_at || 0) - new Date(a.checked_at || a.created_at || 0))[0]
+    : null;
+  const status = String(last?.status || props.integration?.last_health_status || '').toUpperCase();
+  if (!last && !status) {
+    return { ok: false, label: 'Not tested', detail: 'Run Test Connection to record a health check.' };
+  }
+  const ok = status === 'HEALTHY' || status === 'OK';
+  const latency = last?.latency_ms != null ? `${last.latency_ms}ms` : null;
+  const when = last?.checked_at || last?.created_at;
+  const whenLabel = when ? new Date(when).toLocaleString() : 'unknown time';
+  return {
+    ok,
+    label: ok ? 'Healthy' : (status || 'Unknown'),
+    detail: [latency ? `Latency: ${latency}` : null, `Checked ${whenLabel}`].filter(Boolean).join(' • '),
+  };
 });
 
 function getCategoryColor(cat) {

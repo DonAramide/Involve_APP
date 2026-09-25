@@ -547,14 +547,7 @@ const resultColumns = [
   { name: 'score', label: 'SCORE', align: 'right', field: 'score', sortable: true },
   { name: 'grade', label: 'GRADE', align: 'right', field: 'grade' }
 ]
-const mockResults = [
-  { id: 1, term: 'Term 2 (2025/2026)', subject: 'Mathematics', score: 85, grade: 'A' },
-  { id: 2, term: 'Term 2 (2025/2026)', subject: 'English Language', score: 72, grade: 'B' },
-  { id: 3, term: 'Term 2 (2025/2026)', subject: 'Basic Science', score: 68, grade: 'C' },
-  { id: 4, term: 'Term 2 (2025/2026)', subject: 'History', score: 91, grade: 'A' },
-  { id: 5, term: 'Term 1 (2025/2026)', subject: 'Mathematics', score: 78, grade: 'B' },
-  { id: 6, term: 'Term 1 (2025/2026)', subject: 'English Language', score: 65, grade: 'C' }
-]
+const mockResults = []
 
 const resultsByTerm = computed(() => {
   const grouped = {}

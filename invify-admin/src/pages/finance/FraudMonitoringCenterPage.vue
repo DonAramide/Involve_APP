@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top Fraud Pattern:</span>
-            <span class="text-red-4 text-weight-bold text-subtitle2">Velocity Abuse</span>
+            <span class="text-red-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Active Threats:</span>
-            <q-badge color="red-10" text-color="red-3"><q-icon name="warning" size="xs" class="q-mr-xs"/>3 CRITICAL</q-badge>
+            <q-badge color="grey-8" text-color="grey-3">0 OPEN</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Risk Concentration:</span>
-            <span class="text-amber-4 text-weight-bold">Agent Network (South West)</span>
+            <span class="text-amber-4 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">AI Forecast:</span>
-            <span class="text-cyan-4 text-weight-bold">Elevated Weekend Risk</span>
+            <span class="text-cyan-4 text-weight-bold">—</span>
           </div>
           <q-icon name="security" color="red-4" size="sm" />
         </div>
@@ -53,37 +53,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Open Cases / Critical</div>
-          <div class="text-h5 text-metric-mono text-red-4">124 / 3</div>
+          <div class="text-h5 text-metric-mono text-red-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Fraud Loss Exposure</div>
-          <div class="text-h5 text-metric-mono text-amber-4">{{ currentCurrency.symbol }}14.5M</div>
+          <div class="text-h5 text-metric-mono text-amber-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Blocked Txns (24h)</div>
-          <div class="text-h5 text-metric-mono text-purple-4">1,402</div>
+          <div class="text-h5 text-metric-mono text-purple-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Account Takeovers / Tampering</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">12 / 4</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">High Risk (Wallets/Cards/Trm)</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">84 / 24 / 12</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0 / 0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Detection Rate / False +</div>
-          <div class="text-h5 text-metric-mono text-green-4">99.1% / 0.8%</div>
+          <div class="text-h5 text-metric-mono text-green-4">— / —</div>
         </div>
       </div>
     </div>
@@ -397,68 +397,7 @@ const fraudCols = [
   { name: 'investigator', label: 'INVESTIGATOR', field: 'investigator', align: 'left' }
 ]
 
-const fraudRecords = ref([
-  {
-    id: 'CAS-2026-8812',
-    fraudType: 'VELOCITY_ABUSE',
-    severity: 'CRITICAL',
-    tenant: 'Invify Agency Network',
-    tenantType: 'AGENT',
-    wallet: 'WAL-AGT-8812',
-    terminal: 'TRM-AGT-0012',
-    device: 'DEV-AND-991',
-    exposure: 2450000,
-    riskScore: 98,
-    anomalyScore: 0.99,
-    confidence: 96,
-    status: 'OPEN',
-    investigator: 'Unassigned',
-    createdDate: '2026-05-30',
-    fraudFlags: ['VELOCITY_SPIKE', 'MULTIPLE_DECLINES', 'UNUSUAL_GEO'],
-    recommendedAction: 'Freeze Wallet & Block Terminal',
-    recoveryProbability: 45
-  },
-  {
-    id: 'CAS-2026-8813',
-    fraudType: 'DEVICE_TAMPERING',
-    severity: 'HIGH',
-    tenant: 'Shoprite Mega Store',
-    tenantType: 'RETAIL',
-    wallet: 'WAL-RET-0091',
-    terminal: 'TRM-MER-0091',
-    device: 'DEV-AND-004',
-    exposure: 850000,
-    riskScore: 88,
-    anomalyScore: 0.91,
-    confidence: 92,
-    status: 'INVESTIGATING',
-    investigator: 'M. Ojo',
-    createdDate: '2026-05-29',
-    fraudFlags: ['DEVICE_TAMPER_SUSPECTED', 'ROOT_DETECTED'],
-    recommendedAction: 'Suspend Terminal Operations',
-    recoveryProbability: 80
-  },
-  {
-    id: 'CAS-2026-8814',
-    fraudType: 'ACCOUNT_TAKEOVER',
-    severity: 'HIGH',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    wallet: 'WAL-SCH-1122',
-    terminal: null,
-    device: 'DEV-IOS-211',
-    exposure: 450000,
-    riskScore: 85,
-    anomalyScore: 0.89,
-    confidence: 85,
-    status: 'OPEN',
-    investigator: 'Unassigned',
-    createdDate: '2026-05-30',
-    fraudFlags: ['NEW_DEVICE_LOGIN', 'PASSWORD_RESET_SPIKE'],
-    recommendedAction: 'Force Logout & Freeze Wallet',
-    recoveryProbability: 60
-  }
-])
+const fraudRecords = ref([])
 
 </script>
 

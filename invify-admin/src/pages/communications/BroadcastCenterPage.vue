@@ -571,7 +571,7 @@ const applyTemplate = (tmpl) => {
     composerForm.launcherMode = built.launcherMode
     composerForm.priorityLane = built.priorityLane
   } else if (tmpl === "quarantine") {
-    const built = BroadcastFactory.createEmergencyQuarantineNotice("tenant-alpha", "edge-node-01", "Manual administrative engagement requested.")
+    const built = BroadcastFactory.createEmergencyQuarantineNotice("global", "selected-endpoint", "Manual administrative engagement requested.")
     composerForm.type = built.type
     composerForm.severity = built.severity
     composerForm.title = built.title

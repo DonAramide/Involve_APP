@@ -144,7 +144,7 @@
               <!-- Scope Alpha -->
               <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-alpha</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">none</span></span>
                 <q-chip dense size="xs" color="cyan-10" text-color="cyan-3" class="text-metric-sm">STRICT_INHERIT</q-chip>
                 <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
                   <div class="text-weight-bold text-cyan-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Strict Inheritance Mode</div>
@@ -155,7 +155,7 @@
               <!-- Scope Omega -->
               <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-omega</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">none</span></span>
                 <q-chip dense size="xs" color="amber-10" text-color="amber-3" class="text-metric-sm">CUSTOM_DRIFT</q-chip>
                 <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
                   <div class="text-weight-bold text-amber-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Custom Drift Mode</div>
@@ -166,7 +166,7 @@
               <!-- Scope Beta -->
               <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-beta</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">none</span></span>
                 <q-chip dense size="xs" color="grey-9" text-color="grey-4" class="text-metric-sm">MUTED_PARENT</q-chip>
                 <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
                   <div class="text-weight-bold text-grey-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Muted Parent Mode</div>

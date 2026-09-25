@@ -297,11 +297,7 @@ onMounted(async () => {
     tenants.value = res.data || []
   } catch (e) {
     // Sandbox offline presets fallback
-    tenants.value = [
-      { id: 'tenant-alpha', name: 'Fintech Alpha' },
-      { id: 'tenant-beta', name: 'Beta Labs' },
-      { id: 'tenant-omega', name: 'Omega Retail Group' }
-    ]
+    tenants.value = []
   }
   await fetchOperators()
   loading.value = false

@@ -218,11 +218,7 @@ const autoRemediationConfig = ref({
 
 // 2. Active Isolated Endpoints Array combining store entries seamlessly
 const quarantinedEndpointsList = computed(() => {
-  const base = [
-    { targetId: 'dev-node-delta', tenant: 'tenant-alpha', appPackage: 'com.iips.display', reason: 'Attestation trust vectors breached. Secure signature failed.', durationStr: '12m 42s', lockedTimestamp: '10:04:12 AM', trustScore: 32, latitude: '6.6012', longitude: '3.3514' },
-    { targetId: 'pos-term-omega-04', tenant: 'tenant-omega', appPackage: 'com.iips.pos', reason: 'Kernel module tampering parameter identified', durationStr: '1h 14m', lockedTimestamp: '08:52:01 AM', trustScore: 12, latitude: '6.4531', longitude: '3.3958' },
-    { targetId: 'scanner-gamma-12', tenant: 'tenant-gamma', appPackage: 'com.iips.warehouse', reason: 'Play Integrity secure bridge response sequence expired', durationStr: '4h 02m', lockedTimestamp: '06:05:44 AM', trustScore: 45, latitude: '6.5567', longitude: '3.3421' }
-  ]
+  const base = []
 
   // Combine dynamically with Pinia incoming buffers
   const incoming = govStore.quarantineList.map((q, idx) => ({

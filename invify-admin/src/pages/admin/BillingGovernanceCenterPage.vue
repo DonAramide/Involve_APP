@@ -207,11 +207,7 @@ const masterFees = ref([
   { id: 'ai_inference', name: 'AI Generation Task', category: 'AI_INTELLIGENCE', type: 'FLAT', flatAmount: 10, percentageAmount: 0 }
 ])
 
-const auditLogs = ref([
-  { id: 1, timestamp: '12 mins ago', newVersion: 4, action: 'UPDATE', feeConfigId: 'tx_pos_base', operatorId: 'sys_admin_root', reason: 'Adjusted base commission for new merchant cohort' },
-  { id: 2, timestamp: '2 days ago', newVersion: 3, action: 'ROLLBACK', feeConfigId: 'tx_wallet_withdrawal', operatorId: 'sys_admin_root', reason: 'Reverting withdrawal hike due to merchant complaints' },
-  { id: 3, timestamp: '1 week ago', newVersion: 2, action: 'UPDATE', feeConfigId: 'sms_telemetry', operatorId: 'auto_sys', reason: 'Carrier upstream cost adjusted' }
-])
+const auditLogs = ref([])
 
 // Actions
 const syncPlans = () => {

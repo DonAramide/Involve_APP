@@ -16,7 +16,7 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Health Score:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.3%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
@@ -24,11 +24,11 @@
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Offline Fleet:</span>
-            <span class="text-amber-4 text-weight-bold">120 (4%)</span>
+            <span class="text-amber-4 text-weight-bold">0</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Sync Failures:</span>
-            <span class="text-red-4 text-weight-bold">12</span>
+            <span class="text-red-4 text-weight-bold">0</span>
           </div>
           <q-icon name="point_of_sale" color="green-4" size="sm" />
         </div>
@@ -59,37 +59,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total / Active Terminals</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">8.4K / 8.1K</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Transaction Vol</div>
-          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}450.2M <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Online / Offline Fleet</div>
-          <div class="text-h5 text-metric-mono text-amber-5">8,280 / 120</div>
+          <div class="text-h5 text-metric-mono text-amber-5">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Fraud Alerts / Suspended</div>
-          <div class="text-h5 text-metric-mono text-red-5">14 / 8</div>
+          <div class="text-h5 text-metric-mono text-red-5">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Terminal Utilization</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">88.4%</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">—</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Settlement Value</div>
-          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}448.5M</div>
+          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
     </div>
@@ -400,65 +400,7 @@ const terminalCols = [
   { name: 'lastSync', label: 'LAST SYNC', field: 'lastSync', align: 'right' }
 ]
 
-const terminalRecords = ref([
-  {
-    id: 'TRM-AGT-0012',
-    mposId: 'MPOS-9941-X',
-    deviceSync: 'DEV-AND-991',
-    deviceName: 'Samsung Galaxy A12',
-    type: 'MPOS TERMINAL',
-    tenant: 'Invify Agency Network',
-    tenantType: 'PLATFORM',
-    assignedUser: 'Sarah Agent',
-    status: 'ACTIVE',
-    onlineStatus: 'ONLINE',
-    battery: 84,
-    txnCount: 12450,
-    riskScore: 12,
-    anomalyScore: 0.05,
-    fraudFlags: [],
-    createdDate: '2025-10-12',
-    lastSync: '2 mins ago'
-  },
-  {
-    id: 'TRM-SCH-0044',
-    mposId: null,
-    deviceSync: 'DEV-IOS-211',
-    deviceName: 'iPhone 13',
-    type: 'SOFTPOS TERMINAL',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    assignedUser: 'Bursary Admin 1',
-    status: 'ACTIVE',
-    onlineStatus: 'OFFLINE',
-    battery: 15,
-    txnCount: 890,
-    riskScore: 25,
-    anomalyScore: 0.12,
-    fraudFlags: [],
-    createdDate: '2026-02-14',
-    lastSync: '4 hrs ago'
-  },
-  {
-    id: 'TRM-MER-0091',
-    mposId: 'MPOS-8822-Y',
-    deviceSync: 'DEV-AND-004',
-    deviceName: 'Tecno Spark 10',
-    type: 'MPOS TERMINAL',
-    tenant: 'Shoprite Mega Store',
-    tenantType: 'MERCHANT',
-    assignedUser: 'Checkout Counter 4',
-    status: 'SUSPENDED',
-    onlineStatus: 'ONLINE',
-    battery: 98,
-    txnCount: 450,
-    riskScore: 88,
-    anomalyScore: 0.91,
-    fraudFlags: ['DEVICE_TAMPER_SUSPECTED', 'VELOCITY_SPIKE'],
-    createdDate: '2025-11-20',
-    lastSync: '1 min ago'
-  }
-])
+const terminalRecords = ref([])
 
 </script>
 

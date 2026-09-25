@@ -197,9 +197,6 @@ export class BillingAuditGovernance {
 
 // Global Singleton Instance
 export const globalAuditGovernance = new BillingAuditGovernance();
-export const mockAuditJournalData = [
-  { auditId: "AUD-K57XJ4-182", timestamp: Date.now() - 86400000 * 3, operator: "treasury-admin-1", action: "MUTATE_FEE_APPROVED", feeClass: "TRANSACTION_GATEWAY_CHARGE", previousValue: "1.0%", newValue: "1.25%", effectiveDate: Date.now() - 86400000 * 2, reason: "Card processor baseline fee hikes adjustment.", tamperCheckHash: "TMP-SEC-3F4G6K" },
-  { auditId: "AUD-L92MZ1-344", timestamp: Date.now() - 86400000 * 5, operator: "systems-root", action: "MUTATE_FEE_APPROVED", feeClass: "SMS_NOTIFICATION_CHARGE", previousValue: "₦3.50", newValue: "₦4.00", effectiveDate: Date.now() - 86400000 * 4, reason: "Sovereign SMS provider tariff calibration.", tamperCheckHash: "TMP-SEC-9G2H1F" }
-];
+export const mockAuditJournalData = [];
 // Populate initial history for rich visuals
 mockAuditJournalData.forEach(d => globalAuditGovernance.journal.push(d));

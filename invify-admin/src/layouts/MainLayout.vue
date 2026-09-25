@@ -51,12 +51,6 @@
               <q-item clickable v-close-popup @click="setTenantScope('global')" class="hover-bg">
                 <q-item-section :class="prefs.isDarkMode ? 'text-white' : 'text-main'">Global Master Array</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-alpha')" class="hover-bg">
-                <q-item-section class="text-cyan-3">Tenant Alpha Scope</q-item-section>
-              </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-omega')" class="hover-bg">
-                <q-item-section class="text-purple-3">Tenant Omega Scope</q-item-section>
-              </q-item>
             </q-list>
           </q-btn-dropdown>
         </div>
@@ -934,7 +928,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Operator Governance', path: '/governance/operators', icon: 'manage_accounts', color: 'blue-4' },
         { label: 'RBAC Capabilities & Matrix', path: '/governance/rbac-roles', icon: 'admin_panel_settings', color: 'amber-4' },
         { label: 'Approval Engine', path: '/governance/approvals', icon: 'fact_check', color: 'purple-4', badge: 'Queue', badgeBg: 'purple-10', badgeColor: 'purple-3' },
-        { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4', badge: '99.8%', badgeBg: 'green-10', badgeColor: 'green-3' },
+        { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4' },
         { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },
         { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
         { label: 'Enterprise Support Desk', path: '/governance/support', icon: 'headset_mic', color: 'amber-4', badge: 'TICKETS', badgeBg: 'amber-10', badgeColor: 'amber-2' },

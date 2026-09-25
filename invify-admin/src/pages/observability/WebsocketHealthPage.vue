@@ -35,7 +35,7 @@
           </div>
           <div class="row justify-between text-caption q-mt-sm">
             <span class="text-secondary">Uptime:</span>
-            <span class="text-weight-bold" :class="prefs.isDarkMode ? 'text-green-4' : 'text-positive'">99.98%</span>
+            <span class="text-weight-bold" :class="prefs.isDarkMode ? 'text-green-4' : 'text-positive'">—</span>
           </div>
           <div class="row justify-between text-caption q-mt-sm">
             <span class="text-secondary">SSL Status:</span>

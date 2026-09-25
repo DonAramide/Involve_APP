@@ -217,8 +217,8 @@ const flatProcessingFee = ref(150)
 const smsChargeTier = ref(4)
 const simulatorVolume = ref(50000)
 
-const simulatedGTV = ref(384850200)
-const simulatedRev = ref(18485020)
+const simulatedGTV = ref(0)
+const simulatedRev = ref(0)
 
 const platformShare = computed(() => {
   return (simulatorVolume.value * (platformFeePercentage.value / 100)) + flatProcessingFee.value
@@ -229,12 +229,7 @@ const merchantNet = computed(() => {
 })
 
 // Mock Settlements Data
-const settlementLogs = ref([
-  { id: 1, tenant: 'Glisten International Academy', icon: 'school', date: 'Just Now', volume: 150000, feeCollected: 2025 },
-  { id: 2, tenant: 'Abuja Retail Supermart Ltd', icon: 'shopping_cart', date: '3 mins ago', volume: 45000, feeCollected: 712.5 },
-  { id: 3, tenant: 'Elite Tailors & Drycleaners', icon: 'dry_cleaning', date: '12 mins ago', volume: 85000, feeCollected: 1212.5 },
-  { id: 4, tenant: 'Federal Capital Fleet Express', icon: 'explore', date: '25 mins ago', volume: 220000, feeCollected: 2900 }
-])
+const settlementLogs = ref([])
 
 const resetDefaults = () => {
   platformFeePercentage.value = 1.25

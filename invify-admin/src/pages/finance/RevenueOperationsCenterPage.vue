@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top Revenue Source:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">Transaction Fees</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Growth Trend:</span>
-            <q-badge color="green-10" text-color="green-3"><q-icon name="trending_up" size="xs" class="q-mr-xs"/>+14.2%</q-badge>
+            <q-badge color="grey-10" text-color="grey-4">—</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Concentration Risk:</span>
-            <span class="text-amber-4 text-weight-bold">MEDIUM (School Sector)</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top Merchant:</span>
-            <span class="text-cyan-4 text-weight-bold">Shoprite Mega Store</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <q-icon name="insights" color="green-4" size="sm" />
         </div>
@@ -69,37 +69,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Gross Revenue (MTD)</div>
-          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}1.24B <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Net Revenue (Margin)</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}984M <span class="text-caption text-muted">(79%)</span></div>
+          <div class="text-h5 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Rev Per Tenant</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}142.5K</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Rev Per Txn</div>
-          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}14.20</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Recurring / Comm Vol</div>
-          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}45M / {{ currentCurrency.symbol }}120M</div>
+          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}0 / {{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Forecast (End of Mo)</div>
-          <div class="text-h5 text-metric-mono text-main">{{ currentCurrency.symbol }}2.1B <span class="text-green-4">+5%</span></div>
+          <div class="text-h5 text-metric-mono text-main">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
     </div>
@@ -405,59 +405,7 @@ const revenueCols = [
   { name: 'riskScore', label: 'RISK', field: 'riskScore', align: 'center' }
 ]
 
-const revenueRecords = ref([
-  {
-    id: 'REV-2026-MAY-001',
-    revenueType: 'TRANSACTION_FEE',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    period: 'MAY-2026',
-    txnCount: 425000,
-    revenueAmount: 12500000,
-    costAmount: 2500000,
-    netRevenue: 10000000,
-    margin: 80,
-    growth: 14.2,
-    riskScore: 5,
-    anomalyScore: 0.02,
-    fraudFlags: [],
-    confidenceScore: 94
-  },
-  {
-    id: 'REV-2026-MAY-002',
-    revenueType: 'COMMISSION',
-    tenant: 'Shoprite Mega Store',
-    tenantType: 'RETAIL',
-    period: 'MAY-2026',
-    txnCount: 85400,
-    revenueAmount: 8540000,
-    costAmount: 1800000,
-    netRevenue: 6740000,
-    margin: 78,
-    growth: -2.4,
-    riskScore: 12,
-    anomalyScore: 0.08,
-    fraudFlags: [],
-    confidenceScore: 88
-  },
-  {
-    id: 'REV-2026-MAY-003',
-    revenueType: 'TERMINAL_RENTAL',
-    tenant: 'Invify Agency Network',
-    tenantType: 'AGENT',
-    period: 'MAY-2026',
-    txnCount: 0,
-    revenueAmount: 4500000,
-    costAmount: 1200000,
-    netRevenue: 3300000,
-    margin: 73,
-    growth: 5.5,
-    riskScore: 8,
-    anomalyScore: 0.04,
-    fraudFlags: [],
-    confidenceScore: 91
-  }
-])
+const revenueRecords = ref([])
 
 </script>
 

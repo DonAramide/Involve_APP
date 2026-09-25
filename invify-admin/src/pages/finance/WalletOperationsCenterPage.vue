@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Health Score:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.2%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
-            <q-badge color="green-10" text-color="green-3">Healthy</q-badge>
+            <q-badge color="grey-10" text-color="grey-4">No data</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Negative Balance:</span>
-            <span class="text-amber-4 text-weight-bold">3</span>
+            <span class="text-grey-5 text-weight-bold">0</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">High Risk:</span>
-            <span class="text-red-4 text-weight-bold">12</span>
+            <span class="text-grey-5 text-weight-bold">0</span>
           </div>
           <q-icon name="account_balance_wallet" color="green-4" size="sm" />
         </div>
@@ -60,37 +60,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Wallets</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">1.2M <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Active Wallets</div>
-          <div class="text-h5 text-metric-mono text-green-4">845K</div>
+          <div class="text-h5 text-metric-mono text-green-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Dormant Wallets</div>
-          <div class="text-h5 text-metric-mono text-amber-5">352K</div>
+          <div class="text-h5 text-metric-mono text-amber-5">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Suspended / Negative</div>
-          <div class="text-h5 text-metric-mono text-red-5">1,204 / 3</div>
+          <div class="text-h5 text-metric-mono text-red-5">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Wallet Float</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}18.4B</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Wallet Growth Rate</div>
-          <div class="text-h5 text-metric-mono text-purple-4">+12.4% /mo</div>
+          <div class="text-h5 text-metric-mono text-purple-4">—</div>
         </div>
       </div>
     </div>
@@ -410,56 +410,7 @@ const walletCols = [
   { name: 'lastActivity', label: 'LAST ACTIVE', field: 'lastActivity', align: 'right' }
 ]
 
-const walletRecords = ref([
-  {
-    id: 'WAL-SCH-0001',
-    walletType: 'SCHOOL',
-    owner: 'Ahmadu Bello University',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    currentBalance: 8250000,
-    availableBalance: 8250000,
-    pendingBalance: 0,
-    status: 'ACTIVE',
-    riskScore: 5,
-    anomalyScore: 0.01,
-    fraudFlags: [],
-    createdDate: new Date(Date.now() - 31536000000).toISOString(),
-    lastActivity: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'WAL-RET-0092',
-    walletType: 'MERCHANT',
-    owner: 'Shoprite Ikeja',
-    tenant: 'Shoprite Mega Store',
-    tenantType: 'RETAIL',
-    currentBalance: -150000,
-    availableBalance: -150000,
-    pendingBalance: 450000,
-    status: 'SUSPENDED',
-    riskScore: 85,
-    anomalyScore: 0.88,
-    fraudFlags: ['NEGATIVE_BALANCE', 'VELOCITY_SPIKE'],
-    createdDate: new Date(Date.now() - 15768000000).toISOString(),
-    lastActivity: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: 'WAL-CUS-8812',
-    walletType: 'CUSTOMER',
-    owner: 'John Doe',
-    tenant: 'Invify Core',
-    tenantType: 'PLATFORM',
-    currentBalance: 12500,
-    availableBalance: 12500,
-    pendingBalance: 0,
-    status: 'DORMANT',
-    riskScore: 12,
-    anomalyScore: 0.05,
-    fraudFlags: [],
-    createdDate: new Date(Date.now() - 63072000000).toISOString(),
-    lastActivity: new Date(Date.now() - 31536000000).toISOString()
-  }
-])
+const walletRecords = ref([])
 
 </script>
 

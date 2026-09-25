@@ -16,7 +16,7 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Health Score:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.1%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
@@ -24,11 +24,11 @@
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Blocked Cards:</span>
-            <span class="text-red-4 text-weight-bold">42</span>
+            <span class="text-red-4 text-weight-bold">0</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Active Disputes:</span>
-            <span class="text-amber-4 text-weight-bold">14</span>
+            <span class="text-amber-4 text-weight-bold">0</span>
           </div>
           <q-icon name="credit_card" color="green-4" size="sm" />
         </div>
@@ -59,37 +59,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total / Active Cards</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">3.4M / 2.8M</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Card Spend (30d)</div>
-          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}142.5B <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Spend / Card Success</div>
-          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}41,900 / 99.4%</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}0 / —</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Blocked / Frozen / Expired</div>
-          <div class="text-h5 text-metric-mono text-red-5">42 / 12 / 8K</div>
+          <div class="text-h5 text-metric-mono text-red-5">0 / 0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Chargeback / Dispute Vol</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}2.4M / 14</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Cards At Risk</div>
-          <div class="text-h5 text-metric-mono text-purple-4">24</div>
+          <div class="text-h5 text-metric-mono text-purple-4">0</div>
         </div>
       </div>
     </div>
@@ -199,28 +199,7 @@
         <!-- CHARGEBACK CENTER -->
         <q-tab-panel name="chargebacks" class="q-pa-md column">
           <div class="text-h6 font-mono text-main q-mb-md">Chargeback & Dispute Management</div>
-          <div class="row q-col-gutter-md">
-            <div class="col-12 col-md-3">
-              <div class="enterprise-subpanel q-pa-md border-muted rounded-borders bg-dark column op-gap-8">
-                <div class="text-caption text-muted font-mono">Dispute DISP-2026-001</div>
-                <div class="row justify-between"><span class="text-muted">Card:</span><span class="text-cyan-4">**** 4111</span></div>
-                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">{{ currentCurrency.symbol }}14,500</span></div>
-                <div class="row justify-between"><span class="text-muted">Reason:</span><span class="text-main">Fraudulent Use</span></div>
-                <div class="q-mt-sm"><q-badge color="amber-10" text-color="amber-3">INVESTIGATING</q-badge></div>
-                <q-btn outline size="xs" color="cyan-4" label="Review Evidence" class="q-mt-sm" />
-              </div>
-            </div>
-            <div class="col-12 col-md-3">
-              <div class="enterprise-subpanel q-pa-md border-muted rounded-borders bg-dark column op-gap-8">
-                <div class="text-caption text-muted font-mono">Dispute DISP-2026-002</div>
-                <div class="row justify-between"><span class="text-muted">Card:</span><span class="text-cyan-4">**** 8824</span></div>
-                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">{{ currentCurrency.symbol }}5,000</span></div>
-                <div class="row justify-between"><span class="text-muted">Reason:</span><span class="text-main">Duplicate Charge</span></div>
-                <div class="q-mt-sm"><q-badge color="green-10" text-color="green-3">RESOLVED</q-badge></div>
-                <q-btn outline size="xs" color="grey-6" label="View Resolution" class="q-mt-sm" />
-              </div>
-            </div>
-          </div>
+          <div class="text-caption text-grey-5">No chargeback records loaded.</div>
         </q-tab-panel>
 
       </q-tab-panels>
@@ -310,7 +289,7 @@
                 <div class="text-weight-bold q-mb-md">Issuing & Control Profile</div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Card Scheme:</span><span class="text-main">Mastercard</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Card Product:</span><span class="text-cyan-4">Standard Virtual Prepaid</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">BIN / Issuer:</span><span class="text-main">5399XX / Providus Bank</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">BIN / Issuer:</span><span class="text-main">—</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Program:</span><span class="text-main">Invify Student Pay</span></div>
                 <div class="q-my-md border-top"></div>
                 <div class="text-muted text-caption q-mb-sm">Card Controls & Restrictions</div>
@@ -432,62 +411,7 @@ const cardCols = [
   { name: 'lastTransaction', label: 'LAST TXN', field: 'lastTransaction', align: 'right' }
 ]
 
-const cardRecords = ref([
-  {
-    id: 'CRD-STU-0012',
-    maskedPan: '5399 **** **** 4111',
-    cardType: 'STUDENT VIRTUAL',
-    owner: 'Michael Ojo',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    walletId: 'WAL-SCH-1122',
-    currentBalance: 45000,
-    spendLimit: 20000,
-    status: 'ACTIVE',
-    riskScore: 8,
-    anomalyScore: 0.02,
-    fraudFlags: [],
-    createdDate: '2026-01-15',
-    expiryDate: '2029-01-31',
-    lastTransaction: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'CRD-AGT-0094',
-    maskedPan: '5399 **** **** 8824',
-    cardType: 'AGENT PHYSICAL',
-    owner: 'Sarah Agent',
-    tenant: 'Invify Agency Network',
-    tenantType: 'PLATFORM',
-    walletId: 'WAL-AGT-8812',
-    currentBalance: 150000,
-    spendLimit: 500000,
-    status: 'FROZEN',
-    riskScore: 78,
-    anomalyScore: 0.81,
-    fraudFlags: ['UNUSUAL_GEO', 'CARD_TESTING_SUSPECTED'],
-    createdDate: '2025-11-05',
-    expiryDate: '2028-11-30',
-    lastTransaction: new Date(Date.now() - 43200000).toISOString()
-  },
-  {
-    id: 'CRD-COR-0001',
-    maskedPan: '5399 **** **** 9912',
-    cardType: 'TREASURY CORPORATE',
-    owner: 'Treasury Admin',
-    tenant: 'Invify Core',
-    tenantType: 'PLATFORM',
-    walletId: 'WAL-TRS-0001',
-    currentBalance: 45000000,
-    spendLimit: 10000000,
-    status: 'ACTIVE',
-    riskScore: 2,
-    anomalyScore: 0.01,
-    fraudFlags: [],
-    createdDate: '2026-01-01',
-    expiryDate: '2030-12-31',
-    lastTransaction: new Date(Date.now() - 7200000).toISOString()
-  }
-])
+const cardRecords = ref([])
 
 </script>
 

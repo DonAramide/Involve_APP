@@ -1026,11 +1026,11 @@ const clearBankForm = () => {
 };
 
 const payoutInfo = [
-  { label: 'Payout Cycle', value: 'Daily (T+1)' },
-  { label: 'Minimum Payout', value: '₦5,000' },
-  { label: 'Processing Fee', value: '0% (Enterprise plan)' },
-  { label: 'Next Scheduled Payout', value: new Date(Date.now() + 86400000).toLocaleDateString('en-NG'), valueClass: 'text-green-3' },
-  { label: 'Account Status', value: bank.value.savedAccount ? 'Verified ✓' : 'Not Configured', valueClass: bank.value.savedAccount ? 'text-green-3' : 'text-amber-3' },
+  { label: 'Payout Cycle', value: '—' },
+  { label: 'Minimum Payout', value: '—' },
+  { label: 'Processing Fee', value: '—' },
+  { label: 'Next Scheduled Payout', value: '—', valueClass: 'text-grey-5' },
+  { label: 'Account Status', value: bank.value.savedAccount ? 'Saved' : 'Not Configured', valueClass: bank.value.savedAccount ? 'text-green-3' : 'text-amber-3' },
 ];
 
 const notifyComingSoon = (feature) => {

@@ -44,12 +44,12 @@
       <div class="panel-body q-pa-sm row items-center justify-between op-gap-16 text-center">
         
         <div class="col column">
-          <span class="text-metric-mono text-positive text-weight-bold" style="font-size: 18px;">99.91%</span>
+          <span class="text-metric-mono text-positive text-weight-bold" style="font-size: 18px;">—</span>
           <span class="text-secondary" style="font-size: 10px;">Lineage Verification</span>
         </div>
 
         <div class="col column border-left">
-          <span class="text-metric-mono text-weight-bold" :class="prefs.isDarkMode ? 'text-amber-4' : 'text-amber-9'" style="font-size: 18px;">2 Flagged</span>
+          <span class="text-metric-mono text-weight-bold" :class="prefs.isDarkMode ? 'text-amber-4' : 'text-amber-9'" style="font-size: 18px;">0 Flagged</span>
           <span class="text-secondary" style="font-size: 10px;">Sideload Exceptions</span>
         </div>
 

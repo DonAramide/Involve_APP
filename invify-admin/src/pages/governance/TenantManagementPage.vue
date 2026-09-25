@@ -199,12 +199,7 @@ const activeImpersonationContext = ref(null)
 const remainingImpersonationTimeStr = ref('15m 00s')
 let countdownTimer = null
 
-const tenantsList = ref([
-  { id: 'tenant-default-01', name: 'Global Invify Production Core Realm', persistentUuid: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', type: 'system_core', status: 'active' },
-  { id: 'oldies-lounge---bar-610011', name: 'Oldies Lounge & Bar', persistentUuid: '63b3d505-36ea-4b00-9c29-b02a1dbc0257', type: 'retail', status: 'active' },
-  { id: 'tenant-alpha', name: 'Alpha Logistics Terminal Fleet', persistentUuid: 'alpha-uuid-999', type: 'logistics', status: 'active' },
-  { id: 'tenant-omega', name: 'Omega Supermarket Chain Nodes', persistentUuid: 'omega-uuid-888', type: 'retail', status: 'active' }
-])
+const tenantsList = ref([])
 
 onMounted(() => {
   fetchTenantsArray()
@@ -219,11 +214,8 @@ const fetchTenantsArray = async () => {
   loading.value = true
   try {
     const { data } = await adminApi.getTenants().catch(() => ({ data: null }))
-    if (data && Array.isArray(data) && data.length > 0) {
-      // Merge unique entries
-      const existingIds = new Set(tenantsList.value.map(t => t.id))
-      const fresh = data.filter(t => !existingIds.has(t.id))
-      tenantsList.value = [...fresh, ...tenantsList.value]
+    if (data && Array.isArray(data)) {
+      tenantsList.value = data
     }
   } catch (err) {
     // Keep beautiful mock arrays online if API connection is delayed

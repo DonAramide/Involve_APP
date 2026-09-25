@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top AML Alert:</span>
-            <span class="text-red-4 text-weight-bold text-subtitle2">Velocity Spike (Agent Network)</span>
+            <span class="text-red-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Compliance Trend:</span>
-            <q-badge color="green-10" text-color="green-3"><q-icon name="trending_up" size="xs" class="q-mr-xs"/>96% Stable</q-badge>
+            <q-badge color="grey-8" text-color="grey-3">No live snapshot</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Highest Risk Tenant:</span>
-            <span class="text-amber-4 text-weight-bold">BetKing (RETAIL)</span>
+            <span class="text-amber-4 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Regulatory Exposure:</span>
-            <span class="text-cyan-4 text-weight-bold">LOW</span>
+            <span class="text-cyan-4 text-weight-bold">—</span>
           </div>
           <q-icon name="policy" color="cyan-4" size="sm" />
         </div>
@@ -58,37 +58,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Global Compliance / KYC</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">96.4% / 98.1%</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">— / —</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Pending Reviews / Cases</div>
-          <div class="text-h5 text-metric-mono text-amber-4">142 / 34</div>
+          <div class="text-h5 text-metric-mono text-amber-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">High Risk Entities</div>
-          <div class="text-h5 text-metric-mono text-red-5">12</div>
+          <div class="text-h5 text-metric-mono text-red-5">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">PEP Matches / Sanctions</div>
-          <div class="text-h5 text-metric-mono text-purple-4">4 / 0</div>
+          <div class="text-h5 text-metric-mono text-purple-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">SARs / Exceptions</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">2 / 8</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">AML Coverage / Sanctions</div>
-          <div class="text-h5 text-metric-mono text-green-4">100% / 100%</div>
+          <div class="text-h5 text-metric-mono text-green-4">— / —</div>
         </div>
       </div>
     </div>
@@ -300,7 +300,7 @@
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md text-cyan-3">Anti-Money Laundering (AML) Monitor</div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transaction Monitoring:</span><span class="text-green-4">NORMAL ACTIVITY</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Velocity Analysis:</span><span class="text-amber-4">ELEVATED (Alert CMP-2026-941)</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Velocity Analysis:</span><span class="text-amber-4">—</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Suspicious Pattern Match:</span><span class="text-green-4">NONE</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Counterparty Risk:</span><span class="text-green-4">LOW</span></div>
               </div>
@@ -381,59 +381,7 @@ const complianceCols = [
   { name: 'createdDate', label: 'CREATED', field: 'createdDate', align: 'right' }
 ]
 
-const complianceRecords = ref([
-  {
-    id: 'CMP-2026-941',
-    complianceType: 'AML_ALERT',
-    entityType: 'TENANT',
-    entityId: 'TEN-AGT-881',
-    tenant: 'Invify Agency Network',
-    tenantType: 'AGENT',
-    status: 'ESCALATED',
-    complianceScore: 85,
-    amlScore: 65,
-    kycScore: 100,
-    riskScore: 78,
-    officer: 'F. Compliance',
-    createdDate: '2026-05-30',
-    predictionStatus: 'REVIEW_REQUIRED',
-    recommendedAction: 'Analyze velocity spikes on Terminal TRM-AGT-0012'
-  },
-  {
-    id: 'CMP-2026-942',
-    complianceType: 'KYC',
-    entityType: 'TENANT',
-    entityId: 'TEN-MER-112',
-    tenant: 'FastFood Central',
-    tenantType: 'RETAIL',
-    status: 'PENDING',
-    complianceScore: 60,
-    amlScore: 100,
-    kycScore: 40,
-    riskScore: 35,
-    officer: 'Unassigned',
-    createdDate: '2026-05-31',
-    predictionStatus: 'AWAITING_DOCS',
-    recommendedAction: 'Review submitted CAC documents'
-  },
-  {
-    id: 'CMP-2026-943',
-    complianceType: 'PEP_SCREENING',
-    entityType: 'USER',
-    entityId: 'USR-8812',
-    tenant: 'Invify Core Platform',
-    tenantType: 'PLATFORM',
-    status: 'PENDING',
-    complianceScore: 92,
-    amlScore: 95,
-    kycScore: 100,
-    riskScore: 45,
-    officer: 'E. Risk',
-    createdDate: '2026-05-30',
-    predictionStatus: 'FALSE_POSITIVE_LIKELY',
-    recommendedAction: 'Verify date of birth mismatch'
-  }
-])
+const complianceRecords = ref([])
 
 </script>
 

@@ -245,13 +245,13 @@
         <div class="row items-center justify-between text-center bg-panel-darker q-pa-sm rounded-borders border-muted">
           
           <div class="col column">
-            <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">99.4%</span>
+            <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">—</span>
             <span class="text-caption text-muted" style="font-size: 10px;">Success Convergence</span>
           </div>
 
           <div class="col column border-left">
             <span class="text-metric-mono text-weight-bold" :class="crashSpikeDetected ? 'text-red-5' : 'text-main'" style="font-size: 18px;">
-              {{ crashSpikeDetected ? '0.84% SPIKE' : '0.02% Nominal' }}
+              {{ crashSpikeDetected ? 'SPIKE' : '—' }}
             </span>
             <span class="text-caption text-muted" style="font-size: 10px;">Crash Spike Index</span>
           </div>
@@ -324,7 +324,7 @@
               <div>
                 <div class="row justify-between text-metric-sm text-secondary q-mb-xs" style="font-size: 10px;">
                   <span>Installation Handshake Success Ratios</span>
-                  <span class="text-metric-mono text-green-4 text-weight-bold">99.4% Converged</span>
+                  <span class="text-metric-mono text-green-4 text-weight-bold">—</span>
                 </div>
                 <q-linear-progress :dark="prefs.isDarkMode" value="0.994" color="green-4" track-color="grey-9" size="xs" />
               </div>
@@ -370,13 +370,7 @@ const rolloutStore = useRolloutEventStore()
 const crashSpikeDetected = computed(() => rolloutStore.activeRollbacksCount > 0)
 
 // Mode Scope Channel Assignment Data
-const modeMappings = ref([
-  { id: 'm-1', modeName: 'Alpha Retail Nodes', modeScope: 'retail', nodeCount: 150, assignedChannel: 'Canary' },
-  { id: 'm-2', modeName: 'Standard POS Sector', modeScope: 'retail', nodeCount: 82000, assignedChannel: 'Stable' },
-  { id: 'm-3', modeName: 'Logistics Scanners', modeScope: 'service', nodeCount: 4100, assignedChannel: 'Beta' },
-  { id: 'm-4', modeName: 'Core Edu Tablets', modeScope: 'school', nodeCount: 12500, assignedChannel: 'Stable' },
-  { id: 'm-5', modeName: 'Global IT Testing', modeScope: 'global', nodeCount: 50, assignedChannel: 'Internal' }
-])
+const modeMappings = ref([])
 
 const notifyMappingChange = (mapping) => {
   console.log(`[ChannelManager] Updated enforced track for ${mapping.modeName} to ${mapping.assignedChannel}`)
@@ -388,12 +382,7 @@ const notifyMappingChange = (mapping) => {
 }
 
 // 1. FINAL REFINEMENT #3: Release Channel Drift Detection Violations array
-const driftViolationsList = ref([
-  { id: 'drift-ch-01', exceptionType: 'EMERGENCY_CHANNEL_LEAKAGE', severity: 'CRITICAL', description: 'Standard consumer kiosk bridge loaded unauthorized emergency channel debug signature', tenantScope: 'tenant-alpha', observedState: 'v2.4.2-hotfix', expectedState: 'v2.4.1-Cert', durationStr: '14m ago' },
-  { id: 'drift-ch-02', exceptionType: 'STALE_ROLLOUT_COHORT', severity: 'HIGH', description: 'Stale target hardware identifiers persisting on legacy canary testing instructions', tenantScope: 'retail_sector_omega', observedState: 'v2.3.0-legacy', expectedState: 'v2.4.1-Cert', durationStr: '2d ago' },
-  { id: 'drift-ch-03', exceptionType: 'UNAUTHORIZED_DOWNGRADE', severity: 'CRITICAL', description: 'Local user permission bypass executed absolute software image fallback profile', tenantScope: 'tenant-beta', observedState: 'v2.2.4-Old', expectedState: 'v2.5.0-rc1', durationStr: '4h ago' },
-  { id: 'drift-ch-04', exceptionType: 'INHERITANCE_INCONSISTENCY', severity: 'WARNING', description: 'Downstream tenant partition scope missing active beta promotion registry synchronization', tenantScope: 'tenant-gamma', observedState: 'v2.4.1-Cert', expectedState: 'v2.5.0-rc1', durationStr: '1d ago' }
-])
+const driftViolationsList = ref([])
 
 const realignChannelDrift = (driftId) => {
   const target = driftViolationsList.value.find(d => d.id === driftId)

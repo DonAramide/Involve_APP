@@ -16,7 +16,7 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Compliance Score:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.6%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
@@ -61,37 +61,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Audit Events</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">8.2M <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Critical Events</div>
-          <div class="text-h5 text-metric-mono text-red-5">14</div>
+          <div class="text-h5 text-metric-mono text-red-5">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Security Events</div>
-          <div class="text-h5 text-metric-mono text-purple-4">2,301</div>
+          <div class="text-h5 text-metric-mono text-purple-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Pending Reviews</div>
-          <div class="text-h5 text-metric-mono text-amber-5">12</div>
+          <div class="text-h5 text-metric-mono text-amber-5">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Open Investigations</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">4</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Audit Coverage</div>
-          <div class="text-h5 text-metric-mono text-green-4">100%</div>
+          <div class="text-h5 text-metric-mono text-green-4">—</div>
         </div>
       </div>
     </div>
@@ -274,7 +274,7 @@
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Category:</span><span class="text-cyan-4">{{ selectedAudit.category }}</span></div>
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Entity Type:</span><span class="text-amber-4">{{ selectedAudit.entityType }}</span></div>
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Entity ID:</span><span class="text-main">{{ selectedAudit.entityId }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Correlation ID:</span><span class="text-grey-5">CORR-99412-A</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Correlation ID:</span><span class="text-grey-5">—</span></div>
                   </div>
                 </div>
                 <div class="col-6">
@@ -431,77 +431,7 @@ const auditCols = [
   { name: 'riskScore', label: 'RISK', field: 'riskScore', align: 'center' }
 ]
 
-const auditRecords = ref([
-  {
-    id: 'AUD-2026-990001',
-    eventType: 'SETTLEMENT_APPROVAL_OVERRIDE',
-    category: 'Settlement Events',
-    severity: 'CRITICAL',
-    actor: 'admin_sys_john',
-    role: 'TREASURY_OFFICER',
-    tenant: 'Global Services Ltd',
-    tenantType: 'MERCHANT',
-    entityType: 'SETTLEMENT',
-    entityId: 'SET-20260531-0002',
-    reference: 'STL/260531/0002',
-    ip: '203.0.113.45',
-    device: 'MacBook Pro / Chrome',
-    location: 'Lagos, NG',
-    status: 'FLAGGED',
-    riskScore: 95,
-    anomalyScore: 0.98,
-    fraudFlags: [],
-    securityFlags: ['UNUSUAL_GEO', 'TOR_NODE_SUSPECTED'],
-    complianceFlags: ['POLICY_OVERRIDE'],
-    timestamp: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'AUD-2026-990002',
-    eventType: 'WALLET_LIMIT_INCREASE',
-    category: 'Wallet Events',
-    severity: 'HIGH',
-    actor: 'support_mary',
-    role: 'SUPPORT_LEAD',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    entityType: 'WALLET',
-    entityId: 'WAL-SCH-0001',
-    reference: 'TKT-88412',
-    ip: '203.0.113.12',
-    device: 'Windows 11 / Edge',
-    location: 'Abuja, NG',
-    status: 'RESOLVED',
-    riskScore: 60,
-    anomalyScore: 0.45,
-    fraudFlags: [],
-    securityFlags: [],
-    complianceFlags: [],
-    timestamp: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'AUD-2026-990003',
-    eventType: 'USER_LOGIN_SUCCESS',
-    category: 'Authentication Events',
-    severity: 'INFO',
-    actor: 'admin_sys_john',
-    role: 'TREASURY_OFFICER',
-    tenant: 'SYSTEM',
-    tenantType: 'INTERNAL',
-    entityType: 'USER',
-    entityId: 'USR-841',
-    reference: 'AUTH-OK',
-    ip: '203.0.113.45',
-    device: 'MacBook Pro / Chrome',
-    location: 'Lagos, NG',
-    status: 'SUCCESS',
-    riskScore: 10,
-    anomalyScore: 0.02,
-    fraudFlags: [],
-    securityFlags: [],
-    complianceFlags: [],
-    timestamp: new Date(Date.now() - 86400000).toISOString()
-  }
-])
+const auditRecords = ref([])
 
 </script>
 
