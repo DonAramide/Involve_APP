@@ -55,16 +55,19 @@ CREATE INDEX IF NOT EXISTS idx_financial_dispute_events_case
 ALTER TABLE public.financial_disputes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_dispute_events ENABLE ROW LEVEL SECURITY;
 
+-- Phase 32C.2R.3: restrict to service_role (hardened convention). Do not grant PUBLIC ALL.
 DROP POLICY IF EXISTS financial_disputes_service_all ON public.financial_disputes;
 CREATE POLICY financial_disputes_service_all
     ON public.financial_disputes
     FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    TO service_role
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS financial_dispute_events_service_all ON public.financial_dispute_events;
 CREATE POLICY financial_dispute_events_service_all
     ON public.financial_dispute_events
     FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    TO service_role
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');

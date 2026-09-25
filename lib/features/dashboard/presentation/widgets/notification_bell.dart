@@ -37,6 +37,13 @@ class NotificationInbox {
     Map<String, dynamic>? extra,
   }) async {
     final items = await load();
+    final reference = extra?['reference']?.toString().trim();
+    if (reference != null && reference.isNotEmpty) {
+      final already = items.any(
+        (e) => e['reference']?.toString() == reference && e['type'] == type,
+      );
+      if (already) return;
+    }
     items.insert(0, {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'message': message,

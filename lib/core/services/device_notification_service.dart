@@ -41,12 +41,16 @@ class DeviceNotificationService {
   static Future<void> showPayment({
     required String message,
     String title = 'Payment received',
+    String? reference,
   }) async {
     if (kIsWeb) return;
     if (!_ready) await init();
     if (!_ready) return;
     try {
-      final id = DateTime.now().millisecondsSinceEpoch.remainder(1 << 31);
+      // Stable id per payment reference so Android replaces instead of stacking duplicates.
+      final id = (reference != null && reference.trim().isNotEmpty)
+          ? reference.trim().hashCode.abs().remainder(1 << 31)
+          : DateTime.now().millisecondsSinceEpoch.remainder(1 << 31);
       await _plugin.show(
         id,
         title,

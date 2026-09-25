@@ -131,6 +131,8 @@ class Student extends Equatable {
   final String? department;
   /// `active`, `promoted`, or `graduated`.
   final String enrollmentStatus;
+  /// Health conditions, medical needs, or special care notes.
+  final String? notes;
 
   const Student({
     this.id,
@@ -154,6 +156,7 @@ class Student extends Equatable {
     this.virtualAccountStatus,
     this.department,
     this.enrollmentStatus = 'active',
+    this.notes,
   });
 
   Student copyWith({
@@ -178,6 +181,7 @@ class Student extends Equatable {
     String? virtualAccountStatus,
     String? department,
     String? enrollmentStatus,
+    String? notes,
   }) {
     return Student(
       id: id ?? this.id,
@@ -201,6 +205,7 @@ class Student extends Equatable {
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
       department: department ?? this.department,
       enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
+      notes: notes ?? this.notes,
     );
   }
 
@@ -254,6 +259,7 @@ class Student extends Equatable {
         virtualAccountStatus,
         department,
         enrollmentStatus,
+        notes,
       ];
 }
 

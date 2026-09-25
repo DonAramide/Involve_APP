@@ -415,6 +415,27 @@ class _StudentListPageState extends State<StudentListPage> {
                   }
                   return const SizedBox.shrink();
                 })(),
+                if (student.notes != null && student.notes!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(Icons.medical_information_outlined, size: 13, color: Colors.orange.shade800),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          student.notes!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             trailing: _isSelectionMode 
@@ -552,20 +573,20 @@ class _StudentListPageState extends State<StudentListPage> {
             ),
             ListTile(
               leading: const Icon(Icons.upload_file),
-              title: const Text('Upload students (CSV)'),
-              subtitle: const Text('Import multiple records from a CSV file'),
+              title: const Text('Upload students (CSV / Excel)'),
+              subtitle: const Text('Import multiple records from a CSV or Excel (.xlsx) file'),
               onTap: () {
                 Navigator.pop(ctx);
-                _importStudentsCsv(context);
+                _importStudents(context);
               },
             ),
             ListTile(
               leading: const Icon(Icons.download),
-              title: const Text('Download CSV template'),
+              title: const Text('Download template (CSV / Excel)'),
               subtitle: const Text('Headers match the Add Student form'),
               onTap: () {
                 Navigator.pop(ctx);
-                _downloadStudentCsvTemplate(context);
+                _downloadStudentTemplate(context);
               },
             ),
           ],
@@ -574,16 +595,47 @@ class _StudentListPageState extends State<StudentListPage> {
     );
   }
 
-  Future<void> _downloadStudentCsvTemplate(BuildContext context) async {
+  Future<void> _downloadStudentTemplate(BuildContext context) async {
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined, color: Colors.green),
+              title: const Text('Excel Template (.xlsx)'),
+              subtitle: const Text('Recommended for Microsoft Excel & Google Sheets'),
+              onTap: () => Navigator.pop(ctx, 'xlsx'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('CSV Template (.csv)'),
+              subtitle: const Text('Plain comma-separated values file'),
+              onTap: () => Navigator.pop(ctx, 'csv'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (format == null || !context.mounted) return;
+
     try {
+      final isExcel = format == 'xlsx';
+      final fileName = isExcel ? 'student_import_template.xlsx' : 'student_import_template.csv';
+      final bytes = isExcel
+          ? StudentCsvImport.createExcelTemplate()
+          : Uint8List.fromList(utf8.encode(StudentCsvImport.template));
+
       final result = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save student CSV template',
-        fileName: 'student_import_template.csv',
-        bytes: Uint8List.fromList(utf8.encode(StudentCsvImport.template)),
+        dialogTitle: 'Save student $format template',
+        fileName: fileName,
+        bytes: bytes,
       );
       if (!context.mounted || result == null) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('CSV template saved.')),
+        SnackBar(content: Text('${isExcel ? "Excel" : "CSV"} template saved.')),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -596,7 +648,7 @@ class _StudentListPageState extends State<StudentListPage> {
     }
   }
 
-  Future<void> _importStudentsCsv(BuildContext context) async {
+  Future<void> _importStudents(BuildContext context) async {
     final bloc = context.read<SchoolBloc>();
     if (bloc.state.classes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -610,7 +662,7 @@ class _StudentListPageState extends State<StudentListPage> {
 
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['csv'],
+      allowedExtensions: const ['csv', 'xlsx'],
       withData: true,
     );
     if (picked == null || picked.files.isEmpty) return;
@@ -621,15 +673,16 @@ class _StudentListPageState extends State<StudentListPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not read the selected CSV file.'),
+          content: Text('Could not read the selected file.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    final parsed = StudentCsvImport.parse(
-      utf8.decode(bytes, allowMalformed: true),
+    final parsed = StudentCsvImport.parseAuto(
+      bytes,
+      fileName: file.name,
       classes: bloc.state.classes,
       startingAdmissionNumber: bloc.state.nextAdmissionNumber ?? '0001',
     );
@@ -695,7 +748,7 @@ class _StudentListPageState extends State<StudentListPage> {
     }
 
     if (!shouldImport || !context.mounted) return;
-    bloc.add(ImportStudentsEvent(parsed.students));
+    bloc.add(ImportStudentsEvent(parsed.students, parentAddresses: parsed.parentAddresses));
   }
 
   void _showStudentDialog(BuildContext context, {Student? student}) {
@@ -708,6 +761,7 @@ class _StudentListPageState extends State<StudentListPage> {
     );
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
+    final notesController = TextEditingController(text: student?.notes);
     final schoolState = context.read<SchoolBloc>().state;
     SchoolParent? initialParent;
     if (student?.parentId != null) {
@@ -1224,6 +1278,31 @@ class _StudentListPageState extends State<StudentListPage> {
                             validator: (val) => (selectedCountry != 'Nigeria' && (val == null || val.trim().isEmpty)) ? 'State/Region is required' : null,
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.health_and_safety_outlined, size: 20, color: Theme.of(context).primaryColor),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Health Condition & Notes',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: notesController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Health condition / Special notes (Optional)',
+                            hintText: 'e.g. Asthmatic, peanut allergy, wears glasses, needs front desk seating',
+                            prefixIcon: Icon(Icons.medical_information_outlined),
+                            border: OutlineInputBorder(),
+                            alignLabelWithHint: true,
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -1235,6 +1314,8 @@ class _StudentListPageState extends State<StudentListPage> {
                           onPressed: () {
                             if (formKey.currentState!.validate()) {
                               final middleName = middleNameController.text.trim();
+                              final notesText = notesController.text.trim();
+                              final studentNotes = notesText.isEmpty ? null : notesText;
                               final newStudent = student?.copyWith(
                                     firstName: firstNameController.text,
                                     middleName: middleName,
@@ -1247,6 +1328,7 @@ class _StudentListPageState extends State<StudentListPage> {
                                     dateOfBirth: selectedDob,
                                     gender: selectedGender,
                                     department: selectedDepartment,
+                                    notes: studentNotes,
                                   ) ??
                                   Student(
                                     firstName: firstNameController.text,
@@ -1261,6 +1343,7 @@ class _StudentListPageState extends State<StudentListPage> {
                                     gender: selectedGender,
                                     registrationDate: DateTime.now(),
                                     department: selectedDepartment,
+                                    notes: studentNotes,
                                   );
 
                               final street = streetController.text.trim();

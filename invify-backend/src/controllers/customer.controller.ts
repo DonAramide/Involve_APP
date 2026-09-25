@@ -68,6 +68,7 @@ export class CustomerController {
         childId: customerId, 
         parentId: tenantId,  
         email: email || `customer-${customerId.substring(0, 8)}@invify.com`,
+        phone: String(phone).trim(),
         firstName: name?.split(' ')[0] || 'Valued',
         lastName: name?.split(' ').slice(1).join(' ') || 'Customer',
         metadata: { source: 'customer_provisioning', phone: phone }
@@ -254,17 +255,22 @@ export class CustomerController {
       const quasar = await getQuasarService(tenantId);
       const platformId = 'platform-admin-owner-id';
 
+      const staffPhone = String(phone || defaultPhone || '').trim();
+      if (!staffPhone) {
+        return res.status(400).json({ error: 'Customer phone number is required' });
+      }
       const quasarAccount = await quasar.createVirtualAccount({
         childId: userId,
         parentId: platformId,
         email: email || defaultEmail,
+        phone: staffPhone,
         firstName: companyName,
         lastName: customLastName,
         parentShareBps: 0,
         metadata: { 
           type: 'staff_account', 
           tenantId: tenantId, 
-          phone: phone || defaultPhone || undefined 
+          phone: staffPhone 
         }
       });
 

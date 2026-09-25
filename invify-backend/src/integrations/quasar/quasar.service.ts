@@ -91,6 +91,8 @@ export class QuasarService {
     childId: string;
     parentId: string;
     email: string;
+    /** Forwarded to Quasar as phoneNumber + metadata (not as `phone`). */
+    phone?: string;
     firstName?: string;
     lastName?: string;
     parentShareBps?: number;
@@ -98,6 +100,10 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Provisioning virtual account for child: ${params.childId}`);
+      const phone =
+        QuasarService.normalizeCustomerPhone(params.phone) ||
+        QuasarService.normalizeCustomerPhone(params.metadata?.phone) ||
+        QuasarService.normalizeCustomerPhone(params.metadata?.phoneNumber);
       if (this.apiKey.startsWith('sk_test_')) {
         console.log('[QuasarSDK] Test API key detected. Routing to sandbox account generator...');
         const sandboxAccounts = await this.client.generateSandboxAccounts({
@@ -118,14 +124,26 @@ export class QuasarService {
 
       return await this.client.createVirtualAccount({
         ...params,
+        phone: phone || undefined,
         firstName: params.firstName || 'User',
         lastName: params.lastName || 'Account',
-        currency: 'NGN' // Defaulting to NGN for virtual accounts
+        currency: 'NGN'
       });
     } catch (error: any) {
       console.error('[QuasarSDK] createVirtualAccount failed:', error.message);
       throw error;
     }
+  }
+
+  /** Normalize to +234… for Nigerian mobiles when possible. */
+  static normalizeCustomerPhone(raw: string | null | undefined): string {
+    const digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('234') && digits.length >= 13) return `+${digits}`;
+    if (digits.length === 11 && digits.startsWith('0')) return `+234${digits.slice(1)}`;
+    if (digits.length === 10 && /^[789]/.test(digits)) return `+234${digits}`;
+    if (raw && String(raw).trim().startsWith('+')) return `+${digits}`;
+    return digits.length >= 10 ? `+${digits}` : digits;
   }
 
   /**

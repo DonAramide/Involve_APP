@@ -654,6 +654,8 @@ export class QuasarPaymentsClient {
       parentId: string;
       currency: string;
       email: string;
+      /** Quasar CreateVirtualAccountDto now accepts phone (+ alias phoneNumber). */
+      phone?: string;
       firstName?: string;
       lastName?: string;
       parentShareBps?: number;
@@ -664,21 +666,81 @@ export class QuasarPaymentsClient {
     opts?: RequestOptions,
   ): Promise<any> {
     const idempotencyKey = opts?.idempotencyKey ?? `virtual-account:${params.childId}`;
-    return this.client.post(
-      `/school/students/${encodeURIComponent(params.childId)}/virtual-account`,
-      {
-        merchantWalletOwnerId: params.parentId,
-        currency: params.currency,
-        email: params.email,
-        firstName: params.firstName || 'User',
-        lastName: params.lastName || 'Account',
-        counterpartyShareBps: params.parentShareBps ?? 0,
-        preferredBankCode: params.preferredBankCode,
-        bvn: params.bvn,
-        metadata: params.metadata,
+    const phone = String(params.phone || '').trim();
+    const path = `/school/students/${encodeURIComponent(params.childId)}/virtual-account`;
+    const body: Record<string, unknown> = {
+      merchantWalletOwnerId: params.parentId,
+      currency: params.currency,
+      email: params.email,
+      firstName: params.firstName || 'User',
+      lastName: params.lastName || 'Account',
+      counterpartyShareBps: params.parentShareBps ?? 0,
+      preferredBankCode: params.preferredBankCode,
+      bvn: params.bvn,
+      metadata: {
+        ...(params.metadata || {}),
+        ...(phone
+          ? { phone, phoneNumber: phone, customerPhone: phone }
+          : {}),
       },
-      { ...opts, idempotencyKey },
+    };
+    // Quasar live: top-level phone (whitelist now allows phone + phoneNumber).
+    if (phone) {
+      body.phone = phone;
+      body.phoneNumber = phone;
+    }
+
+    const safeBody = {
+      ...body,
+      // keep phone visible in logs (needed for Quasar support); never log API keys
+    };
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        tag: 'INVIFY_VA_QUASAR_REQ',
+        method: 'POST',
+        path,
+        childId: params.childId,
+        idempotencyKey,
+        body: safeBody,
+      }),
     );
+
+    try {
+      const result = await this.client.post(path, body, { ...opts, idempotencyKey });
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          tag: 'INVIFY_VA_QUASAR_RES',
+          method: 'POST',
+          path,
+          childId: params.childId,
+          ok: true,
+          accountNumber: (result as any)?.accountNumber || (result as any)?.account_number || null,
+          bankName: (result as any)?.bankName || null,
+          reference: (result as any)?.reference || null,
+          rawKeys: result && typeof result === 'object' ? Object.keys(result as object) : [],
+        }),
+      );
+      return result;
+    } catch (err: any) {
+      const status = err?.response?.status || err?.statusCode || null;
+      const data = err?.response?.data || err?.data || null;
+      console.error(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          tag: 'INVIFY_VA_QUASAR_RES',
+          method: 'POST',
+          path,
+          childId: params.childId,
+          ok: false,
+          status,
+          message: err?.message || String(err),
+          responseBody: data,
+        }),
+      );
+      throw err;
+    }
   }
 
   /**

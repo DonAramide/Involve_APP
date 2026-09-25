@@ -59,6 +59,32 @@ export class StudentController {
       const last = String(lastName || '').trim() || String(admissionNumber || studentId).trim() || 'Learner';
       const admission = String(admissionNumber || studentId).trim();
       const fullName = `${first} ${last}`.trim();
+      const phoneDigits = String(phone || '').replace(/\D/g, '');
+      if (!phoneDigits || phoneDigits.length < 10) {
+        return res.status(400).json({
+          error: 'Parent phone number is required to generate a virtual account',
+          code: 'PARENT_PHONE_REQUIRED',
+        });
+      }
+      // Quasar / Paystack prefer E.164 (+234…)
+      let phoneE164 = phoneDigits;
+      if (phoneDigits.startsWith('234') && phoneDigits.length >= 13) phoneE164 = `+${phoneDigits}`;
+      else if (phoneDigits.length === 11 && phoneDigits.startsWith('0')) phoneE164 = `+234${phoneDigits.slice(1)}`;
+      else if (phoneDigits.length === 10 && /^[789]/.test(phoneDigits)) phoneE164 = `+234${phoneDigits}`;
+      else if (String(phone || '').trim().startsWith('+')) phoneE164 = `+${phoneDigits}`;
+      else if (phoneDigits.length >= 10) phoneE164 = `+${phoneDigits}`;
+
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          tag: 'INVIFY_VA_APP_REQ',
+          tenantId,
+          externalKey: String(studentId).trim(),
+          phoneE164,
+          firstName: String(firstName || '').trim() || null,
+          lastName: String(lastName || '').trim() || null,
+        }),
+      );
       const fallbackEmail =
         (email && String(email).trim()) ||
         `${admission.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student'}@invify.edu`;
@@ -135,6 +161,7 @@ export class StudentController {
         childId: quasarChildId,
         parentId: tenantId,
         email: fallbackEmail,
+        phone: phoneE164,
         firstName: first,
         lastName: last,
         parentShareBps: 0,
@@ -142,7 +169,9 @@ export class StudentController {
           type: String(externalKey).startsWith('par-') ? 'parent_account' : 'student_account',
           tenantId,
           admissionNumber: admission,
-          phone: phone || undefined,
+          phone: phoneE164,
+          phoneNumber: phoneE164,
+          customerPhone: phoneE164,
           source: String(externalKey).startsWith('par-')
             ? 'school_parent_provisioning'
             : 'school_student_provisioning',
@@ -243,6 +272,13 @@ export class StudentController {
           error:
             'Payment account service is temporarily unavailable. If Financial Platform is still UNPROVISIONED, activate it for this school in Invify Admin, then try again.',
           code: 'VA_SERVICE_UNAVAILABLE',
+        });
+      }
+      // Rare: old Quasar deploy still rejecting phone property names.
+      if (/property phone(number)? should not exist/i.test(msg)) {
+        return res.status(502).json({
+          error: msg,
+          code: 'QUASAR_VA_PHONE_WHITELIST',
         });
       }
       const scopeHint = /sandbox:write|Missing required scope/i.test(msg)

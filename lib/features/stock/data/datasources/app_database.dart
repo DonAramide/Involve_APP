@@ -68,7 +68,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 99;
+  int get schemaVersion => 100;
 
   @override
   MigrationStrategy get migration {
@@ -498,6 +498,9 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 99) {
           await _safeAddColumn(m, settings, settings.hiddenDashboardIcons);
+        }
+        if (from < 100) {
+          await _safeAddColumn(m, students, students.notes);
         }
       },
       beforeOpen: (details) async {

@@ -18,7 +18,9 @@ class CustomerWalletCreditService {
       CustomerWalletCreditService._();
 
   static const String prefsKey = 'customer_fund_ledger';
+  static const String notifiedRefsPrefsKey = 'payment_notified_refs';
   static const int maxItems = 500;
+  static const int maxNotifiedRefs = 500;
 
   IServicesRepository? _repository;
   SchoolRepository? _schoolRepository;
@@ -181,6 +183,43 @@ class CustomerWalletCreditService {
     return (await _processedAmount(reference)) > 0.009;
   }
 
+  /// True if any ledger row exists for [reference] (including notify-only).
+  Future<bool> hasLedgerEntry(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final ledger = await loadLedger();
+    return ledger.any((e) => e['reference']?.toString() == ref);
+  }
+
+  /// Claim a one-time UI/device notification for this payment reference.
+  /// Returns true only the first time; later calls for the same ref return false.
+  Future<bool> claimPaymentNotification(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getStringList(notifiedRefsPrefsKey) ?? <String>[];
+    if (existing.contains(ref)) return false;
+
+    // Already in local ledger (including prior "notify only" catch-ups) →
+    // seed the claim list and do not show another notification.
+    final alreadyInLedger = await hasLedgerEntry(ref);
+    existing.insert(0, ref);
+    while (existing.length > maxNotifiedRefs) {
+      existing.removeLast();
+    }
+    await prefs.setStringList(notifiedRefsPrefsKey, existing);
+    if (alreadyInLedger) return false;
+    return true;
+  }
+
+  Future<bool> hasNotifiedReference(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getStringList(notifiedRefsPrefsKey) ?? <String>[];
+    return existing.contains(ref);
+  }
+
   double _roundNaira(double value) => (value * 100).round() / 100.0;
 
   double _nairaFromPayload(Map map, Map metadata) {
@@ -221,7 +260,8 @@ class CustomerWalletCreditService {
     String? createdAt,
     String source = 'live',
   }) async {
-    if (await hasProcessedReference(reference)) return;
+    // Deduplicate including catchup_notify_only so reconnects never re-insert.
+    if (await hasLedgerEntry(reference)) return;
     final ledger = await loadLedger();
     ledger.insert(0, {
       'id': reference,

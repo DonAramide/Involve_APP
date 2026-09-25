@@ -343,7 +343,7 @@
             <div class="text-h6 q-mb-sm text-main">Tenant Quasar API Key (card rails)</div>
             <div class="text-caption text-muted q-mb-md">
               <code>/pos/icc-data</code> and <code>/pos/card-transaction</code> require
-              <code>sk_live_*</code>. Activation currently stores <code>sk_test_*</code> (sandbox only).
+              <code>sk_live_*</code>. On production, Activate / Rotate issues <code>sk_live_*</code>; staging still uses <code>sk_test_*</code>.
             </div>
             <div class="row q-col-gutter-md items-start">
               <div class="col-12 col-md-7">

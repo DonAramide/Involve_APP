@@ -1092,6 +1092,9 @@ class _SettingsPageState extends State<SettingsPage> {
                         'virtualAccountNumber': s.virtualAccountNumber,
                         'virtualAccountBank': s.virtualAccountBank,
                         'virtualAccountStatus': s.virtualAccountStatus,
+                        'notes': s.notes,
+                        'health_condition': s.notes,
+                        'healthCondition': s.notes,
                         'isDeleted': s.isDeleted,
                       })
                   .toList(),

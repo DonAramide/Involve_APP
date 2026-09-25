@@ -168,6 +168,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
       enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
+      notes: row.notes,
     )).toList();
   }
 
@@ -194,6 +195,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.virtualAccountStatus,
       database.students.department,
       database.students.enrollmentStatus,
+      database.students.notes,
     ]);
     
     final rows = await query.get();
@@ -219,6 +221,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountStatus: row.read(database.students.virtualAccountStatus),
       department: row.read(database.students.department),
       enrollmentStatus: _enrollmentOf(row.read(database.students.enrollmentStatus)),
+      notes: row.read(database.students.notes),
     )).toList();
   }
 
@@ -245,6 +248,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
       enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
+      notes: Value(student.notes),
     ));
   }
 
@@ -272,6 +276,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
       enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
+      notes: Value(student.notes),
     ));
   }
 
@@ -520,6 +525,11 @@ class SchoolRepositoryImpl implements SchoolRepository {
     if (match != null) {
       bool needUpdate = false;
       var updated = match;
+      final trimmedPhone = (phone ?? '').trim();
+      if (trimmedPhone.isNotEmpty && (match.phone ?? '').trim().isEmpty) {
+        updated = updated.copyWith(phone: trimmedPhone);
+        needUpdate = true;
+      }
       if ((email ?? '').trim().isNotEmpty && (match.email ?? '').isEmpty) {
         updated = updated.copyWith(email: email!.trim());
         needUpdate = true;
@@ -558,12 +568,16 @@ class SchoolRepositoryImpl implements SchoolRepository {
       throw StateError('Parent $parentId not found');
     }
     if (studentIds.isEmpty) return parent;
+    final resolvedPhone = (parent.phone ?? '').trim().isNotEmpty
+        ? parent.phone
+        : null;
     await (database.update(database.students)
           ..where((t) => t.id.isIn(studentIds)))
         .write(db.StudentsCompanion(
       parentId: Value(parentId),
       parentName: Value(parent.fullName),
-      parentPhone: Value(parent.phone),
+      // Never wipe a student guardian phone with an empty parent.phone.
+      parentPhone: resolvedPhone != null ? Value(resolvedPhone) : const Value.absent(),
     ));
     if (parent.hasCanonicalVa) {
       await (database.update(database.students)

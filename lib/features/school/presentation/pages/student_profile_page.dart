@@ -438,6 +438,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Widget _buildGeneralTab(Student student, {bool isProvisioningVa = false}) {
+    final parent = _parentFor(student, context.read<SchoolBloc>().state);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
       children: [
@@ -464,6 +465,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 ? Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.grey.shade500)
                 : null,
           ),
+          if (parent?.address != null && parent!.address!.trim().isNotEmpty)
+            _buildInfoRow(
+              icon: Icons.location_on_outlined,
+              label: 'Residential Address',
+              value: parent.address!.trim(),
+            ),
           ..._siblingInfoRows(context, student),
         ]),
         const SizedBox(height: 22),
@@ -496,6 +503,19 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             showDivider: false,
           ),
         ]),
+        if (student.notes != null && student.notes!.trim().isNotEmpty) ...[
+          const SizedBox(height: 22),
+          _buildSectionLabel('Health Condition & Special Notes'),
+          const SizedBox(height: 10),
+          _buildDetailsCard([
+            _buildInfoRow(
+              icon: Icons.health_and_safety_outlined,
+              label: 'Medical / Special Notes',
+              value: student.notes!.trim(),
+              showDivider: false,
+            ),
+          ]),
+        ],
       ],
     );
   }

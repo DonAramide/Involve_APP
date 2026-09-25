@@ -5,6 +5,10 @@ import { ObservabilityContext, AuditLogger, DomainEventPublisher, MetricsExporte
 import { QuasarIntegrationStore } from '../../../integrations/quasar/quasar-integration.store';
 import { VaultEncryptionUtil } from '../../../utils/vault-encryption.util';
 import { supabaseAdmin } from '../../../db/supabase';
+import {
+  resolveQuasarTenantKeyEnvironment,
+  scopesForQuasarTenantKeyEnvironment,
+} from '../../../integrations/quasar/quasar-tenant-key-environment';
 
 export class RotationSaga {
   constructor(
@@ -17,15 +21,23 @@ export class RotationSaga {
 
   async execute(tenantId: string, quasarTenantId: string, vaultUrn: string, context: ObservabilityContext): Promise<void> {
     const startTime = Date.now();
+    const keyEnvironment = resolveQuasarTenantKeyEnvironment();
+    const keyScopes = scopesForQuasarTenantKeyEnvironment(keyEnvironment);
+    const existing = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
+    const vertical = String(existing?.quasar_vertical || 'invify_retail');
 
     try {
       await QuasarIntegrationStore.updateStatus(tenantId, 'provisioned');
 
-      const keyIdempotency = `rotate-apikey:${tenantId}:${Date.now()}`;
+      const keyIdempotency = `rotate-apikey:${tenantId}:${keyEnvironment}:${Date.now()}`;
+      console.log(
+        `[RotationSaga] Issuing Quasar API key environment=${keyEnvironment} vertical=${vertical} for tenant=${tenantId}`,
+      );
       const apiKeyResp = await this.quasarClient.createTenantApiKey(quasarTenantId, {
         name: `Invify MPOS Rotated — ${new Date().toISOString()}`,
-        environment: 'test'
-      }, context, keyIdempotency);
+        environment: keyEnvironment,
+        scopes: keyScopes,
+      }, context, keyIdempotency, vertical);
 
       const keyPayload = apiKeyResp.data?.data || apiKeyResp.data || apiKeyResp;
       const newKeySecret = keyPayload.secretKey;
@@ -33,6 +45,12 @@ export class RotationSaga {
 
       if (!newKeySecret) {
         throw new Error(`Quasar rotation returned no secretKey: ${JSON.stringify(apiKeyResp)}`);
+      }
+
+      if (keyEnvironment === 'live' && !String(newKeySecret).startsWith('sk_live_')) {
+        throw new Error(
+          `Expected sk_live_* from Quasar (environment=live) but got prefix=${String(newKeySecret).slice(0, 8)}`,
+        );
       }
 
       const isVerified = await this.verifyKey(newKeySecret);
@@ -44,7 +62,7 @@ export class RotationSaga {
         tenantId: quasarTenantId,
         apiKeySecret: newKeySecret,
         apiKeyPublic: newKeyPublic,
-        environment: 'test'
+        environment: keyEnvironment,
       });
 
       const encryptedSk = VaultEncryptionUtil.encrypt(newKeySecret);
@@ -53,6 +71,7 @@ export class RotationSaga {
         .update({
           quasar_sk_secret_enc: JSON.stringify(encryptedSk),
           quasar_public_key: newKeyPublic ?? null,
+          quasar_environment: keyEnvironment,
           status: 'active',
           updated_at: new Date().toISOString()
         })
@@ -62,8 +81,12 @@ export class RotationSaga {
         throw new Error(`Failed to persist rotated secret: ${error.message}`);
       }
 
-      await this.eventPublisher.publish('FinancialPlatformCredentialsRotated', { tenantId, quasarTenantId }, context);
-      await this.auditLogger.log('CREDENTIAL_ROTATION_COMPLETED', { tenantId }, context);
+      await this.eventPublisher.publish('FinancialPlatformCredentialsRotated', {
+        tenantId,
+        quasarTenantId,
+        environment: keyEnvironment,
+      }, context);
+      await this.auditLogger.log('CREDENTIAL_ROTATION_COMPLETED', { tenantId, environment: keyEnvironment }, context);
       this.metricsExporter.incrementCounter('rotation_success', { tenantId });
       this.metricsExporter.recordDuration('rotation_duration_ms', Date.now() - startTime, { tenantId });
     } catch (error: any) {

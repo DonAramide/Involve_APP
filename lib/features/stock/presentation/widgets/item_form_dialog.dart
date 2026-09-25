@@ -12,8 +12,10 @@ import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../settings/domain/entities/settings.dart';
 import '../../../../core/utils/terminology.dart';
 import '../../../../core/widgets/barcode_scanner_dialog.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Item? item;
@@ -26,7 +28,8 @@ class ItemFormDialog extends StatefulWidget {
 }
 
 class _ItemFormDialogState extends State<ItemFormDialog> {
-  final _formKey = GlobalKey<FormState>();
+  var _formKey = GlobalKey<FormState>();
+  int _formGeneration = 0;
   late String _name;
   final _priceController = TextEditingController();
   final _costPriceController = TextEditingController();
@@ -42,6 +45,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   String? _billingType;
   String? _serviceCategory; 
   late String _businessMode;
+  bool _saveSubmitted = false;
 
   @override
   void initState() {
@@ -139,10 +143,24 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       bloc: widget.stockBloc,
       listenWhen: (previous, current) => previous.status != current.status,
       listener: (context, state) {
-        if (state.status == StockStatus.success) {
-          Navigator.of(context).pop();
+        if (state.status == StockStatus.success && _saveSubmitted) {
+          _saveSubmitted = false;
+          final savedName = _name;
+          if (widget.item == null) {
+            _showPostAddSuccessPrompt(context, savedName);
+          } else {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '${context.read<SettingsBloc>().state.settings!.productLabel} updated successfully.',
+                ),
+              ),
+            );
+          }
         }
         if (state.status == StockStatus.failure && state.error != null) {
+          _saveSubmitted = false;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.error!),
@@ -156,9 +174,41 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: KeyedSubtree(
+            key: ValueKey('item-form-$_formGeneration'),
+            child: _buildFormFields(context, settingsState, term, isServiceBillingEnabled, serviceTypes),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        ElevatedButton(
+          onPressed: _submit,
+          child: BlocBuilder<StockBloc, StockState>(
+            bloc: widget.stockBloc,
+            builder: (context, state) {
+              if (state.status == StockStatus.loading) {
+                return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
+              }
+              return Text(widget.item == null ? 'ADD' : 'SAVE');
+            },
+          ),
+        ),
+      ],
+      ),
+    );
+  }
+
+  Widget _buildFormFields(
+    BuildContext context,
+    SettingsState settingsState,
+    AppSettings term,
+    bool isServiceBillingEnabled,
+    List<String> serviceTypes,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
               // Image Picker
               GestureDetector(
                 onTap: () => _pickImageFrom(ImageSource.gallery),
@@ -366,32 +416,83 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 ),
               ],
             ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-        ElevatedButton(
-          onPressed: _submit,
-          child: BlocBuilder<StockBloc, StockState>(
-            bloc: widget.stockBloc,
-            builder: (context, state) {
-              if (state.status == StockStatus.loading) {
-                return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
-              }
-              return Text(widget.item == null ? 'ADD' : 'SAVE');
-            },
-          ),
-        ),
-      ],
-    ),
     );
+  }
+
+  Future<void> _showPostAddSuccessPrompt(BuildContext context, String savedName) async {
+    final settings = context.read<SettingsBloc>().state.settings!;
+    final label = settings.productLabel;
+    final labelLower = label.toLowerCase();
+
+    final addMore = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text('$label added successfully'),
+        content: Text(
+          'Your $labelLower "$savedName" was saved.\n\n'
+          'Would you like to add another $labelLower before going to the dashboard?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('GO TO DASHBOARD'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ADD MORE'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (addMore == true) {
+      widget.stockBloc.add(ResetStockStatus());
+      _resetFormForAnotherEntry(settings);
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      DashboardPage.routeName,
+      (route) => false,
+    );
+  }
+
+  void _resetFormForAnotherEntry(AppSettings settings) {
+    setState(() {
+      _formKey = GlobalKey<FormState>();
+      _formGeneration++;
+      _name = '';
+      _priceController.text = '0';
+      _costPriceController.text = '0';
+      _barcodeController.clear();
+      _stockQty = 0;
+      _legacyCategory = ItemCategory.drink;
+      _selectedCategoryId = null;
+      _imageBytes = null;
+      _minStockLevel = 0;
+      _businessMode = settings.businessMode;
+      if (settings.businessMode == 'school') {
+        _type = 'service';
+        _billingType = 'fixed';
+      } else {
+        _type = 'product';
+        _billingType = null;
+        _serviceCategory = null;
+      }
+    });
   }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      
+      _saveSubmitted = true;
+
       final price = double.tryParse(_priceController.text) ?? 0.0;
       final costPrice = double.tryParse(_costPriceController.text) ?? 0.0;
 

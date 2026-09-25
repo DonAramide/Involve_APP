@@ -4,6 +4,8 @@
 // Injects JWT (from Supabase session), tenant_id (school_id),
 // and provides structured error handling for all API calls.
 
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../features/settings/domain/services/security_service.dart';
@@ -164,6 +166,62 @@ class PlanGatingInterceptor extends Interceptor {
 
 // ── Error Interceptor ──────────────────────────────────────────────────────────
 
+/// Logs full VA request/response bodies for Android Studio Logcat.
+/// Filter Logcat by: `INVIFY_VA`
+class _VaTrafficLogInterceptor extends Interceptor {
+  static bool _isVa(RequestOptions o) {
+    final p = o.path.toLowerCase();
+    final u = o.uri.path.toLowerCase();
+    return p.contains('virtual-account') || u.contains('virtual-account');
+  }
+
+  static String _safeJson(Object? data) {
+    try {
+      if (data == null) return 'null';
+      if (data is Map || data is List) {
+        return const JsonEncoder.withIndent('  ').convert(data);
+      }
+      return data.toString();
+    } catch (_) {
+      return data.toString();
+    }
+  }
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (_isVa(options)) {
+      // ignore: avoid_print — must appear in release Logcat for Quasar support
+      print('──────── INVIFY_VA REQUEST ────────');
+      print('[INVIFY_VA] ${options.method} ${options.uri}');
+      print('[INVIFY_VA] headers.tenant=${options.headers['X-Tenant-ID'] ?? options.headers['x-tenant-id']}');
+      print('[INVIFY_VA] body=${_safeJson(options.data)}');
+    }
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    if (_isVa(response.requestOptions)) {
+      print('──────── INVIFY_VA RESPONSE ────────');
+      print('[INVIFY_VA] status=${response.statusCode} ${response.requestOptions.uri}');
+      print('[INVIFY_VA] body=${_safeJson(response.data)}');
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (_isVa(err.requestOptions)) {
+      print('──────── INVIFY_VA ERROR ────────');
+      print('[INVIFY_VA] status=${err.response?.statusCode} ${err.requestOptions.uri}');
+      print('[INVIFY_VA] requestBody=${_safeJson(err.requestOptions.data)}');
+      print('[INVIFY_VA] responseBody=${_safeJson(err.response?.data)}');
+      print('[INVIFY_VA] message=${err.message}');
+    }
+    handler.next(err);
+  }
+}
+
 /// Converts Dio errors into structured [FinanceApiException] subtypes.
 class ErrorInterceptor extends Interceptor {
   @override
@@ -284,12 +342,17 @@ class FinanceApiClient {
       TenantInterceptor(getTenantId: getTenantId),
       PlanGatingInterceptor(),
       ErrorInterceptor(),
+      _VaTrafficLogInterceptor(),
       LogInterceptor(
         requestHeader: true,
         requestBody: true,
-        responseHeader: true,
+        responseHeader: false,
         responseBody: true,
         error: true,
+        logPrint: (Object object) {
+          // Visible in Android Studio Logcat (filter: INVIFY_HTTP or flutter)
+          debugPrint('[INVIFY_HTTP] $object');
+        },
       ),
     ]);
   }

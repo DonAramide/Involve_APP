@@ -4,6 +4,7 @@ import { ActivationLockProvider } from '../infrastructure/ActivationLockProvider
 import { ActivationSaga } from '../orchestration/ActivationSaga';
 import { ObservabilityContext } from '../domain/Types';
 import { supabaseAdmin as supabase } from '../../../utils/db'; // Placeholder DB Client
+import { resolveQuasarTenantKeyEnvironment } from '../../../integrations/quasar/quasar-tenant-key-environment';
 
 export class FinancialPlatformActivationService {
   constructor(
@@ -55,12 +56,13 @@ export class FinancialPlatformActivationService {
 
       // Execute Saga
       const quasarTenantId = await this.activationSaga.execute(tenantId, tenantData, context);
+      const environment = resolveQuasarTenantKeyEnvironment();
 
       return {
         message: 'Financial Platform successfully activated.',
         status: 'ACTIVE',
         quasar_tenant_id: quasarTenantId,
-        environment: 'test'
+        environment,
       };
 
     } finally {

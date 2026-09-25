@@ -9,6 +9,7 @@ import {
   type InvifyVertical,
 } from '../../../integrations/quasar/quasar-platform.client';
 import { QuasarIntegrationStore } from '../../../integrations/quasar/quasar-integration.store';
+import { resolveQuasarTenantKeyEnvironment } from '../../../integrations/quasar/quasar-tenant-key-environment';
 
 const ALLOWED_TYPES = ['school', 'retail', 'services'] as const;
 export type InvifyTenantType = (typeof ALLOWED_TYPES)[number];
@@ -168,7 +169,7 @@ export class FinancialPlatformChangeVerticalService {
         newVertical,
         previousQuasarTenantId,
         quasar_tenant_id: quasarTenantId,
-        environment: 'test',
+        environment: resolveQuasarTenantKeyEnvironment(),
         warning: previousQuasarTenantId
           ? `Previous Quasar tenant ${previousQuasarTenantId} (${previousQuasarVertical}) was unlinked locally but not deleted on Quasar. Clean it up in Quasar admin if needed.`
           : null,

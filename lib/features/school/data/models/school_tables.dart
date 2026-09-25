@@ -174,6 +174,8 @@ class Students extends Table {
   TextColumn get department => text().nullable()();
   /// `active`, `promoted`, or `graduated`.
   TextColumn get enrollmentStatus => text().withDefault(const Constant('active'))();
+  /// Student health conditions, medical needs, or special care notes.
+  TextColumn get notes => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

@@ -100,9 +100,25 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
         }
         final studentName =
             (metadata['studentName'] ?? metadata['senderName'] ?? 'a student').toString();
-        final reference = event.data['reference'] ?? '';
+        final reference = '${event.data['reference'] ?? ''}'.trim();
 
         if (mounted) {
+          if (reference.isNotEmpty) {
+            final shouldNotify = await CustomerWalletCreditService.instance
+                .claimPaymentNotification(reference);
+            if (!shouldNotify) {
+              debugPrint(
+                '[GlobalPaymentNotification] Skip duplicate notify for $reference',
+              );
+              unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess({
+                'amount': amount,
+                'reference': reference,
+                'metadata': metadata,
+                ...event.data,
+              }));
+              return;
+            }
+          }
           _showNotification(amount, studentName, reference);
           unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess({
             'amount': amount,
@@ -125,7 +141,10 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
       type: 'payment',
       extra: {'reference': reference},
     ));
-    unawaited(DeviceNotificationService.showPayment(message: message));
+    unawaited(DeviceNotificationService.showPayment(
+      message: message,
+      reference: reference.isEmpty ? null : reference,
+    ));
     widget.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text('₦$amount received from $studentName!'),

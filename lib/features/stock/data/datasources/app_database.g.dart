@@ -14376,6 +14376,11 @@ class $StudentsTable extends Students
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('active'));
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -14432,6 +14437,7 @@ class $StudentsTable extends Students
         virtualAccountStatus,
         department,
         enrollmentStatus,
+        notes,
         syncId,
         updatedAt,
         createdAt,
@@ -14565,6 +14571,10 @@ class $StudentsTable extends Students
           enrollmentStatus.isAcceptableOrUnknown(
               data['enrollment_status']!, _enrollmentStatusMeta));
     }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -14638,6 +14648,8 @@ class $StudentsTable extends Students
           .read(DriftSqlType.string, data['${effectivePrefix}department']),
       enrollmentStatus: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}enrollment_status'])!,
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -14681,6 +14693,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
 
   /// `active`, `promoted`, or `graduated`.
   final String enrollmentStatus;
+
+  /// Student health conditions, medical needs, or special care notes.
+  final String? notes;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -14708,6 +14723,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.virtualAccountStatus,
       this.department,
       required this.enrollmentStatus,
+      this.notes,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -14761,6 +14777,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       map['department'] = Variable<String>(department);
     }
     map['enrollment_status'] = Variable<String>(enrollmentStatus);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
     }
@@ -14822,6 +14841,8 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ? const Value.absent()
           : Value(department),
       enrollmentStatus: Value(enrollmentStatus),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -14865,6 +14886,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           serializer.fromJson<String?>(json['virtualAccountStatus']),
       department: serializer.fromJson<String?>(json['department']),
       enrollmentStatus: serializer.fromJson<String>(json['enrollmentStatus']),
+      notes: serializer.fromJson<String?>(json['notes']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -14897,6 +14919,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'virtualAccountStatus': serializer.toJson<String?>(virtualAccountStatus),
       'department': serializer.toJson<String?>(department),
       'enrollmentStatus': serializer.toJson<String>(enrollmentStatus),
+      'notes': serializer.toJson<String?>(notes),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -14927,6 +14950,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<String?> virtualAccountStatus = const Value.absent(),
           Value<String?> department = const Value.absent(),
           String? enrollmentStatus,
+          Value<String?> notes = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -14961,6 +14985,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
             : this.virtualAccountStatus,
         department: department.present ? department.value : this.department,
         enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
+        notes: notes.present ? notes.value : this.notes,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -15011,6 +15036,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       enrollmentStatus: data.enrollmentStatus.present
           ? data.enrollmentStatus.value
           : this.enrollmentStatus,
+      notes: data.notes.present ? data.notes.value : this.notes,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -15043,6 +15069,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('department: $department, ')
           ..write('enrollmentStatus: $enrollmentStatus, ')
+          ..write('notes: $notes, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -15075,6 +15102,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         virtualAccountStatus,
         department,
         enrollmentStatus,
+        notes,
         syncId,
         updatedAt,
         createdAt,
@@ -15106,6 +15134,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.virtualAccountStatus == this.virtualAccountStatus &&
           other.department == this.department &&
           other.enrollmentStatus == this.enrollmentStatus &&
+          other.notes == this.notes &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -15135,6 +15164,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String?> virtualAccountStatus;
   final Value<String?> department;
   final Value<String> enrollmentStatus;
+  final Value<String?> notes;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -15162,6 +15192,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountStatus = const Value.absent(),
     this.department = const Value.absent(),
     this.enrollmentStatus = const Value.absent(),
+    this.notes = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -15190,6 +15221,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountStatus = const Value.absent(),
     this.department = const Value.absent(),
     this.enrollmentStatus = const Value.absent(),
+    this.notes = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -15221,6 +15253,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? virtualAccountStatus,
     Expression<String>? department,
     Expression<String>? enrollmentStatus,
+    Expression<String>? notes,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -15252,6 +15285,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
         'virtual_account_status': virtualAccountStatus,
       if (department != null) 'department': department,
       if (enrollmentStatus != null) 'enrollment_status': enrollmentStatus,
+      if (notes != null) 'notes': notes,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -15282,6 +15316,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String?>? virtualAccountStatus,
       Value<String?>? department,
       Value<String>? enrollmentStatus,
+      Value<String?>? notes,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -15309,6 +15344,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
       department: department ?? this.department,
       enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
+      notes: notes ?? this.notes,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -15385,6 +15421,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     if (enrollmentStatus.present) {
       map['enrollment_status'] = Variable<String>(enrollmentStatus.value);
     }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -15427,6 +15466,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('department: $department, ')
           ..write('enrollmentStatus: $enrollmentStatus, ')
+          ..write('notes: $notes, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -33700,6 +33740,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountStatus,
   Value<String?> department,
   Value<String> enrollmentStatus,
+  Value<String?> notes,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -33728,6 +33769,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountStatus,
   Value<String?> department,
   Value<String> enrollmentStatus,
+  Value<String?> notes,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -33885,6 +33927,9 @@ class $$StudentsTableFilterComposer
   ColumnFilters<String> get enrollmentStatus => $composableBuilder(
       column: $table.enrollmentStatus,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -34076,6 +34121,9 @@ class $$StudentsTableOrderingComposer
       column: $table.enrollmentStatus,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -34214,6 +34262,9 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<String> get enrollmentStatus => $composableBuilder(
       column: $table.enrollmentStatus, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -34385,6 +34436,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> department = const Value.absent(),
             Value<String> enrollmentStatus = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -34413,6 +34465,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountStatus: virtualAccountStatus,
             department: department,
             enrollmentStatus: enrollmentStatus,
+            notes: notes,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -34441,6 +34494,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> department = const Value.absent(),
             Value<String> enrollmentStatus = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -34469,6 +34523,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountStatus: virtualAccountStatus,
             department: department,
             enrollmentStatus: enrollmentStatus,
+            notes: notes,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,

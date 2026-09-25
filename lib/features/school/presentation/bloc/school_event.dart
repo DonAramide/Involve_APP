@@ -89,9 +89,10 @@ class AddStudentEvent extends SchoolEvent {
 
 class ImportStudentsEvent extends SchoolEvent {
   final List<Student> students;
-  const ImportStudentsEvent(this.students);
+  final Map<Student, String> parentAddresses;
+  const ImportStudentsEvent(this.students, {this.parentAddresses = const {}});
   @override
-  List<Object?> get props => [students];
+  List<Object?> get props => [students, parentAddresses];
 }
 
 class UpdateStudentEvent extends SchoolEvent {

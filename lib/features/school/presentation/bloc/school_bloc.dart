@@ -284,7 +284,16 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           if (studentToAdd.academicYearId == null && state.activeYear != null) {
             studentToAdd = studentToAdd.copyWith(academicYearId: state.activeYear!.id);
           }
-          await repository.addStudent(studentToAdd);
+          final newId = await repository.addStudent(studentToAdd);
+          if (studentToAdd.hasParent) {
+            final parentAddr = event.parentAddresses[student];
+            await repository.assignParentToStudents(
+              studentIds: [newId],
+              parentName: studentToAdd.parentName?.trim() ?? '',
+              parentPhone: studentToAdd.parentPhone?.trim() ?? '',
+              parentAddress: parentAddr,
+            );
+          }
           imported++;
         } catch (e) {
           final reason = friendlyApiError(e);
@@ -1219,6 +1228,21 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         fullName: student.parentName!.trim(),
         phone: student.parentPhone,
       );
+
+      // Prefer any non-empty guardian phone (empty string must not shadow student phone).
+      String? pickPhone(String? a, String? b) {
+        final x = (a ?? '').trim();
+        if (x.isNotEmpty) return x;
+        final y = (b ?? '').trim();
+        return y.isNotEmpty ? y : null;
+      }
+
+      final resolvedGuardianPhone = pickPhone(parent.phone, student.parentPhone);
+      if ((parent.phone ?? '').trim().isEmpty && resolvedGuardianPhone != null) {
+        parent = parent.copyWith(phone: resolvedGuardianPhone);
+        await repository.updateParent(parent);
+      }
+
       await repository.linkStudentsToParent(
         parentId: parent.id!,
         studentIds: {
@@ -1263,6 +1287,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         }
       }
 
+      final parentPhone = pickPhone(parent.phone, student.parentPhone) ?? '';
+      if (parentPhone.isEmpty) {
+        throw Exception(
+          'Parent phone number is required to generate a virtual account. '
+          'Edit this student (or the parent profile) and add a phone number, then try again.',
+        );
+      }
+
       if (parent.hasCanonicalVa) {
         await repository.saveParentVirtualAccount(
           parentId: parent.id!,
@@ -1287,7 +1319,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         firstName: parent.fullName.trim().split(RegExp(r'\s+')).first,
         lastName: parent.fullName.trim().split(RegExp(r'\s+')).skip(1).join(' '),
         admissionNumber: parentKey,
-        phone: parent.phone,
+        phone: parentPhone,
         email: parent.email,
       );
 
@@ -1406,13 +1438,41 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         return;
       }
 
+      var parentPhone = (parent.phone ?? '').trim();
+      if (parentPhone.isEmpty) {
+        // Prefer guardian phone stored on any linked child before failing.
+        final parentId = parent.id;
+        final parentKey = parent.parentKey;
+        final kids = await repository.getStudents();
+        for (final s in kids) {
+          final linked = (parentId != null && s.parentId == parentId) ||
+              (s.parentKey == parentKey) ||
+              ((s.parentName ?? '').trim().toLowerCase() ==
+                  parent.fullName.trim().toLowerCase());
+          if (!linked) continue;
+          final p = (s.parentPhone ?? '').trim();
+          if (p.isNotEmpty) {
+            parentPhone = p;
+            break;
+          }
+        }
+        if (parentPhone.isEmpty) {
+          throw Exception(
+            'Parent phone number is required to generate a virtual account. '
+            'Edit the parent profile and add a phone number, then try again.',
+          );
+        }
+        parent = parent.copyWith(phone: parentPhone);
+        await repository.updateParent(parent);
+      }
+
       final parentKey = 'par-${parent.syncId ?? parent.id}';
       final result = await financeRepository!.initiateStudentVirtualAccount(
         studentId: parentKey,
         firstName: parent.fullName.trim().split(RegExp(r'\s+')).first,
         lastName: parent.fullName.trim().split(RegExp(r'\s+')).skip(1).join(' '),
         admissionNumber: parentKey,
-        phone: parent.phone,
+        phone: parentPhone,
         email: parent.email,
       );
       final accountNumber = result['accountNumber']?.toString();

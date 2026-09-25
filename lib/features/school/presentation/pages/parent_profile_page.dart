@@ -484,7 +484,16 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
   }
 
   Widget _parentContactCard(BuildContext context, SchoolParent parent) {
-    final phone = (parent.phone ?? '').trim();
+    final state = context.watch<SchoolBloc>().state;
+    final fromChildren = state.students
+        .where((s) =>
+            (parent.id != null && s.parentId == parent.id) ||
+            s.parentKey == parent.parentKey)
+        .map((s) => (s.parentPhone ?? '').trim())
+        .firstWhere((p) => p.isNotEmpty, orElse: () => '');
+    final phone = (parent.phone ?? '').trim().isNotEmpty
+        ? (parent.phone ?? '').trim()
+        : fromChildren;
     final email = (parent.email ?? '').trim();
     final address = (parent.address ?? '').trim();
     return Card(

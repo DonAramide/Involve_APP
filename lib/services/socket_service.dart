@@ -275,7 +275,7 @@ class SocketService {
       } catch (_) {}
       unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess(data));
       unawaited(PaymentCatchUpService.instance.markSeenFromLivePayment(data));
-      _showPaymentSuccessBanner(data);
+      unawaited(_showPaymentSuccessBanner(data));
     });
 
     _socket!.on('emergency_lock', (data) async {
@@ -671,14 +671,24 @@ class SocketService {
     );
   }
 
-  void _showPaymentSuccessBanner(dynamic data) {
+  Future<void> _showPaymentSuccessBanner(dynamic data) async {
     try {
-      // Loud POS-style beep as soon as payment lands
-      unawaited(PaymentAlertSound.play());
-
       final map = data is Map
           ? Map<String, dynamic>.from(data as Map)
           : <String, dynamic>{};
+      final reference = map['reference']?.toString().trim() ?? '';
+      if (reference.isNotEmpty) {
+        final shouldNotify =
+            await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        if (!shouldNotify) {
+          debugPrint('[SocketService] Skip duplicate payment notification for $reference');
+          return;
+        }
+      }
+
+      // Loud POS-style beep as soon as payment lands
+      unawaited(PaymentAlertSound.play());
+
       final amount = map['amount'] ?? 0;
       final metadataRaw = map['metadata'];
       Map<String, dynamic> metadata = {};
@@ -705,11 +715,14 @@ class SocketService {
         message: message,
         type: 'payment',
         extra: {
-          'reference': map['reference']?.toString(),
+          'reference': reference.isEmpty ? null : reference,
           'amount': amountNum,
         },
       ));
-      unawaited(DeviceNotificationService.showPayment(message: message));
+      unawaited(DeviceNotificationService.showPayment(
+        message: message,
+        reference: reference.isEmpty ? null : reference,
+      ));
 
       scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(

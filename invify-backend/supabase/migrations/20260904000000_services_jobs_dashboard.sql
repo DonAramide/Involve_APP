@@ -50,17 +50,25 @@ ALTER TABLE public.services_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.services_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.services_payments ENABLE ROW LEVEL SECURITY;
 
+-- Phase 32C.2R.3: services_* module is DEFERRED for initial prod launch, but policies must
+-- not grant PUBLIC ALL if/when this migration is applied. Use service_role convention.
 DROP POLICY IF EXISTS services_customers_service_all ON public.services_customers;
 CREATE POLICY services_customers_service_all
     ON public.services_customers FOR ALL
-    USING (true) WITH CHECK (true);
+    TO service_role
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS services_jobs_service_all ON public.services_jobs;
 CREATE POLICY services_jobs_service_all
     ON public.services_jobs FOR ALL
-    USING (true) WITH CHECK (true);
+    TO service_role
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS services_payments_service_all ON public.services_payments;
 CREATE POLICY services_payments_service_all
     ON public.services_payments FOR ALL
-    USING (true) WITH CHECK (true);
+    TO service_role
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');

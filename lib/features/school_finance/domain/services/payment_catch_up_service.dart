@@ -146,6 +146,15 @@ class PaymentCatchUpService {
         final credited =
             await CustomerWalletCreditService.instance.applyPaymentSuccess(payload);
 
+        // Once we've shown a notification for this reference, never resend it
+        // on reconnect / catch-up / VA refresh.
+        final shouldNotify =
+            await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        if (!shouldNotify) {
+          debugPrint('[PaymentCatchUp] Skip re-notify for $reference');
+          continue;
+        }
+
         final sender = (metadata['senderName'] ??
                 metadata['studentName'] ??
                 'a payer')
@@ -168,6 +177,7 @@ class PaymentCatchUpService {
           message: credited
               ? '₦$formatted received from $sender (synced)'
               : '₦$formatted payment while offline · $sender',
+          reference: reference,
         ));
 
         if (!credited) {
