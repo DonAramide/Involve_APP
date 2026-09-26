@@ -16,6 +16,7 @@ import '../../../../printer/domain/usecases/printer_usecases.dart';
 import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
@@ -1908,6 +1909,14 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 onPressed: isProcessing
                     ? null
                     : () async {
+                        if (selectedMethod == 'Cash') {
+                          final authorised = await requireSystemAccess(
+                            context,
+                            purpose:
+                                'Cash posting requires admin System Access. Enter the password to mark this invoice paid.',
+                          );
+                          if (authorised != true) return;
+                        }
                         setDialogState(() => isProcessing = true);
                         try {
                           final repository = context.read<HistoryBloc>().getHistory.repository;

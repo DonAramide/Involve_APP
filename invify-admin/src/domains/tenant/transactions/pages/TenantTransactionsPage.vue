@@ -140,7 +140,7 @@
         
         <template v-slot:body-cell-amount="props">
           <q-td :props="props" class="text-metric-mono font-mono text-weight-bold">
-            {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
+            {{ currentCurrency.symbol }}{{ Number(props.value || 0).toLocaleString() }}
           </q-td>
         </template>
 
@@ -171,55 +171,47 @@ const { currentCurrency } = useCurrency();
 const $q = useQuasar();
 const store = useTenantTransactionStore();
 
-const { syncing, filters, payoutStats, filteredRows } = storeToRefs(store);
+const { syncing, filters, payoutStats, filteredRows, dailyTrend } = storeToRefs(store);
 
 const showCharts = ref(true);
 
-const trendSeries = computed(() => {
-  const groups = {};
-  filteredRows.value.forEach(row => {
-    let dateStr = 'Unknown';
-    try {
-      const d = new Date(row.date);
-      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch (e) {
-      dateStr = row.date.split(',')[0];
-    }
-    groups[dateStr] = (groups[dateStr] || 0) + Math.abs(Number(row.amount || 0));
-  });
+function formatDayLabel(isoDate) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-  const sortedDates = Object.keys(groups).sort((a, b) => new Date(a) - new Date(b));
-  
-  if (sortedDates.length === 0) {
-    return [{
-      name: 'Transaction Value (₦)',
-      data: [12000, 19000, 32000, 5000, 24000, 35000, 28000]
-    }];
+const trendPoints = computed(() => {
+  if (Array.isArray(dailyTrend.value) && dailyTrend.value.length > 0) {
+    return dailyTrend.value.map((p) => ({
+      label: formatDayLabel(p.date),
+      value: Number(p.revenue || 0),
+    }));
   }
-
-  return [{
-    name: 'Transaction Value (₦)',
-    data: sortedDates.map(d => groups[d])
-  }];
+  const groups = {};
+  filteredRows.value.forEach((row) => {
+    const iso = row.createdAt || row.date;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return;
+    const key = d.toISOString().slice(0, 10);
+    groups[key] = (groups[key] || 0) + Math.abs(Number(row.amount || 0));
+  });
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    days.push({ label: formatDayLabel(key), value: Number(groups[key] || 0) });
+  }
+  return days;
 });
 
-const trendChartOptions = computed(() => {
-  const groups = {};
-  filteredRows.value.forEach(row => {
-    let dateStr = 'Unknown';
-    try {
-      const d = new Date(row.date);
-      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch (e) {
-      dateStr = row.date.split(',')[0];
-    }
-    groups[dateStr] = (groups[dateStr] || 0) + Math.abs(Number(row.amount || 0));
-  });
+const trendSeries = computed(() => [{
+  name: 'Transaction Value (₦)',
+  data: trendPoints.value.map((p) => p.value),
+}]);
 
-  const sortedDates = Object.keys(groups).sort((a, b) => new Date(a) - new Date(b));
-  const categories = sortedDates.length > 0 ? sortedDates : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  return {
+const trendChartOptions = computed(() => ({
     chart: {
       type: 'area',
       foreColor: '#9ca3af',
@@ -238,13 +230,13 @@ const trendChartOptions = computed(() => {
       }
     },
     xaxis: {
-      categories,
+      categories: trendPoints.value.map((p) => p.label),
       axisBorder: { show: false },
       axisTicks: { show: false }
     },
     yaxis: {
       labels: {
-        formatter: (val) => '₦' + val.toLocaleString(undefined, { maximumFractionDigits: 0 })
+        formatter: (val) => '₦' + Number(val || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
       }
     },
     grid: {
@@ -252,8 +244,7 @@ const trendChartOptions = computed(() => {
       strokeDashArray: 4
     },
     tooltip: { theme: 'dark' }
-  };
-});
+}));
 
 const channelSeries = computed(() => {
   const counts = {};
@@ -261,11 +252,8 @@ const channelSeries = computed(() => {
     const t = row.type || 'OTHER';
     counts[t] = (counts[t] || 0) + 1;
   });
-
   const keys = Object.keys(counts);
-  if (keys.length === 0) {
-    return [45, 30, 25];
-  }
+  if (keys.length === 0) return [0];
   return keys.map(k => counts[k]);
 });
 
@@ -275,9 +263,9 @@ const channelChartOptions = computed(() => {
     const t = row.type || 'OTHER';
     counts[t] = (counts[t] || 0) + 1;
   });
-
   const keys = Object.keys(counts);
-  const labels = keys.length > 0 ? keys.map(k => k.toUpperCase()) : ['CARD PAYMENT', 'BANK TRANSFER', 'CASH'];
+  const labels = keys.length > 0 ? keys.map(k => k.toUpperCase()) : ['NO DATA'];
+
 
   return {
     labels,
@@ -298,7 +286,7 @@ const channelChartOptions = computed(() => {
               show: true,
               label: 'Total TXs',
               color: '#9ca3af',
-              formatter: () => filteredRows.value.length || 3
+              formatter: () => String(filteredRows.value.length || 0)
             }
           }
         }

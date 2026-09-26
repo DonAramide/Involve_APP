@@ -487,6 +487,8 @@ import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
+app.get('/api/admin/kyc/documents', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.listPending);
+app.patch('/api/admin/kyc/documents/:id', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.reviewDocument);
 app.get('/api/tenant/:id/kyc', authenticate, TenantKycController.getKycDocuments);
 
 const deviceLinkQrLimiter = rateLimit({
@@ -695,6 +697,12 @@ app.patch('/api/devices/activations/:code/reset', authenticate, checkRole(['supe
 app.get('/api/devices/:deviceId/status', authenticate, DeviceController.getDeviceStatus);
 app.get('/api/devices/:deviceId/telemetry', authenticate, DeviceController.getDeviceTelemetry);
 app.get('/api/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
+app.post(
+  '/api/devices/:deviceId/command',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_ops', 'manager']),
+  DeviceController.sendCommand,
+);
 app.get('/devices/:deviceId/status', authenticate, DeviceController.getDeviceStatus);
 app.get('/devices/:deviceId/telemetry', authenticate, DeviceController.getDeviceTelemetry);
 app.get('/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
@@ -1045,11 +1053,23 @@ app.post(
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   StaffController.bulkSync,
 );
+app.post(
+  '/api/staff',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  StaffController.create,
+);
 app.get(
   '/api/staff',
   authenticate,
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   StaffController.list,
+);
+app.patch(
+  '/api/staff/:id',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  StaffController.patch,
 );
 app.post(
   '/api/staff/:id/pay-salary',

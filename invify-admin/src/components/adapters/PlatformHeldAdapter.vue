@@ -14,7 +14,7 @@
       </div>
 
       <div class="text-caption text-grey-5">
-        This is live Quasar VA money, not sales-period invoices. When card is ₦0.00, Held must equal Unswept VA. Unswept VA = customer VA + staff VA + any unmapped remainder.
+        This is live money still sitting on Quasar virtual accounts (parents, students, customers). It is not the ₦ sales on this page. Card/own-bank/cash invoices never increase this number.
       </div>
       <div class="row items-center justify-between q-mt-xs text-caption">
         <span class="text-grey-5">In: {{ financeStore.summary?.platformCollectedFormatted || '₦0.00' }}</span>
@@ -23,6 +23,8 @@
       <div class="column q-mt-xs text-caption op-gap-4">
         <span class="text-amber-5">Unswept VA total: {{ financeStore.summary?.unsweptVaFormatted || '₦0.00' }}</span>
         <span class="text-grey-5">Customer VA wallets: {{ financeStore.summary?.unsweptCustomerVaFormatted || '₦0.00' }}</span>
+        <span class="text-grey-5">Parent VA wallets: {{ financeStore.summary?.unsweptParentVaFormatted || '₦0.00' }}</span>
+        <span class="text-grey-5">Student VA wallets: {{ financeStore.summary?.unsweptStudentVaFormatted || '₦0.00' }}</span>
         <span class="text-grey-5">Staff VA wallets: {{ financeStore.summary?.unsweptStaffVaFormatted || '₦0.00' }}</span>
         <span class="text-grey-5">Unmapped VA: {{ financeStore.summary?.unsweptUnmappedVaFormatted || '₦0.00' }}</span>
       </div>

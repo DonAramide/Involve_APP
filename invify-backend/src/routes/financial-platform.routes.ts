@@ -277,6 +277,10 @@ const router = Router();
 
 // Express routes
 router.post('/tenants/:id/financial-platform/activate', authenticate, checkTenantAccess, (req, res) => activationController.activate(req, res));
+router.get('/tenants/:id/financial-platform/activation-gate', authenticate, checkTenantAccess, (req, res) => activationController.getGate(req, res));
+router.post('/tenants/:id/financial-platform/manual-checks', authenticate, checkTenantAccess, (req, res) => activationController.recordCheck(req, res));
+router.post('/tenants/:id/financial-platform/propose-activation', authenticate, checkTenantAccess, (req, res) => activationController.propose(req, res));
+router.post('/tenants/:id/financial-platform/reject-activation', authenticate, checkTenantAccess, (req, res) => activationController.reject(req, res));
 router.post('/tenants/:id/financial-platform/rotate', authenticate, checkTenantAccess, (req, res) => rotationController.rotate(req, res));
 router.post('/tenants/:id/financial-platform/deactivate', authenticate, checkTenantAccess, (req, res) => deactivationController.deactivate(req, res));
 router.post('/tenants/:id/financial-platform/change-vertical', authenticate, checkTenantAccess, (req, res) => changeVerticalController.changeVertical(req, res));

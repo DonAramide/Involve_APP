@@ -19,6 +19,7 @@ import '../../../school_finance/domain/repositories/finance_repository_new.dart'
 import '../../../../core/utils/progress_dialog_utils.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
 import '../../../activation/presentation/pages/tenant_kyc_upload_page.dart';
+import '../../../activation/data/services/tenant_kyc_service.dart';
 import '../../../../core/license/storage_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -53,9 +54,13 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
 
   bool _initializedControllers = false;
   bool _draftLoaded = false;
+  bool _cacDocumentUploaded = false;
+  bool _idDocumentUploaded = false;
   Map<String, String> _formDraft = {};
   static const _storage = FlutterSecureStorage();
   static const _formDraftKey = 'account_setup_form_draft';
+  static const _cacUploadedKey = 'account_setup_cac_uploaded';
+  static const _idUploadedKey = 'account_setup_id_uploaded';
 
   @override
   void initState() {
@@ -128,12 +133,16 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     final vae = await _storage.read(key: 'toggle_virtual_account');
     final mdl = await _storage.read(key: 'toggle_multi_device');
     final asl = await _storage.read(key: 'toggle_auto_sync');
+    final cacUploaded = await _storage.read(key: _cacUploadedKey);
+    final idUploaded = await _storage.read(key: _idUploadedKey);
     if (mounted) {
       setState(() {
         _claudeBackupEnabled = cbe == 'true';
         _virtualAccountsEnabled = vae == 'true';
         _multiDeviceLinkage = mdl == 'true';
         _autoSyncLedger = asl == 'true';
+        _cacDocumentUploaded = cacUploaded == 'true';
+        _idDocumentUploaded = idUploaded == 'true';
       });
     }
   }
@@ -541,32 +550,78 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                     ),
                     const SizedBox(height: 18),
 
-                    // CAC Document Upload UI
+                    if (!_cacDocumentUploaded || !_idDocumentUploaded) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colorScheme.primary.withOpacity(0.25)),
+                        ),
+                        child: Text(
+                          'Please upload your CAC certificate and a valid ID card (NIN, National ID, driver’s licence, or passport).',
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withOpacity(0.8)),
+                        ),
+                      ),
+                    ],
                     Text(
-                      'CAC Certificate / Registration Document',
+                      'CAC certificate',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _uploadCacDocument(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library, size: 16),
-                            label: const Text('Upload Gallery'),
+                    if (_cacDocumentUploaded)
+                      const Text('CAC uploaded', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600))
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _uploadKycDocument('CAC_CERT', ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library, size: 16),
+                              label: const Text('Upload Gallery'),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _uploadCacDocument(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt, size: 16),
-                            label: const Text('Capture Camera'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _uploadKycDocument('CAC_CERT', ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt, size: 16),
+                              label: const Text('Capture Camera'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Valid ID card',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 6),
+                    if (_idDocumentUploaded)
+                      const Text('ID uploaded', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600))
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _uploadKycDocument('GOVT_ID', ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library, size: 16),
+                              label: const Text('Upload Gallery'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _uploadKycDocument('GOVT_ID', ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt, size: 16),
+                              label: const Text('Capture Camera'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
                     // Save Profile Details Button
                     SizedBox(
@@ -811,7 +866,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('KYC is mandatory for the Pro version. Please upload the required documents.'),
+                                    content: const Text('KYC is mandatory. Upload your CAC certificate and a valid ID card.'),
                                     backgroundColor: Colors.orange.shade800,
                                   ),
                                 );
@@ -1175,41 +1230,42 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     onUpdateState(requestedValue);
   }
 
-  Future<void> _uploadCacDocument(ImageSource source) async {
+  Future<void> _uploadKycDocument(String documentType, ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
     if (pickedFile == null) return;
-
     if (!mounted) return;
 
     try {
       await ProgressDialogUtils.showDancingProgress(context, () async {
-        final client = _safeClient();
-        final formData = FormData.fromMap({
-          'cac_document': await MultipartFile.fromFile(pickedFile.path, filename: 'cac_document.jpg'),
-        });
-
-        final response = await client.post('/api/admin/upload-cac', data: formData);
-        if (mounted) {
-          if (response.statusCode == 200) {
-            _showToast('CAC Document uploaded successfully!');
+        final ok = await TenantKycService().uploadKycDocument(
+          file: File(pickedFile.path),
+          documentType: documentType,
+        );
+        if (!mounted) return;
+        if (ok) {
+          if (documentType == 'CAC_CERT') {
+            await _storage.write(key: _cacUploadedKey, value: 'true');
+            setState(() => _cacDocumentUploaded = true);
+            _showToast('CAC certificate uploaded.');
           } else {
-            _showToast('Upload failed: ${response.data}');
+            await _storage.write(key: _idUploadedKey, value: 'true');
+            setState(() => _idDocumentUploaded = true);
+            _showToast('Valid ID card uploaded.');
           }
+        } else {
+          _showToast('Upload failed. Try again.');
         }
-      }, message: 'Uploading CAC Document...');
+      }, message: documentType == 'CAC_CERT' ? 'Uploading CAC certificate...' : 'Uploading ID card...');
     } catch (e) {
       if (mounted) {
-        String message = e.toString();
-        try {
-          final data = (e as dynamic).response?.data;
-          if (data is Map && data['error'] != null) {
-            message = data['error'].toString();
-          }
-        } catch (_) {}
-        _showToast('Error uploading document: $message');
+        _showToast('Error uploading document: $e');
       }
     }
+  }
+
+  Future<void> _uploadCacDocument(ImageSource source) async {
+    await _uploadKycDocument('CAC_CERT', source);
   }
 
   Future<void> _triggerClaudeBackup() async {

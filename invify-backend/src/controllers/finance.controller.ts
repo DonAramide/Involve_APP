@@ -139,6 +139,30 @@ export class ExecutiveFinanceController {
         }
       }
 
+      try {
+        const { data: schoolPays } = await supabaseAdmin
+          .from('school_payment_events')
+          .select('amount, payment_method, local_invoice_number, payment_status, paid_at')
+          .eq('tenant_id', tenantId);
+        const invoiceNumbers = new Set(
+          (invoices || []).map((inv: any) => String(inv.invoice_number || '').trim()).filter(Boolean),
+        );
+        for (const pay of schoolPays || []) {
+          const num = String(pay.local_invoice_number || '').trim();
+          if (num && invoiceNumbers.has(num)) continue;
+          const rail = classifyInvoicePaymentMethod(pay.payment_method);
+          const amt = Number(pay.amount || 0);
+          if (!(amt > 0)) continue;
+          if (rail === 'cash') {
+            cash += amt;
+            totalCollected += amt;
+            totalInvoiced += amt;
+          }
+        }
+      } catch (schoolPayErr: any) {
+        console.warn('[ExecutiveFinance] school_payment_events skip:', schoolPayErr?.message || schoolPayErr);
+      }
+
       const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + collectedInvoiceAmount(inv), 0) || 0;
 
       // Only card/POS + Quasar VA invoices. Tenant personal-bank transfers stay out.
@@ -199,24 +223,13 @@ export class ExecutiveFinanceController {
         console.warn('[ExecutiveFinance] Quasar live VA total unavailable:', err?.message || err);
       }
       pendingVirtualAccountFunds = roundNaira(pendingVirtualAccountFunds);
-      const parentVaDeposits = roundNaira(
-        (quasarCredits || []).reduce((sum, tx) => {
-          const meta = tx?.metadata && typeof tx.metadata === 'object' ? tx.metadata : {};
-          const via = String(meta.paidVia || meta.paid_via || '').toLowerCase();
-          if (!via.includes('parent')) return sum;
-          const amount = transactionAmountNaira(tx);
-          return amount > 0 ? sum + amount : sum;
-        }, 0),
-      );
-      // Held = unswept customer/staff/parent VA + card not yet remitted. Own-bank is excluded.
-      // Parent transfers sit with Quasar until payout even after they credit the tenant wallet.
+      // Held is money still sitting at Quasar now (unswept VA + unremitted card).
+      // Do not floor that with all-time deposit totals — those stay in "In".
       const pendingQuasarRemittance = Math.max(
         0,
-        pendingVirtualAccountFunds + totalQuasarFromCardInvoices - totalQuasarRemitted,
-        parentVaDeposits + totalQuasarFromCardInvoices - totalQuasarRemitted,
-        totalQuasarFromDeposits + totalQuasarFromCardInvoices - totalQuasarRemitted,
+        roundNaira(pendingVirtualAccountFunds + totalQuasarFromCardInvoices - totalQuasarRemitted),
       );
-      const totalQuasarCollected = pendingQuasarRemittance + totalQuasarRemitted;
+      const totalQuasarCollected = roundNaira(totalQuasarFromDeposits + totalQuasarFromCardInvoices);
 
       let totalCount = 0;
       let owingCount = 0;
@@ -270,7 +283,7 @@ export class ExecutiveFinanceController {
         /** VA credits not yet swept into tenant wallet (already on a customer or staff VA) */
         pendingVirtualAccountFunds,
         unsweptVirtualAccount: {
-          total: pendingVirtualAccountFunds,
+          total: unsweptVa.total,
           customer: unsweptVa.customer,
           staff: unsweptVa.staff,
           student: unsweptVa.student,
@@ -360,18 +373,25 @@ export class ExecutiveFinanceController {
     const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
     try {
       const since = new Date();
-      since.setUTCDate(since.getUTCDate() - (days - 1));
-      since.setUTCHours(0, 0, 0, 0);
+      since.setDate(since.getDate() - days);
+      since.setHours(0, 0, 0, 0);
+
+      const lagosDay = (iso?: string) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+        return d.toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+      };
 
       const [invoicesRes, creditsRes] = await Promise.all([
         supabaseAdmin
           .from('invoices')
-          .select('amount_paid, payment_status, created_at')
+          .select('id, invoice_number, amount_paid, payment_status, created_at, updated_at')
           .eq('tenant_id', tenantId)
           .gte('created_at', since.toISOString()),
         supabaseAdmin
           .from('transactions_log')
-          .select('amount, type, status, metadata, created_at')
+          .select('amount, type, status, metadata, created_at, reference')
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
@@ -381,22 +401,31 @@ export class ExecutiveFinanceController {
       const byDay = new Map<string, number>();
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date();
-        d.setUTCDate(d.getUTCDate() - i);
-        const key = d.toISOString().slice(0, 10);
+        d.setDate(d.getDate() - i);
+        const key = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
         byDay.set(key, 0);
       }
 
       const add = (iso: string | undefined, amount: number) => {
         if (!(amount > 0) || !iso) return;
-        const key = String(iso).slice(0, 10);
+        const key = lagosDay(iso);
         if (!byDay.has(key)) return;
         byDay.set(key, (byDay.get(key) || 0) + amount);
       };
 
+      const invoiceIds = new Set<string>();
+      const invoiceNumbers = new Set<string>();
       for (const inv of invoicesRes.data || []) {
-        add(inv.created_at, collectedInvoiceAmount(inv));
+        if (inv.id) invoiceIds.add(String(inv.id));
+        if (inv.invoice_number) invoiceNumbers.add(String(inv.invoice_number));
+        add(inv.updated_at || inv.created_at, collectedInvoiceAmount(inv));
       }
       for (const tx of creditsRes.data || []) {
+        const meta = tx.metadata || {};
+        const linkedId = String(meta.invoice_id || meta.invoiceId || '');
+        const linkedNo = String(meta.invoice_number || meta.invoiceNumber || '');
+        if (linkedId && invoiceIds.has(linkedId)) continue;
+        if (linkedNo && invoiceNumbers.has(linkedNo)) continue;
         add(tx.created_at, transactionAmountNaira(tx));
       }
 
@@ -421,7 +450,7 @@ export class ExecutiveFinanceController {
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
-    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
     try {
       const [invoicesRes, creditsRes] = await Promise.all([
         supabaseAdmin

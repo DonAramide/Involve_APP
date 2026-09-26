@@ -1,6 +1,7 @@
 // src/controllers/wallet.controller.ts
 import { Request, Response } from 'express';
 import { WalletService } from '../services/wallet.service';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 export class WalletController {
   /**
@@ -31,9 +32,10 @@ export class WalletController {
    */
   static async getTransactions(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId;
-
-      if (!tenantId) {
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch {
         return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       }
 

@@ -3,6 +3,15 @@
     <div class="row items-center q-mb-md">
       <div class="text-h5 text-weight-bold text-indigo-9">School Roster (Web Sync)</div>
       <q-space />
+      <q-btn
+        outline
+        color="amber-8"
+        icon="cloud_upload"
+        label="Pull from tablet"
+        class="q-mr-sm"
+        :loading="pulling"
+        @click="pullFromTablet"
+      />
       <q-btn color="primary" icon="refresh" label="Refresh" @click="fetchData" :loading="loading" />
     </div>
 
@@ -33,9 +42,55 @@
 
     <q-tab-panels v-model="tab" animated>
       <q-tab-panel name="students">
+        <div class="row q-col-gutter-sm q-mb-md">
+          <div class="col-12 col-sm-6 col-md-3">
+            <q-input
+              v-model="studentQuery"
+              dense
+              filled
+              dark
+              clearable
+              label="Student / admission"
+              placeholder="Name or admission no"
+            />
+          </div>
+          <div class="col-12 col-sm-6 col-md-3">
+            <q-input
+              v-model="parentNameQuery"
+              dense
+              filled
+              dark
+              clearable
+              label="Parent name"
+            />
+          </div>
+          <div class="col-12 col-sm-6 col-md-3">
+            <q-input
+              v-model="parentPhoneQuery"
+              dense
+              filled
+              dark
+              clearable
+              label="Parent phone"
+            />
+          </div>
+          <div class="col-12 col-sm-6 col-md-3">
+            <q-select
+              v-model="classQuery"
+              :options="classFilterOptions"
+              dense
+              filled
+              dark
+              clearable
+              emit-value
+              map-options
+              label="Class"
+            />
+          </div>
+        </div>
         <q-table
           class="roster-table cursor-pointer"
-          :rows="students"
+          :rows="filteredStudents"
           :columns="studentColumns"
           row-key="id"
           :loading="loading"
@@ -52,9 +107,17 @@
         </q-table>
       </q-tab-panel>
       <q-tab-panel name="parents">
+        <div class="row q-col-gutter-sm q-mb-md">
+          <div class="col-12 col-sm-6">
+            <q-input v-model="parentNameQuery" dense filled dark clearable label="Parent name" />
+          </div>
+          <div class="col-12 col-sm-6">
+            <q-input v-model="parentPhoneQuery" dense filled dark clearable label="Parent phone" />
+          </div>
+        </div>
         <q-table
           class="roster-table cursor-pointer"
-          :rows="parents"
+          :rows="filteredParents"
           :columns="parentColumns"
           row-key="id"
           :loading="loading"
@@ -165,19 +228,19 @@
       overlay
       bordered
       :width="440"
-      class="bg-white"
+      class="roster-drawer"
     >
       <div v-if="selected" class="column full-height">
-        <div class="row items-center q-pa-md bg-indigo-1">
-          <q-avatar color="primary" text-color="white" size="48px" class="q-mr-md">
+        <div class="row items-center q-pa-md drawer-head">
+          <q-avatar color="cyan-8" text-color="white" size="48px" class="q-mr-md">
             {{ selectedInitials }}
           </q-avatar>
           <div class="col">
-            <div class="text-caption text-grey-7 text-uppercase">{{ selectedTypeLabel }}</div>
-            <div class="text-h6 text-weight-bold">{{ selectedTitle }}</div>
-            <div v-if="selectedSubtitle" class="text-caption text-grey-7">{{ selectedSubtitle }}</div>
+            <div class="text-caption text-cyan-3 text-uppercase">{{ selectedTypeLabel }}</div>
+            <div class="text-h6 text-weight-bold text-white">{{ selectedTitle }}</div>
+            <div v-if="selectedSubtitle" class="text-caption text-grey-4">{{ selectedSubtitle }}</div>
           </div>
-          <q-btn flat round dense icon="close" @click="drawerOpen = false" />
+          <q-btn flat round dense icon="close" color="white" @click="drawerOpen = false" />
         </div>
 
         <q-scroll-area class="col" style="min-height: 0">
@@ -197,22 +260,22 @@
             </div>
 
             <!-- Field grid -->
-            <div class="text-caption text-grey-7 text-uppercase q-mb-sm">Details</div>
-            <q-list bordered separator class="rounded-borders q-mb-md">
+            <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Details</div>
+            <q-list bordered separator dark class="rounded-borders q-mb-md drawer-list">
               <q-item v-for="field in selectedFields" :key="field.label">
                 <q-item-section>
-                  <q-item-label caption>{{ field.label }}</q-item-label>
-                  <q-item-label class="text-body2 text-weight-medium">{{ field.value }}</q-item-label>
+                  <q-item-label caption class="text-grey-5">{{ field.label }}</q-item-label>
+                  <q-item-label class="text-body2 text-weight-medium text-white">{{ field.value }}</q-item-label>
                 </q-item-section>
               </q-item>
             </q-list>
 
             <!-- Related students for a class -->
             <div v-if="(selected.type === 'class' || selected.type === 'parent') && relatedStudents.length" class="q-mb-md">
-              <div class="text-caption text-grey-7 text-uppercase q-mb-sm">
+              <div class="text-caption text-grey-5 text-uppercase q-mb-sm">
                 {{ selected.type === 'parent' ? 'Children' : 'Students in class' }} ({{ relatedStudents.length }})
               </div>
-              <q-list bordered separator class="rounded-borders">
+              <q-list bordered separator dark class="rounded-borders drawer-list">
                 <q-item
                   v-for="s in relatedStudents"
                   :key="s.id"
@@ -221,8 +284,8 @@
                   @click="openProfile('student', s)"
                 >
                   <q-item-section>
-                    <q-item-label>{{ studentName(s) }}</q-item-label>
-                    <q-item-label caption>{{ s.admission_number || s.admissionNumber || '—' }}</q-item-label>
+                    <q-item-label class="text-white">{{ studentName(s) }}</q-item-label>
+                    <q-item-label caption class="text-grey-5">{{ s.admission_number || s.admissionNumber || '—' }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <q-item-label :class="balanceClass(s.running_balance ?? s.balance)">
@@ -235,16 +298,16 @@
 
             <!-- Related results for student / subject -->
             <div v-if="relatedResults.length" class="q-mb-md">
-              <div class="text-caption text-grey-7 text-uppercase q-mb-sm">
+              <div class="text-caption text-grey-5 text-uppercase q-mb-sm">
                 Academic results ({{ relatedResults.length }})
               </div>
-              <q-list bordered separator class="rounded-borders">
+              <q-list bordered separator dark class="rounded-borders drawer-list">
                 <q-item v-for="(r, idx) in relatedResults" :key="r.id || idx">
                   <q-item-section>
-                    <q-item-label>
+                    <q-item-label class="text-white">
                       {{ resolveSubjectName(r) }} · {{ resolveStudentName(r) }}
                     </q-item-label>
-                    <q-item-label caption>
+                    <q-item-label caption class="text-grey-5">
                       Score {{ r.totalScore ?? r.total_score ?? '—' }} · Grade {{ r.grade || '—' }}
                       <span v-if="r.remarks"> · {{ r.remarks }}</span>
                     </q-item-label>
@@ -255,12 +318,12 @@
 
             <!-- Raw payload for anything else synced -->
             <div v-if="extraPayloadKeys.length">
-              <div class="text-caption text-grey-7 text-uppercase q-mb-sm">Synced fields</div>
-              <q-list bordered separator class="rounded-borders">
+              <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Synced fields</div>
+              <q-list bordered separator dark class="rounded-borders drawer-list">
                 <q-item v-for="key in extraPayloadKeys" :key="key">
                   <q-item-section>
-                    <q-item-label caption>{{ key }}</q-item-label>
-                    <q-item-label class="text-body2">{{ formatFieldValue(selected.row[key]) }}</q-item-label>
+                    <q-item-label caption class="text-grey-5">{{ key }}</q-item-label>
+                    <q-item-label class="text-body2 text-white">{{ formatFieldValue(selected.row[key]) }}</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -275,7 +338,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { Notify } from 'quasar'
-import { schoolApi } from 'src/api'
+import { schoolApi, deviceApi } from 'src/api'
+import { userFacingApiError } from 'src/utils/userFacingApiError'
 
 const emptyRoster = () => ({
   students: [],
@@ -289,12 +353,41 @@ const emptyRoster = () => ({
 })
 
 const loading = ref(false)
+const pulling = ref(false)
 const tab = ref('students')
 const loadError = ref('')
 const roster = ref(emptyRoster())
 
 const drawerOpen = ref(false)
 const selected = ref(null)
+const studentQuery = ref('')
+const parentNameQuery = ref('')
+const parentPhoneQuery = ref('')
+const classQuery = ref(null)
+
+function digitsOnly(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+function studentParentName(s) {
+  const direct = String(s.parentName || s.parent_name || s.guardianName || s.guardian_name || '').trim()
+  if (direct) return direct
+  const parentIds = [s.parentSyncId, s.parentId, s.parent_id].filter(Boolean).map(String)
+  const match = (roster.value.parents || []).find((p) =>
+    parentIds.includes(String(p.id || '')) || parentIds.includes(String(p.syncId || '')) || parentIds.includes(String(p.localId || '')),
+  )
+  return String(match?.fullName || match?.name || '').trim()
+}
+
+function studentParentPhone(s) {
+  const direct = String(s.parentPhone || s.parent_phone || s.phone || s.guardianPhone || '').trim()
+  if (direct) return direct
+  const parentIds = [s.parentSyncId, s.parentId, s.parent_id].filter(Boolean).map(String)
+  const match = (roster.value.parents || []).find((p) =>
+    parentIds.includes(String(p.id || '')) || parentIds.includes(String(p.syncId || '')) || parentIds.includes(String(p.localId || '')),
+  )
+  return String(match?.phone || '').trim()
+}
 
 const students = computed(() => roster.value.students || [])
 const teachers = computed(() => roster.value.teachers || [])
@@ -318,6 +411,49 @@ const parents = computed(() => {
   })
 })
 
+const classFilterOptions = computed(() => {
+  const names = new Set()
+  for (const c of classes.value) {
+    const n = String(c.name || '').trim()
+    if (n) names.add(n)
+  }
+  for (const s of students.value) {
+    const n = String(s.current_class || s.className || '').trim()
+    if (n) names.add(n)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b)).map((name) => ({ label: name, value: name }))
+})
+
+const filteredStudents = computed(() => {
+  const q = String(studentQuery.value || '').trim().toLowerCase()
+  const pn = String(parentNameQuery.value || '').trim().toLowerCase()
+  const pp = digitsOnly(parentPhoneQuery.value)
+  const cls = String(classQuery.value || '').trim().toLowerCase()
+  return students.value.filter((s) => {
+    if (q) {
+      const hay = `${studentName(s)} ${s.admission_number || s.admissionNumber || ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    if (pn && !studentParentName(s).toLowerCase().includes(pn)) return false
+    if (pp && !digitsOnly(studentParentPhone(s)).includes(pp)) return false
+    if (cls) {
+      const sClass = String(s.current_class || s.className || '').trim().toLowerCase()
+      if (sClass !== cls) return false
+    }
+    return true
+  })
+})
+
+const filteredParents = computed(() => {
+  const pn = String(parentNameQuery.value || '').trim().toLowerCase()
+  const pp = digitsOnly(parentPhoneQuery.value)
+  return parents.value.filter((p) => {
+    if (pn && !`${p.fullName || ''} ${p.name || ''}`.toLowerCase().includes(pn)) return false
+    if (pp && !digitsOnly(p.phone).includes(pp)) return false
+    return true
+  })
+})
+
 const summaryCards = computed(() => [
   { label: 'Students', value: students.value.length },
   { label: 'Teachers', value: teachers.value.length },
@@ -330,6 +466,8 @@ const studentColumns = [
   { name: 'admission', label: 'Admission No', field: (r) => r.admission_number || r.admissionNumber, align: 'left' },
   { name: 'name', label: 'Name', field: (r) => studentName(r), align: 'left' },
   { name: 'class', label: 'Class', field: (r) => r.current_class || r.className || '—', align: 'left' },
+  { name: 'parent', label: 'Parent', field: (r) => studentParentName(r) || '—', align: 'left' },
+  { name: 'phone', label: 'Phone', field: (r) => studentParentPhone(r) || '—', align: 'left' },
   { name: 'balance', label: 'Balance', field: (r) => r.running_balance ?? r.balance ?? 0, align: 'right' },
 ]
 
@@ -534,7 +672,8 @@ const selectedFields = computed(() => {
     push('Balance', formatMoney(row.running_balance ?? row.balance))
     push('Email', row.email)
     push('Phone', row.phone || row.parentPhone || row.parent_phone)
-    push('Guardian', row.guardianName || row.guardian_name || row.parentName || row.parent_name)
+    push('Guardian', row.guardianName || row.guardian_name || studentParentName(row))
+    push('Parent phone', studentParentPhone(row))
     push('Address', row.address || row.parentAddress || row.parent_address)
     push('Health condition / Notes', row.notes || row.health_condition || row.healthCondition)
     push('Gender', row.gender)
@@ -699,6 +838,30 @@ function resolveSubjectName(r) {
   return match?.name || keys[0] || '—'
 }
 
+const pullFromTablet = async () => {
+  pulling.value = true
+  try {
+    const { data } = await deviceApi.getDevices()
+    const list = Array.isArray(data) ? data : (data?.devices || [])
+    const ids = list.map((d) => d.device_id || d.deviceId || d.id).filter(Boolean)
+    if (!ids.length) {
+      Notify.create({ type: 'warning', message: 'No linked tablet found. Open Devices and confirm the tablet is registered.' })
+      return
+    }
+    await Promise.all(ids.map((id) => deviceApi.sendDeviceCommand(id, { action: 'pull_sync' })))
+    Notify.create({
+      type: 'positive',
+      message: 'Asked the tablet to upload students and records. Keep the app open, then Refresh in a few seconds.',
+    })
+    await new Promise((r) => setTimeout(r, 8000))
+    await fetchData()
+  } catch (e) {
+    Notify.create({ type: 'negative', message: userFacingApiError(e, 'Could not reach the tablet') })
+  } finally {
+    pulling.value = false
+  }
+}
+
 const fetchData = async () => {
   loading.value = true
   loadError.value = ''
@@ -731,5 +894,17 @@ onMounted(fetchData)
 }
 .cursor-pointer :deep(tbody tr) {
   cursor: pointer;
+}
+.roster-drawer {
+  background: #0b0f19 !important;
+  color: #e8edf7;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.drawer-head {
+  background: #12182a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.drawer-list {
+  background: #101624;
 }
 </style>

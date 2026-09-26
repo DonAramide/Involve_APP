@@ -5,7 +5,7 @@ import multer from 'multer';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
 import { resolveApkObjectKey } from '../utils/apk-object-key';
-import { createContaboS3Client, formatContaboNetworkError, putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
+import { createContaboS3Client, formatContaboNetworkError, putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
 
 const APK_MAX_BYTES = 500 * 1024 * 1024;
 
@@ -65,8 +65,8 @@ function removeTempApk(filePath?: string) {
 const APK_TRANSFER_TIMEOUT_MS = 30 * 60 * 1000;
 
 function publicApkDownloadUrl(apkId: string): string {
-  const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || '').replace(/\/+$/, '');
-  return base ? `${base}/api/apk/${apkId}/download` : `/api/apk/${apkId}/download`;
+  const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || 'https://api.invify.org').replace(/\/+$/, '');
+  return `${base}/api/apk/${apkId}/download`;
 }
 
 function getIo() {
@@ -117,19 +117,7 @@ export class ApkController {
         contentType: 'application/vnd.android.package-archive',
       });
 
-      // Construct public URL with Contabo tenant ID format: https://<endpoint>/<tenantId>:<bucket>/<key>
-      let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
-      let s3Url = '';
-      if (baseUrl) {
-        if (!baseUrl.endsWith('/')) baseUrl += '/';
-        s3Url = `${baseUrl}${objectKey}`;
-      } else {
-        let endpointUrl = resolveContaboEndpoint();
-        if (!endpointUrl.endsWith('/')) endpointUrl += '/';
-        const tenantId = (process.env.CONTABO_TENANT_ID || process.env.CONTABO_CUSTOMER_ID || '0d205683f3b543beb7298e9b68e26b0f').trim();
-        const bucketPath = tenantId && !bucket?.includes(':') ? `${tenantId}:${bucket}` : bucket;
-        s3Url = `${endpointUrl}${bucketPath}/${objectKey}`;
-      }
+      const s3Url = publicContaboObjectUrl(objectKey);
 
       const apkData = {
         name,
@@ -153,7 +141,13 @@ export class ApkController {
         result = await ApkVaultService.addApk(apkData, operatorEmail);
       }
 
-      return res.status(200).json(result);
+      const downloadUrl = publicApkDownloadUrl(result.id);
+      return res.status(200).json({
+        ...result,
+        url: downloadUrl,
+        downloadUrl,
+        s3Url: result.s3Url || s3Url,
+      });
     } catch (error: any) {
       console.error('[ApkController] upload error:', error);
       const isDuplicate = error?.code === '23505' || /already exists|already in the vault/i.test(String(error?.message || ''));

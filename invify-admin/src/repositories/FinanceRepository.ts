@@ -72,6 +72,7 @@ export class FinanceRepository {
             customer: 0,
             staff: 0,
             student: 0,
+            parent: 0,
             unmapped: 0,
           },
           salesSummary: data.salesSummary || {
@@ -174,8 +175,38 @@ export class FinanceRepository {
   }
 
   /**
-   * GET /api/v1/finance/invoices
+   * GET /api/finance/daily-revenue
    */
+  static async getDailyRevenue(tenantId: string, days = 14, options?: { refresh?: boolean }): Promise<{ date: string; revenue: number }[]> {
+    const scopedTenant = tenantId || localStorage.getItem('tenant_id') || 'unknown';
+    return QueryCache.get(
+      `finance_daily_revenue_${scopedTenant}_${days}`,
+      async () => {
+        const { data } = await financeApi.getDailyRevenue({ days });
+        const rows = Array.isArray(data) ? data : (data?.data || []);
+        return rows.map((r: any) => ({
+          date: String(r.date || '').slice(0, 10),
+          revenue: Number(r.revenue || 0),
+        }));
+      },
+      options
+    );
+  }
+
+  /**
+   * GET /api/finance/transactions — paid invoices + VA credits
+   */
+  static async getSchoolTransactions(tenantId: string, options?: { refresh?: boolean }): Promise<any[]> {
+    const scopedTenant = tenantId || localStorage.getItem('tenant_id') || 'unknown';
+    return QueryCache.get(
+      `finance_school_tx_${scopedTenant}`,
+      async () => {
+        const { data } = await financeApi.getSchoolTransactions({ limit: 500 });
+        return Array.isArray(data) ? data : (data?.transactions || data?.data || []);
+      },
+      options
+    );
+  }
   static async getInvoices(tenantId: string, options?: { refresh?: boolean }): Promise<any[]> {
     return QueryCache.get(
       `finance_invoices_${tenantId}`,

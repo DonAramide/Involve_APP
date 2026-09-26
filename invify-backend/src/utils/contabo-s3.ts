@@ -92,6 +92,16 @@ export function contaboObjectPath(bucket: string, key: string): string {
   return `/${bucket}/${keyPath}`;
 }
 
+/** Public HTTPS URL of an object, matching the path-style PUT used by putContaboObject. */
+export function publicContaboObjectUrl(key: string): string {
+  const objectKey = String(key || '').replace(/^\/+/, '');
+  const configured = (process.env.CONTABO_PUBLIC_BASE_URL || '').trim();
+  if (configured) {
+    return `${configured.replace(/\/+$/, '')}/${objectKey}`;
+  }
+  return `${resolveContaboEndpoint()}${contaboObjectPath(resolveContaboBucket(), objectKey)}`;
+}
+
 export function formatContaboNetworkError(error: unknown): string {
   const raw = String((error as any)?.message || error || '');
   if (/altnames|CERT_ALTNAME|unable to verify the first certificate/i.test(raw)) {

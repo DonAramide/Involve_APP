@@ -25,7 +25,19 @@ export class FinancialPlatformHealthController {
       };
 
       const diagnostics = await this.healthService.getDiagnostics(tenantId, context);
-      
+      try {
+        const { loadActivationGate, evidenceForChecks, allManualChecksPassed, missingManualChecks } = await import('../activation/activation-gate');
+        const { gate } = await loadActivationGate(tenantId);
+        const evidence = await evidenceForChecks(tenantId);
+        diagnostics.activationGate = {
+          ...gate,
+          allChecksPassed: allManualChecksPassed(gate),
+          missing: missingManualChecks(gate),
+          evidence,
+        };
+      } catch (gateErr: any) {
+        diagnostics.activationGate = { error: gateErr?.message || 'unavailable' };
+      }
       return res.status(200).json(diagnostics);
     } catch (error: any) {
       console.error('Health Check Error:', error);

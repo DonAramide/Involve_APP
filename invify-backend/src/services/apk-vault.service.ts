@@ -54,6 +54,39 @@ function displayPackageName(stored: string): string {
   return String(stored || '').replace(/#slot-\d+$/i, '');
 }
 
+function publicApkDownloadUrl(id: string): string {
+  const base = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.BASE_URL ||
+    'https://api.invify.org'
+  ).replace(/\/+$/, '');
+  return `${base}/api/apk/${id}/download`;
+}
+
+function mapApkRow(a: any) {
+  const downloadUrl = publicApkDownloadUrl(a.id);
+  return {
+    id: a.id,
+    name: a.name,
+    packageName: displayPackageName(a.package_name),
+    version: a.version,
+    size: formatBytesToHuman(a.size),
+    status: a.status,
+    uploadProgress: Number(a.upload_progress) || 0,
+    installCount: a.install_count,
+    uninstallCount: a.uninstall_count,
+    versionDistribution: a.version_distribution,
+    selectedDeployVersion: a.selected_deploy_version,
+    s3Url: a.s3_url,
+    url: downloadUrl,
+    downloadUrl,
+    createdBy: a.created_by,
+    updatedBy: a.updated_by,
+    createdAt: a.created_at,
+    updatedAt: a.updated_at,
+  };
+}
+
 export class ApkVaultService {
   static async getVault() {
     const { data, error } = await supabase
@@ -66,26 +99,7 @@ export class ApkVaultService {
       return [];
     }
     
-    // Map database columns to camelCase expected by client
-    return (data || []).map((a: any) => ({
-      id: a.id,
-      name: a.name,
-      packageName: displayPackageName(a.package_name),
-      version: a.version,
-      size: formatBytesToHuman(a.size),
-      status: a.status,
-      uploadProgress: Number(a.upload_progress) || 0,
-      installCount: a.install_count,
-      uninstallCount: a.uninstall_count,
-      versionDistribution: a.version_distribution,
-      selectedDeployVersion: a.selected_deploy_version,
-      s3Url: a.s3_url,
-      downloadUrl: `/api/apk/${a.id}/download`,
-      createdBy: a.created_by,
-      updatedBy: a.updated_by,
-      createdAt: a.created_at,
-      updatedAt: a.updated_at
-    }));
+    return (data || []).map((a: any) => mapApkRow(a));
   }
 
   static async getApkById(id: string) {
@@ -171,24 +185,7 @@ export class ApkVaultService {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: displayPackageName(data.package_name),
-      version: data.version,
-      size: formatBytesToHuman(data.size),
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async updateApkSlot(slotId: string, apkData: any, operatorEmail: string = 'system') {
@@ -227,24 +224,7 @@ export class ApkVaultService {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: displayPackageName(data.package_name),
-      version: data.version,
-      size: formatBytesToHuman(data.size),
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async updateApkUrl(slotId: string, s3Url: string, operatorEmail: string = 'system') {
@@ -263,24 +243,7 @@ export class ApkVaultService {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: displayPackageName(data.package_name),
-      version: data.version,
-      size: formatBytesToHuman(data.size),
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async removeApk(slotId: string) {

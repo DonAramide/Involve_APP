@@ -242,6 +242,37 @@ export class InvoiceApplicationService {
 
     } catch (error) {
       await client.query('ROLLBACK');
+      // Keep the invoice visible on web even if PG ledger/FK fails (school cash often has no customer UUID).
+      try {
+        const fallbackRow: Record<string, unknown> = {
+          id: invoiceId,
+          tenant_id: context.tenantId,
+          invoice_number: payload.invoiceNumber,
+          customer_id: customerId,
+          subtotal: payload.subtotal || 0,
+          tax_amount: payload.taxAmount || 0,
+          discount_amount: payload.discountAmount || 0,
+          total_amount: payload.totalAmount || 0,
+          amount_paid: payload.amountPaid || 0,
+          balance_amount: payload.balanceAmount || 0,
+          payment_status: payload.paymentStatus || 'Unpaid',
+          payment_method: payload.paymentMethod || null,
+          created_at: payload.dateCreated || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        let { error: fbErr } = await supabaseAdmin.from('invoices').upsert(fallbackRow);
+        if (fbErr && /customer/i.test(fbErr.message || '')) {
+          fallbackRow.customer_id = null;
+          const retry = await supabaseAdmin.from('invoices').upsert(fallbackRow);
+          fbErr = retry.error;
+        }
+        if (!fbErr) {
+          console.warn('[InvoiceApplicationService] PG invoice rolled back; saved via Supabase fallback:', (error as any)?.message || error);
+          return { alreadyExists: false, invoiceId, fallback: true };
+        }
+      } catch (fallbackErr: any) {
+        console.error('[InvoiceApplicationService] Supabase invoice fallback failed:', fallbackErr?.message || fallbackErr);
+      }
       throw error;
     } finally {
       client.release();

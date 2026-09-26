@@ -17,14 +17,14 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
   
   Map<String, File?> _selectedFiles = {
     'GOVT_ID': null,
-    'UTILITY_BILL': null,
     'CAC_CERT': null,
+    'UTILITY_BILL': null,
   };
 
   Map<String, bool> _uploadStatus = {
     'GOVT_ID': false,
-    'UTILITY_BILL': false,
     'CAC_CERT': false,
+    'UTILITY_BILL': false,
   };
 
   bool _isLoading = true;
@@ -41,7 +41,7 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
       if (mounted) {
         setState(() {
           for (var doc in docs) {
-            final type = doc['document_type'];
+            final type = _normalizeType(doc['document_type']?.toString());
             if (_uploadStatus.containsKey(type)) {
               _uploadStatus[type] = true;
             }
@@ -145,9 +145,17 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
     }
   }
 
+  String _normalizeType(String? raw) {
+    final key = (raw ?? '').trim().toUpperCase().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (key.contains('CAC')) return 'CAC_CERT';
+    if (key.contains('ID') || key == 'NIN' || key == 'PASSPORT' || key.contains('LICENSE')) {
+      return 'GOVT_ID';
+    }
+    return key;
+  }
+
   bool _isAllRequiredUploaded() {
-    // Make ID and Utility Bill mandatory, CAC optional depending on business type (for simplicity all 3 or just 2)
-    return _uploadStatus['GOVT_ID'] == true && _uploadStatus['UTILITY_BILL'] == true;
+    return _uploadStatus['GOVT_ID'] == true && _uploadStatus['CAC_CERT'] == true;
   }
 
   @override
@@ -182,12 +190,12 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Mandatory for Pro Tier',
+                            'Upload CAC and a valid ID card',
                             style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary, fontSize: 16),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Please upload the following documents to verify your business identity and activate your cloud linkage.',
+                            'We need your CAC certificate and a valid government ID (NIN slip, National ID, driver’s licence, or passport) before this workspace can be verified.',
                             style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
                           ),
                         ],
@@ -199,26 +207,26 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
               const SizedBox(height: 32),
               
               _buildDocumentCard(
-                title: 'Government Issued ID',
-                subtitle: "Passport, Driver's License, or National ID",
+                title: 'Valid ID card',
+                subtitle: 'NIN slip, National ID, driver’s licence, or international passport',
                 documentType: 'GOVT_ID',
                 icon: Icons.badge,
                 isRequired: true,
               ),
-              
+
               _buildDocumentCard(
-                title: 'Utility Bill',
-                subtitle: 'Recent electricity, water, or internet bill containing your address',
-                documentType: 'UTILITY_BILL',
-                icon: Icons.receipt_long,
+                title: 'CAC certificate',
+                subtitle: 'Certificate of Incorporation or Business Name registration',
+                documentType: 'CAC_CERT',
+                icon: Icons.business,
                 isRequired: true,
               ),
 
               _buildDocumentCard(
-                title: 'CAC Certificate (Optional)',
-                subtitle: 'Certificate of Incorporation for registered businesses',
-                documentType: 'CAC_CERT',
-                icon: Icons.business,
+                title: 'Utility bill (optional)',
+                subtitle: 'Recent electricity, water, or internet bill with your address',
+                documentType: 'UTILITY_BILL',
+                icon: Icons.receipt_long,
                 isRequired: false,
               ),
 

@@ -27,6 +27,7 @@ import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/settings/domain/entities/user_plan.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
@@ -1101,6 +1102,15 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                               const SnackBar(content: Text('Add the school account in Settings first.')),
                             );
                             return;
+                          }
+
+                          if (method == 'Cash') {
+                            final authorised = await requireSystemAccess(
+                              context,
+                              purpose:
+                                  'Cash posting requires admin System Access. Enter the password to record this credit.',
+                            );
+                            if (authorised != true) return;
                           }
 
                           if (method == 'POS') {

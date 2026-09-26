@@ -556,9 +556,9 @@ function apkUploadErrorMessage(error) {
 
 const copyDownloadLink = async (apk) => {
   const origin = publicApiOrigin()
-  const url = apk?.id
+  const url = apk?.url || apk?.downloadUrl || (apk?.id
     ? `${origin}/api/apk/${apk.id}/download`
-    : String(apk?.s3Url || '').trim()
+    : String(apk?.s3Url || '').trim())
   if (!url) {
     Notify.create({ type: 'warning', message: 'No download URL yet. Wait for the upload to finish.', position: 'bottom-right' })
     return
@@ -707,7 +707,15 @@ const commitApkToVault = async () => {
     uploadStatusText.value = 'APK committed to Contabo Vault successfully!'
     apkVault.value[finalIndex] = data
     uploadDialogOpen.value = false
-    Notify.create({ type: 'positive', message: `APK [${data.name}] committed to vault successfully`, position: 'bottom-right' })
+    const publicUrl = data.url || data.downloadUrl || (data.id ? `${publicApiOrigin()}/api/apk/${data.id}/download` : data.s3Url)
+    Notify.create({
+      type: 'positive',
+      message: `APK [${data.name}] committed. ${publicUrl}`,
+      caption: publicUrl,
+      timeout: 12000,
+      position: 'bottom-right',
+      actions: publicUrl ? [{ label: 'COPY URL', color: 'white', handler: () => copyToClipboard(publicUrl) }] : [],
+    })
   } catch (error) {
     Notify.create({ type: 'negative', message: apkUploadErrorMessage(error), position: 'bottom-right' })
     try {

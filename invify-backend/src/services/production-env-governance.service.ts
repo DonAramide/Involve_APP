@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 
 export const APPLY_CONFIRM_PHRASE = 'APPLY PRODUCTION ENV';
 
-const DEFAULT_GOVERNORS = ['invifyd99@gmail.com'];
+const DEFAULT_GOVERNORS: string[] = [];
 
 const SECRET_KEY =
   /(SECRET|PASSWORD|TOKEN|PRIVATE|HMAC|JWT|SERVICE_ROLE|DATABASE_URL|API_KEY|ACCESS_KEY|SIGNING)/i;
@@ -74,8 +74,7 @@ export function listGovernorEmails(): string[] {
     .split(/[,;\s]+/)
     .map(normalizeEmail)
     .filter(Boolean);
-  if (fromEnv.length) return [...new Set(fromEnv)];
-  return [...DEFAULT_GOVERNORS];
+  return [...new Set(fromEnv)];
 }
 
 export function isProductionEnvGovernor(email: unknown, role: unknown): boolean {
@@ -83,7 +82,10 @@ export function isProductionEnvGovernor(email: unknown, role: unknown): boolean 
     .split(',')
     .map((r) => r.trim().toLowerCase());
   if (!roles.includes('super_admin')) return false;
-  return listGovernorEmails().includes(normalizeEmail(email));
+  const governors = listGovernorEmails();
+  // No explicit list: any platform super_admin may maker/check.
+  if (!governors.length) return true;
+  return governors.includes(normalizeEmail(email));
 }
 
 export function isWritableKey(key: string): boolean {
@@ -135,12 +137,16 @@ function parseEnvText(text: string): { lines: string[]; map: Record<string, stri
 
 function readEnvFile(): { exists: boolean; text: string; map: Record<string, string>; lines: string[] } {
   const filePath = envFilePath();
-  if (!fs.existsSync(filePath)) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { exists: false, text: '', map: {}, lines: [] };
+    }
+    const text = fs.readFileSync(filePath, 'utf8');
+    const parsed = parseEnvText(text);
+    return { exists: true, text, map: parsed.map, lines: parsed.lines };
+  } catch {
     return { exists: false, text: '', map: {}, lines: [] };
   }
-  const text = fs.readFileSync(filePath, 'utf8');
-  const parsed = parseEnvText(text);
-  return { exists: true, text, map: parsed.map, lines: parsed.lines };
 }
 
 function readQueue(): PendingChange[] {
@@ -207,13 +213,19 @@ export class ProductionEnvGovernanceService {
             (k) => k.startsWith('FEATURE_') || k === 'PAYSTACK_MODE' || k.startsWith('ENABLE_'),
           )),
       ...Object.keys(overlay),
+      'FEATURE_REAL_MONEY_PAYOUTS',
+      'PAYSTACK_MODE',
     ])];
-    const source = {
-      ...(file.exists ? file.map : (process.env as Record<string, string>)),
+    const source: Record<string, string> = {
+      ...(file.exists ? file.map : {}),
+      FEATURE_REAL_MONEY_PAYOUTS: String(process.env.FEATURE_REAL_MONEY_PAYOUTS || ''),
+      PAYSTACK_MODE: String(process.env.PAYSTACK_MODE || ''),
       ...overlay,
     };
-    if (!file.exists) {
-      for (const k of Object.keys(overlay)) source[k] = overlay[k];
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith('FEATURE_') || k.startsWith('ENABLE_') || k === 'PAYSTACK_MODE') {
+        if (source[k] === undefined || source[k] === '') source[k] = String(process.env[k] || '');
+      }
     }
     const rows: EnvRow[] = keys.sort().map((key) => ({
       key,

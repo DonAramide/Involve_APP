@@ -175,7 +175,7 @@ export class PaymentService {
     // 1. Fetch tenant bank details when no explicit destination
     if (!bankDetails) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from('payout_settings')
           .select('*')
           .eq('tenant_id', tenantId)
@@ -215,7 +215,7 @@ export class PaymentService {
       : `payout:${reference}`;
 
     // 3. Database Pessimistic Locking & Double Entry
-    const { data: ledgerRes, error: ledgerError } = await supabase.rpc('request_payout_with_lock', {
+    const { data: ledgerRes, error: ledgerError } = await supabaseAdmin.rpc('request_payout_with_lock', {
       p_tenant_id: tenantId,
       p_idempotency_key: idempotencyKey,
       p_reference: reference,
@@ -255,7 +255,7 @@ export class PaymentService {
     }
 
     // 5. Store transaction record (PENDING)
-    const { error: txError } = await supabase
+    const { error: txError } = await supabaseAdmin
       .from('transactions_log')
       .insert({
         reference,

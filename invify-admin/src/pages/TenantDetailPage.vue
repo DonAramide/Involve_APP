@@ -346,16 +346,104 @@
                   </div>
                 </div>
 
+                <div class="q-mt-lg text-left">
+                  <div class="text-overline text-cyan-3 q-mb-sm">Manual verification (required)</div>
+                  <div class="text-caption text-grey-5 q-mb-sm">
+                    CAC, a direct phone call, and address must be confirmed by an operator. A second operator then checker-approves activation.
+                  </div>
+                  <q-list dark bordered separator class="rounded-borders">
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>CAC certificate</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.hasCac ? 'Document on file — review then confirm' : 'Ask the tenant to upload CAC on Compliance or the mobile app' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-btn
+                          v-if="activationEvidence.cacUrl"
+                          flat dense color="cyan-4" icon="launch" tag="a" target="_blank" :href="activationEvidence.cacUrl"
+                        />
+                        <q-chip v-if="gateCheck('cac')" color="green-9" text-color="white" size="sm">CONFIRMED</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Confirm CAC" :disable="!activationEvidence.hasCac" :loading="checkBusy==='cac'" @click="recordFpCheck('cac')" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Valid ID card</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.hasId ? 'ID on file' : 'Ask the tenant to upload NIN, National ID, driver’s licence, or passport' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-btn
+                          v-if="activationEvidence.idUrl"
+                          flat dense color="cyan-4" icon="launch" tag="a" target="_blank" :href="activationEvidence.idUrl"
+                        />
+                        <q-chip v-if="activationEvidence.hasId" color="green-9" text-color="white" size="sm">ON FILE</q-chip>
+                        <q-chip v-else color="orange-9" text-color="white" size="sm">MISSING</q-chip>
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Phone — direct call</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.phone || 'No phone on file' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-chip v-if="gateCheck('phone_call')" color="green-9" text-color="white" size="sm">CALLED</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Confirm call" :disable="!activationEvidence.phone" :loading="checkBusy==='phone_call'" @click="recordFpCheck('phone_call')" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Address validation</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.address || 'No address on file' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-chip v-if="gateCheck('address')" color="green-9" text-color="white" size="sm">VALIDATED</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Confirm address" :disable="!activationEvidence.address" :loading="checkBusy==='address'" @click="recordFpCheck('address')" />
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                  <div v-if="activationGate?.proposal?.status === 'pending'" class="text-caption text-amber-4 q-mt-sm">
+                    Pending maker-checker: proposed by {{ activationGate.proposal.makerEmail }}. A different admin must approve.
+                  </div>
+                </div>
+
                 <div class="row q-gutter-sm justify-center">
+                  <q-btn 
+                    v-if="!financialHealth || financialHealth?.platformStatus === 'UNPROVISIONED'"
+                    color="indigo-6" 
+                    text-color="white"
+                    icon="how_to_reg" 
+                    label="Propose activation" 
+                    @click="proposeFinancialPlatform" 
+                    :loading="proposingPlatform"
+                    :disable="!allFpChecksPassed || activationGate?.proposal?.status === 'pending'"
+                    class="text-weight-bold" 
+                  />
                   <q-btn 
                     v-if="!financialHealth || financialHealth?.platformStatus === 'UNPROVISIONED'"
                     color="cyan-6" 
                     text-color="black"
                     icon="flash_on" 
-                    label="Activate Platform" 
+                    label="Approve & activate" 
                     @click="activateFinancialPlatform" 
                     :loading="activatingPlatform"
+                    :disable="!canCheckerActivate"
                     class="text-weight-bold" 
+                  />
+                  <q-btn
+                    v-if="activationGate?.proposal?.status === 'pending'"
+                    outline
+                    color="red-4"
+                    label="Reject proposal"
+                    :loading="rejectingPlatform"
+                    @click="rejectFinancialPlatform"
                   />
                   <q-btn 
                     v-if="financialHealth?.platformStatus === 'ACTIVE' || financialHealth?.platformStatus === 'DEGRADED'"
@@ -785,13 +873,25 @@
                   <q-list dark separator class="q-mt-sm">
                     <q-item v-for="doc in kycDocuments" :key="doc.id">
                       <q-item-section>
-                        <q-item-label class="text-weight-bold">{{ doc.document_type.replace('_', ' ') }}</q-item-label>
+                        <q-item-label class="text-weight-bold">{{ (doc.document_type || 'DOCUMENT').replace(/_/g, ' ') }}</q-item-label>
                         <q-item-label caption class="text-grey-5">{{ new Date(doc.created_at).toLocaleDateString() }}</q-item-label>
                       </q-item-section>
                       <q-item-section side>
                         <div class="row items-center no-wrap">
-                          <q-btn flat dense icon="launch" label="View" type="a" target="_blank" :href="doc.document_url" color="cyan-4" size="sm" class="q-mr-sm" />
-                          <q-chip :color="doc.status === 'VERIFIED' ? 'green-9' : 'orange-9'" text-color="white" size="sm" icon="check_circle">
+                          <q-btn flat dense icon="launch" label="View" type="a" target="_blank" :href="doc.document_url || doc.url" color="cyan-4" size="sm" class="q-mr-sm" />
+                          <q-btn
+                            v-if="String(doc.status).toUpperCase() !== 'APPROVED'"
+                            unelevated dense color="green-8" size="sm" label="Approve" class="q-mr-xs"
+                            :loading="reviewingDoc === doc.id"
+                            @click="reviewTenantDoc(doc, 'APPROVED')"
+                          />
+                          <q-btn
+                            v-if="String(doc.status).toUpperCase() !== 'REJECTED'"
+                            outline dense color="red-4" size="sm" label="Reject"
+                            :loading="reviewingDoc === doc.id"
+                            @click="reviewTenantDoc(doc, 'REJECTED')"
+                          />
+                          <q-chip :color="doc.status === 'APPROVED' || doc.status === 'VERIFIED' ? 'green-9' : (doc.status === 'REJECTED' ? 'red-9' : 'orange-9')" text-color="white" size="sm" class="q-ml-sm">
                             {{ doc.status }}
                           </q-chip>
                         </div>
@@ -1172,6 +1272,7 @@ const certificates = ref([])
 const registeredDevices = ref([])
 const auditRecords = ref([])
 const kycDocuments = ref([])
+const reviewingDoc = ref('')
 
 const showResetDialog = ref(false)
 const resetDialogKey = ref('')
@@ -1227,6 +1328,19 @@ const isSuperAdmin = computed(() => {
 const financialHealth = ref(null)
 const financialAudit = ref([])
 const activatingPlatform = ref(false)
+const proposingPlatform = ref(false)
+const rejectingPlatform = ref(false)
+const checkBusy = ref('')
+const activationGate = ref(null)
+const activationEvidence = ref({
+  hasCac: false,
+  hasId: false,
+  cacUrl: null,
+  idUrl: null,
+  phone: null,
+  address: null,
+  kycStatus: null,
+})
 const rotatingPlatform = ref(false)
 const changingVertical = ref(false)
 const showChangeVerticalDialog = ref(false)
@@ -1653,6 +1767,22 @@ const copyTempPassword = () => {
   });
 };
 
+const reviewTenantDoc = async (doc, status) => {
+  if (!doc?.id) return
+  reviewingDoc.value = doc.id
+  try {
+    await adminApi.reviewKycDocument(doc.id, { status })
+    $q.notify({ type: 'positive', message: `Document ${status.toLowerCase()}` })
+    const kycRes = await adminApi.getTenantKyc(tenant.value.id)
+    const payload = kycRes.data
+    kycDocuments.value = Array.isArray(payload) ? payload : (payload?.data || [])
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e?.response?.data?.message || 'Review failed' })
+  } finally {
+    reviewingDoc.value = ''
+  }
+}
+
 const fetchDetails = async () => {
   loading.value = true
   loadError.value = ''
@@ -1684,7 +1814,8 @@ const fetchDetails = async () => {
 
     try {
       const kycRes = await adminApi.getTenantKyc(tenant.value.id)
-      kycDocuments.value = kycRes.data?.data || []
+      const payload = kycRes.data
+      kycDocuments.value = Array.isArray(payload) ? payload : (payload?.data || [])
     } catch (e) {
       console.error('Failed to fetch KYC documents:', e)
     }
@@ -1697,6 +1828,8 @@ const fetchDetails = async () => {
       console.warn('Failed to fetch financial platform health (may not be provisioned):', e)
       financialHealth.value = null
     }
+
+    await loadActivationGate()
 
     // Fetch Financial Platform Audit
     try {
@@ -1720,11 +1853,134 @@ const fetchDetails = async () => {
   }
 }
 
-const activateFinancialPlatform = async () => {
+const operatorEmail = () => String(localStorage.getItem('operator_email') || '').trim().toLowerCase()
+
+const gateCheck = (key) => activationGate.value?.checks?.[key]?.passed === true
+
+const allFpChecksPassed = computed(() =>
+  ['cac', 'phone_call', 'address'].every((k) => gateCheck(k)),
+)
+
+const canCheckerActivate = computed(() => {
+  const proposal = activationGate.value?.proposal
+  if (!proposal || proposal.status !== 'pending') return false
+  if (!allFpChecksPassed.value) return false
+  const maker = String(proposal.makerEmail || '').trim().toLowerCase()
+  const me = operatorEmail()
+  return Boolean(me) && me !== maker
+})
+
+const applyActivationPayload = (payload) => {
+  if (payload?.gate) activationGate.value = payload.gate
+  if (payload?.evidence) activationEvidence.value = { ...activationEvidence.value, ...payload.evidence }
+}
+
+const loadActivationGate = async () => {
+  if (!tenant.value?.id) return
+  try {
+    const res = await adminApi.getFinancialPlatformActivationGate(tenant.value.id)
+    applyActivationPayload(res.data || {})
+  } catch (e) {
+    const fromHealth = financialHealth.value?.activationGate
+    if (fromHealth && !fromHealth.error) {
+      activationGate.value = {
+        checks: fromHealth.checks,
+        proposal: fromHealth.proposal,
+      }
+      if (fromHealth.evidence) {
+        activationEvidence.value = { ...activationEvidence.value, ...fromHealth.evidence }
+      }
+    }
+    console.warn('Failed to load financial platform activation gate:', e)
+  }
+}
+
+const recordFpCheck = async (key) => {
+  if (!tenant.value) return
+  checkBusy.value = key
+  try {
+    const res = await adminApi.recordFinancialPlatformManualCheck(tenant.value.id, { key, passed: true })
+    if (res.data?.gate) activationGate.value = res.data.gate
+    $q.notify({ type: 'positive', message: 'Manual check recorded' })
+    await loadActivationGate()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Failed to record check',
+      timeout: 8000,
+    })
+  } finally {
+    checkBusy.value = ''
+  }
+}
+
+const proposeFinancialPlatform = async () => {
   if (!tenant.value) return
   $q.dialog({
-    title: 'Activate Financial Platform',
-    message: `Are you sure you want to provision Quasar financial capabilities for ${tenant.value.name}? This will allocate real-world ledger accounts.`,
+    title: 'Propose activation',
+    message: `This records you as maker for ${tenant.value.name}. A different admin must checker-approve before the platform is provisioned.`,
+    cancel: true,
+    persistent: true,
+    dark: true,
+    color: 'indigo-6',
+  }).onOk(async () => {
+    proposingPlatform.value = true
+    try {
+      const res = await adminApi.proposeFinancialPlatformActivation(tenant.value.id)
+      if (res.data?.gate) activationGate.value = res.data.gate
+      $q.notify({ type: 'positive', message: 'Activation proposed. A second admin must approve.' })
+    } catch (err) {
+      $q.notify({
+        type: 'negative',
+        message: err.response?.data?.error || 'Failed to propose activation',
+        timeout: 8000,
+      })
+    } finally {
+      proposingPlatform.value = false
+    }
+  })
+}
+
+const rejectFinancialPlatform = async () => {
+  if (!tenant.value) return
+  $q.dialog({
+    title: 'Reject activation proposal',
+    message: 'Reject this pending Activate Platform request?',
+    prompt: { model: '', type: 'text', label: 'Reason (optional)' },
+    cancel: true,
+    persistent: true,
+    dark: true,
+    color: 'red-5',
+  }).onOk(async (reason) => {
+    rejectingPlatform.value = true
+    try {
+      const res = await adminApi.rejectFinancialPlatformActivation(tenant.value.id, { reason })
+      if (res.data?.gate) activationGate.value = res.data.gate
+      $q.notify({ type: 'warning', message: 'Activation proposal rejected' })
+    } catch (err) {
+      $q.notify({
+        type: 'negative',
+        message: err.response?.data?.error || 'Failed to reject proposal',
+      })
+    } finally {
+      rejectingPlatform.value = false
+    }
+  })
+}
+
+const activateFinancialPlatform = async () => {
+  if (!tenant.value) return
+  if (!canCheckerActivate.value) {
+    $q.notify({
+      type: 'warning',
+      message: 'Complete CAC, direct-call phone, and address checks, then have a second admin approve.',
+      timeout: 7000,
+    })
+    return
+  }
+  $q.dialog({
+    title: 'Checker-approve activation',
+    message: `You are the checker. This will provision Quasar financial capabilities for ${tenant.value.name}.`,
     cancel: true,
     persistent: true,
     dark: true,

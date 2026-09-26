@@ -140,6 +140,8 @@ export const useFinanceStore = defineStore('finance', {
           unsweptVaFormatted: formatCurrency(execSummary.pendingVirtualAccountFunds || 0),
           unsweptCustomerVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.customer || 0),
           unsweptStaffVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.staff || 0),
+          unsweptStudentVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.student || 0),
+          unsweptParentVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.parent || 0),
           unsweptUnmappedVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.unmapped || 0),
           salesSummary: execSummary.salesSummary,
           studentMetrics: execSummary.studentMetrics,

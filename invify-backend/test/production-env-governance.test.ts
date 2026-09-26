@@ -21,9 +21,11 @@ describe('production env governance', () => {
     expect(isProductionEnvGovernor('other@example.com', 'super_admin')).toBe(false);
   });
 
-  test('default governor is the platform owner email when env list is empty', () => {
+  test('any super_admin can access when PRODUCTION_ENV_GOVERNORS is unset', () => {
     delete process.env.PRODUCTION_ENV_GOVERNORS;
-    expect(listGovernorEmails()).toEqual(['invifyd99@gmail.com']);
+    expect(listGovernorEmails()).toEqual([]);
+    expect(isProductionEnvGovernor('ops@invify.org', 'super_admin')).toBe(true);
+    expect(isProductionEnvGovernor('ops@invify.org', 'owner')).toBe(false);
   });
 
   test('secrets are masked and flags stay readable', () => {

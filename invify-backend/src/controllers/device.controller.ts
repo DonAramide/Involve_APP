@@ -5,6 +5,7 @@ import { LicenseGenerator } from '../utils/license.util';
 import { applyPaidLicenseToTenant, paidLicenseFromActivation } from '../utils/paid-license';
 import { GovAuditService } from '../services/gov-audit.service';
 import { authenticator } from 'otplib';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 function isNetworkTimeout(error: any): boolean {
   return (
@@ -31,15 +32,17 @@ export class DeviceController {
         role === 'internal_staff' ||
         role.startsWith('admin_');
 
+      const tenantScope = isPlatform ? null : resolveAuthoritativeTenantId(req);
+
       // 1. Fetch devices raw data (tenant-scoped for non-platform operators)
       const buildDeviceQuery = () => {
         let q = supabaseAdmin.from('devices').select('*');
-        if (!isPlatform) {
-          q = q.eq('tenant_id', user.tenantId);
+        if (tenantScope) {
+          q = q.eq('tenant_id', tenantScope);
         }
         return q;
       };
-      if (!isPlatform && !user?.tenantId) {
+      if (!isPlatform && !tenantScope) {
         return res.status(403).json({ error: 'Tenant context required' });
       }
       let { data: devices, error: devError } = await buildDeviceQuery().order('last_seen', { ascending: false });
@@ -51,8 +54,8 @@ export class DeviceController {
       if (devError) throw devError;
 
       let registrationQuery = supabaseAdmin.from('device_registrations').select('*');
-      if (!isPlatform) {
-        registrationQuery = registrationQuery.eq('tenant_id', user.tenantId);
+      if (tenantScope) {
+        registrationQuery = registrationQuery.eq('tenant_id', tenantScope);
       }
       const { data: registrations } = await registrationQuery;
 
@@ -967,11 +970,32 @@ export class DeviceController {
   static async getDeviceTelemetry(req: Request, res: Response) {
     try {
       const { deviceId } = req.params;
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform) {
+        const tenantId = resolveAuthoritativeTenantId(req);
+        const { data: owned, error: ownErr } = await supabase
+          .from('devices')
+          .select('device_id')
+          .eq('device_id', deviceId)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        if (ownErr) throw ownErr;
+        if (!owned) {
+          return res.status(404).json({ error: 'Device not found' });
+        }
+      }
+
       const { data, error } = await supabase.from('device_telemetry').select('*').eq('device_id', deviceId).order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
       return res.status(200).json(data);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      const status = error.status || 500;
+      return res.status(status).json({ error: error.message });
     }
   }
 
@@ -1060,6 +1084,127 @@ export class DeviceController {
     } catch (error: any) {
       console.error('[DeviceController] upgradeToCompany error:', error.message);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async sendCommand(req: Request, res: Response) {
+    try {
+      const rawId = String(req.params.deviceId || '').trim();
+      const action = String(req.body?.action || '').trim().toLowerCase();
+      const message = String(req.body?.message || '').trim();
+      const allowed = ['lock', 'unlock', 'notify', 'pull_sync'];
+      if (!rawId) return res.status(400).json({ error: 'deviceId is required' });
+      if (!allowed.includes(action)) {
+        return res.status(400).json({ error: `action must be one of ${allowed.join(', ')}` });
+      }
+      if (action === 'notify' && !message) {
+        return res.status(400).json({ error: 'message is required for notify' });
+      }
+
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform = role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_');
+      const tenantId = isPlatform
+        ? (req.body?.tenantId || user?.tenantId)
+        : resolveAuthoritativeTenantId(req);
+
+      const byDeviceId = await supabaseAdmin
+        .from('devices')
+        .select('*')
+        .eq('device_id', rawId)
+        .maybeSingle();
+      const byRowId = byDeviceId.data
+        ? byDeviceId
+        : await supabaseAdmin.from('devices').select('*').eq('id', rawId).maybeSingle();
+      let device = byRowId.data;
+      if (!device) {
+        const { data: registration } = await supabaseAdmin
+          .from('device_registrations')
+          .select('*')
+          .eq('device_id', rawId)
+          .maybeSingle();
+        if (registration) {
+          device = {
+            device_id: registration.device_id,
+            tenant_id: registration.tenant_id,
+            status: registration.status,
+          };
+        }
+      }
+      if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!isPlatform && String(device.tenant_id) !== String(tenantId)) {
+        return res.status(403).json({ error: 'This device is not in your workspace' });
+      }
+
+      const deviceKey = String(device.device_id || rawId);
+      const { io } = require('../app');
+      const room = `device:${deviceKey}`;
+      const tenantRoom = device.tenant_id ? `tenant:${device.tenant_id}` : null;
+      const emitBoth = (event: string, payload: any) => {
+        io.to(room).emit(event, payload);
+        if (tenantRoom) io.to(tenantRoom).emit(event, payload);
+      };
+      let passcode: string | undefined;
+
+      if (action === 'lock') {
+        passcode = String(req.body?.passcode || '').trim().toUpperCase();
+        if (!passcode) {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          passcode = '';
+          for (let i = 0; i < 6; i++) passcode += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        emitBoth('emergency_lock', { action: 'lock', passcode, deviceId: deviceKey });
+        try {
+          await supabaseAdmin.from('devices').update({ status: 'locked', updated_at: new Date().toISOString() }).eq('device_id', deviceKey);
+        } catch (_) { /* schema may not allow locked */ }
+      } else if (action === 'unlock') {
+        emitBoth('emergency_lock', { action: 'unlock', deviceId: deviceKey });
+        try {
+          await supabaseAdmin.from('devices').update({ status: 'active', updated_at: new Date().toISOString() }).eq('device_id', deviceKey);
+        } catch (_) { /* ignore */ }
+      } else if (action === 'notify') {
+        emitBoth('app_broadcast', {
+          message,
+          title: req.body?.title || 'Message from admin',
+          deviceId: deviceKey,
+          timestamp: new Date().toISOString(),
+        });
+      } else if (action === 'pull_sync') {
+        emitBoth('device_command', {
+          action: 'pull_sync',
+          deviceId: deviceKey,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: `TENANT_DEVICE_${action.toUpperCase()}`,
+          user_email: user?.email || 'unknown',
+          user_name: user?.email || 'tenant_admin',
+          ip_address: String(req.headers['x-forwarded-for'] || req.ip || '127.0.0.1').split(',')[0].trim(),
+          target: deviceKey,
+          status: 'success',
+          tenant_id: device.tenant_id,
+          metadata: { action, message: message || undefined },
+        });
+      } catch (_) { /* audit is best-effort */ }
+
+      return res.status(200).json({
+        success: true,
+        action,
+        deviceId: deviceKey,
+        onlineRoom: room,
+        passcode: passcode || undefined,
+        message: `Command ${action} sent to ${deviceKey}`,
+      });
+    } catch (error: any) {
+      const status = error.status || 500;
+      console.error('[DeviceController] sendCommand Error:', error.message);
+      return res.status(status).json({ error: error.message || 'Failed to send device command' });
     }
   }
 }

@@ -19,6 +19,14 @@
         </div>
       </div>
       <div class="col-auto q-gutter-sm">
+        <q-btn
+          outline
+          color="amber-4"
+          icon="pending_actions"
+          label="Pending Documents"
+          class="q-px-md"
+          to="/admin/kyc-pending"
+        />
         <q-btn 
           outline
           color="cyan-4" 

@@ -1799,6 +1799,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
           .toList();
 
       await repo.apiClient.post('/api/staff/bulk-sync', data: {'staff': payloads});
+      try {
+        await context.read<StaffBloc>().repository.pullCloudGovernance();
+      } catch (_) {}
     } catch (e) {
       debugPrint('Staff cloud sync skipped/failed: $e');
     }

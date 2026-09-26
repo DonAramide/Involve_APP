@@ -489,11 +489,16 @@ const toggleOperatorState = (row) => {
   const nextStatus = row.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
   $q.dialog({
     title: `${nextStatus === 'SUSPENDED' ? 'Suspend' : 'Reactivate'} Operator Account?`,
-    message: `Are you sure you want to transition ${row.name} to ${nextStatus} status?`,
+    message: `Are you sure you want to transition ${row.name} to ${nextStatus} status? This is pushed to POS devices immediately.`,
     cancel: true, dark: true
-  }).onOk(() => {
-    store.updateOperatorStatus(row.id, nextStatus)
-    $q.notify({ type: 'positive', message: `Operator account marked as ${nextStatus.toLowerCase()}.` })
+  }).onOk(async () => {
+    try {
+      await store.persistOperator(row.id, { status: nextStatus, isActive: nextStatus === 'ACTIVE' })
+      store.logAudit(`${nextStatus === 'SUSPENDED' ? 'Suspended' : 'Reactivated'} ${row.name}.`)
+      $q.notify({ type: 'positive', message: `${row.name} is now ${nextStatus.toLowerCase()} on web and mobile.` })
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e?.response?.data?.error || e?.message || 'Failed to update operator status' })
+    }
   })
 }
 
@@ -504,16 +509,21 @@ const resetOperatorPassword = (row) => {
   }
   $q.dialog({
     title: 'Reset Operator Auth Code / Password',
-    message: `Enter new 4-digit security code for ${row.name}:`,
+    message: `Enter new 4-digit security code for ${row.name}. Devices receive this PIN immediately.`,
     prompt: { model: '', type: 'password', maxLength: 4, filled: true, dark: true },
     cancel: true, dark: true
-  }).onOk((newCode) => {
+  }).onOk(async (newCode) => {
     if (!newCode || newCode.length !== 4 || isNaN(newCode)) {
       $q.notify({ type: 'negative', message: 'Auth code must be a 4-digit number.' })
       return
     }
-    store.logAudit(`Reset security auth code for ${row.staffId}.`)
-    $q.notify({ type: 'positive', message: `Auth code reset successfully for ${row.name}.` })
+    try {
+      await store.persistOperator(row.id, { authCode: newCode })
+      store.logAudit(`Reset security auth code for ${row.staffId || row.name}.`)
+      $q.notify({ type: 'positive', message: `Auth code reset for ${row.name}. Ask them to sign in again on the tablet.` })
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e?.response?.data?.error || e?.message || 'Failed to reset auth code' })
+    }
   })
 }
 
@@ -524,7 +534,7 @@ const changeOperatorRole = (row) => {
   }
   $q.dialog({
     title: 'Change Security Role',
-    message: `Choose a new role for ${row.name}:`,
+    message: `Choose a new role for ${row.name}. This updates POS permissions after they sign in again.`,
     options: {
       type: 'radio', model: row.role,
       items: [
@@ -534,13 +544,18 @@ const changeOperatorRole = (row) => {
       ]
     },
     cancel: true, dark: true
-  }).onOk((newRole) => {
-    store.updateOperatorRole(row.id, newRole)
-    $q.notify({ type: 'positive', message: `Security role for ${row.name} updated.` })
+  }).onOk(async (newRole) => {
+    try {
+      await store.persistOperator(row.id, { role: newRole })
+      store.logAudit(`Changed role for ${row.name} to ${newRole}.`)
+      $q.notify({ type: 'positive', message: `${row.name} is now ${newRole} on web and mobile.` })
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e?.response?.data?.error || e?.message || 'Failed to update role' })
+    }
   })
 }
 
-const provisionOperator = () => {
+const provisionOperator = async () => {
   if (activeUserRole.value === 'FINANCE') {
     $q.notify({ type: 'negative', message: 'Action Rejected: Finance Scope is read-only compliant.' })
     return
@@ -549,17 +564,21 @@ const provisionOperator = () => {
     $q.notify({ type: 'negative', message: 'Staff Name and Auth Code are required.' })
     return
   }
-  store.addOperator({
-    id: Date.now(),
-    name: newOperator.value.name,
-    staffId: newOperator.value.staffId || 'OPT-MEMBER',
-    phone: newOperator.value.phone || 'Unlinked',
-    role: newOperator.value.role,
-    status: 'ACTIVE'
-  })
-  $q.notify({ type: 'positive', message: `Staff profile for ${newOperator.value.name} created successfully.` })
-  showAddDialog.value = false
-  newOperator.value = { name: '', staffId: '', authCode: '', phone: '', role: 'STAFF' }
+  try {
+    await store.provisionOperator({
+      name: newOperator.value.name,
+      staffId: newOperator.value.staffId,
+      phone: newOperator.value.phone,
+      role: newOperator.value.role,
+      authCode: newOperator.value.authCode,
+    })
+    store.logAudit(`Provisioned ${newOperator.value.name} as ${newOperator.value.role}.`)
+    $q.notify({ type: 'positive', message: `Staff profile for ${newOperator.value.name} created and pushed to devices.` })
+    showAddDialog.value = false
+    newOperator.value = { name: '', staffId: '', authCode: '', phone: '', role: 'STAFF' }
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e?.response?.data?.error || e?.message || 'Failed to create staff' })
+  }
 }
 </script>
 

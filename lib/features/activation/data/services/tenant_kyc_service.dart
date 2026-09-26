@@ -20,13 +20,19 @@ class TenantKycService {
       },
     ));
     client.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
+      onRequest: (options, handler) async {
         if (AppConfig.supabaseInitialized) {
           final token = Supabase.instance.client.auth.currentSession?.accessToken;
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
         }
+        try {
+          final tenantId = await SecurityService().getTenantId();
+          if (tenantId != null && tenantId.isNotEmpty) {
+            options.headers['X-Tenant-ID'] = tenantId;
+          }
+        } catch (_) {}
         handler.next(options);
       },
     ));

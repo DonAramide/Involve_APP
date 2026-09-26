@@ -15,8 +15,9 @@ import {
 } from '../utils/sanitize-tenant-updates';
 import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { displayableDeviceId } from '../utils/device-identity';
+import { planNameFromIndex } from '../utils/paid-license';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
-import { putContaboObject, resolveContaboBucket, resolveContaboEndpoint } from '../utils/contabo-s3';
+import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
 import {
   sanitizeVerificationSearch,
   toVerificationLogRow,
@@ -1249,9 +1250,12 @@ export class AdminController {
       const certificates = (certRes.data || []).map((a: any) => ({
         code: a.activation_code,
         deviceId: a.device_id,
-        plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
+        plan_index: a.plan_index,
+        plan: String(planNameFromIndex(a.plan_index) || 'basic').toUpperCase(),
         duration: `${a.duration_days} Days`,
-        expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        expiry: a.expires_at
+          ? new Date(a.expires_at).toLocaleDateString()
+          : new Date(new Date(a.created_at).getTime() + Number(a.duration_days || 0) * 24 * 60 * 60 * 1000).toLocaleDateString(),
         status: a.is_used ? 'USED' : 'ACTIVE',
         createdBy: a.created_by || null,
         createdAt: a.created_at || null,
@@ -2593,18 +2597,7 @@ export class AdminController {
         contentType: file.mimetype || 'image/jpeg',
       });
 
-      let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
-      let fileUrl = '';
-      if (baseUrl) {
-        if (!baseUrl.endsWith('/')) baseUrl += '/';
-        fileUrl = `${baseUrl}${objectKey}`;
-      } else {
-        let endpointUrl = resolveContaboEndpoint();
-        if (!endpointUrl.endsWith('/')) endpointUrl += '/';
-        const storageTenant = (process.env.CONTABO_TENANT_ID || process.env.CONTABO_CUSTOMER_ID || '').trim();
-        const bucketPath = storageTenant && !bucket.includes(':') ? `${storageTenant}:${bucket}` : bucket;
-        fileUrl = `${endpointUrl}${bucketPath}/${objectKey}`;
-      }
+      const fileUrl = publicContaboObjectUrl(objectKey);
 
       const { data: tenant, error: readError } = await supabaseAdmin
         .from('tenants')
@@ -2622,6 +2615,7 @@ export class AdminController {
             cac_document_url: fileUrl,
             cac_uploaded_at: new Date().toISOString(),
           },
+          kyc_status: 'PENDING',
           updated_at: new Date().toISOString(),
         })
         .eq('id', tenantId);

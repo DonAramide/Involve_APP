@@ -21,7 +21,7 @@ export function classifyInvoicePaymentMethod(raw?: string | null): InvoiceRail {
 
   if (!method) return 'other';
   if (method === 'wallet' || method === 'customer_wallet') return 'wallet';
-  if (method === 'cash') return 'cash';
+  if (method === 'cash' || method.includes('cash')) return 'cash';
   if (method === 'card' || method === 'pos') return 'card';
   if (
     method === 'virtualaccount' ||

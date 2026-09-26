@@ -25,8 +25,19 @@ export function sandboxBalanceToNaira(account: any): number {
 }
 
 export function sumQuasarSandboxBalancesNaira(accounts: any[]): number {
+  const seen = new Set<string>();
   let total = 0;
   for (const account of accounts || []) {
+    const key = String(
+      account?.accountNumber ||
+        account?.account_number ||
+        account?.id ||
+        '',
+    ).trim();
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
     total += sandboxBalanceToNaira(account);
   }
   return roundNaira(total);

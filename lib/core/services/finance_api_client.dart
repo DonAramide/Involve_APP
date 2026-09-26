@@ -105,7 +105,16 @@ class PlanGatingInterceptor extends Interceptor {
     if (options.path.contains('/api/admin/register-device') ||
         options.path.contains('/public/lookup') ||
         options.path.contains('/api/license/verify') ||
-        options.path.contains('/api/auth/')) {
+        options.path.contains('/api/auth/') ||
+        options.path.contains('/api/school/bulk-sync') ||
+        options.path.contains('/api/school/payments/sync') ||
+        options.path.contains('/api/inventory/products/bulk-sync') ||
+        options.path.contains('/api/v1/crm/customers/bulk-sync') ||
+        options.path.contains('/api/staff/bulk-sync') ||
+        options.path.contains('/api/staff') ||
+        options.path.contains('/api/v1/finance/invoices/bulk-sync') ||
+        options.path.contains('/api/admin/claude-backup') ||
+        options.path.contains('/api/mobile/terminal/sync')) {
       return super.onRequest(options, handler);
     }
 

@@ -70,6 +70,15 @@ function hasPayoutAccount(row: any): boolean {
   return Boolean(String(row?.account_number || row?.accountNumber || '').trim());
 }
 
+function payoutResponse(row: any) {
+  const account_number = String(row?.account_number || row?.accountNumber || '').trim();
+  const account_name = String(row?.account_name || row?.accountName || '').trim();
+  const bank_name = String(row?.bank_name || row?.bankName || '').trim();
+  const bank_code = String(row?.bank_code || row?.bankCode || '').trim();
+  const settings = { account_number, account_name, bank_name, bank_code };
+  return { ...settings, settings };
+}
+
 export class PayoutController {
   private static getLocalSettingsPath() {
     return path.join(process.cwd(), 'tenant_payout_settings.json');
@@ -121,21 +130,27 @@ export class PayoutController {
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
-      if (error) throw error;
-      if (hasPayoutAccount(data)) return res.status(200).json(data);
+      if (error) {
+        console.warn('[PayoutController] payout_settings read skipped:', error.message);
+      } else if (hasPayoutAccount(data)) {
+        return res.status(200).json(payoutResponse(data));
+      }
 
-      const { data: tenant } = await supabaseAdmin
+      const { data: tenant, error: tenantError } = await supabaseAdmin
         .from('tenants')
         .select('settings')
         .eq('id', tenantId)
         .maybeSingle();
+      if (tenantError) {
+        console.warn('[PayoutController] tenants.settings payout read skipped:', tenantError.message);
+      }
       const fromTenant = (tenant?.settings as any)?.payout;
-      if (hasPayoutAccount(fromTenant)) return res.status(200).json(fromTenant);
+      if (hasPayoutAccount(fromTenant)) return res.status(200).json(payoutResponse(fromTenant));
 
       const localData = PayoutController.getLocalTenantSettings(tenantId);
-      if (hasPayoutAccount(localData)) return res.status(200).json(localData);
+      if (hasPayoutAccount(localData)) return res.status(200).json(payoutResponse(localData));
 
-      return res.status(200).json({});
+      return res.status(200).json({ settings: {} });
     } catch (error: any) {
       const status = error.status || 500;
       if (status !== 500) return res.status(status).json({ error: error.message });
@@ -143,9 +158,9 @@ export class PayoutController {
       try {
         const tenantId = resolveAuthoritativeTenantId(req);
         const localData = PayoutController.getLocalTenantSettings(tenantId);
-        if (hasPayoutAccount(localData)) return res.status(200).json(localData);
+        if (hasPayoutAccount(localData)) return res.status(200).json(payoutResponse(localData));
       } catch (_) { /* ignore */ }
-      return res.status(200).json({});
+      return res.status(200).json({ settings: {} });
     }
   }
 
@@ -173,20 +188,24 @@ export class PayoutController {
       };
       PayoutController.saveLocalTenantSettings(tenantId, payload);
 
+      let settingsSaved = false;
       try {
-        const { data: tenant } = await supabaseAdmin
+        const { data: tenant, error: readErr } = await supabaseAdmin
           .from('tenants')
           .select('settings')
           .eq('id', tenantId)
           .maybeSingle();
+        if (readErr) throw readErr;
         const existingSettings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {};
-        await supabaseAdmin
+        const { error: writeErr } = await supabaseAdmin
           .from('tenants')
           .update({
             settings: { ...existingSettings, payout: payload },
             updated_at: new Date().toISOString(),
           })
           .eq('id', tenantId);
+        if (writeErr) throw writeErr;
+        settingsSaved = true;
       } catch (settingsErr: any) {
         console.warn('[PayoutController] tenants.settings payout backup skipped:', settingsErr?.message || settingsErr);
       }
@@ -207,16 +226,19 @@ export class PayoutController {
         if (error) throw error;
         return res.status(200).json({
           success: true,
-          settings: { ...(data || {}), bank_name },
+          ...payoutResponse({ ...(data || {}), bank_name }),
         });
       } catch (error: any) {
         console.warn('[PayoutController] Supabase saveSettings failed. Saved to tenant settings / local cache:', error.message);
+        if (!settingsSaved) {
+          return res.status(500).json({ error: 'Could not persist bank account. Please try again.' });
+        }
         return res.status(200).json({
           success: true,
-          settings: {
+          ...payoutResponse({
             ...payload,
             updated_at: new Date().toISOString()
-          }
+          })
         });
       }
     } catch (error: any) {

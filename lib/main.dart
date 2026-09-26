@@ -477,11 +477,20 @@ class AppDependencies {
 
     // Register in GetIt for legacy sl access
     final sl = GetIt.instance;
+    if (!sl.isRegistered<AppDatabase>()) {
+      sl.registerSingleton<AppDatabase>(database);
+    }
+    if (!sl.isRegistered<OutboxWorker>()) {
+      sl.registerSingleton<OutboxWorker>(outboxWorker);
+    }
     if (!sl.isRegistered<FinanceRepository>()) {
       sl.registerSingleton<FinanceRepository>(financeRepoNew);
     }
     if (!sl.isRegistered<NotificationRepository>()) {
       sl.registerSingleton<NotificationRepository>(notificationRepo);
+    }
+    if (!sl.isRegistered<StaffRepositoryImpl>()) {
+      sl.registerSingleton<StaffRepositoryImpl>(staffRepository);
     }
     if (!sl.isRegistered<FinanceApiClient>()) {
       sl.registerSingleton<FinanceApiClient>(financeApiClient);

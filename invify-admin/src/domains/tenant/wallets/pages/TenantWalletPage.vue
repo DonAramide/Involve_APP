@@ -817,20 +817,18 @@ const maskedAccountNumber = computed(() => {
 async function loadTenantBankDetails() {
   try {
     const res = await adminApi.getTenantPayoutSettings()
-    if (res && res.data && res.data.account_number) {
+    const row = res?.data?.settings || res?.data || {}
+    const accountNumber = String(row.account_number || row.accountNumber || '').trim()
+    if (accountNumber) {
       bankDetails.value = {
-        bank_name: res.data.bank_name || '',
-        bank_code: res.data.bank_code || '',
-        account_number: res.data.account_number || '',
-        account_name: res.data.account_name || ''
+        bank_name: row.bank_name || row.bankName || '',
+        bank_code: row.bank_code || row.bankCode || '',
+        account_number: accountNumber,
+        account_name: row.account_name || row.accountName || ''
       }
-      // Populate form backup
       bankForm.value = { ...bankDetails.value }
-      
-      // Load bank list to match dropdown option
       loadBanksList()
     } else {
-      // Load bank list immediately if they don't have settings so options are ready
       loadBanksList()
     }
   } catch (err) {

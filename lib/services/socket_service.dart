@@ -16,6 +16,10 @@ import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_worker.dart';
+import 'package:involve_app/core/sync/domain/services/web_cloud_sync_service.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class SocketService {
@@ -218,6 +222,13 @@ class SocketService {
     _socket!.on('app_broadcast', (data) async {
       debugPrint('[SocketService] Broadcast received from server: $data');
       if (data != null && data['message'] != null) {
+        final targetDevice = (data['deviceId'] ?? data['device_id'])?.toString();
+        if (targetDevice != null &&
+            targetDevice.isNotEmpty &&
+            _lastDeviceId != null &&
+            targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+          return;
+        }
         _showBroadcastBanner(data['message']);
         
         // Save broadcast to history
@@ -280,8 +291,27 @@ class SocketService {
 
     _socket!.on('emergency_lock', (data) async {
       debugPrint('[SocketService] Emergency Lock received: $data');
-      if (data != null && data['passcode'] != null) {
-        final passcode = data['passcode'].toString();
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final targetDevice = (map['deviceId'] ?? map['device_id'])?.toString();
+      if (targetDevice != null &&
+          targetDevice.isNotEmpty &&
+          _lastDeviceId != null &&
+          targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+        return;
+      }
+      final action = map['action']?.toString() ?? 'lock';
+      if (action == 'unlock') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_emergency_locked', false);
+        await prefs.remove('emergency_lock_passcode');
+        final ctx = navigatorKey?.currentContext;
+        if (ctx != null) {
+          Navigator.of(ctx, rootNavigator: true).maybePop();
+        }
+        return;
+      }
+      if (map['passcode'] != null) {
+        final passcode = map['passcode'].toString();
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('emergency_lock_passcode', passcode);
@@ -290,6 +320,71 @@ class SocketService {
         if (navigatorKey?.currentContext != null) {
           showEmergencyLockScreen(navigatorKey!.currentContext!, passcode);
         }
+      }
+    });
+
+    _socket!.on('device_command', (data) async {
+      debugPrint('[SocketService] device_command received: $data');
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final targetDevice = (map['deviceId'] ?? map['device_id'])?.toString();
+      if (targetDevice != null &&
+          targetDevice.isNotEmpty &&
+          _lastDeviceId != null &&
+          targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+        return;
+      }
+      final action = map['action']?.toString() ?? '';
+      if (action == 'pull_sync') {
+        _showBroadcastBanner('Admin requested a data sync. Uploading records…');
+        try {
+          final sl = GetIt.instance;
+          if (sl.isRegistered<OutboxWorker>()) {
+            await sl.get<OutboxWorker>().triggerSync();
+          }
+          await WebCloudSyncService.pushSchoolRoster();
+          try {
+            final sl2 = GetIt.instance;
+            if (sl2.isRegistered<StaffRepositoryImpl>()) {
+              await sl2.get<StaffRepositoryImpl>().pullCloudGovernance();
+            }
+          } catch (e) {
+            debugPrint('[SocketService] staff governance pull failed: $e');
+          }
+          if (_lastDeviceId != null && _lastDeviceId!.isNotEmpty) {
+            await TerminalSyncService.syncTerminalConfig(deviceId: _lastDeviceId!);
+          }
+          _showBroadcastBanner('Records uploaded to the web portal.');
+        } catch (e) {
+          debugPrint('[SocketService] pull_sync failed: $e');
+          _showBroadcastBanner('Sync failed: $e');
+        }
+      }
+    });
+
+    _socket!.on('staff_governance', (data) async {
+      debugPrint('[SocketService] staff_governance received: $data');
+      try {
+        final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+        final raw = map['staff'];
+        final records = raw is List
+            ? raw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : <Map<String, dynamic>>[];
+        final sl = GetIt.instance;
+        if (!sl.isRegistered<StaffRepositoryImpl>()) return;
+        final repo = sl.get<StaffRepositoryImpl>();
+        final applied = records.isNotEmpty
+            ? await repo.applyCloudStaffRecords(records)
+            : await repo.pullCloudGovernance();
+        if (applied > 0) {
+          _showBroadcastBanner(
+            'Staff roles updated from the web portal. Sign in again to apply new permissions.',
+          );
+        }
+      } catch (e) {
+        debugPrint('[SocketService] staff_governance failed: $e');
       }
     });
 

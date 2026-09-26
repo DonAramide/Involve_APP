@@ -33,10 +33,14 @@ export function requireProductionEnvGovernor(req: Request, res: Response, next: 
 export class ProductionEnvController {
   static getSnapshot(req: Request, res: Response) {
     try {
+      const snap = productionEnvGovernance.snapshot();
       return res.status(200).json({
         confirmPhrase: APPLY_CONFIRM_PHRASE,
         selfApproveAllowed: true,
-        ...productionEnvGovernance.snapshot(),
+        actorEmail: actor(req).email,
+        actorRole: actor(req).role,
+        ...snap,
+        governors: snap.governors.length ? snap.governors : ['any super_admin'],
       });
     } catch (error: any) {
       return res.status(500).json({ error: error.message || 'Failed to read production env' });

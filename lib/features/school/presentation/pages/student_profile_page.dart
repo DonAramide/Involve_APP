@@ -15,6 +15,7 @@ import 'package:involve_app/features/printer/presentation/bloc/printer_state.dar
 import 'package:involve_app/features/school/domain/services/result_service.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
@@ -2465,6 +2466,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                 }
                               } else {
                                 // Cash
+                                if (paymentMethod == 'Cash') {
+                                  final authorised = await requireSystemAccess(
+                                    context,
+                                    purpose:
+                                        'Cash posting requires admin System Access. Enter the password to record this payment.',
+                                  );
+                                  if (authorised != true) return;
+                                }
                                 setState(() {
                                   _awaitingPaymentSuccess = true;
                                   _pendingPosTx = null;

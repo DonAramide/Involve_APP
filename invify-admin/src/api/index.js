@@ -118,12 +118,24 @@ export const adminApi = {
   pingMissingTenantIdentities: () => api.post('/api/admin/tenants/ping-missing-identity'),
   getVerificationLog: (params) => api.get('/api/admin/verification-log', { params }),
   getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
+  listPendingKycDocuments: (params) => api.get('/api/admin/kyc/documents', { params }),
+  reviewKycDocument: (id, data) => api.patch(`/api/admin/kyc/documents/${id}`, data),
+  uploadTenantKyc: (data) => api.post('/api/tenant/kyc/upload', data, {
+    timeout: 120000,
+  }),
   provisionVirtualAccount: (id) => api.post(`/api/admin/tenants/${id}/provision-virtual-account`),
   
   // Financial Platform Tenant Operations
   getFinancialPlatformHealth: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`),
   getFinancialPlatformAudit: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/audit`),
   activateFinancialPlatform: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/activate`),
+  getFinancialPlatformActivationGate: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/activation-gate`),
+  recordFinancialPlatformManualCheck: (tenantId, data) =>
+    api.post(`/api/v1/tenants/${tenantId}/financial-platform/manual-checks`, data),
+  proposeFinancialPlatformActivation: (tenantId) =>
+    api.post(`/api/v1/tenants/${tenantId}/financial-platform/propose-activation`),
+  rejectFinancialPlatformActivation: (tenantId, data) =>
+    api.post(`/api/v1/tenants/${tenantId}/financial-platform/reject-activation`, data),
   rotateFinancialPlatformCredentials: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/rotate`),
   changeFinancialPlatformVertical: (tenantId, data) =>
     api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data),
@@ -136,6 +148,10 @@ export const adminApi = {
   // Legacy alias kept for older builds
   getLedgerLegacy: (params) => api.get('/admin/ledger', { params }),
   getAuditLedger: (params) => api.get('/api/admin/audit/ledger', { params }),
+  getTenantAuditLogs: (params) => api.get('/api/admin/audit-logs', { params }),
+  getFinanceTransactionLedger: () => api.get('/api/finance/audit/ledger'),
+  getTenantAuditLogs: (params) => api.get('/api/admin/audit-logs', { params }),
+  getFinanceAuditLedger: (params) => api.get('/api/finance/audit/ledger', { params }),
   getPayments: (params) => api.get('/api/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),
   getAnalytics: () => api.get('/admin/analytics'),
@@ -176,6 +192,8 @@ export const adminApi = {
   initiatePayout: (data) =>
     api.post('/api/payout/withdraw', withClientTenantId(data)),
   getTenantStaff: () => api.get('/api/staff'),
+  createTenantStaff: (data) => api.post('/api/staff', data),
+  patchTenantStaff: (id, data) => api.patch(`/api/staff/${id}`, data),
   payStaffSalary: (id, data) => api.post(`/api/staff/${id}/pay-salary`, data),
   getUserDevices: (params) => api.get('/api/admin/user-devices', { params }),
   approveUserDevice: (id) => api.post('/api/admin/user-devices/approve', { id }),
@@ -255,6 +273,7 @@ export const deviceApi = {
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
   getDeviceTelemetry: (deviceId) => api.get(`/api/devices/${deviceId}/telemetry`),
   getDeviceAlerts: (deviceId) => api.get(`/api/devices/${deviceId}/alerts`),
+  sendDeviceCommand: (deviceId, data) => api.post(`/api/devices/${deviceId}/command`, data),
 };
 
 export const billingApi = {
@@ -266,6 +285,8 @@ export const financeApi = {
   getExecutiveSummary: () => api.get('/api/v1/finance/executive-summary'),
   getWalletBalance: () => api.get('/api/v1/wallet'),
   getWalletTransactions: () => api.get('/api/v1/wallet/transactions'),
+  getDailyRevenue: (params) => api.get('/api/finance/daily-revenue', { params }),
+  getSchoolTransactions: (params) => api.get('/api/finance/transactions', { params }),
   getPayoutStats: (headers) => api.get('/api/v1/finance/stats/payouts', { headers }),
   getInvoices: () => api.get('/api/v1/finance/invoices'),
   getInvoice: (id) => api.get(`/api/v1/finance/invoices/${id}`),
