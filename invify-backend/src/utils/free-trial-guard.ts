@@ -98,11 +98,23 @@ export async function rejectIfFreeTrialVa(
   return true;
 }
 
-/** Unprovisioned platform first — that is the actionable block for paid tablets. */
+/** Maker-checker approval, then a provisioned platform, then paid plan. */
 export async function rejectIfVaBlocked(
   res: import('express').Response,
   tenantId: string,
 ): Promise<boolean> {
+  const { loadActivationGate, virtualAccountGenerationBlockReason } = await import(
+    '../modules/financial-platform/activation/activation-gate'
+  );
+  const { gate } = await loadActivationGate(tenantId);
+  const reason = virtualAccountGenerationBlockReason(gate);
+  if (reason) {
+    res.status(403).json({
+      error: reason,
+      code: 'MAKER_CHECKER_REQUIRED',
+    });
+    return true;
+  }
   if (await rejectIfFinancialPlatformUnprovisioned(res, tenantId)) return true;
   if (await rejectIfFreeTrialVa(res, tenantId)) return true;
   return false;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
-import '../../domain/repositories/school_repository.dart';
 import '../../../invoicing/domain/entities/invoice.dart';
 import '../../../invoicing/domain/repositories/invoice_repository.dart';
 import '../../../invoicing/domain/services/invoice_calculation_service.dart';
@@ -13,6 +12,7 @@ import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/school/data/services/term_bill_email_service.dart';
 
 class FeeManagementPage extends StatefulWidget {
   const FeeManagementPage({super.key});
@@ -237,7 +237,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: _isGenerating 
-                            ? const Text('GENERATING BILLS...', style: TextStyle(fontWeight: FontWeight.bold)) 
+                            ? const Text('GENERATING & EMAILING BILLS...', style: TextStyle(fontWeight: FontWeight.bold)) 
                             : const Text('GENERATE BILLS FOR CLASS', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
@@ -264,7 +264,11 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Generate Bills?'),
-        content: Text('This will create invoices for ${studentsInClass.length} students. Total per student: ${CurrencyFormatter.formatWithSymbol(_selectedFees.fold(0, (sum, f) => sum + f.price.toInt()), symbol: '₦')}'),
+        content: Text(
+          'This will create invoices for ${studentsInClass.length} students '
+          '(${CurrencyFormatter.formatWithSymbol(_selectedFees.fold(0, (sum, f) => sum + f.price.toInt()), symbol: '₦')} per student).\n\n'
+          'Each parent with an email on file will receive their own bill, including a downloadable PDF.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
           ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('GENERATE')),
@@ -273,6 +277,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
     );
 
     if (confirm != true) return;
+    if (!context.mounted) return;
 
     setState(() => _isGenerating = true);
 
@@ -281,6 +286,12 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
       final calcService = InvoiceCalculationService();
       final activeYear = schoolState.activeYear;
       final activeTerm = schoolState.terms.where((t) => t.isActive).firstOrNull ?? schoolState.terms.firstOrNull;
+      final settings = context.read<SettingsBloc>().state.settings;
+      final className = schoolState.classes
+          .where((c) => c.id == _selectedClassId)
+          .map((c) => c.name)
+          .firstOrNull;
+      final generated = <Invoice>[];
 
       for (final student in studentsInClass) {
         final List<InvoiceItem> items = _selectedFees.map((f) => InvoiceItem(
@@ -310,9 +321,10 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
 
         final subtotal = calcService.calculateSubtotal(items);
         final total = subtotal; // Simplicity: No tax/discount for auto bills for now
+        final parent = TermBillEmailService.parentFor(student, schoolState.parents);
 
         final invoice = Invoice(
-          invoiceNumber: 'BILL-${student.admissionNumber ?? student.id}-${DateTime.now().millisecondsSinceEpoch}',
+          invoiceNumber: 'BILL-${student.admissionNumber.isNotEmpty ? student.admissionNumber : student.id}-${DateTime.now().millisecondsSinceEpoch}',
           dateCreated: DateTime.now(),
           items: items,
           subtotal: subtotal,
@@ -324,32 +336,70 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
           balanceAmount: total,
           customerName: student.fullName,
           customerPhone: student.parentPhone,
+          customerAddress: parent?.email ?? TermBillEmailService.parentEmail(student, schoolState.parents),
           businessMode: 'school',
           studentId: student.id,
           classId: student.classId,
           termId: activeTerm?.id,
           academicYearId: activeYear?.id,
           admissionNumber: student.admissionNumber,
-          className: schoolState.classes.firstWhere((c) => c.id == student.classId, orElse: () => schoolState.classes.first).name,
+          className: className ?? schoolState.classes.firstWhere((c) => c.id == student.classId, orElse: () => schoolState.classes.first).name,
           termName: activeTerm?.name,
           academicYearName: activeYear?.name,
           studentImage: student.image,
         );
 
         await invoiceRepo.saveInvoice(invoice);
+        generated.add(invoice);
       }
 
+      TermBillEmailResult? emailResult;
+      try {
+        emailResult = await TermBillEmailService.emailClassBills(
+          invoices: generated,
+          students: studentsInClass,
+          parents: schoolState.parents,
+          settings: settings,
+          term: activeTerm,
+          year: activeYear,
+          className: className,
+        );
+      } catch (e) {
+        debugPrint('Term bill email failed: $e');
+      }
+
+      if (!context.mounted) return;
       Navigator.pop(context);
       context.read<SchoolBloc>().add(LoadSchoolData());
+
+      final emailed = emailResult?.sent ?? 0;
+      final skipped = emailResult?.skipped ?? 0;
+      final failed = emailResult?.failed ?? 0;
+      String message = 'Generated ${generated.length} bills.';
+      if (emailed > 0) {
+        message += ' Emailed $emailed parent${emailed == 1 ? '' : 's'} with a downloadable PDF.';
+      }
+      if (skipped > 0) {
+        message += ' $skipped skipped (no parent email).';
+      }
+      if (failed > 0) {
+        message += ' $failed email${failed == 1 ? '' : 's'} failed.';
+      }
+      if (emailed == 0 && skipped == generated.length) {
+        message += ' Add parent emails to send bills automatically.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully generated ${studentsInClass.length} bills!')),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isGenerating = false);
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 }

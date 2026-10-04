@@ -90,11 +90,109 @@ export class WalletService {
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false });
         if (fallback.error) throw fallback.error;
-        return walletRows(fallback.data || []);
+        return this.withLedgerContext(walletRows(fallback.data || []));
       }
       throw error;
     }
-    return data;
+    return this.withLedgerContext(data || []);
+  }
+
+  private static async withLedgerContext(rows: any[]) {
+    const ids = [...new Set(rows.map((r) => r.ledger_id).filter(Boolean))];
+    if (!ids.length) return rows;
+    const { data: ledgers } = await supabaseAdmin
+      .from('ledgers')
+      .select('id, reference, metadata, idempotency_key')
+      .in('id', ids);
+    const byId = new Map((ledgers || []).map((l: any) => [l.id, l]));
+    return rows.map((row) => {
+      const ledger = byId.get(row.ledger_id);
+      return {
+        ...row,
+        reference: ledger?.reference || row.reference,
+        metadata: { ...(ledger?.metadata || {}), ...(row.metadata || {}) },
+        idempotency_key: ledger?.idempotency_key || row.idempotency_key,
+      };
+    });
+  }
+
+  /**
+   * Creates the tenant wallet row if payout/ledger RPCs would otherwise fail.
+   */
+  static async ensureWallet(tenantId: string, currency = 'NGN') {
+    if (!tenantId) return null;
+    const existing = await supabaseAdmin
+      .from('wallets')
+      .select('id, tenant_id, balance, currency')
+      .eq('tenant_id', tenantId)
+      .limit(1)
+      .maybeSingle();
+    if (existing.data) return existing.data;
+
+    const full = await supabaseAdmin
+      .from('wallets')
+      .insert({ tenant_id: tenantId, balance: 0, currency })
+      .select('id, tenant_id, balance, currency')
+      .maybeSingle();
+    if (!full.error && full.data) return full.data;
+
+    const slim = await supabaseAdmin
+      .from('wallets')
+      .insert({ tenant_id: tenantId, balance: 0 })
+      .select('id, tenant_id, balance')
+      .maybeSingle();
+    if (slim.error) {
+      const raced = await supabaseAdmin
+        .from('wallets')
+        .select('id, tenant_id, balance')
+        .eq('tenant_id', tenantId)
+        .limit(1)
+        .maybeSingle();
+      if (raced.data) return raced.data;
+      console.warn('[WalletService] ensureWallet failed:', slim.error.message || full.error?.message);
+      return null;
+    }
+    return slim.data;
+  }
+
+  /**
+   * Surface gross / fee / net so inbound is never shown as a single netted amount.
+   */
+  static presentWalletHistory(rows: any[]) {
+    const wallet = walletRows(rows || []);
+    const byRef = new Map<string, { gross: number; fee: number }>();
+    const transactions = wallet.map((row: any) => {
+      const amount = Number(row.amount) || 0;
+      const kind = entryKind(row);
+      const meta = row.metadata || {};
+      const reference = String(row.reference || meta.reference || row.ledger_id || '');
+      let presentationKind = 'OTHER';
+      if (kind === 'CREDIT') presentationKind = 'INBOUND_CREDIT';
+      else if (kind === 'DEBIT' && (String(row.account) === 'USER_WALLET' || !row.account)) {
+        presentationKind = String(meta.kind || '').includes('FEE') || String(meta.guard || '').includes('fee')
+          ? 'FEE_DEBIT'
+          : 'PAYOUT_PRINCIPAL';
+        if (String(row.idempotency_key || meta.idempotency_key || '').includes('ledger:fee:')) presentationKind = 'FEE_DEBIT';
+      }
+      const bucket = byRef.get(reference) || { gross: 0, fee: 0 };
+      if (presentationKind === 'INBOUND_CREDIT') bucket.gross += amount;
+      if (presentationKind === 'FEE_DEBIT') bucket.fee += amount;
+      byRef.set(reference, bucket);
+      return {
+        ...row,
+        presentation_kind: presentationKind,
+        signed_amount: WalletService.toSignedAmount(row),
+      };
+    });
+    const inbound = [...byRef.entries()]
+      .filter(([, v]) => v.gross > 0)
+      .map(([reference, v]) => ({
+        reference,
+        gross_amount: v.gross,
+        fee_amount: v.fee,
+        net_wallet_impact: v.gross - v.fee,
+      }));
+    return { transactions, inbound, outbound: [] as any[] };
   }
 
   static toSignedAmount(entry: LedgerRow): number {

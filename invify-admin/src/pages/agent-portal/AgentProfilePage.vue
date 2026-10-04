@@ -7,7 +7,7 @@
         <q-icon name="manage_accounts" size="sm" color="amber-4" />
         <div>
           <div class="text-operator-title text-weight-bold" style="font-size: 16px;">IDENTITY & SECURITY CENTER</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ profile?.agent_code || 'LOADING' }} // ACTIVE_PROFILE</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ profileCode || '—' }}<template v-if="profile?.status"> // {{ profile.status }}</template></div>
         </div>
       </div>
       <div>
@@ -27,10 +27,11 @@
       <!-- Desktop Sidebar / Mobile Accordion -->
       <div class="col-xs-12 col-md-3 bg-panel border-muted rounded-borders q-pa-md column shrink-0" style="max-height: 500px;">
         <div class="flex flex-center column q-mb-md">
-          <q-avatar size="100px" class="q-mb-sm border-muted shadow-2">
-            <img :src="profile?.profile?.photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
+          <q-avatar size="100px" color="amber-9" text-color="amber-2" class="q-mb-sm border-muted shadow-2">
+            <img v-if="profile?.profile?.photo_url || profile?.profile?.profile_photo_url" :src="profile?.profile?.photo_url || profile?.profile?.profile_photo_url" />
+            <span v-else>{{ profileInitials }}</span>
           </q-avatar>
-          <div class="text-h6 text-weight-bold">{{ profile?.first_name }} {{ profile?.last_name }}</div>
+          <div class="text-h6 text-weight-bold">{{ profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() }}</div>
           <div class="text-caption text-muted">{{ profile?.email }}</div>
           <div class="text-caption text-amber-4 q-mt-xs">{{ profile?.territory || 'Unassigned Territory' }}</div>
           
@@ -169,10 +170,10 @@
             </div>
             <div class="q-pa-lg row items-center op-gap-16">
               <q-avatar size="100px" class="shadow-2 border-muted">
-                <img :src="profile?.profile?.photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
+                <img :src="profile?.profile?.photo_url || profile?.profile?.profile_photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
               </q-avatar>
               <div class="column flex-1">
-                <div class="text-h5 text-weight-bold">{{ profile?.first_name }} {{ profile?.last_name }}</div>
+                <div class="text-h5 text-weight-bold">{{ profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() }}</div>
                 <div class="text-caption text-amber-4 text-uppercase">Field Agent</div>
                 <div class="text-metric-mono text-muted q-mt-sm" style="font-size: 11px;">
                   <div>ID: {{ profile?.agent_code }}</div>
@@ -226,13 +227,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import QrcodeVue from 'qrcode.vue'
+import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
 const saving = ref(false)
@@ -246,6 +249,15 @@ const mfaSetupData = ref({})
 const mfaVerifyCode = ref('')
 
 const activeTab = ref('personal')
+const profileCode = computed(() =>
+  pickInstituteCode(profile.value?.agent_code, profile.value?.agentCode),
+)
+
+const profileInitials = computed(() => {
+  const name = profile.value?.name || `${profile.value?.first_name || ''} ${profile.value?.last_name || ''}`.trim() || profile.value?.email || ''
+  const parts = String(name).split(/\s+/).filter(Boolean)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase() || '?'
+})
 
 const formData = ref({
   first_name: '',
@@ -271,33 +283,40 @@ const fetchProfileData = async () => {
   try {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
-      router.push('/agent/login')
+      router.push('/institute/login')
       return
     }
+    try {
+      const stored = JSON.parse(localStorage.getItem('invify_agent_info') || 'null')
+      if (stored) profile.value = stored
+    } catch { /* ignore */ }
 
     const headers = { Authorization: `Bearer ${token}` }
-    
-    const [pRes, kycRes, secRes, qrRes] = await Promise.all([
+    const [pRes, kycRes, secRes, qrRes] = await Promise.allSettled([
       axios.get('/api/agent/profile', { headers }),
       axios.get('/api/agent/profile/kyc', { headers }),
       axios.get('/api/agent/security/sessions', { headers }),
-      axios.get('/api/agent/profile/id-card', { headers })
+      axios.get('/api/agent/profile/id-card', { headers }),
     ])
 
-    profile.value = pRes.data.data
-    kycDocs.value = kycRes.data.data || []
-    sessions.value = secRes.data.data?.history || []
-    qrData.value = qrRes.data.data || {}
+    if (pRes.status === 'fulfilled' && pRes.value.data?.data) {
+      profile.value = pRes.value.data.data
+    }
+    kycDocs.value = kycRes.status === 'fulfilled' ? (kycRes.value.data.data || []) : []
+    sessions.value = secRes.status === 'fulfilled' ? (secRes.value.data.data?.history || []) : []
+    qrData.value = qrRes.status === 'fulfilled' ? (qrRes.value.data.data || {}) : {}
 
-    // Populate form
     formData.value = {
-      first_name: profile.value.first_name || '',
-      last_name: profile.value.last_name || '',
-      email: profile.value.email || '',
-      phone_number: profile.value.phone_number || '',
-      residential_address: profile.value.profile?.residential_address || ''
+      first_name: profile.value?.first_name || '',
+      last_name: profile.value?.last_name || '',
+      email: profile.value?.email || '',
+      phone_number: profile.value?.phone_number || profile.value?.phone || '',
+      residential_address: profile.value?.profile?.residential_address || profile.value?.profile?.address || '',
     }
 
+    if (pRes.status === 'rejected') {
+      $q.notify({ type: 'negative', message: 'Failed to load profile data' })
+    }
   } catch (err) {
     console.error(err)
     $q.notify({ type: 'negative', message: 'Failed to load profile data' })
@@ -306,15 +325,19 @@ const fetchProfileData = async () => {
   }
 }
 
-onMounted(fetchProfileData)
+onMounted(() => {
+  if (String(route.query.tab || '') === 'security') activeTab.value = 'security'
+  fetchProfileData()
+})
 
 const updateProfile = async () => {
   saving.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.patch('/api/agent/profile', formData.value, {
+    const res = await axios.patch('/api/agent/profile', formData.value, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    if (res.data?.data) profile.value = res.data.data
     $q.notify({ type: 'positive', message: 'Profile updated successfully' })
     await fetchProfileData()
   } catch (err) {
@@ -408,24 +431,39 @@ const changePassword = async () => {
 
 const toggleMfa = async () => {
   const isEnabled = profile.value?.profile?.mfa_enabled
-  const endpoint = isEnabled ? '/api/agent/security/mfa/disable' : '/api/agent/security/mfa/enable'
-  
+  if (isEnabled) {
+    $q.dialog({
+      title: 'Disable 2FA',
+      message: 'Enter the current 6-digit authenticator code to disable 2FA.',
+      prompt: { model: '', type: 'text' },
+      cancel: true,
+      persistent: true,
+      dark: true,
+    }).onOk(async (code) => {
+      try {
+        const token = localStorage.getItem('invify_agent_token')
+        await axios.post('/api/agent/security/mfa/disable', { code }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        $q.notify({ type: 'positive', message: '2FA disabled' })
+        await fetchProfileData()
+      } catch (err) {
+        $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Failed to disable 2FA' })
+      }
+    })
+    return
+  }
+
   try {
     const token = localStorage.getItem('invify_agent_token')
-    const res = await axios.post(endpoint, {}, {
+    const res = await axios.post('/api/agent/security/mfa/enable', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    
-    if (isEnabled) {
-      $q.notify({ type: 'positive', message: 'MFA Disabled' })
-      await fetchProfileData()
-    } else {
-      mfaSetupData.value = res.data
-      mfaVerifyCode.value = ''
-      showMfaModal.value = true
-    }
+    mfaSetupData.value = res.data
+    mfaVerifyCode.value = ''
+    showMfaModal.value = true
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to update MFA settings' })
+    $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Failed to start 2FA setup' })
   }
 }
 
@@ -436,11 +474,11 @@ const verifyMfa = async () => {
     await axios.post('/api/agent/security/mfa/verify', { code: mfaVerifyCode.value }, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    $q.notify({ type: 'positive', message: 'MFA Enabled & Verified' })
+    $q.notify({ type: 'positive', message: '2FA enabled' })
     showMfaModal.value = false
     await fetchProfileData()
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Invalid verification code' })
+    $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Invalid verification code' })
   } finally {
     saving.value = false
   }

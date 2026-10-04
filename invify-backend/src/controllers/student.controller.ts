@@ -25,12 +25,21 @@ export class StudentController {
         return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       }
 
+      // Fee lines and local school ids are not cloud student UUIDs.
+      // Returning null lets the ledger open instead of failing the whole page.
+      if (!isUuid(studentId)) {
+        return res.status(200).json(null);
+      }
+
       if (await rejectIfVaBlocked(res, tenantId)) return;
 
       const virtualAccount = await StudentService.getOrCreateVirtualAccount(studentId, tenantId);
       
       return res.status(200).json(virtualAccount);
     } catch (error: any) {
+      if (error?.code === 'MAKER_CHECKER_REQUIRED') {
+        return res.status(403).json({ error: error.message, code: 'MAKER_CHECKER_REQUIRED' });
+      }
       console.error('[StudentController] getVirtualAccount Error:', error.message);
       return res.status(500).json({ error: "Failed to provision virtual account" });
     }
@@ -265,6 +274,9 @@ export class StudentController {
         quasarChildId,
       });
     } catch (error: any) {
+      if (error?.code === 'MAKER_CHECKER_REQUIRED') {
+        return res.status(403).json({ error: error.message, code: 'MAKER_CHECKER_REQUIRED' });
+      }
       console.error('[StudentController] provisionStudentVirtualAccount Error:', error.message);
       const msg = String(error.message || '');
       if (/econnrefused|connection refused/i.test(msg)) {

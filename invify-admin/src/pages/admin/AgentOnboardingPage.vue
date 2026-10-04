@@ -3,7 +3,14 @@
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="admin_panel_settings" size="sm" color="cyan-3" />
-        <div class="text-operator-title text-weight-bold" style="font-size: 14px;">AGENT GOVERNANCE & ONBOARDING</div>
+        <div class="text-operator-title text-weight-bold" style="font-size: 14px;">INSTITUTE GOVERNANCE & ONBOARDING</div>
+      </div>
+      <div class="row items-center op-gap-8">
+        <span class="text-caption text-muted">Institute portal</span>
+        <code class="text-amber-4 text-caption">{{ institutePortalUrl }}</code>
+        <q-btn flat dense size="sm" icon="content_copy" color="cyan-3" @click="copyPortalUrl">
+          <q-tooltip>Copy Institute login URL</q-tooltip>
+        </q-btn>
       </div>
     </div>
 
@@ -11,7 +18,7 @@
       <!-- Agent Directory (Full Width) -->
       <div class="col-12 column border-muted rounded-borders bg-panel overflow-hidden">
         <div class="panel-header bg-panel-darker q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
-          <span class="text-operator-title text-weight-bold">Active Agent Roster</span>
+          <span class="text-operator-title text-weight-bold">Active Institute Roster</span>
           <div class="row items-center op-gap-8">
             <q-btn dense outline color="cyan-3" label="PROVISION NEW AGENT" size="sm" @click="showProvisionDialog = true" class="text-weight-bold q-px-sm" :disable="!schemaAvailable" />
             <q-btn dense flat size="sm" color="cyan-3" icon="refresh" @click="fetchAgents" :loading="loadingList" />
@@ -24,7 +31,7 @@
           <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
             <thead class="bg-panel-darker text-muted text-metric-mono text-weight-bold border-bottom sticky-header" style="font-size: 10px;">
               <tr>
-                <th class="q-pa-xs">Agent Code</th>
+                <th class="q-pa-xs">Institute Code</th>
                 <th class="q-pa-xs">Name</th>
                 <th class="q-pa-xs">KYC Status</th>
                 <th class="q-pa-xs">Profile Status</th>
@@ -69,7 +76,7 @@
     <q-dialog v-model="showProvisionDialog" persistent backdrop-filter="blur(4px)">
       <q-card class="bg-panel border-muted font-inter text-main" style="width: 500px; max-width: 90vw;">
         <q-card-section class="row items-center q-pb-none border-bottom bg-panel-darker">
-          <div class="text-weight-bold text-subtitle1">Provision New Agent</div>
+          <div class="text-weight-bold text-subtitle1">Provision New Institute</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
@@ -90,9 +97,9 @@
             <q-file v-model="idCardFile" dark filled dense label="Upload Government ID" accept="image/*,application/pdf" class="bg-panel-darker text-caption" required>
               <template v-slot:prepend><q-icon name="badge" /></template>
             </q-file>
-            <q-input v-model="newAgent.agentCode" dark filled dense label="Agent Code" class="bg-panel-darker text-caption" maxlength="6" hint="Auto-generated from phone number" />
+            <q-input v-model="newAgent.agentCode" dark filled dense label="Institute Code" class="bg-panel-darker text-caption" maxlength="6" hint="Auto-generated from phone number" />
             
-            <q-btn type="submit" dense color="cyan-3" text-color="black" label="Provision Agent & Verify KYC" :loading="loading" class="q-mt-md text-weight-bold full-width" />
+            <q-btn type="submit" dense color="cyan-3" text-color="black" label="Provision Institute & Verify KYC" :loading="loading" class="q-mt-md text-weight-bold full-width" />
           </q-form>
         </q-card-section>
       </q-card>
@@ -102,7 +109,7 @@
     <q-dialog v-model="showSuspendDialog" persistent backdrop-filter="blur(4px)">
       <q-card class="bg-panel border-muted font-inter text-main" style="width: 450px; max-width: 90vw;">
         <q-card-section class="row items-center q-pb-none border-bottom bg-panel-darker">
-          <div class="text-weight-bold text-subtitle1 text-red-4">Suspend Agent</div>
+          <div class="text-weight-bold text-subtitle1 text-red-4">Suspend Institute</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
@@ -163,7 +170,7 @@
         <q-card-section class="row items-center justify-between bg-panel-darker border-bottom shrink-0 q-pa-sm">
           <div class="row items-center op-gap-8">
             <q-btn icon="close" flat round dense v-close-popup size="sm" />
-            <div class="text-weight-bold text-subtitle2">Agent Profile Inspector</div>
+            <div class="text-weight-bold text-subtitle2">Institute Profile Inspector</div>
           </div>
           <template v-if="selectedAgent">
             <q-btn v-if="selectedAgent.status === 'PENDING_APPROVAL'" :loading="loadingStatus" dense size="sm" 
@@ -172,7 +179,7 @@
             <q-btn v-else :loading="loadingStatus" dense size="sm" 
                    :color="selectedAgent.status === 'SUSPENDED' ? 'green-10' : 'red-10'"
                    :text-color="selectedAgent.status === 'SUSPENDED' ? 'green-2' : 'red-2'"
-                   :label="selectedAgent.status === 'SUSPENDED' ? 'REACTIVATE AGENT' : 'SUSPEND AGENT'" 
+                   :label="selectedAgent.status === 'SUSPENDED' ? 'REACTIVATE INSTITUTE' : 'SUSPEND INSTITUTE'" 
                    @click="toggleAgentStatus" class="text-weight-bold q-px-sm" />
           </template>
         </q-card-section>
@@ -244,9 +251,10 @@
 
               <!-- Messaging Actions -->
               <div class="row op-gap-8">
-                <q-btn outline color="cyan-3" label="Message Agent" icon="send" size="sm" class="col" @click="promptMessageAgent" />
+                <q-btn outline color="cyan-3" label="Message Institute" icon="send" size="sm" class="col" @click="promptMessageAgent" />
                 <q-btn outline color="amber-4" label="Broadcast to Tenants" icon="campaign" size="sm" class="col" @click="promptMessageTenants" />
               </div>
+              <q-btn outline color="teal-3" label="Resend Invite (Set-Password Email)" icon="mark_email_unread" size="sm" class="full-width q-mt-sm" :loading="resendingInvite" @click="resendInvite" />
             </div>
 
             <!-- Onboarded Tenants Section -->
@@ -288,13 +296,21 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useQuasar } from 'quasar'
+import { useQuasar, copyToClipboard } from 'quasar'
 import axios from '../../api'
 import { useCurrency } from '../../composables/useCurrency'
 
 const $q = useQuasar()
 const { currentCurrency } = useCurrency()
-
+const institutePortalUrl = `${window.location.origin}/institute/login`
+const copyPortalUrl = async () => {
+  try {
+    await copyToClipboard(institutePortalUrl)
+    $q.notify({ type: 'positive', message: 'Institute portal URL copied', position: 'top-right' })
+  } catch {
+    $q.notify({ type: 'negative', message: 'Could not copy URL', position: 'top-right' })
+  }
+}
 const agents = ref([])
 const loading = ref(false)
 const loadingList = ref(false)
@@ -422,7 +438,7 @@ const onboardAgent = async () => {
     if (idCardFile.value) idCard = await toBase64(idCardFile.value)
 
     const token = localStorage.getItem('invify_access_token')
-    await axios.post('/api/admin/agents/onboard', {
+    const res = await axios.post('/api/admin/agents/onboard', {
       name: newAgent.value.name,
       email: newAgent.value.email,
       phone: newAgent.value.phone,
@@ -435,7 +451,13 @@ const onboardAgent = async () => {
       headers: { Authorization: `Bearer ${token}` }
     })
     
-    $q.notify({ type: 'positive', message: `Agent ${code} provisioned successfully`, position: 'top-right' })
+    const provisionedCode = res.data?.agent?.agentCode || code
+    $q.notify({
+      type: res.data?.welcomeEmailSent === false ? 'warning' : 'positive',
+      message: `Agent ${provisionedCode} provisioned. ${res.data?.message || ''}`.trim(),
+      position: 'top-right',
+      timeout: 8000
+    })
     newAgent.value.name = ''
     newAgent.value.email = ''
     newAgent.value.phone = ''
@@ -589,6 +611,24 @@ const openIdCard = (idCard) => {
   const newTab = window.open()
   if (newTab) {
     newTab.document.write(`<iframe src="${idCard}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`)
+  }
+}
+
+const resendingInvite = ref(false)
+const resendInvite = async () => {
+  if (!selectedAgent.value?.id) return
+  resendingInvite.value = true
+  try {
+    const token = localStorage.getItem('invify_token') || localStorage.getItem('invify_access_token')
+    const res = await axios.post(`/api/admin/agents/${selectedAgent.value.id}/resend-invite`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    $q.notify({ type: 'positive', message: res.data?.message || 'Invitation email re-sent', position: 'top-right' })
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Resend failed: ${msg}`, position: 'top-right' })
+  } finally {
+    resendingInvite.value = false
   }
 }
 

@@ -12,6 +12,68 @@ import {
 } from '../utils/virtual-account-funds';
 import { WalletService } from '../services/wallet.service';
 import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
+import {
+  isQuasarCreditEntry,
+  quasarEntryTimestamp,
+  quasarLedgerAmountNaira,
+  quasarLedgerReference,
+  QUASAR_RESYNC_DAYS,
+  selectQuasarResyncEntries,
+} from '../utils/quasar-resync';
+
+/** Configured fee in naira, kept to kobo. 102 kobo is ₦1.02. */
+function feeNairaFromKobo(finalFeeKobo: number): number {
+  const kobo = Number(finalFeeKobo);
+  if (!Number.isFinite(kobo) || kobo <= 0) return 0;
+  return Number((Math.round(kobo) / 100).toFixed(2));
+}
+
+/** Fee debits that already posted. The credit feed only stores the gross Quasar amount. */
+async function postedInwardFeeLines(tenantId: string, limit: number) {
+  try {
+    const { data: posted, error } = await supabaseAdmin
+      .from('fee_posting_outbox')
+      .select('assessment_id')
+      .eq('tenant_id', tenantId)
+      .eq('kind', 'FEE_ASSESSMENT_POST')
+      .eq('status', 'DONE')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error || !posted?.length) return [];
+    const ids = [...new Set(posted.map((row: { assessment_id?: string }) => row.assessment_id).filter(Boolean))];
+    if (!ids.length) return [];
+    const { data: assessments, error: assessErr } = await supabaseAdmin
+      .from('fee_assessments')
+      .select('id, transaction_type, final_fee_kobo, created_at')
+      .in('id', ids);
+    if (assessErr || !assessments?.length) return [];
+    const lines = [];
+    for (const row of assessments) {
+      if (row.transaction_type !== 'VIRTUAL_ACCOUNT_INWARD_TRANSFER') continue;
+      const naira = feeNairaFromKobo(Number(row.final_fee_kobo || 0));
+      if (!(naira > 0)) continue;
+      lines.push({
+        id: `fee-${row.id}`,
+        wallet_id: 'fee',
+        amount: -naira,
+        type: 'debit',
+        reference: `fee-${String(row.id).slice(0, 8)}`,
+        description: 'Inward transfer fee',
+        balance_after: 0,
+        channel: 'Fee',
+        created_at: row.created_at,
+        metadata: {
+          student_name: 'Inward transfer fee',
+          fee: true,
+        },
+      });
+    }
+    return lines;
+  } catch (err: any) {
+    console.warn('[ExecutiveFinance] inward fee lines skipped:', err?.message || err);
+    return [];
+  }
+}
 
 export class ExecutiveFinanceController {
   /**
@@ -51,19 +113,19 @@ export class ExecutiveFinanceController {
         staffVaRes,
         studentVaRes,
       ] = await Promise.all([
-        supabaseAdmin.from('wallets').select('id, balance').eq('tenant_id', tenantId).maybeSingle(),
+        supabaseAdmin.from('wallets').select('id, balance').eq('tenant_id', tenantId).limit(1).maybeSingle(),
         invoiceQuery,
         supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, payment_status, total_amount, created_at').eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
         supabaseAdmin
           .from('transactions_log')
-          .select('amount, type, reference, metadata')
+          .select('id, amount, type, reference, created_at, metadata')
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT']),
         supabaseAdmin
           .from('transactions_log')
-          .select('amount, type, reference, metadata')
+          .select('id, amount, type, reference, created_at, metadata')
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['SWEEP', 'DEBIT', 'WITHDRAWAL']),
@@ -89,6 +151,9 @@ export class ExecutiveFinanceController {
       ]);
 
       const wallet = walletRes.data;
+      if (!wallet) {
+        await WalletService.ensureWallet(tenantId);
+      }
       let derivedWalletBalance = Number(wallet?.balance || 0);
       try {
         const derived = await WalletService.getBalance(tenantId);
@@ -173,17 +238,28 @@ export class ExecutiveFinanceController {
         if (rail === 'card') totalQuasarFromCardInvoices += collected;
       }
 
-      // Live Quasar VA / webhook deposits (dedupe by reference)
+      // Live Quasar VA / webhook deposits (dedupe by reference AND same VA+amount in a 2-minute window)
       const seenCreditRefs = new Set<string>();
       let totalQuasarFromDeposits = 0;
       for (const tx of (quasarCredits || [])) {
-        const ref = String(tx.reference || '').trim();
-        if (ref) {
-          if (seenCreditRefs.has(ref)) continue;
-          seenCreditRefs.add(ref);
-        }
         const amount = transactionAmountNaira(tx);
-        if (amount > 0) totalQuasarFromDeposits += amount;
+        if (!(amount > 0)) continue;
+        const va = String(
+          tx?.metadata?.virtualAccountNumber ||
+            tx?.metadata?.accountNumber ||
+            tx?.metadata?.virtual_account_number ||
+            '',
+        ).trim();
+        const ref = String(tx.reference || tx.id || '').trim();
+        const ts = Date.parse(String(tx.created_at || ''));
+        const bucket = Number.isFinite(ts) ? Math.floor(ts / 120000) : String(tx.created_at || '');
+        const keys = [
+          ref ? `ref:${ref}` : '',
+          `fuzzy:${va || 'NOVA'}:${amount}:${bucket}`,
+        ].filter(Boolean);
+        if (keys.some((k) => seenCreditRefs.has(k))) continue;
+        keys.forEach((k) => seenCreditRefs.add(k));
+        totalQuasarFromDeposits += amount;
       }
 
       const totalQuasarRemitted = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
@@ -212,15 +288,38 @@ export class ExecutiveFinanceController {
         parentVas,
       });
       let pendingVirtualAccountFunds = unsweptVa.total;
+      let quasarLiveBalance: number | null = null;
       try {
-        const sandboxAccounts = await QfsQuasarBridgeService.listAccounts(tenantId);
-        const quasarLive = sumQuasarSandboxBalancesNaira(sandboxAccounts || []);
-        // Prefer Quasar's live VA total when Invify's log still has truncated naira (2.50 → 2).
-        if (quasarLive > pendingVirtualAccountFunds + 0.009) {
-          pendingVirtualAccountFunds = quasarLive;
+        const sandboxAccounts = await Promise.race([
+          QfsQuasarBridgeService.listAccounts(tenantId),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Quasar live VA timed out')), 4000),
+          ),
+        ]);
+        if (Array.isArray(sandboxAccounts) && sandboxAccounts.length > 0) {
+          quasarLiveBalance = sumQuasarSandboxBalancesNaira(sandboxAccounts);
         }
       } catch (err: any) {
         console.warn('[ExecutiveFinance] Quasar live VA total unavailable:', err?.message || err);
+      }
+      const invifyLoggedVa = roundNaira(pendingVirtualAccountFunds);
+      // Quasar is source of truth for what is actually sitting at the PSP.
+      // Invify > Quasar means double-posting (tablet sync + webhook) and needs investigation.
+      // Quasar > Invify is fine — credits not yet in Invify.
+      let quasarBalanceStatus: 'ok' | 'quasar_ahead' | 'invify_overstated' = 'ok';
+      if (quasarLiveBalance != null && Number.isFinite(quasarLiveBalance)) {
+        if (invifyLoggedVa > quasarLiveBalance + 0.009) {
+          quasarBalanceStatus = 'invify_overstated';
+          pendingVirtualAccountFunds = quasarLiveBalance;
+          console.warn(
+            `[ExecutiveFinance] Invify VA log ₦${invifyLoggedVa} > live Quasar ₦${quasarLiveBalance} for tenant ${tenantId} — investigate double sync`,
+          );
+        } else if (quasarLiveBalance > invifyLoggedVa + 0.009) {
+          quasarBalanceStatus = 'quasar_ahead';
+          pendingVirtualAccountFunds = quasarLiveBalance;
+        } else {
+          pendingVirtualAccountFunds = quasarLiveBalance;
+        }
       }
       pendingVirtualAccountFunds = roundNaira(pendingVirtualAccountFunds);
       // Held is money still sitting at Quasar now (unswept VA + unremitted card).
@@ -272,7 +371,7 @@ export class ExecutiveFinanceController {
 
       return res.status(200).json({
         walletBalance: derivedWalletBalance,
-        totalCollected: allTimeCollected + totalQuasarFromDeposits,
+        totalCollected: allTimeCollected,
         revenueInRange: totalCollected,
         /** All-time Quasar inflows (VA deposits + card invoices). Own-bank transfers excluded. */
         totalQuasarCollected,
@@ -282,6 +381,9 @@ export class ExecutiveFinanceController {
         pendingQuasarRemittance,
         /** VA credits not yet swept into tenant wallet (already on a customer or staff VA) */
         pendingVirtualAccountFunds,
+        quasarLiveBalance: quasarLiveBalance == null ? null : roundNaira(quasarLiveBalance),
+        invifyLoggedVa,
+        quasarBalanceStatus,
         unsweptVirtualAccount: {
           total: unsweptVa.total,
           customer: unsweptVa.customer,
@@ -342,9 +444,10 @@ export class ExecutiveFinanceController {
     }
     const sales = payload.salesSummary || {};
     const card = Number(sales.card || 0);
-    const invoiceVa = Number(sales.vaTransfer || 0);
-    const liveVa = Number(payload.pendingVirtualAccountFunds || 0);
-    const vaTransfer = Math.max(invoiceVa, liveVa);
+    const liveVa =
+      payload.quasarLiveBalance != null && Number.isFinite(Number(payload.quasarLiveBalance))
+        ? Number(payload.quasarLiveBalance)
+        : Number(payload.pendingVirtualAccountFunds || 0);
     return res.status(200).json({
       ...payload,
       totalRevenue: payload.totalCollected,
@@ -354,10 +457,11 @@ export class ExecutiveFinanceController {
       totalStudents: payload.studentMetrics?.total || 0,
       lastUpdated: new Date().toISOString(),
       cardCollected: card,
-      vaTransferCollected: vaTransfer,
+      /** Live Quasar VA sitting at the PSP — not Invify's possibly doubled tx log. */
+      vaTransferCollected: liveVa,
       cashCollected: Number(sales.cash || 0),
-      /** Quasar on this page is collectively card (POS) + VA transfer. */
-      quasarCollected: card + vaTransfer,
+      /** Quasar on this page is collectively card (POS) + live VA. */
+      quasarCollected: card + liveVa,
     });
   }
 
@@ -533,6 +637,8 @@ export class ExecutiveFinanceController {
           },
         });
       }
+
+      items.push(...(await postedInwardFeeLines(tenantId, limit)));
 
       items.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -807,11 +913,27 @@ export class ExecutiveFinanceController {
     if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
 
     try {
+      const notAStudent = new Set(['fee', 'school', 'quasar', 'local']);
+      if (notAStudent.has(studentId)) {
+        return res.status(200).json({
+          totalFees: 0,
+          totalPaid: 0,
+          outstandingBalance: 0,
+          currentBalance: 0,
+          studentId,
+        });
+      }
+
+      const isCloudCustomer = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(studentId);
+      if (!isCloudCustomer) {
+        return res.status(500).json({ error: 'Failed to load student summary' });
+      }
+
       const { data: invoices, error } = await supabaseAdmin
         .from('invoices')
-        .select('amount_paid, total_amount, balance_due, payment_status, student_id, customer_id')
+        .select('amount_paid, total_amount, payment_status, customer_id')
         .eq('tenant_id', tenantId)
-        .or(`student_id.eq.${studentId},customer_id.eq.${studentId}`);
+        .eq('customer_id', studentId);
       if (error) throw error;
 
       let totalPaid = 0;
@@ -953,6 +1075,118 @@ export class ExecutiveFinanceController {
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] getStudentTransactions Error:', error.message);
       return res.status(500).json({ error: 'Failed to load student transactions' });
+    }
+  }
+
+  /**
+   * POST /api/v1/finance/quasar-resync
+   * Pull each Quasar account ledger and record credits Invify is missing.
+   * Window: the newest 50 entries, plus any older entry from the last 20 days.
+   */
+  static async resyncQuasar(req: Request, res: Response) {
+    const tenantId = resolveTenantScope(req);
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    try {
+      const accounts = (await QfsQuasarBridgeService.listAccounts(tenantId)) || [];
+      const cutoff = Date.now() - QUASAR_RESYNC_DAYS * 24 * 60 * 60 * 1000;
+      const credits: Array<{ reference: string; amount: number; va: string; createdAt: string }> = [];
+
+      for (const account of accounts) {
+        const accountId = String(account?.id || account?.account_id || '').trim();
+        if (!accountId) continue;
+        const va = String(account?.accountNumber || account?.account_number || '').trim();
+        const collected: any[] = [];
+        let offset = 0;
+        for (let page = 0; page < 8; page += 1) {
+          const raw = await QfsQuasarBridgeService.getLedger(tenantId, accountId, 50, offset, { noRetry: true, timeoutMs: 8000 });
+          const rows = Array.isArray(raw) ? raw : [];
+          if (rows.length === 0) break;
+          collected.push(...rows);
+          offset += rows.length;
+          if (rows.length < 50) break;
+          const oldest = quasarEntryTimestamp(rows[rows.length - 1]);
+          if (page > 0 && (!Number.isFinite(oldest) || oldest < cutoff)) break;
+        }
+
+        for (const entry of selectQuasarResyncEntries(collected)) {
+          if (!isQuasarCreditEntry(entry)) continue;
+          const amount = quasarLedgerAmountNaira(entry);
+          const reference = quasarLedgerReference(entry, accountId);
+          if (!(amount > 0) || !reference) continue;
+          const ts = quasarEntryTimestamp(entry);
+          credits.push({
+            reference,
+            amount,
+            va,
+            createdAt: Number.isFinite(ts) ? new Date(ts).toISOString() : new Date().toISOString(),
+          });
+        }
+      }
+
+      const unique = new Map<string, (typeof credits)[number]>();
+      for (const credit of credits) {
+        if (!unique.has(credit.reference)) unique.set(credit.reference, credit);
+      }
+      const wanted = [...unique.values()];
+      const references = wanted.map((c) => c.reference);
+
+      const existing = new Set<string>();
+      for (let i = 0; i < references.length; i += 100) {
+        const slice = references.slice(i, i + 100);
+        if (slice.length === 0) continue;
+        const { data, error } = await supabaseAdmin
+          .from('transactions_log')
+          .select('reference')
+          .eq('tenant_id', tenantId)
+          .in('reference', slice);
+        if (error) throw error;
+        for (const row of data || []) {
+          if (row?.reference) existing.add(String(row.reference));
+        }
+      }
+
+      let imported = 0;
+      const errors: string[] = [];
+      for (const credit of wanted) {
+        if (existing.has(credit.reference)) continue;
+        const { error } = await supabaseAdmin.from('transactions_log').insert({
+          reference: credit.reference,
+          tenant_id: tenantId,
+          amount: credit.amount,
+          type: 'CREDIT',
+          provider: 'quasar',
+          status: 'SUCCESS',
+          created_at: credit.createdAt,
+          metadata: {
+            virtualAccountNumber: credit.va || null,
+            accountNumber: credit.va || null,
+            amountNaira: credit.amount,
+            source: 'quasar_resync',
+            window: 'last_50_or_20_days',
+          },
+        });
+        if (error) {
+          errors.push(error.message || credit.reference);
+          continue;
+        }
+        imported += 1;
+      }
+
+      return res.status(200).json({
+        success: true,
+        accounts: accounts.length,
+        scanned: wanted.length,
+        alreadyRecorded: wanted.length - imported - errors.length,
+        imported,
+        errors: errors.slice(0, 5),
+        window: { latest: 50, days: QUASAR_RESYNC_DAYS },
+      });
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] resyncQuasar Error:', error.message);
+      return res.status(500).json({ error: 'Could not resync Quasar transactions' });
     }
   }
 }

@@ -48,6 +48,8 @@ describe('Phase 32D.R1 portal login URL configuration', () => {
     const v = BuildVariantService.getInstance();
     expect(v.getAppPortalBaseUrl()).toBe('https://staging.invify.org');
     expect(v.getLoginUrl('admin')).toBe('https://staging.invify.org/admin/login');
+    expect(v.getLoginUrl('agent')).toBe('https://staging.invify.org/institute/login');
+    expect(v.getAgentPortalUrl()).toBe('https://staging.invify.org/institute/login');
   });
 
   test('PROD rejects staging portal URL override (fail closed)', () => {

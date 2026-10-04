@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../../../db/supabase';
+import { rewritePublicContaboUrl } from '../../../utils/contabo-s3';
 
 export type ManualCheckKey = 'cac' | 'phone_call' | 'address';
 
@@ -9,6 +10,9 @@ export type ManualCheck = {
   email?: string;
   at?: string;
   notes?: string;
+  checkerId?: string;
+  checkerEmail?: string;
+  checkerAt?: string;
 };
 
 export type ActivationProposal = {
@@ -67,6 +71,9 @@ function normalizeGate(raw: any): ActivationGate {
         email: row.email,
         at: row.at,
         notes: row.notes,
+        checkerId: row.checkerId,
+        checkerEmail: row.checkerEmail,
+        checkerAt: row.checkerAt,
       };
     }
   }
@@ -76,8 +83,40 @@ function normalizeGate(raw: any): ActivationGate {
   return base;
 }
 
+/** A check counts only after a different admin checker-approves the maker's record. */
+export function isManualCheckApproved(check?: ManualCheck | null): boolean {
+  if (!check?.passed) return false;
+  const maker = String(check.email || '').trim().toLowerCase();
+  const checker = String(check.checkerEmail || '').trim().toLowerCase();
+  return Boolean(checker) && checker !== maker;
+}
+
 export function allManualChecksPassed(gate: ActivationGate): boolean {
-  return MANUAL_CHECK_KEYS.every((k) => gate.checks[k]?.passed === true);
+  return MANUAL_CHECK_KEYS.every((k) => isManualCheckApproved(gate.checks[k]));
+}
+
+/**
+ * Virtual accounts stay locked until the maker proposes activation and a
+ * different admin checker-approves. Document checks alone are not enough.
+ */
+export function virtualAccountGenerationBlockReason(gate: ActivationGate): string | null {
+  const missing = missingManualChecks(gate);
+  if (missing.length) {
+    return `Manual checks incomplete: ${missing.join('; ')}. Confirm CAC, a direct phone call, and address, then propose activation. A different admin must approve with their authenticator code before a virtual account can be generated.`;
+  }
+  if (!gate.proposal) {
+    return 'Maker-checker required. After the document checks, the maker must click Propose activation. A different admin must then Approve & activate with their authenticator code before a virtual account can be generated.';
+  }
+  if (gate.proposal.status === 'pending') {
+    return `Activation is waiting for a different admin to checker-approve. Proposed by ${gate.proposal.makerEmail || 'the maker'}. Virtual accounts stay locked until that approval.`;
+  }
+  if (gate.proposal.status === 'rejected') {
+    return 'The activation proposal was rejected. A maker must propose activation again. A different admin must approve before a virtual account can be generated.';
+  }
+  if (gate.proposal.status !== 'approved') {
+    return 'Maker-checker approval is required before a virtual account can be generated.';
+  }
+  return null;
 }
 
 export function missingManualChecks(gate: ActivationGate): string[] {
@@ -86,7 +125,11 @@ export function missingManualChecks(gate: ActivationGate): string[] {
     phone_call: 'Phone number confirmation by direct call',
     address: 'Address validation (manual)',
   };
-  return MANUAL_CHECK_KEYS.filter((k) => !gate.checks[k]?.passed).map((k) => labels[k]);
+  return MANUAL_CHECK_KEYS.filter((k) => !isManualCheckApproved(gate.checks[k])).map((k) => {
+    const row = gate.checks[k];
+    if (row?.email) return `${labels[k]} (recorded by ${row.email}, waiting for a different admin)`;
+    return labels[k];
+  });
 }
 
 export async function loadActivationGate(tenantId: string): Promise<{
@@ -129,8 +172,8 @@ export async function evidenceForChecks(tenantId: string) {
     .select('id, document_type, document_url, status')
     .eq('tenant_id', tenantId)
     .limit(20);
-  const cacUrl = String(settings.cac_document_url || '').trim();
-  const idUrl = String(settings.id_document_url || '').trim();
+  const cacUrl = rewritePublicContaboUrl(String(settings.cac_document_url || '').trim());
+  const idUrl = rewritePublicContaboUrl(String(settings.id_document_url || '').trim());
   const hasCac =
     Boolean(cacUrl) ||
     (docs || []).some((d: any) => /cac/i.test(String(d.document_type || '')));
@@ -152,8 +195,8 @@ export async function evidenceForChecks(tenantId: string) {
   return {
     hasCac,
     hasId,
-    cacUrl: cacUrl || (docs || []).find((d: any) => /cac/i.test(String(d.document_type || '')))?.document_url || null,
-    idUrl: idUrl || (docs || []).find((d: any) => /id|nin|passport|license/i.test(String(d.document_type || '')))?.document_url || null,
+    cacUrl: cacUrl || rewritePublicContaboUrl((docs || []).find((d: any) => /cac/i.test(String(d.document_type || '')))?.document_url || '') || null,
+    idUrl: idUrl || rewritePublicContaboUrl((docs || []).find((d: any) => /id|nin|passport|license/i.test(String(d.document_type || '')))?.document_url || '') || null,
     phone: phone || null,
     address: address || null,
     kycStatus: tenant.kyc_status || null,
@@ -193,7 +236,7 @@ export async function recordManualCheck(opts: {
     }
   }
   gate.checks[opts.key] = {
-    passed: opts.passed === true,
+    passed: false,
     by: opts.actorId,
     email: opts.actorEmail,
     at: new Date().toISOString(),
@@ -204,6 +247,46 @@ export async function recordManualCheck(opts: {
   }
   await saveGate(opts.tenantId, settings, gate);
   void tenant;
+  return gate;
+}
+
+export async function approveManualCheck(opts: {
+  tenantId: string;
+  key: ManualCheckKey;
+  actorId: string;
+  actorEmail: string;
+}): Promise<ActivationGate> {
+  if (!MANUAL_CHECK_KEYS.includes(opts.key)) {
+    const err: any = new Error('Unknown check. Use cac, phone_call, or address.');
+    err.status = 400;
+    throw err;
+  }
+  const { gate, settings } = await loadActivationGate(opts.tenantId);
+  const row = gate.checks[opts.key];
+  if (!row?.email) {
+    const err: any = new Error('A maker must record this check before a different admin can approve it.');
+    err.status = 400;
+    throw err;
+  }
+  const maker = String(row.email || '').trim().toLowerCase();
+  const checker = String(opts.actorEmail || '').trim().toLowerCase();
+  const samePerson =
+    (!!checker && maker === checker) ||
+    (!!opts.actorId && !!row.by && row.by === opts.actorId);
+  if (!checker || samePerson) {
+    const err: any = new Error('You recorded this check. A different admin must checker-approve it.');
+    err.status = 403;
+    throw err;
+  }
+  if (isManualCheckApproved(row)) return gate;
+  gate.checks[opts.key] = {
+    ...row,
+    passed: true,
+    checkerId: opts.actorId,
+    checkerEmail: opts.actorEmail,
+    checkerAt: new Date().toISOString(),
+  };
+  await saveGate(opts.tenantId, settings, gate);
   return gate;
 }
 

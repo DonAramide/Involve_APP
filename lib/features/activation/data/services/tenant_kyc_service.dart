@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 import 'dart:io';
@@ -8,35 +10,25 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 
 class TenantKycService {
-  TenantKycService({Dio? dio}) : _dio = dio ?? _createClient();
-
-  final Dio _dio;
-
-  static Dio _createClient() {
-    final client = Dio(BaseOptions(
+  FinanceApiClient _client() {
+    final sl = GetIt.instance;
+    if (sl.isRegistered<FinanceApiClient>()) {
+      return sl<FinanceApiClient>();
+    }
+    return FinanceApiClient(
       baseUrl: AppConfig.baseUrl,
-      headers: {
-        'Accept': 'application/json',
-      },
-    ));
-    client.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
+      getToken: () async {
+        final offline = await SecurityService().getOfflineToken();
+        if (offline != null && offline.isNotEmpty) return offline;
         if (AppConfig.supabaseInitialized) {
-          final token = Supabase.instance.client.auth.currentSession?.accessToken;
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
+          try {
+            return Supabase.instance.client.auth.currentSession?.accessToken;
+          } catch (_) {}
         }
-        try {
-          final tenantId = await SecurityService().getTenantId();
-          if (tenantId != null && tenantId.isNotEmpty) {
-            options.headers['X-Tenant-ID'] = tenantId;
-          }
-        } catch (_) {}
-        handler.next(options);
+        return null;
       },
-    ));
-    return client;
+      getTenantId: () async => await SecurityService().getTenantId(),
+    );
   }
 
   Future<bool> uploadKycDocument({
@@ -48,32 +40,23 @@ class TenantKycService {
       final tenantId = await security.getTenantId();
       final suffix = await DeviceInfoService.getDeviceSuffix();
       final finalIdentifier = tenantId ?? suffix;
+      final fileName = path.basename(file.path);
 
-      String fileName = path.basename(file.path);
-
-      FormData formData = FormData.fromMap({
-        "tenant_id": finalIdentifier,
-        "type": documentType,
-        "file": await MultipartFile.fromFile(file.path, filename: fileName),
+      final formData = FormData.fromMap({
+        'tenant_id': finalIdentifier,
+        'type': documentType,
+        'file': await MultipartFile.fromFile(file.path, filename: fileName),
       });
 
-      final response = await _dio.post(
+      final response = await _client().post(
         '/api/tenant/kyc/upload',
         data: formData,
-        options: Options(
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        ),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      }
-      return false;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       debugPrint('[TenantKycService] Error uploading KYC document: $e');
-      throw Exception('Failed to upload $documentType: $e');
+      throw Exception(_friendlyError(e, documentType));
     }
   }
 
@@ -83,15 +66,30 @@ class TenantKycService {
       final tenantId = await security.getTenantId();
       final suffix = await DeviceInfoService.getDeviceSuffix();
       final finalIdentifier = tenantId ?? suffix;
-
-      final response = await _dio.get('/api/tenant/$finalIdentifier/kyc');
+      final response = await _client().get('/api/tenant/$finalIdentifier/kyc');
       if (response.statusCode == 200) {
-        return response.data['data'] ?? [];
+        final raw = response.data;
+        if (raw is Map && raw['data'] is List) return raw['data'] as List;
+        if (raw is List) return raw;
       }
       return [];
     } catch (e) {
       debugPrint('[TenantKycService] Error fetching KYC: $e');
       return [];
     }
+  }
+
+  String _friendlyError(Object e, String documentType) {
+    if (e is FinanceApiException) {
+      if (e.statusCode == 401) {
+        return 'Device is not signed in to the cloud. Use Web Sync / activate this tablet, then upload again.';
+      }
+      return e.message;
+    }
+    final text = e.toString();
+    if (text.contains('401')) {
+      return 'Device is not signed in to the cloud. Use Web Sync / activate this tablet, then upload again.';
+    }
+    return 'Failed to upload $documentType';
   }
 }

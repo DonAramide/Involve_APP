@@ -89,16 +89,29 @@ export class HealthController {
 
   /** Compatibility endpoint — prefer /livez and /readyz. */
   static async health(req: Request, res: Response) {
-    return res.status(200).json({
+    const variant = BuildVariantService.getInstance();
+    const body: Record<string, unknown> = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       env: process.env.NODE_ENV,
-      variant: BuildVariantService.getInstance().getVariant(),
+      variant: variant.getVariant(),
       contract: {
         livez: '/livez',
         readyz: '/readyz',
         health: '/health (compatibility; does not gate traffic)',
       },
-    });
+    };
+    // LOCAL-only proof fields. Staging/production health payload is unchanged.
+    if (variant.isLocal()) {
+      let supabaseTarget = '';
+      try {
+        supabaseTarget = String(variant.getSupabaseConfig().url || '').replace(/\/$/, '');
+      } catch {
+        supabaseTarget = '';
+      }
+      body.supabaseTarget = supabaseTarget;
+      body.remoteSupabase = /supabase\.co/i.test(supabaseTarget);
+    }
+    return res.status(200).json(body);
   }
 }

@@ -13,6 +13,7 @@ import {
   markProposalApproved,
   proposeActivation,
   recordManualCheck,
+  approveManualCheck,
   rejectActivationProposal,
 } from './activation-gate';
 
@@ -48,11 +49,31 @@ export class FinancialPlatformActivationController {
     try {
       const user = actor(req);
       const key = String(req.body?.key || '') as ManualCheckKey;
-      const passed = req.body?.passed !== false;
+      if (req.body?.action === 'checker_approve') {
+        const gate = await approveManualCheck({
+          tenantId: req.params.id,
+          key,
+          actorId: user.id,
+          actorEmail: user.email,
+        });
+        await GovAuditService.logAction({
+          id: uuidv4(),
+          timestamp: new Date().toISOString(),
+          module: 'MAKER_CHECKER',
+          action: `FP_MANUAL_CHECK_CHECKER_${String(key).toUpperCase()}`,
+          user_email: user.email,
+          user_name: user.email,
+          ip_address: clientIp(req),
+          tenant_id: req.params.id,
+          target: req.params.id,
+          status: 'approved',
+        });
+        return res.status(200).json({ success: true, gate });
+      }
       const gate = await recordManualCheck({
         tenantId: req.params.id,
         key,
-        passed,
+        passed: true,
         actorId: user.id,
         actorEmail: user.email,
         notes: req.body?.notes,
@@ -67,7 +88,7 @@ export class FinancialPlatformActivationController {
         ip_address: clientIp(req),
         tenant_id: req.params.id,
         target: req.params.id,
-        status: passed ? 'approved' : 'rejected',
+        status: 'pending',
         metadata: { notes: req.body?.notes },
       });
       return res.status(200).json({ success: true, gate });

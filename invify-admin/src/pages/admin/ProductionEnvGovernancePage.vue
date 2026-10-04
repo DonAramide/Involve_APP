@@ -44,6 +44,7 @@
           <div class="text-caption">Maker: {{ row.makerEmail }} · {{ row.reason }}</div>
           <div class="row q-gutter-sm q-mt-sm">
             <q-input v-model="confirmById[row.id]" dense outlined dark label="Confirm phrase" class="col" />
+            <q-input v-model="otpById[row.id]" dense outlined dark label="2FA code" class="col" maxlength="8" autocomplete="one-time-code" />
             <q-btn color="green-7" label="Approve & apply" @click="approve(row)" />
             <q-btn outline color="red-4" label="Reject" @click="reject(row)" />
           </div>
@@ -97,6 +98,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
+import { promptCheckerMfa } from '../../utils/promptCheckerMfa'
 
 const $q = useQuasar()
 const loading = ref(false)
@@ -104,6 +106,7 @@ const error = ref('')
 const search = ref('')
 const showPropose = ref(false)
 const confirmById = reactive({})
+const otpById = reactive({})
 const snapshot = ref({
   filePath: '',
   fileExists: false,
@@ -161,20 +164,36 @@ async function propose() {
 
 async function approve(row) {
   try {
+    const otp = String(otpById[row.id] || '').trim()
+    if (otp.length < 6) {
+      $q.notify({ type: 'warning', message: 'Enter your 2FA authenticator code to apply.' })
+      return
+    }
     await adminApi.approveProductionEnv({
       id: row.id,
       confirmPhrase: confirmById[row.id],
+      otp,
     })
     $q.notify({ type: 'positive', message: 'Applied to production env' })
     await load()
   } catch (err) {
-    $q.notify({ type: 'negative', message: err.response?.data?.error || err.message })
+    $q.notify({ type: 'negative', message: err.response?.data?.message || err.response?.data?.error || err.message })
   }
 }
 
 async function reject(row) {
   try {
-    await adminApi.rejectProductionEnv({ id: row.id, reason: 'rejected from dashboard' })
+    const otp = await promptCheckerMfa($q.dialog, {
+      title: 'Checker 2FA required',
+      message: 'Enter your authenticator code to reject this production env change.',
+      okLabel: 'Verify & reject',
+      okColor: 'red-6',
+    })
+    if (!otp) {
+      $q.notify({ type: 'warning', message: 'Rejection cancelled. 2FA code is required.' })
+      return
+    }
+    await adminApi.rejectProductionEnv({ id: row.id, reason: 'rejected from dashboard', otp })
     $q.notify({ type: 'warning', message: 'Change rejected' })
     await load()
   } catch (err) {

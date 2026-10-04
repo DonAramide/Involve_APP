@@ -3,7 +3,7 @@
     <div class="row items-center q-mb-lg">
       <div class="col">
         <div class="text-h4 text-weight-bold text-indigo-4">Device Activation Hub</div>
-        <div class="text-caption text-secondary">Manage hardware terminals and generate secure activation codes.</div>
+        <div class="text-caption text-secondary">Every generated code is listed under Activation History. A code can be used only after support@iips.app approves it. Activated codes are marked ACTIVATED.</div>
       </div>
       <div class="col-auto">
         <q-btn 
@@ -40,8 +40,8 @@
           <q-card-section class="q-pa-md">
             <div class="row items-center no-wrap">
               <div class="col">
-                <div class="text-caption text-secondary text-weight-medium">Pending Codes</div>
-                <div class="text-h5 text-weight-bold">{{ pendingCount }}</div>
+                <div class="text-caption text-secondary text-weight-medium">Awaiting approval</div>
+                <div class="text-h5 text-weight-bold">{{ awaitingCount }}</div>
               </div>
               <div class="col-auto">
                 <q-icon name="vpn_key" color="amber-5" size="2em" />
@@ -50,7 +50,51 @@
           </q-card-section>
         </q-card>
       </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <q-card class="bg-panel text-main border-main shadow-1 rounded-borders">
+          <q-card-section class="q-pa-md">
+            <div class="row items-center no-wrap">
+              <div class="col">
+                <div class="text-caption text-secondary text-weight-medium">Generated</div>
+                <div class="text-h5 text-weight-bold">{{ generatedCount }}</div>
+              </div>
+              <div class="col-auto">
+                <q-icon name="qr_code_2" color="cyan-4" size="2em" />
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <q-card class="bg-panel text-main border-main shadow-1 rounded-borders">
+          <q-card-section class="q-pa-md">
+            <div class="row items-center no-wrap">
+              <div class="col">
+                <div class="text-caption text-secondary text-weight-medium">Activated</div>
+                <div class="text-h5 text-weight-bold">{{ activatedCount }}</div>
+              </div>
+              <div class="col-auto">
+                <q-icon name="verified" color="green-4" size="2em" />
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
     </div>
+
+    <q-input
+      v-model="listSearch"
+      dense
+      filled
+      clearable
+      label="Search requests by email, school, or code"
+      class="q-mb-md"
+      :dark="prefs.isDarkMode"
+    >
+      <template v-slot:prepend>
+        <q-icon name="search" />
+      </template>
+    </q-input>
 
     <!-- TABS -->
     <q-tabs
@@ -69,7 +113,7 @@
     <q-tab-panels v-model="tab" animated class="bg-transparent">
       <q-tab-panel name="active" class="q-pa-none">
         <q-table
-          :rows="devices"
+          :rows="visibleDevices"
           :columns="deviceColumns"
           row-key="id"
           flat
@@ -82,14 +126,19 @@
         >
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge color="green-10" text-color="green-4" class="text-weight-bold">
-                {{ props.value.toUpperCase() }}
+              <q-badge :color="deviceStatusColor(props.value)" :text-color="deviceStatusText(props.value)" class="text-weight-bold">
+                {{ deviceStatusLabel(props.value) }}
               </q-badge>
             </q-td>
           </template>
           <template v-slot:body-cell-plan="props">
             <q-td :props="props">
-              <div class="text-weight-bold text-indigo-4">{{ props.value.toUpperCase() }}</div>
+              <div class="text-weight-bold text-indigo-4">{{ String(props.value || '—').toUpperCase() }}</div>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-plan_expires="props">
+            <q-td :props="props">
+              <div :class="expiryClass(props.value)">{{ formatExpiry(props.value) }}</div>
             </q-td>
           </template>
           <template v-slot:body-cell-actions="props">
@@ -107,7 +156,7 @@
 
       <q-tab-panel name="codes" class="q-pa-none">
         <q-table
-          :rows="activations"
+          :rows="visibleActivations"
           :columns="activationColumns"
           row-key="id"
           flat
@@ -118,11 +167,6 @@
           :loading="loading"
           :dark="prefs.isDarkMode"
         >
-          <template v-slot:body-cell-code="props">
-            <q-td :props="props">
-              <div class="text-subtitle1 text-weight-bolder text-amber-4 font-mono">{{ props.value }}</div>
-            </q-td>
-          </template>
           <template v-slot:body-cell-device_id="props">
             <q-td :props="props">
               <div class="text-caption font-mono text-indigo-4 text-weight-bold">
@@ -138,16 +182,39 @@
               </div>
             </q-td>
           </template>
+          <template v-slot:body-cell-code="props">
+            <q-td :props="props">
+              <div class="text-subtitle1 text-weight-bolder text-amber-4 font-mono">
+                {{ props.value || 'Hidden until approved' }}
+              </div>
+            </q-td>
+          </template>
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge :color="props.row.is_used ? 'green-10' : 'blue-10'" :text-color="props.row.is_used ? 'green-4' : 'blue-4'" class="text-weight-bold">
-                {{ props.row.is_used ? 'ACTIVATED' : 'PENDING' }}
+              <q-badge :color="activationStatusColor(props.row)" text-color="white" class="text-weight-bold">
+                {{ activationStatusLabel(props.row) }}
               </q-badge>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-expires="props">
+            <q-td :props="props">
+              <div :class="expiryClass(props.value)">{{ formatExpiry(props.value) }}</div>
             </q-td>
           </template>
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <q-btn flat round dense icon="card_membership" color="amber-4" @click="reviewCertificate(props.row)">
+              <q-btn
+                v-if="props.row.canApprove"
+                flat dense color="green-4" label="Approve" :loading="reviewingId === props.row.id"
+                @click="approveActivation(props.row)"
+              />
+              <q-btn
+                v-if="props.row.canApprove"
+                flat dense color="red-4" label="Reject" :loading="reviewingId === props.row.id"
+                @click="rejectActivation(props.row)"
+              />
+              <div v-else-if="props.row.approvalNote" class="text-caption text-orange-3">{{ props.row.approvalNote }}</div>
+              <q-btn v-if="props.row.activation_code" flat round dense icon="card_membership" color="amber-4" @click="reviewCertificate(props.row)">
                 <q-tooltip>Review Certificate</q-tooltip>
               </q-btn>
             </q-td>
@@ -170,13 +237,21 @@
             use-input
             input-debounce="300"
             @filter="filterTenants"
-            label="Target School/Business"
+            label="Target school, business, or email"
             filled 
             emit-value map-options
             class="q-mb-md"
             @update:model-value="onTenantChange"
             :dark="prefs.isDarkMode"
           >
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section>
+                  <q-item-label>{{ scope.opt.name || scope.opt.label }}</q-item-label>
+                  <q-item-label v-if="scope.opt.email" caption>{{ scope.opt.email }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
             <template v-slot:after>
               <q-btn round flat icon="refresh" color="indigo-4" @click="loadData" :loading="loading" :dark="prefs.isDarkMode">
                 <q-tooltip>Reload Businesses</q-tooltip>
@@ -185,7 +260,7 @@
             <template v-slot:no-option>
               <q-item :dark="prefs.isDarkMode">
                 <q-item-section class="text-secondary">
-                  No businesses found. Try refreshing.
+                  No match. Search the school name or the owner email.
                 </q-item-section>
               </q-item>
             </template>
@@ -549,21 +624,64 @@ const newCode = ref({
   deviceSuffix: '0'
 })
 
-const filterTenants = (val, update) => {
-  if (val === '') {
-    update(() => {
-      filteredTenantOptions.value = tenants.value.map(t => ({ label: t.name, value: t.id }))
-    })
-    return
-  }
+const listSearch = ref('')
 
-  update(() => {
-    const needle = val.toLowerCase()
-    filteredTenantOptions.value = tenants.value
-      .filter(t => t.name.toLowerCase().indexOf(needle) > -1)
-      .map(t => ({ label: t.name, value: t.id }))
+const tenantEmail = (tenant) => String(tenant?.owner_email || tenant?.email || '').trim()
+
+const tenantOption = (tenant) => {
+  const email = tenantEmail(tenant)
+  return {
+    label: email ? `${tenant.name} — ${email}` : tenant.name,
+    name: tenant.name,
+    email,
+    value: tenant.id,
+  }
+}
+
+let tenantFilterSeq = 0
+
+const matchingTenants = (rows, needle) => {
+  const query = String(needle || '').trim().toLowerCase()
+  return rows.filter((tenant) => {
+    if (!query) return true
+    const name = String(tenant.name || '').toLowerCase()
+    const email = tenantEmail(tenant).toLowerCase()
+    return name.includes(query) || email.includes(query)
   })
 }
+
+const filterTenants = (val, update) => {
+  const needle = String(val || '').trim()
+  const seq = ++tenantFilterSeq
+  update(() => {
+    filteredTenantOptions.value = matchingTenants(tenants.value, needle).map(tenantOption)
+  })
+  if (!needle) return
+  adminApi.getTenants({ name: needle }).then((res) => {
+    if (seq !== tenantFilterSeq) return
+    const rows = Array.isArray(res.data) ? res.data : []
+    update(() => {
+      filteredTenantOptions.value = rows.map(tenantOption)
+    })
+  }).catch(() => {})
+}
+
+const rowMatchesSearch = (row) => {
+  const needle = String(listSearch.value || '').trim().toLowerCase()
+  if (!needle) return true
+  const haystack = [
+    row?.tenants?.name,
+    row?.tenants?.owner_email,
+    row?.created_by,
+    row?.activation_code,
+    row?.device_id,
+    row?.device_suffix,
+  ].join(' ').toLowerCase()
+  return haystack.includes(needle)
+}
+
+const visibleDevices = computed(() => devices.value.filter(rowMatchesSearch))
+const visibleActivations = computed(() => activations.value.filter(rowMatchesSearch))
 
 const durationOptions = [
   { label: '1 Month', value: 30 },
@@ -586,6 +704,7 @@ const deviceColumns = [
   { name: 'tenant', label: 'School/Business', field: row => row.tenants?.name, align: 'left', sortable: true },
   { name: 'device_id', label: 'Device Serial', field: row => row.device_suffix || row.device_id, align: 'left' },
   { name: 'plan', label: 'Plan', field: row => row.tenants?.plan, align: 'center' },
+  { name: 'plan_expires', label: 'Plan expires', field: row => row.tenants?.plan_expires_at || null, align: 'center' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
   { name: 'last_seen', label: 'Last Seen', field: row => row.last_seen ? date.formatDate(row.last_seen, 'YYYY-MM-DD HH:mm') : 'Never', align: 'right' },
   { name: 'actions', label: 'ACTIONS', align: 'center' }
@@ -598,13 +717,62 @@ const activationColumns = [
   { name: 'duration', label: 'Duration', field: row => `${row.duration_days} Days`, align: 'center' },
   { name: 'created_by', label: 'Generated By', field: row => row.created_by || 'superadmin@invify.app', align: 'left' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
+  { name: 'expires', label: 'Expires', field: row => row.expires_at || null, align: 'center' },
   { name: 'created', label: 'Created At', field: row => date.formatDate(row.created_at, 'YYYY-MM-DD HH:mm'), align: 'right' },
   { name: 'actions', label: 'ACTIONS', align: 'center' }
 ]
 
 const tenantOptions = computed(() => tenants.value.map(t => ({ label: t.name, value: t.id })))
-const activeCount = computed(() => devices.value.filter(d => d.status === 'active').length)
-const pendingCount = computed(() => activations.value.filter(a => !a.is_used).length)
+const isActiveDevice = (row) => String(row?.status || '').trim().toLowerCase() === 'active'
+const deviceStatusLabel = (status) => String(status || 'UNKNOWN').trim().toUpperCase()
+const deviceStatusColor = (status) => (isActiveDevice({ status }) ? 'green-10' : 'grey-8')
+const deviceStatusText = (status) => (isActiveDevice({ status }) ? 'green-4' : 'grey-4')
+const activeCount = computed(() => devices.value.filter(isActiveDevice).length)
+const awaitingCount = computed(() => activations.value.filter(a => a.status === 'awaiting_approval').length)
+const generatedCount = computed(() => activations.value.filter(a => a.status !== 'rejected').length)
+const activatedCount = computed(() => activations.value.filter(a => a.is_used || a.status === 'used').length)
+
+const formatExpiry = (value) => {
+  if (!value) return 'Permanent'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Permanent'
+  return date.formatDate(parsed, 'YYYY-MM-DD')
+}
+
+const expiryClass = (value) => {
+  if (!value) return 'text-grey-5'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'text-grey-5'
+  return parsed.getTime() < Date.now() ? 'text-red-4 text-weight-bold' : 'text-indigo-3'
+}
+const reviewingId = ref(null)
+
+const activationStatusLabel = (row) => {
+  if (row.is_used || row.status === 'used') return 'ACTIVATED'
+  if (row.status === 'rejected') return 'REJECTED'
+  if (row.status === 'awaiting_approval') return 'AWAITING APPROVAL'
+  if (row.status === 'expired') return 'EXPIRED'
+  return 'ISSUED'
+}
+
+const activationStatusColor = (row) => {
+  if (row.is_used || row.status === 'used') return 'green-8'
+  if (row.status === 'rejected' || row.status === 'expired') return 'red-8'
+  if (row.status === 'awaiting_approval') return 'orange-8'
+  return 'blue-8'
+}
+
+const noteApprovalRequest = () => {
+  showCodeDialog.value = false
+  showSuccessDialog.value = false
+  tab.value = 'codes'
+  $q.notify({
+    type: 'info',
+    message: 'Request sent. support@iips.app must approve it before the code can be used.',
+    timeout: 5000,
+  })
+  loadData()
+}
 
 const loadData = async () => {
   loading.value = true
@@ -619,8 +787,13 @@ const loadData = async () => {
     try {
       const details = await adminApi.getTenantDetails(tenantId)
       myTenantName.value = details.data.name
-      tenants.value = [{ id: tenantId, name: details.data.name, type: details.data.type || 'Retail' }]
-      filteredTenantOptions.value = [{ label: details.data.name, value: tenantId }]
+      tenants.value = [{
+        id: tenantId,
+        name: details.data.name,
+        type: details.data.type || 'Retail',
+        owner_email: details.data.owner_email || details.data.email || '',
+      }]
+      filteredTenantOptions.value = tenants.value.map(tenantOption)
       newCode.value.tenantId = tenantId
       newCode.value.serviceMode = details.data.type ? details.data.type.charAt(0).toUpperCase() + details.data.type.slice(1) : 'Retail'
       console.log('[Activation] Loaded scoped tenant details successfully.')
@@ -635,10 +808,7 @@ const loadData = async () => {
       tenants.value = tenRes.data || []
       
       // Explicitly update options after loading
-      filteredTenantOptions.value = tenants.value.map(t => ({ 
-        label: t.name, 
-        value: t.id 
-      }))
+      filteredTenantOptions.value = tenants.value.map(tenantOption)
       console.log('[Activation] Loaded Tenants:', tenants.value.length)
     } catch (err) {
       console.error('Failed to load tenants:', err)
@@ -687,6 +857,10 @@ const reviewDeviceCertificate = async (row) => {
       planIndex,
       deviceSuffix,
     });
+    if (data?.status === 'awaiting_approval' || !data?.activation_code) {
+      noteApprovalRequest()
+      return
+    }
     lastGeneratedCode.value = data?.activation_code || data?.code || data?.activationCode || '';
     
     showSuccessDialog.value = true
@@ -706,7 +880,7 @@ const generateCodeForDevice = (row) => {
     deviceSuffix: row.device_suffix ? row.device_suffix.toUpperCase() : (row.device_id ? row.device_id.substring(Math.max(0, row.device_id.length - 6)).toUpperCase() : '0')
   }
   
-  filteredTenantOptions.value = tenants.value.map(t => ({ label: t.name, value: t.id }))
+  filteredTenantOptions.value = tenants.value.map(tenantOption)
   showCodeDialog.value = true
 }
 
@@ -751,6 +925,10 @@ const generateCode = async () => {
       expiry: expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     }
 
+    if (data?.status === 'awaiting_approval' || !data?.activation_code) {
+      noteApprovalRequest()
+      return
+    }
     lastGeneratedCode.value = data.activation_code
     showCodeDialog.value = false
     showSuccessDialog.value = true
@@ -759,6 +937,39 @@ const generateCode = async () => {
     console.error('Failed to generate code:', err)
   } finally {
     generating.value = false
+  }
+}
+
+const approveActivation = async (row) => {
+  reviewingId.value = row.id
+  try {
+    const { data } = await deviceApi.approveActivation(row.id)
+    lastGeneratedCode.value = data?.activation_code || ''
+    $q.notify({
+      type: data?.emailSent ? 'positive' : 'warning',
+      message: data?.emailSent
+        ? `Activation approved. The file was emailed to ${data.emailedTo}.`
+        : `Activation approved. ${data?.emailError || 'The activation file was not emailed.'}`,
+      timeout: 6000,
+    })
+    await loadData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Approval failed' })
+  } finally {
+    reviewingId.value = null
+  }
+}
+
+const rejectActivation = async (row) => {
+  reviewingId.value = row.id
+  try {
+    await deviceApi.rejectActivation(row.id)
+    $q.notify({ type: 'warning', message: 'Activation rejected. The code cannot be used.' })
+    await loadData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Rejection failed' })
+  } finally {
+    reviewingId.value = null
   }
 }
 

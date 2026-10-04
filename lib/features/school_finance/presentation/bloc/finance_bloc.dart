@@ -449,9 +449,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     SchoolFinancialSummary local,
   ) {
     final card = remote.cardCollected > 0.001 ? remote.cardCollected : local.cardCollected;
-    final va = remote.vaTransferCollected > 0.001
-        ? remote.vaTransferCollected
-        : local.vaTransferCollected;
+    final va = remote.vaTransferCollected;
     final cash = remote.cashCollected > 0.001 ? remote.cashCollected : local.cashCollected;
     final quasar = remote.quasarCollected > 0.001 ? remote.quasarCollected : card + va;
     return SchoolFinancialSummary(
@@ -470,6 +468,9 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       vaTransferCollected: va,
       cashCollected: cash,
       quasarCollected: quasar,
+      quasarLiveBalance: remote.quasarLiveBalance,
+      invifyLoggedVa: remote.invifyLoggedVa,
+      quasarBalanceStatus: remote.quasarBalanceStatus,
     );
   }
 
@@ -506,13 +507,25 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     final seen = <String>{};
     final merged = <FinancialTransaction>[];
     for (final tx in [...remote, ...local]) {
-      final key = tx.reference.trim().isNotEmpty ? tx.reference : tx.id;
-      if (seen.contains(key)) continue;
-      seen.add(key);
+      final keys = _transactionDedupeKeys(tx);
+      if (keys.any(seen.contains)) continue;
+      seen.addAll(keys);
       merged.add(tx);
     }
     merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return merged.take(50).toList();
+  }
+
+  List<String> _transactionDedupeKeys(FinancialTransaction tx) {
+    final ref = tx.reference.trim();
+    final va = '${tx.metadata['virtualAccountNumber'] ?? tx.metadata['accountNumber'] ?? ''}'
+        .trim();
+    final bucket = tx.createdAt.millisecondsSinceEpoch ~/ 120000;
+    final amount = tx.amount.toStringAsFixed(2);
+    return [
+      if (ref.isNotEmpty) 'ref:$ref',
+      'fuzzy:${va.isEmpty ? 'NOVA' : va}:${tx.type.name}:$amount:$bucket',
+    ];
   }
 
   List<DailyRevenue> _chartFromInvoices(List<Invoice> invoices, {required int days}) {

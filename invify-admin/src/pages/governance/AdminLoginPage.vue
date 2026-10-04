@@ -987,7 +987,10 @@ function mapAuthError(err, { otp = false } = {}) {
     return 'Invalid or expired OTP'
   }
   if (!err?.response) {
-    return 'Unable to connect to Invify. Check your connection and try again.'
+    return 'No internet connection. Check your network and try again.'
+  }
+  if (status === 503 || data.error === 'AUTH_SERVICE_UNAVAILABLE' || data.retryable) {
+    return data.message || 'No internet connection. Sign-in needs a network connection to Auth.'
   }
   if (status === 429 || /rate|too many/i.test(raw)) {
     return 'Too many sign-in attempts. Please wait before trying again.'
@@ -1006,6 +1009,9 @@ function mapAuthError(err, { otp = false } = {}) {
   }
   if (status === 403 && /super admin|unauthorized|forbidden|portal/i.test(raw)) {
     return 'This account does not have Super Admin access.'
+  }
+  if (/could not send the verification|smtp|verification email/i.test(combined)) {
+    return 'Recovery email could not be sent. Staging mail delivery is down — this is not a session error.'
   }
   if (status >= 500 || data.error === 'AUTH_SERVICE_UNAVAILABLE') {
     return 'Your session could not be established. Please try again.'

@@ -4,6 +4,10 @@ import { QuasarProvisioningService } from "../integrations/quasar/quasar-provisi
 import { supabase, supabaseAdmin } from "../db/supabase";
 import { AuditService } from "./audit.service";
 import { LedgerService } from "./ledger.service";
+import { WalletService } from "./wallet.service";
+import { isDefinitiveTransferRejection, PayoutReversalService } from "./payout-reversal.service";
+import { isSandboxPayoutAllowed } from "./fee-live-gate";
+import { TreasuryFeeService } from "./treasury-fee.service";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -156,11 +160,22 @@ export class PaymentService {
       idempotencyKey?: string;
     },
   ) {
-    const { FeatureGateService } = await import('../config/build-variant');
-    if (!FeatureGateService.isFeatureEnabled('real_money_payouts')) {
-      const err: any = new Error(
-        'Real-money payouts are disabled for this environment. Set FEATURE_REAL_MONEY_PAYOUTS=true only when intentionally enabling live exits.',
-      );
+    const { FeatureGateService, BuildVariantService } = await import('../config/build-variant');
+    const wallet = await WalletService.ensureWallet(tenantId);
+    if (!wallet) {
+      throw new Error(`Could not create wallet for tenant ${tenantId}`);
+    }
+    const variant = BuildVariantService.getInstance();
+    if (variant.isProd()) {
+      if (!FeatureGateService.isFeatureEnabled('real_money_payouts')) {
+        const err: any = new Error(
+          'Real-money payouts are disabled for this environment. Set FEATURE_REAL_MONEY_PAYOUTS=true only when intentionally enabling live exits.',
+        );
+        err.status = 403;
+        throw err;
+      }
+    } else if (!isSandboxPayoutAllowed()) {
+      const err: any = new Error('Payouts are not enabled in this environment.');
       err.status = 403;
       throw err;
     }
@@ -214,20 +229,81 @@ export class PaymentService {
       ? `payout:${tenantId}:${options.idempotencyKey}`
       : `payout:${reference}`;
 
-    // 3. Database Pessimistic Locking & Double Entry
-    const { data: ledgerRes, error: ledgerError } = await supabaseAdmin.rpc('request_payout_with_lock', {
+    const requestedAmount = Math.round(amount);
+    const quote = await TreasuryFeeService.quote(tenantId, requestedAmount);
+    const version = quote.fee_profile_version_id ? await TreasuryFeeService.resolve(tenantId) : null;
+    const feeEntries = version ? TreasuryFeeService.feeCreditEntriesNaira(version, quote.service_fee) : [];
+
+    // 3. Atomic lock: balance >= requested + treasury fee. External amount stays requested.
+    const { data: ledgerRes, error: ledgerError } = await supabaseAdmin.rpc('request_treasury_withdrawal_with_fee', {
       p_tenant_id: tenantId,
       p_idempotency_key: idempotencyKey,
       p_reference: reference,
-      p_amount: Math.round(amount),
+      p_requested_amount: requestedAmount,
+      p_fee_entries: feeEntries,
       p_metadata: {
         type: payoutType === 'staff_salary' ? 'staff_salary' : 'payout_request',
+        transaction_type: 'TREASURY_WITHDRAWAL',
+        requested_amount: requestedAmount,
+        service_fee: quote.service_fee,
+        total_required: quote.total_required,
+        fee_profile_version_id: quote.fee_profile_version_id,
         ...(options?.metadata || {}),
       },
     });
 
     if (ledgerError) {
+      const message = String(ledgerError.message || '');
+      if (message.includes('INSUFFICIENT_BALANCE')) {
+        const err: any = new Error(
+          `Insufficient balance for requested amount plus service fee. Available ₦${quote.available_balance}, this withdrawal needs ₦${quote.total_required} (₦${requestedAmount} plus ₦${quote.service_fee} fee).`,
+        );
+        err.status = 402;
+        err.code = 'INSUFFICIENT_BALANCE';
+        err.quote = { ...quote, sufficient: false };
+        throw err;
+      }
       throw new Error(`Payout rejected: ${ledgerError.message}`);
+    }
+
+    // Client retry with the same idempotency key: the wallet was debited once
+    // under the original reference — never initiate a second transfer.
+    if ((ledgerRes as any)?.status === 'DE-DUPLICATED') {
+      const { data: original } = await supabaseAdmin
+        .from('ledgers')
+        .select('reference')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      const originalReference = original?.reference || null;
+      let originalStatus = 'PENDING';
+      if (originalReference) {
+        const { data: originalTx } = await supabaseAdmin
+          .from('transactions_log')
+          .select('status')
+          .eq('reference', originalReference)
+          .maybeSingle();
+        originalStatus = originalTx?.status || originalStatus;
+      }
+      return {
+        reference: originalReference,
+        status: originalStatus,
+        transfer: null,
+        idempotentReplay: true,
+        quote,
+      };
+    }
+
+    if (version) {
+      try {
+        await TreasuryFeeService.persistAssessment({
+          tenantId,
+          reference,
+          requestedAmount,
+          version,
+        });
+      } catch (assessErr: any) {
+        console.error('[PaymentService] treasury fee assessment persist failed:', assessErr?.message || assessErr);
+      }
     }
 
     // 4. Call Quasar SDK (via service)
@@ -235,7 +311,7 @@ export class PaymentService {
     try {
       const quasar = await getQuasarService(tenantId);
       transfer = await quasar.initiateTransfer({
-        amount: Math.round(amount),
+        amount: requestedAmount,
         reference,
         destination: {
           account_number: bankDetails.account_number,
@@ -251,6 +327,21 @@ export class PaymentService {
       });
     } catch (error: any) {
       console.error('[PaymentService] Quasar Transfer Failure:', error.message);
+      await PaymentService.handleTransferInitiationFailure({
+        tenantId,
+        reference,
+        amount: requestedAmount,
+        payoutType,
+        bankDetails,
+        metadata: {
+          ...(options?.metadata || {}),
+          requested_amount: requestedAmount,
+          service_fee: quote.service_fee,
+          total_required: quote.total_required,
+        },
+        ledgerId: (ledgerRes as any)?.ledger_id || null,
+        error,
+      });
       throw new Error(`Failed to initiate transfer with Quasar: ${error.message}`);
     }
 
@@ -261,7 +352,7 @@ export class PaymentService {
         reference,
         tenant_id: tenantId,
         wallet_id: (ledgerRes as any)?.ledger_id || null,
-        amount: Math.round(amount),
+        amount: requestedAmount,
         provider: 'quasar',
         type: 'payout',
         status: 'PENDING',
@@ -270,6 +361,10 @@ export class PaymentService {
           destination: bankDetails.account_number,
           bank_name: bankDetails.bank_name || null,
           payout_type: payoutType,
+          requested_amount: requestedAmount,
+          service_fee: quote.service_fee,
+          total_required: quote.total_required,
+          fee_profile_version_id: quote.fee_profile_version_id,
           ...(options?.metadata || {}),
         },
       })
@@ -303,7 +398,86 @@ export class PaymentService {
       reference,
       status: 'PENDING',
       transfer,
+      quote,
     };
+  }
+
+  /**
+   * Definitive provider rejection → restore the reserved wallet debit (idempotent).
+   * Ambiguous outcome (timeout / network / 5xx) → keep the reservation, record a
+   * PENDING row flagged for reconciliation, and let the webhook settle it.
+   */
+  private static async handleTransferInitiationFailure(params: {
+    tenantId: string;
+    reference: string;
+    amount: number;
+    payoutType: string;
+    bankDetails: any;
+    metadata: Record<string, any>;
+    ledgerId: string | null;
+    error: any;
+  }): Promise<void> {
+    const { tenantId, reference, amount, payoutType, bankDetails, metadata, ledgerId, error } = params;
+    const definitive = isDefinitiveTransferRejection(error);
+    const errorMessage = String(error?.message || error);
+
+    let reversalStatus: string | null = null;
+    let reversalError: string | null = null;
+    if (definitive) {
+      try {
+        const reversal = await PayoutReversalService.reverseFailedPayout({
+          tenantId,
+          reference,
+          reason: `transfer_rejected: ${errorMessage}`,
+          source: 'SYNC_TRANSFER_REJECTED',
+        });
+        reversalStatus = reversal.status;
+      } catch (revErr: any) {
+        reversalError = String(revErr?.message || revErr);
+        console.error(`[PaymentService] CRITICAL payout reversal failed for ${reference}:`, reversalError);
+      }
+    }
+
+    const { error: txError } = await supabaseAdmin.from('transactions_log').insert({
+      reference,
+      tenant_id: tenantId,
+      wallet_id: ledgerId,
+      amount,
+      provider: 'quasar',
+      type: 'payout',
+      status: definitive ? 'FAILED' : 'PENDING',
+      metadata: {
+        destination: bankDetails?.account_number,
+        bank_name: bankDetails?.bank_name || null,
+        payout_type: payoutType,
+        ...metadata,
+        transfer_error: errorMessage,
+        reconciliation_required: !definitive || reversalError !== null,
+        reversal_status: reversalStatus,
+        ...(reversalError ? { reversal_error: reversalError } : {}),
+      },
+    });
+    if (txError) {
+      console.error('[PaymentService] DB Audit Write Failed (payout failure):', txError.message);
+    }
+
+    try {
+      await AuditService.log({
+        eventType: (definitive && !reversalError ? 'payout.failed' : 'payout.reconciliation_required') as any,
+        reference,
+        tenantId,
+        payload: {
+          amount,
+          payoutType,
+          definitive_rejection: definitive,
+          reversal_status: reversalStatus,
+          reversal_error: reversalError,
+          transfer_error: errorMessage,
+        },
+      });
+    } catch (auditErr: any) {
+      console.error('[PaymentService] payout failure audit failed:', auditErr?.message || auditErr);
+    }
   }
 
   /** Prefer reference match; only query id when value looks like a UUID (PostgREST OR with non-UUID id breaks). */

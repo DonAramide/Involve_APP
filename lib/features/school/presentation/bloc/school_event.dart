@@ -82,9 +82,15 @@ class AddStudentEvent extends SchoolEvent {
   final Student student;
   final List<int> alsoAssignStudentIds;
   final String? parentAddress;
-  const AddStudentEvent(this.student, {this.alsoAssignStudentIds = const [], this.parentAddress});
+  final String? parentEmail;
+  const AddStudentEvent(
+    this.student, {
+    this.alsoAssignStudentIds = const [],
+    this.parentAddress,
+    this.parentEmail,
+  });
   @override
-  List<Object?> get props => [student, alsoAssignStudentIds, parentAddress];
+  List<Object?> get props => [student, alsoAssignStudentIds, parentAddress, parentEmail];
 }
 
 class ImportStudentsEvent extends SchoolEvent {
@@ -99,9 +105,15 @@ class UpdateStudentEvent extends SchoolEvent {
   final Student student;
   final List<int> alsoAssignStudentIds;
   final String? parentAddress;
-  const UpdateStudentEvent(this.student, {this.alsoAssignStudentIds = const [], this.parentAddress});
+  final String? parentEmail;
+  const UpdateStudentEvent(
+    this.student, {
+    this.alsoAssignStudentIds = const [],
+    this.parentAddress,
+    this.parentEmail,
+  });
   @override
-  List<Object?> get props => [student, alsoAssignStudentIds, parentAddress];
+  List<Object?> get props => [student, alsoAssignStudentIds, parentAddress, parentEmail];
 }
 
 class UpdateParentEvent extends SchoolEvent {

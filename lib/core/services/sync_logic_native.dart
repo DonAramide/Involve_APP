@@ -726,15 +726,16 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
              final query = database.select(database.businessSettings)..limit(1);
              final existing = await query.getSingleOrNull();
              
+             // Importing a backup is explicit: its business mode always wins.
+             // Local updated_at is bumped on every settings save, so a
+             // timestamp comparison would almost always keep the device's mode.
              if (existing != null) {
-               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
-                 await (database.update(database.businessSettings)..where((s) => s.id.equals(existing!.id))).write(
-                   BusinessSettingsCompanion(
-                     businessMode: Value(businessMode),
-                     updatedAt: Value(incomingUpdate),
-                   )
-                 );
-               }
+               await (database.update(database.businessSettings)..where((s) => s.id.equals(existing.id))).write(
+                 BusinessSettingsCompanion(
+                   businessMode: Value(businessMode),
+                   updatedAt: Value(DateTime.now()),
+                 )
+               );
              } else {
                await database.into(database.businessSettings).insert(
                  BusinessSettingsCompanion.insert(

@@ -18,7 +18,8 @@ const authenticate = (req, res, next) => {
     
     // Inject user and tenant context into the request object
     req.user = {
-      id: decoded.id,
+      id: decoded.id || decoded.sub,
+      email: decoded.email,
       tenantId: decoded.tenantId,
       role: decoded.role
     };

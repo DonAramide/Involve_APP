@@ -3,6 +3,7 @@
 import { FinancialVerificationModule, VerificationResult } from "../../shared/interfaces";
 import { VerificationContext } from "../../shared/VerificationContext";
 import { supabaseAdmin } from "../../../../db/supabase";
+import { WalletService } from "../../../wallet.service";
 
 export class WalletVerificationService implements FinancialVerificationModule {
   public readonly moduleId = 'wallet_verification';
@@ -19,11 +20,12 @@ export class WalletVerificationService implements FinancialVerificationModule {
           .from('wallets')
           .select('*')
           .eq('tenant_id', context.tenantId)
-          .eq('currency', context.currency)
+          .limit(1)
           .maybeSingle();
 
         if (error) throw new Error(error.message);
-        return data;
+        if (data) return data;
+        return WalletService.ensureWallet(context.tenantId, context.currency || 'NGN');
       });
 
       if (!wallet) {

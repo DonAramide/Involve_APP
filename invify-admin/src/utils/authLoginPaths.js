@@ -26,6 +26,10 @@ const GUEST_OR_PUBLIC_PATHS = new Set([
   '/login',
   '/admin/login',
   '/tenant/login',
+  '/institute/login',
+  '/institute/signup',
+  '/institute/reset-password',
+  '/agent/login',
   '/register',
   '/forgot-password',
   '/reset-password',
@@ -62,7 +66,7 @@ export function navigateAfterAuth(_router, roleStr, redirect) {
 
 export function loginPathForContext({ pathname, role } = {}) {
   const path = pathname || (typeof window !== 'undefined' ? window.location.pathname : '')
-  if (String(path || '').toLowerCase().startsWith('/agent')) return '/agent/login'
+  if (String(path || '').toLowerCase().startsWith('/agent') || String(path || '').toLowerCase().startsWith('/institute')) return '/institute/login'
   if (isTenantSurfacePath(path)) return '/tenant/login'
 
   const roleStr = String(role || (typeof localStorage !== 'undefined' ? localStorage.getItem('operator_role') : '') || '')

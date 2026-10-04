@@ -28,7 +28,12 @@ export interface FinanceSummaryViewModel {
   unsweptVaFormatted: string;
   unsweptCustomerVaFormatted: string;
   unsweptStaffVaFormatted: string;
+  unsweptStudentVaFormatted: string;
+  unsweptParentVaFormatted: string;
   unsweptUnmappedVaFormatted: string;
+  quasarLiveFormatted?: string;
+  invifyLoggedVaFormatted?: string;
+  quasarBalanceStatus?: 'ok' | 'quasar_ahead' | 'invify_overstated';
   salesSummary?: {
     totalInvoiced: number;
     totalCollected: number;
@@ -113,6 +118,11 @@ export const useFinanceStore = defineStore('finance', {
       this.fetchSummary(true);
       this.fetchTransactions(true);
     },
+    async resyncQuasarHeld() {
+      const { data } = await financeApi.resyncQuasar();
+      await this.fetchSummary(true);
+      return data || {};
+    },
     async fetchSummary(forceRefresh = false) {
       const tenantId = resolveTenantId();
 
@@ -143,6 +153,9 @@ export const useFinanceStore = defineStore('finance', {
           unsweptStudentVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.student || 0),
           unsweptParentVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.parent || 0),
           unsweptUnmappedVaFormatted: formatCurrency(execSummary.unsweptVirtualAccount?.unmapped || 0),
+            quasarLiveFormatted: formatCurrency((execSummary.quasarLiveBalance ?? execSummary.pendingVirtualAccountFunds) || 0),
+          invifyLoggedVaFormatted: formatCurrency(execSummary.invifyLoggedVa || 0),
+          quasarBalanceStatus: execSummary.quasarBalanceStatus || 'ok',
           salesSummary: execSummary.salesSummary,
           studentMetrics: execSummary.studentMetrics,
           alerts: {

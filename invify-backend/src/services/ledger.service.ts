@@ -4,17 +4,52 @@ import { PoolClient } from "pg";
 
 export type LedgerEntryType = "DEBIT" | "CREDIT";
 
-export type LedgerAccount = 
-  | "USER_WALLET"
-  | "QUASAR_CLEARING"
-  | "EXTERNAL_BANK"
-  | "REVENUE"
-  | "COMMISSIONS"
-  | "TAXES"
-  | "SETTLEMENTS"
-  | "REFUNDS"
-  | "CHARGEBACKS"
-  | "ADJUSTMENTS";
+export const PRINCIPAL_LEDGER_ACCOUNTS = [
+  "USER_WALLET",
+  "QUASAR_CLEARING",
+  "EXTERNAL_BANK",
+  "REVENUE",
+  "COMMISSIONS",
+  "TAXES",
+  "SETTLEMENTS",
+  "REFUNDS",
+  "CHARGEBACKS",
+  "ADJUSTMENTS",
+] as const;
+
+export const FEE_LEDGER_ACCOUNTS = [
+  "PLATFORM_FEE",
+  "PROCESSOR_FEE",
+  "SERVICE_FEE",
+  "AGENT_FEE",
+] as const;
+
+export type PrincipalLedgerAccount = (typeof PRINCIPAL_LEDGER_ACCOUNTS)[number];
+export type FeeLedgerAccount = (typeof FEE_LEDGER_ACCOUNTS)[number];
+
+export type LedgerAccount = PrincipalLedgerAccount | FeeLedgerAccount;
+
+/** Processor is a payable/cost, not Invify platform revenue. */
+export const FEE_LEDGER_ACCOUNT_NATURE: Record<
+  FeeLedgerAccount,
+  "PLATFORM_REVENUE" | "PROCESSOR_PAYABLE" | "SERVICE_COST" | "AGENT_PAYABLE"
+> = {
+  PLATFORM_FEE: "PLATFORM_REVENUE",
+  PROCESSOR_FEE: "PROCESSOR_PAYABLE",
+  SERVICE_FEE: "SERVICE_COST",
+  AGENT_FEE: "AGENT_PAYABLE",
+};
+
+export function isFeeLedgerAccount(account: string): account is FeeLedgerAccount {
+  return (FEE_LEDGER_ACCOUNTS as readonly string[]).includes(account);
+}
+
+export function isRecognizedLedgerAccount(account: string): account is LedgerAccount {
+  return (
+    (PRINCIPAL_LEDGER_ACCOUNTS as readonly string[]).includes(account) ||
+    isFeeLedgerAccount(account)
+  );
+}
 
 export interface LedgerEntry {
   account: LedgerAccount;
@@ -73,7 +108,7 @@ export class LedgerService {
         error = err;
       }
     } else {
-      const rpcRes = await supabaseAdmin.rpc('process_ledger_double_entry', {
+      const rpcRes = await supabaseAdmin.rpc('process_ledger_double_entry_text', {
         p_tenant_id: tenantId,
         p_idempotency_key: idempotencyKey,
         p_reference: reference,

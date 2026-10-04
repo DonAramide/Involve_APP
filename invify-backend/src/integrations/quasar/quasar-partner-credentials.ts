@@ -98,11 +98,23 @@ export async function resolveQuasarPartnerCredentials(verticalRaw?: string): Pro
   const envSecret = readEnvValue(cfg.secretEnv);
   const envId = readEnvValue(cfg.idEnv);
 
-  const clientSecret = vaultSecret || envSecret || '';
-  const clientId = vaultId || envId || cfg.defaultClientId;
+  // Staging keeps the working partner secret in the process environment.
+  // A stale vault row must not override it, or Quasar returns 401 and activation
+  // deletes the tenant link. Production still prefers the vault.
+  const preferEnv =
+    String(process.env.NODE_ENV || '').trim().toLowerCase() === 'staging' ||
+    String(process.env.APP_ENV || '').trim().toLowerCase() === 'staging' ||
+    String(process.env.BUILD_VARIANT || '').trim().toUpperCase() === 'STAGING' ||
+    process.cwd().includes('/releases/staging-');
+  const clientSecret = (preferEnv ? envSecret || vaultSecret : vaultSecret || envSecret) || '';
+  const clientId = (preferEnv ? envId || vaultId : vaultId || envId) || cfg.defaultClientId;
   const source = [
-    vaultId ? 'vault-id' : (envId ? 'env-id' : 'default-id'),
-    vaultSecret ? 'vault-secret' : (envSecret ? 'env-secret' : 'missing-secret'),
+    preferEnv
+      ? (envId ? 'env-id' : (vaultId ? 'vault-id' : 'default-id'))
+      : (vaultId ? 'vault-id' : (envId ? 'env-id' : 'default-id')),
+    preferEnv
+      ? (envSecret ? 'env-secret' : (vaultSecret ? 'vault-secret' : 'missing-secret'))
+      : (vaultSecret ? 'vault-secret' : (envSecret ? 'env-secret' : 'missing-secret')),
   ].join('+');
 
   return { vertical, clientId, clientSecret, source };

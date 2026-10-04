@@ -2,6 +2,7 @@
 import { QuasarService } from "./quasar.service";
 import { IntegrationVaultService } from "../../services/integration-vault.service";
 import { QuasarIntegrationStore } from "./quasar-integration.store";
+import { BuildVariantService } from "../../config/build-variant";
 
 function describeKey(sk: string): string {
   if (sk.startsWith('sk_live_')) return 'sk_live_*';
@@ -9,11 +10,65 @@ function describeKey(sk: string): string {
   return `other(len=${sk.length})`;
 }
 
+export type GetQuasarServiceOptions = {
+  /**
+   * Tenant operating VA only: quasar_integrations row, no env/vault/demo-key fallback.
+   */
+  tenantIntegrationOnly?: boolean;
+};
+
+function webhookSecretFromEnv(): string {
+  return process.env.QUASAR_WEBHOOK_SECRET || process.env.QUASER_WEBHOOK_SECRET || '';
+}
+
+/**
+ * Fail-closed tenant credential for POST /api/admin/tenants/:id/provision-va.
+ * Reuses QuasarIntegrationStore; does not copy vault/env resolution.
+ */
+async function getQuasarServiceFromTenantIntegration(tenantId: string): Promise<QuasarService> {
+  if (!tenantId) {
+    throw new Error('QUASAR_TENANT_INTEGRATION_MISSING');
+  }
+
+  const row = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
+  if (!row?.quasar_sk_secret_enc) {
+    throw new Error('QUASAR_TENANT_INTEGRATION_MISSING');
+  }
+
+  const sk = QuasarIntegrationStore.decryptSkSecret(row);
+  if (!sk) {
+    throw new Error('QUASAR_TENANT_INTEGRATION_MISSING');
+  }
+
+  const variant = BuildVariantService.getInstance();
+  if (variant.isProd() && sk.startsWith('sk_test_')) {
+    throw new Error('QUASAR_TEST_CREDENTIAL_FORBIDDEN_IN_PRODUCTION');
+  }
+  if (!variant.isProd() && sk.startsWith('sk_live_')) {
+    throw new Error('QUASAR_LIVE_CREDENTIAL_FORBIDDEN_OUTSIDE_PRODUCTION');
+  }
+  if (!sk.startsWith('sk_test_') && !sk.startsWith('sk_live_')) {
+    throw new Error('QUASAR_TENANT_INTEGRATION_INVALID_KEY');
+  }
+
+  console.log(
+    `[Quasar Factory] tenant=${tenantId} key=${describeKey(sk)} source=quasar_integrations(${row.quasar_environment || '?'})`,
+  );
+  return new QuasarService(sk, webhookSecretFromEnv());
+}
+
 /**
  * Factory function to retrieve a correctly initialized QuasarService.
  * Prefer live tenant keys for production financial / POS APIs.
  */
-export const getQuasarService = async (tenantId: string): Promise<QuasarService> => {
+export const getQuasarService = async (
+  tenantId: string,
+  options?: GetQuasarServiceOptions,
+): Promise<QuasarService> => {
+  if (options?.tenantIntegrationOnly) {
+    return getQuasarServiceFromTenantIntegration(tenantId);
+  }
+
   let apiKey = '';
   let source = '';
 
@@ -78,9 +133,5 @@ export const getQuasarService = async (tenantId: string): Promise<QuasarService>
     );
   }
 
-  const webhookSecret =
-    process.env.QUASAR_WEBHOOK_SECRET ||
-    process.env.QUASER_WEBHOOK_SECRET ||
-    '';
-  return new QuasarService(apiKey, webhookSecret);
+  return new QuasarService(apiKey, webhookSecretFromEnv());
 };

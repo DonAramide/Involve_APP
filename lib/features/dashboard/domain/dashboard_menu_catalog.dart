@@ -61,6 +61,9 @@ class DashboardMenuCatalog {
 
   static bool isPinned(String id) => id == adminHubId;
 
+  static List<String> hideableIds() =>
+      all.where((o) => !o.pinned).map((o) => o.id).toList(growable: false);
+
   static bool isVisibleOnDashboard(String id, Iterable<String> hidden) {
     if (isPinned(id)) return true;
     return !hidden.contains(id);

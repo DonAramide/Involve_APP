@@ -292,7 +292,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
-            'Choose which menu icons appear on the home dashboard. Admin Hub stays visible so you can always return here.',
+            'Choose which menu icons appear on the home dashboard. Linked devices start with Admin Hub only; you can turn other icons back on here. Admin Hub always stays visible.',
             style: TextStyle(fontSize: 13, color: Colors.grey[600]),
           ),
         ),
@@ -1791,6 +1791,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 'phone': s.phone,
                 'role': s.role,
                 'isActive': s.isActive,
+                'pinHash': s.staffCode,
                 'bankName': s.virtualBankName,
                 'bankCode': s.bankCode,
                 'accountNumber': s.virtualAccountNumber,

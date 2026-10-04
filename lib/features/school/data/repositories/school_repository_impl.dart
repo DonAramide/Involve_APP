@@ -291,11 +291,13 @@ class SchoolRepositoryImpl implements SchoolRepository {
     required String parentName,
     required String parentPhone,
     String? parentAddress,
+    String? parentEmail,
   }) async {
     if (studentIds.isEmpty) return;
     final parent = await ensureParent(
       fullName: parentName,
       phone: parentPhone,
+      email: parentEmail,
       address: parentAddress,
     );
     await linkStudentsToParent(parentId: parent.id!, studentIds: studentIds);
@@ -440,6 +442,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
       enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
+      notes: row.notes,
     );
   }
 
@@ -551,8 +554,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
         updated = updated.copyWith(phone: trimmedPhone);
         needUpdate = true;
       }
-      if ((email ?? '').trim().isNotEmpty && (match.email ?? '').isEmpty) {
-        updated = updated.copyWith(email: email!.trim());
+      if ((email ?? '').trim().isNotEmpty && (match.email ?? '').trim() != email!.trim()) {
+        updated = updated.copyWith(email: email.trim());
         needUpdate = true;
       }
       if ((address ?? '').trim().isNotEmpty && (match.address ?? '').trim() != address!.trim()) {

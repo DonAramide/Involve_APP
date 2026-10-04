@@ -143,7 +143,7 @@
               <q-tab name="school" label="School" />
               <q-tab name="retail" label="Retail" />
               <q-tab name="service" label="Service" />
-              <q-tab name="agent" label="Agent" />
+              <q-tab name="agent" label="Institute" />
             </q-tabs>
           </div>
           

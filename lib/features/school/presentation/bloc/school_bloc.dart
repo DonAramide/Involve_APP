@@ -257,6 +257,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           parentName: studentToAdd.parentName?.trim() ?? '',
           parentPhone: studentToAdd.parentPhone?.trim() ?? '',
           parentAddress: event.parentAddress,
+          parentEmail: event.parentEmail,
         );
       } else if (event.alsoAssignStudentIds.isNotEmpty) {
         await repository.assignParentToStudents(
@@ -264,6 +265,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           parentName: studentToAdd.parentName?.trim() ?? '',
           parentPhone: studentToAdd.parentPhone?.trim() ?? '',
           parentAddress: event.parentAddress,
+          parentEmail: event.parentEmail,
         );
       }
       emit(state.copyWith(status: SchoolStatus.success));
@@ -346,6 +348,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           parentName: event.student.parentName?.trim() ?? '',
           parentPhone: event.student.parentPhone?.trim() ?? '',
           parentAddress: event.parentAddress,
+          parentEmail: event.parentEmail,
         );
       }
       emit(state.copyWith(status: SchoolStatus.success));

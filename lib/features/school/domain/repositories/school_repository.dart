@@ -35,6 +35,7 @@ abstract class SchoolRepository {
     required String parentName,
     required String parentPhone,
     String? parentAddress,
+    String? parentEmail,
   });
   Future<List<SchoolParent>> getParents();
   Future<SchoolParent?> getParentById(int id);

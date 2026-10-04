@@ -6,9 +6,18 @@
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="dashboard" size="sm" color="amber-4" />
         <div>
-          <div class="text-operator-title text-weight-bold" style="font-size: 16px;">FIELD AGENT PORTAL</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ agentInfo?.agentCode || 'LOADING' }} // ACTIVE_PROFILE</div>
+          <div class="text-operator-title text-weight-bold" style="font-size: 16px;">INSTITUTE PORTAL</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">
+            {{ identity.agentCode || (loading ? 'Loading…' : 'No Institute code') }}
+            <template v-if="identity.status"> // {{ identity.status }}</template>
+          </div>
         </div>
+      </div>
+      <div class="text-right text-caption text-muted" v-if="identity.name || identity.email">
+        <div class="text-weight-bold text-main">{{ identity.name || '—' }}</div>
+        <div>{{ identity.email }}</div>
+        <div v-if="identity.phone">{{ identity.phone }}</div>
+        <div v-if="identity.institution">{{ identity.institution }}</div>
       </div>
     </div>
 
@@ -27,12 +36,13 @@
         narrow-indicator
       >
         <q-tab name="overview" label="Overview" icon="dashboard" no-caps />
-        <q-tab name="merchants" label="Merchants" icon="storefront" no-caps />
+        <q-tab name="tenants" label="Tenants" icon="storefront" no-caps />
         <q-tab name="deployments" label="Deployments" icon="devices" no-caps />
         <q-tab name="finance" label="Finance" icon="account_balance_wallet" no-caps />
         <q-tab name="analytics" label="Analytics" icon="analytics" no-caps />
         <q-tab name="profile" label="Profile" icon="person" no-caps />
         <q-tab name="support" label="Support" icon="help" no-caps />
+        <q-tab name="developer" label="Developer" icon="code" no-caps />
       </q-tabs>
     </div>
 
@@ -64,12 +74,30 @@
           </template>
         </div>
 
-        <!-- ROW 2: Quick Actions & Monthly Target -->
+        <div class="row op-gap-16 shrink-0">
+          <div class="col-xs-12 col-sm-6 col-md panel-card bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Total Tenants</div>
+            <div class="text-h5 text-weight-bold">{{ payload.kpis?.totalTenants?.value ?? payload.kpis?.totalMerchants?.value ?? 0 }}</div>
+          </div>
+          <div class="col-xs-12 col-sm-6 col-md panel-card bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Active Tenants</div>
+            <div class="text-h5 text-weight-bold text-green-4">{{ payload.kpis?.activeTenants?.value || 0 }}</div>
+          </div>
+          <div class="col-xs-12 col-sm-6 col-md panel-card bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Pending Onboarding</div>
+            <div class="text-h5 text-weight-bold text-amber-4">{{ payload.kpis?.pendingOnboarding?.value || 0 }}</div>
+          </div>
+          <div class="col-xs-12 col-sm-6 col-md panel-card bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Assessed Institute share (SHADOW)</div>
+            <div class="text-h5 text-weight-bold text-amber-4">{{ formatKobo(payload.feeOrchestration?.assessed_kobo) }}</div>
+            <div class="text-metric-mono text-muted" style="font-size: 9px;">NOT YET AVAILABLE</div>
+          </div>
+        </div>
         <div class="row op-gap-16 shrink-0">
           <!-- Quick Actions -->
           <div class="col-xs-12 col-md-8 row op-gap-16">
             <div 
-              v-for="(action, index) in payload.quickActions" 
+              v-for="(action, index) in visibleQuickActions" 
               :key="index" 
               class="col panel-card bg-panel border-muted rounded-borders q-pa-md row items-center justify-center op-gap-8 cursor-pointer hover-card"
               @click="$router.push(action.route)"
@@ -94,7 +122,7 @@
         </div>
 
         <!-- ROW 3: Reputation Summary -->
-        <div class="row op-gap-16 shrink-0 cursor-pointer hover-card" @click="$router.push('/agent/reputation')">
+        <div class="row op-gap-16 shrink-0 cursor-pointer hover-card" @click="$router.push('/institute/reputation')">
           <div class="col bg-panel border-muted rounded-borders q-pa-md row items-center justify-between">
             <div>
               <div class="text-caption text-muted text-uppercase text-weight-bold q-mb-xs">Trust Score</div>
@@ -146,18 +174,18 @@
         </div>
       </q-tab-panel>
 
-      <!-- MERCHANTS TAB -->
-      <q-tab-panel name="merchants" class="q-pa-none column op-gap-16">
+      <!-- TENANTS TAB -->
+      <q-tab-panel name="tenants" class="q-pa-none column op-gap-16">
         <!-- Actions & Territory/Portfolio Summary -->
         <div class="row op-gap-16 shrink-0">
           <!-- Quick Actions -->
           <div class="col-xs-12 col-md-4 bg-panel border-muted rounded-borders q-pa-md column justify-between">
             <div class="text-weight-bold q-mb-sm text-caption">QUICK ACTIONS</div>
             <div class="column op-gap-8">
-              <q-btn color="amber-4" text-color="black" icon="person_add" label="Create Lead" class="full-width" no-caps @click="$router.push('/agent/leads')" />
-              <q-btn outline color="amber-4" icon="storefront" label="Register Merchant" class="full-width" no-caps @click="$router.push('/agent/portfolio')" />
+              <q-btn color="amber-4" text-color="black" icon="person_add" label="Create Lead" class="full-width" no-caps @click="$router.push('/institute/leads')" />
               <q-btn outline color="grey-4" icon="upload_file" label="Upload KYC Documents" class="full-width" no-caps @click="kycModal.open()" />
             </div>
+            <div class="text-caption text-muted q-mt-sm">Tenant registration is on the Invify mobile app. Assigned tenants show in this portfolio.</div>
           </div>
 
           <!-- Territory Summary -->
@@ -168,15 +196,15 @@
             </div>
             <div class="text-h6 text-purple-2 q-mb-sm">{{ payload.territory?.name || agentInfo?.territory || 'Default' }}</div>
             <div class="row justify-between border-bottom-light q-pb-xs q-mb-xs">
-              <span class="text-caption text-muted">Total Merchants</span>
+              <span class="text-caption text-muted">Total Tenants</span>
               <span class="text-weight-bold">{{ payload.territory?.merchants || 0 }}</span>
             </div>
             <div class="row justify-between border-bottom-light q-pb-xs q-mb-xs">
-              <span class="text-caption text-muted">Active Merchants</span>
+              <span class="text-caption text-muted">Active Tenants</span>
               <span class="text-weight-bold text-green-4">{{ payload.territory?.active || 0 }}</span>
             </div>
             <div class="row justify-between">
-              <span class="text-caption text-muted">Pending Merchants</span>
+              <span class="text-caption text-muted">Pending Tenants</span>
               <span class="text-weight-bold text-amber-4">{{ payload.territory?.pending || 0 }}</span>
             </div>
           </div>
@@ -239,18 +267,21 @@
           </div>
         </div>
 
-        <!-- Recent Merchants Table -->
+        <!-- Recent Tenants Table -->
         <div class="bg-panel border-muted rounded-borders column overflow-hidden" style="max-height: 300px;">
           <div class="bg-panel-darker q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
-            <span class="text-weight-bold text-caption">RECENT MERCHANTS</span>
-            <q-btn dense flat color="amber-4" label="View All" size="sm" @click="$router.push('/agent/portfolio')" />
+            <span class="text-weight-bold text-caption">RECENT TENANTS</span>
+            <q-btn dense flat color="amber-4" label="View All" size="sm" @click="$router.push('/institute/portfolio')" />
           </div>
-          <div v-if="!payload.recentMerchants?.length" class="flex flex-center col text-muted q-pa-md">No merchants onboarded yet.</div>
+          <div v-if="!payload.recentMerchants?.length" class="flex flex-center col text-muted q-pa-md">
+            No tenants assigned to {{ identity.agentCode || 'this Institute' }} yet.
+          </div>
           <div v-else class="col overflow-auto custom-scrollbar">
             <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
               <thead class="bg-panel-darker text-muted text-metric-mono sticky-header" style="font-size: 10px;">
                 <tr>
-                  <th class="q-pa-sm border-bottom">Merchant</th>
+                  <th class="q-pa-sm border-bottom">Tenant</th>
+                  <th class="q-pa-sm border-bottom">Agent Code</th>
                   <th class="q-pa-sm border-bottom">KYC</th>
                   <th class="q-pa-sm border-bottom">Device</th>
                   <th class="q-pa-sm border-bottom">Action</th>
@@ -259,6 +290,7 @@
               <tbody class="text-caption" style="font-size: 12px;">
                 <tr v-for="m in payload.recentMerchants" :key="m.id" class="border-bottom-light hover-row">
                   <td class="q-pa-sm text-weight-bold">{{ m.business_name || 'Unknown' }}</td>
+                  <td class="q-pa-sm text-metric-mono text-muted">{{ m.agent_code || payload.identity?.agent_code || '—' }}</td>
                   <td class="q-pa-sm">
                     <q-badge :color="m.status === 'ACTIVE' ? 'green-9' : 'amber-9'" :text-color="m.status === 'ACTIVE' ? 'green-3' : 'amber-3'">{{ m.status }}</q-badge>
                   </td>
@@ -347,12 +379,29 @@
 
       <!-- FINANCE TAB -->
       <q-tab-panel name="finance" class="q-pa-none column op-gap-16">
+        <div class="bg-panel-darker border-muted rounded-borders q-pa-sm text-caption text-amber-4">
+          Fee orchestration is in SHADOW mode. The Institute share of each transaction fee is assessed as a pending payable, not withdrawable cash. Payouts are disabled.
+        </div>
+        <div class="row op-gap-16 shrink-0">
+          <div class="col-xs-12 col-sm bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Assessed Institute share</div>
+            <div class="text-h5 text-weight-bold text-amber-4">{{ formatKobo(payload.feeOrchestration?.assessed_kobo) }}</div>
+          </div>
+          <div class="col-xs-12 col-sm bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Pending Payable</div>
+            <div class="text-h5 text-weight-bold">{{ formatKobo(payload.feeOrchestration?.pending_payable_kobo) }}</div>
+          </div>
+          <div class="col-xs-12 col-sm bg-panel border-muted rounded-borders q-pa-md">
+            <div class="text-caption text-muted">Not Yet Available</div>
+            <div class="text-h5 text-weight-bold text-grey-5">{{ formatKobo(payload.feeOrchestration?.available_kobo) }}</div>
+          </div>
+        </div>
         <!-- Balance Summaries & Link to Full Module -->
         <div class="row op-gap-16 shrink-0">
           <div class="col bg-panel border-muted rounded-borders q-pa-md row justify-between items-center">
             <div>
-              <div class="text-caption text-muted">Available Balance</div>
-              <div class="text-h4 text-weight-bold text-green-4">${{ (payload.wallet?.summary?.availableBalance || 0).toLocaleString() }}</div>
+              <div class="text-caption text-muted">Legacy Wallet Available</div>
+              <div class="text-h4 text-weight-bold text-green-4">{{ formatMoney(payload.wallet?.summary?.availableBalance) }}</div>
             </div>
             <q-icon name="account_balance_wallet" size="lg" color="green-4" />
           </div>
@@ -360,14 +409,14 @@
           <div class="col bg-panel border-muted rounded-borders q-pa-md row justify-between items-center">
             <div>
               <div class="text-caption text-muted">Pending Earnings</div>
-              <div class="text-h4 text-weight-bold text-amber-4">${{ (payload.wallet?.summary?.pendingBalance || 0).toLocaleString() }}</div>
+              <div class="text-h4 text-weight-bold text-amber-4">{{ formatMoney(payload.wallet?.summary?.pendingBalance) }}</div>
             </div>
             <q-icon name="pending_actions" size="lg" color="amber-4" />
           </div>
 
           <div class="col bg-panel border-muted rounded-borders q-pa-md column justify-center items-center op-gap-8">
             <div class="text-caption text-muted">Wallet Center</div>
-            <q-btn color="amber-4" text-color="black" icon="open_in_new" label="Open Wallet Center" class="full-width" no-caps @click="$router.push('/agent/wallet')" />
+            <q-btn color="amber-4" text-color="black" icon="open_in_new" label="Open Wallet Center" class="full-width" no-caps @click="$router.push('/institute/wallet')" />
           </div>
         </div>
 
@@ -376,18 +425,33 @@
           <!-- Recent Commissions -->
           <div class="col bg-panel border-muted rounded-borders column overflow-hidden" style="max-height: 300px;">
             <div class="bg-panel-darker q-px-sm q-py-xs border-bottom row items-center shrink-0">
-              <span class="text-weight-bold text-caption text-muted">RECENT COMMISSIONS</span>
+              <span class="text-weight-bold text-caption text-muted">RECENT INSTITUTE FEE SHARES</span>
             </div>
-            <div v-if="!payload.wallet?.recentCommissions?.length" class="flex flex-center col text-muted text-caption q-pa-md">No commissions earned yet.</div>
+            <div v-if="!payload.wallet?.recentCommissions?.length && !payload.feeOrchestration?.recent?.length" class="flex flex-center col text-muted text-caption q-pa-md">No Institute fee shares recorded yet. Shares appear after tenants transact.</div>
             <div v-else class="col overflow-auto custom-scrollbar">
               <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
+                <thead class="bg-panel-darker text-muted text-metric-mono sticky-header" style="font-size: 10px;">
+                  <tr>
+                    <th class="q-pa-sm">Date</th>
+                    <th class="q-pa-sm">Tenant</th>
+                    <th class="q-pa-sm">Type</th>
+                    <th class="q-pa-sm">Fee</th>
+                    <th class="q-pa-sm">Institute Share</th>
+                    <th class="q-pa-sm">Status</th>
+                    <th class="q-pa-sm">Mode</th>
+                  </tr>
+                </thead>
                 <tbody class="text-caption" style="font-size: 12px;">
-                  <tr v-for="c in payload.wallet.recentCommissions" :key="c.id" class="border-bottom-light hover-row">
-                    <td class="q-pa-sm text-muted">{{ c.type || 'ONBOARDING' }}</td>
-                    <td class="q-pa-sm text-weight-bold text-green-4">${{ (c.amount || 0).toLocaleString() }}</td>
-                    <td class="q-pa-sm text-right">
-                      <q-btn dense flat color="amber-4" icon="chevron_right" size="sm" @click="$q.notify({type: 'info', message: 'Commission Details coming soon.'})" />
+                  <tr v-for="c in (payload.feeOrchestration?.recent || payload.wallet?.recentCommissions || [])" :key="c.assessment_id || c.id" class="border-bottom-light hover-row">
+                    <td class="q-pa-sm text-muted">{{ c.date ? new Date(c.date).toLocaleDateString() : '—' }}</td>
+                    <td class="q-pa-sm text-metric-mono">{{ c.tenant_id || '—' }}</td>
+                    <td class="q-pa-sm">{{ c.transaction_type || c.type || 'AGENT_FEE' }}</td>
+                    <td class="q-pa-sm">{{ c.fee_amount_kobo != null ? formatKobo(c.fee_amount_kobo) : '—' }}</td>
+                    <td class="q-pa-sm text-weight-bold text-green-4">{{ c.agent_share_kobo != null ? formatKobo(c.agent_share_kobo) : formatMoney(c.amount) }}</td>
+                    <td class="q-pa-sm">
+                      <q-badge color="amber-9" text-color="amber-3">{{ c.status || 'PENDING' }}</q-badge>
                     </td>
+                    <td class="q-pa-sm">{{ c.mode || 'SHADOW' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -403,9 +467,9 @@
             <div v-else class="col overflow-auto custom-scrollbar">
               <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
                 <tbody class="text-caption" style="font-size: 12px;">
-                  <tr v-for="w in payload.wallet.recentWithdrawals" :key="w.id" class="border-bottom-light hover-row">
+                  <tr v-for="w in (payload.wallet?.recentWithdrawals || [])" :key="w.id" class="border-bottom-light hover-row">
                     <td class="q-pa-sm text-muted">{{ new Date(w.created_at).toLocaleDateString() }}</td>
-                    <td class="q-pa-sm text-weight-bold text-red-4">-${{ (w.amount || 0).toLocaleString() }}</td>
+                    <td class="q-pa-sm text-weight-bold text-red-4">-{{ formatMoney(w.amount) }}</td>
                     <td class="q-pa-sm text-right">
                       <q-badge :color="w.status === 'COMPLETED' ? 'green-9' : 'amber-9'">{{ w.status }}</q-badge>
                     </td>
@@ -425,38 +489,56 @@
           <div class="text-caption text-muted q-mt-sm q-mb-lg" style="max-width: 320px;">
             Access full performance tracking, territory intelligence, operational risk signals, and gamification trends powered by our new fast-sync engine.
           </div>
-          <q-btn color="blue-4" text-color="black" label="Open Analytics Center" icon="open_in_new" no-caps @click="$router.push('/agent/analytics')" />
+          <q-btn color="blue-4" text-color="black" label="Open Analytics Center" icon="open_in_new" no-caps @click="$router.push('/institute/analytics')" />
         </div>
       </q-tab-panel>
 
       <!-- PROFILE TAB -->
       <q-tab-panel name="profile" class="q-pa-none column flex-center op-gap-16">
         <div class="panel-card bg-panel border-muted rounded-borders q-pa-lg column items-center text-center op-gap-16" style="width: 100%; max-width: 460px;">
-          <q-avatar size="100px" class="border-muted shadow-2">
-            <img :src="agentInfo?.profile?.photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
+          <q-avatar size="100px" color="amber-9" text-color="amber-2" class="border-muted shadow-2">
+            <img v-if="identity.photo" :src="identity.photo" />
+            <span v-else>{{ identity.initials }}</span>
           </q-avatar>
           <div>
-            <div class="text-h5 text-weight-bold">{{ agentInfo?.name || 'Agent User' }}</div>
-            <div class="text-metric-mono text-muted">{{ agentInfo?.agentCode || 'AAA000' }}</div>
+            <div class="text-h5 text-weight-bold">{{ identity.name || '—' }}</div>
+            <div class="text-metric-mono text-muted">{{ identity.agentCode || '—' }}</div>
           </div>
 
           <q-separator dark class="full-width opacity-10" />
 
           <div class="full-width column op-gap-8 text-left q-px-md">
             <div class="row justify-between">
+              <span class="text-muted text-caption">Email:</span>
+              <span class="text-weight-bold">{{ identity.email || '—' }}</span>
+            </div>
+            <div class="row justify-between">
+              <span class="text-muted text-caption">Phone:</span>
+              <span class="text-weight-bold">{{ identity.phone || '—' }}</span>
+            </div>
+            <div class="row justify-between">
+              <span class="text-muted text-caption">Status:</span>
+              <span class="text-weight-bold">{{ identity.status || '—' }}</span>
+            </div>
+            <div class="row justify-between">
+              <span class="text-muted text-caption">Joined:</span>
+              <span class="text-weight-bold">{{ identity.joinedLabel }}</span>
+            </div>
+            <div class="row justify-between">
               <span class="text-muted text-caption">Territory:</span>
-              <span class="text-weight-bold">{{ agentInfo?.territory || 'Unassigned' }}</span>
+              <span class="text-weight-bold">{{ identity.territory || '—' }}</span>
             </div>
             <div class="row justify-between">
               <span class="text-muted text-caption">KYC Status:</span>
-              <q-badge :color="agentInfo?.kycStatus === 'VERIFIED' ? 'green-9' : 'amber-9'">
-                {{ agentInfo?.kycStatus || 'PENDING' }}
+              <q-badge v-if="identity.kyc" :color="identity.kyc === 'VERIFIED' ? 'green-9' : 'amber-9'">
+                {{ identity.kyc }}
               </q-badge>
+              <span v-else class="text-weight-bold">—</span>
             </div>
             <div class="row justify-between">
-              <span class="text-muted text-caption">MFA Status:</span>
-              <q-badge :color="agentInfo?.profile?.mfa_enabled ? 'green-9' : 'grey-9'">
-                {{ agentInfo?.profile?.mfa_enabled ? 'ENABLED' : 'DISABLED' }}
+              <span class="text-muted text-caption">2FA Status:</span>
+              <q-badge :color="identity.mfa ? 'green-9' : 'grey-9'">
+                {{ identity.mfa ? 'ENABLED' : 'DISABLED' }}
               </q-badge>
             </div>
           </div>
@@ -464,8 +546,29 @@
           <q-separator dark class="full-width opacity-10" />
 
           <div class="column full-width op-gap-8">
-            <q-btn color="amber-4" text-color="black" label="Open Full Profile" class="full-width" no-caps @click="$router.push('/agent/profile')" />
-            <q-btn outline color="amber-4" label="Open Security Center" class="full-width" no-caps @click="$router.push('/agent/profile')" />
+            <q-btn
+              v-if="!identity.mfa"
+              color="amber-4"
+              text-color="black"
+              icon="phonelink_lock"
+              label="Enable 2FA"
+              class="full-width"
+              no-caps
+              :loading="mfaBusy"
+              @click="startMfaSetup"
+            />
+            <q-btn
+              v-else
+              outline
+              color="green-4"
+              icon="verified_user"
+              label="2FA Enabled"
+              class="full-width"
+              no-caps
+              disable
+            />
+            <q-btn color="amber-4" text-color="black" label="Open Full Profile" class="full-width" no-caps @click="$router.push('/institute/profile')" />
+            <q-btn outline color="amber-4" label="Open Security Center" class="full-width" no-caps @click="$router.push({ path: '/institute/profile', query: { tab: 'security' } })" />
           </div>
         </div>
       </q-tab-panel>
@@ -481,22 +584,62 @@
         </div>
       </q-tab-panel>
 
+      <!-- DEVELOPER TAB -->
+      <q-tab-panel name="developer" class="q-pa-none column flex-center op-gap-16">
+        <div class="text-center column flex-center q-pa-xl">
+          <q-icon name="code" size="4rem" color="amber-4" class="q-mb-md" />
+          <div class="text-h6 text-weight-bold">Developer & Webhooks</div>
+          <div class="text-caption text-muted q-mt-sm q-mb-lg" style="max-width: 360px;">
+            Configure your webhook URL, verify Invify signatures, and manage API credentials. Test events do not affect your balance.
+          </div>
+          <q-btn color="amber-4" text-color="black" label="Open Developer Center" icon="open_in_new" no-caps @click="$router.push('/institute/developer')" />
+        </div>
+      </q-tab-panel>
+
     </q-tab-panels>
     
     <AgentKYCUploadModal ref="kycModal" />
     <AgentHardwareAssignmentModal ref="hardwareModal" />
+
+    <q-dialog v-model="showMfaModal" persistent>
+      <q-card class="bg-panel text-main" style="min-width: 400px">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Enable 2FA</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section class="column flex-center op-gap-16 q-pt-md">
+          <div class="bg-white q-pa-sm rounded-borders">
+            <qrcode-vue v-if="mfaSetupData.qrCodeUri" :value="mfaSetupData.qrCodeUri" :size="200" level="M" />
+          </div>
+          <div class="text-caption text-center text-muted">
+            Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code.
+          </div>
+          <div class="text-metric-mono text-amber-4 text-center">
+            Secret: {{ mfaSetupData.secret }}
+          </div>
+          <q-input dark outlined v-model="mfaVerifyCode" label="Enter 6-digit Code" color="amber-4" class="full-width" maxlength="6" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="white" v-close-popup />
+          <q-btn label="Verify & Enable" color="amber-4" text-color="black" @click="verifyMfaSetup" :loading="mfaBusy" :disable="!mfaVerifyCode || mfaVerifyCode.length < 6" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import VueApexCharts from 'vue3-apexcharts'
+import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
 import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
+import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -504,14 +647,72 @@ const apexchart = VueApexCharts
 const kycModal = ref(null)
 const hardwareModal = ref(null)
 const loading = ref(true)
+const mfaBusy = ref(false)
+const showMfaModal = ref(false)
+const mfaSetupData = ref({})
+const mfaVerifyCode = ref('')
 const agentInfo = ref(null)
 const payload = ref({})
 const activeTab = ref('overview')
+const visibleQuickActions = computed(() =>
+  (payload.value.quickActions || []).filter((action) => {
+    const label = String(action.label || '').toLowerCase()
+    const route = String(action.route || '').toLowerCase()
+    return !label.includes('register merchant') && !route.includes('register-merchant')
+  }),
+)
 
-// Format Helpers
+function parseStoredAgent() {
+  try {
+    return JSON.parse(localStorage.getItem('invify_agent_info') || 'null')
+  } catch {
+    return null
+  }
+}
+
+function agentAuthHeaders() {
+  const token = localStorage.getItem('invify_agent_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+const identity = computed(() => {
+  const p = payload.value?.identity || {}
+  const a = agentInfo.value || {}
+  const s = parseStoredAgent() || {}
+  const composed = `${a.first_name || s.first_name || ''} ${a.last_name || s.last_name || ''}`.trim()
+  const email = p.email || a.email || s.email || ''
+  const name = p.name || a.name || s.name || composed || (email ? email.split('@')[0] : '')
+  const parts = String(name || '').split(/\s+/).filter(Boolean)
+  const initials = ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase() || '?'
+  const joinedRaw = p.date_joined || a.created_at || s.created_at
+  return {
+    name,
+    email,
+    phone: p.phone || a.phone || a.phone_number || s.phone || '',
+    agentCode: pickInstituteCode(p.agent_code, a.agent_code, a.agentCode, s.agentCode, s.agent_code),
+    status: p.status || a.status || s.status || '',
+    institution: p.institution || '',
+    territory: a.territory || p.territory || '',
+    kyc: a.profile?.kyc_status || a.kyc_status || a.kycStatus || p.kyc_status || '',
+    mfa: Boolean(a.profile?.mfa_enabled || s.profile?.mfa_enabled),
+    photo: a.profile?.photo_url || a.profile?.profile_photo_url || a.passportImage || null,
+    initials,
+    joinedLabel: joinedRaw ? new Date(joinedRaw).toLocaleDateString() : '—',
+  }
+})
+
+const formatMoney = (num) => {
+  const value = Number(num || 0)
+  return `₦${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 const formatNumber = (num, isCurrency) => {
-  if (num === undefined || num === null) return '0'
-  return isCurrency ? `$${num.toLocaleString()}` : num.toLocaleString()
+  if (num === undefined || num === null) return isCurrency ? '₦0.00' : '0'
+  return isCurrency ? formatMoney(num) : Number(num).toLocaleString()
+}
+const formatKobo = (kobo) => {
+  const naira = Number(kobo || 0) / 100
+  return `₦${naira.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 const getTrendColor = (trend) => {
   if (!trend) return 'text-muted'
@@ -522,7 +723,7 @@ const getTrendColor = (trend) => {
 }
 
 const kpiConfig = [
-  { key: 'totalMerchants', label: 'Total Merchants', icon: 'storefront', iconColor: 'grey-6', isCurrency: false, colorClass: 'text-main' },
+  { key: 'totalMerchants', label: 'Total Tenants', icon: 'storefront', iconColor: 'grey-6', isCurrency: false, colorClass: 'text-main' },
   { key: 'thisMonth', label: 'This Month', icon: 'event', iconColor: 'amber-4', isCurrency: false, colorClass: 'text-amber-4' },
   { key: 'activeDevices', label: 'Active Devices', icon: 'devices', iconColor: 'cyan-4', isCurrency: false, colorClass: 'text-cyan-4' },
   { key: 'activeTerminals', label: 'Active Terminals', icon: 'point_of_sale', iconColor: 'purple-4', isCurrency: false, colorClass: 'text-purple-4' },
@@ -542,26 +743,90 @@ const syncDevice = async () => {
   }
 }
 
+const startMfaSetup = async () => {
+  mfaBusy.value = true
+  try {
+    const res = await axios.post('/api/agent/security/mfa/enable', {}, { headers: agentAuthHeaders() })
+    mfaSetupData.value = res.data || {}
+    mfaVerifyCode.value = ''
+    showMfaModal.value = true
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.message || 'Could not start 2FA setup',
+    })
+  } finally {
+    mfaBusy.value = false
+  }
+}
+
+const verifyMfaSetup = async () => {
+  mfaBusy.value = true
+  try {
+    await axios.post('/api/agent/security/mfa/verify', { code: mfaVerifyCode.value }, { headers: agentAuthHeaders() })
+    const next = {
+      ...(agentInfo.value || {}),
+      profile: { ...(agentInfo.value?.profile || {}), mfa_enabled: true },
+    }
+    agentInfo.value = next
+    localStorage.setItem('invify_agent_info', JSON.stringify(next))
+    showMfaModal.value = false
+    $q.notify({ type: 'positive', message: '2FA is enabled on this Institute account' })
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.message || 'Invalid 2FA code',
+    })
+  } finally {
+    mfaBusy.value = false
+  }
+}
+
 const fetchDashboardData = async () => {
   loading.value = true
+  agentInfo.value = parseStoredAgent()
   try {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
       $q.notify({ type: 'negative', message: 'Not authenticated. Please log in.' })
+      router.push('/institute/login')
       return
     }
 
-    const authRes = await axios.get('/api/agent/profile', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    agentInfo.value = authRes.data.data
+    const headers = agentAuthHeaders()
+    const [profileRes, dashRes] = await Promise.allSettled([
+      axios.get('/api/agent/profile', { headers }),
+      axios.get('/api/agent/dashboard', { headers }),
+    ])
 
-    const dashRes = await axios.get('/api/agent/dashboard', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    
-    payload.value = dashRes.data
+    if (dashRes.status === 'fulfilled' && dashRes.value.data?.identity) {
+      payload.value = dashRes.value.data
+    } else if (dashRes.status === 'rejected') {
+      const err = dashRes.reason
+      $q.notify({
+        type: 'negative',
+        message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to load dashboard data',
+        position: 'top-right',
+      })
+    }
 
+    const live = { ...(agentInfo.value || {}) }
+    if (profileRes.status === 'fulfilled' && profileRes.value.data?.data) {
+      Object.assign(live, profileRes.value.data.data)
+    }
+    const code = pickInstituteCode(
+      payload.value?.identity?.agent_code,
+      live.agent_code,
+      live.agentCode,
+    )
+    if (code) {
+      live.agent_code = code
+      live.agentCode = code
+    }
+    agentInfo.value = live
+    if (Object.keys(live).length) {
+      localStorage.setItem('invify_agent_info', JSON.stringify(live))
+    }
   } catch (err) {
     console.error('Dashboard fetch failed', err)
     $q.notify({ type: 'negative', message: 'Failed to load dashboard data', position: 'top-right' })
@@ -573,7 +838,7 @@ const fetchDashboardData = async () => {
 onMounted(fetchDashboardData)
 
 // Chart Series
-const growthSeries = computed(() => [{ name: 'Merchants', data: payload.value.analytics?.merchantGrowth || [] }])
+const growthSeries = computed(() => [{ name: 'Tenants', data: payload.value.analytics?.merchantGrowth || [] }])
 const commissionSeries = computed(() => [{ name: 'Commission', data: payload.value.analytics?.commissionTrend || [] }])
 const funnelSeries = computed(() => [{ name: 'Conversion', data: payload.value.analytics?.activationFunnel || [] }])
 

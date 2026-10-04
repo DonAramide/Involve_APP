@@ -3,13 +3,14 @@
     <q-header elevated class="bg-panel-darker border-bottom flex items-center justify-between q-px-md" style="height: 50px;">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="support_agent" size="sm" color="amber-4" />
-        <span class="text-operator-title text-weight-bold" style="letter-spacing: 1px;">AGENT PORTAL</span>
+        <span class="text-operator-title text-weight-bold" style="letter-spacing: 1px;">INSTITUTE PORTAL</span>
       </div>
       
       <div class="row items-center op-gap-12" v-if="agentInfo">
         <div class="text-metric-mono text-muted text-right" style="font-size: 10px;">
           <span>{{ agentInfo.name }}</span><br/>
-          <span class="text-amber-4">[{{ agentInfo.agentCode }}]</span>
+          <span class="text-amber-4">[{{ displayAgentCode }}]</span>
+          <span v-if="agentInfo.email"><br/>{{ agentInfo.email }}</span>
         </div>
         <q-btn flat round size="sm" icon="logout" color="grey-5" @click="logout" />
       </div>
@@ -22,11 +23,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { pickInstituteCode } from '../utils/instituteIdentity'
 
 const router = useRouter()
 const agentInfo = ref(null)
+const displayAgentCode = computed(() =>
+  pickInstituteCode(agentInfo.value?.agent_code, agentInfo.value?.agentCode),
+)
 
 onMounted(() => {
   const stored = localStorage.getItem('invify_agent_info')
@@ -39,7 +44,7 @@ const logout = () => {
   localStorage.removeItem('invify_agent_token')
   localStorage.removeItem('invify_agent_info')
   agentInfo.value = null
-  router.push('/agent/login')
+  router.push('/institute/login')
 }
 </script>
 

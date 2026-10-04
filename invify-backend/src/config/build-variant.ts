@@ -112,15 +112,15 @@ export class BuildVariantService {
 
   public getAgentPortalUrl(): string {
     if (this.isLocal()) {
-      return process.env.LOCAL_AGENT_PORTAL_URL || 'http://localhost:3000/agent/reset-password';
+      return process.env.LOCAL_AGENT_PORTAL_URL || `${this.getAppPortalBaseUrl()}/institute/login`;
     }
     if (this.isStaging()) {
-      return process.env.STAGING_AGENT_PORTAL_URL || 'http://localhost:3000/agent/reset-password';
+      return process.env.STAGING_AGENT_PORTAL_URL || `${this.getAppPortalBaseUrl()}/institute/login`;
     }
     // Production
     const prodUrl = process.env.PROD_AGENT_PORTAL_URL || '';
     if (!prodUrl) {
-      throw new Error('[BuildVariantService] PROD_AGENT_PORTAL_URL is required in PRODUCTION');
+      return `${this.getAppPortalBaseUrl()}/institute/login`;
     }
     return prodUrl;
   }
@@ -172,12 +172,13 @@ export class BuildVariantService {
   }
 
   /**
-   * Full login URL for admin or tenant portals.
+   * Full login URL for admin, tenant, or Institute (agent) portals.
    */
-  public getLoginUrl(portal: 'admin' | 'tenant' = 'admin'): string {
+  public getLoginUrl(portal: 'admin' | 'tenant' | 'agent' = 'admin'): string {
     const base = this.getAppPortalBaseUrl();
-    const path = portal === 'tenant' ? '/tenant/login' : '/admin/login';
-    return `${base}${path}`;
+    if (portal === 'tenant') return `${base}/tenant/login`;
+    if (portal === 'agent') return `${base}/institute/login`;
+    return `${base}/admin/login`;
   }
 
   private assertPortalUrlSafe(url: string, variantLabel: string) {
@@ -205,7 +206,7 @@ export class BuildVariantService {
     let serviceRoleKey = '';
 
     if (this.isLocal()) {
-      url = process.env.LOCAL_SUPABASE_URL || process.env.DEV_SUPABASE_URL || process.env.SUPABASE_URL || '';
+      url = process.env.LOCAL_SUPABASE_URL || process.env.DEV_SUPABASE_URL || '';
       key = process.env.LOCAL_SUPABASE_KEY || process.env.DEV_SUPABASE_KEY || process.env.SUPABASE_KEY || '';
       serviceRoleKey =
         process.env.LOCAL_SUPABASE_SERVICE_KEY ||
@@ -213,6 +214,12 @@ export class BuildVariantService {
         process.env.SUPABASE_SERVICE_KEY ||
         process.env.SUPABASE_SERVICE_ROLE_KEY ||
         '';
+      const host = url.toLowerCase();
+      if (host.includes('supabase.co') || host.includes('rpcjelhacmkhzguljdgi') || host.includes('jjixrywfnaijvahmvcwj')) {
+        throw new Error(
+          '[BuildVariantService] LOCAL must use LOCAL_SUPABASE_URL on loopback (http://127.0.0.1:54321). Refusing remote Supabase.',
+        );
+      }
     } else if (this.isStaging()) {
       url = process.env.STAGING_SUPABASE_URL || '';
       key = process.env.STAGING_SUPABASE_PUBLISHABLE_KEY || process.env.STAGING_SUPABASE_KEY || '';

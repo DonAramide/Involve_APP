@@ -919,7 +919,11 @@ const activeNavigationTree = computed(() => {
         { label: 'Virtual Accounts', path: '/finance/virtual-accounts', icon: 'pin', color: 'cyan-4', badge: 'NUBAN', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
         { label: 'Refunds & Chargebacks', path: '/finance/refunds-chargebacks', icon: 'gavel', color: 'red-4', badge: '4-EYES', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'School Payments', path: '/finance/school-payments', icon: 'school', color: 'teal-4', badge: 'DISPUTES', badgeBg: 'teal-10', badgeColor: 'teal-2' },
-        { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' }
+        { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' },
+        { label: 'Institute Commissions & Billing', path: '/admin/agents/commissions', icon: 'account_balance_wallet', color: 'green-4' },
+        { label: 'Platform Fee Orchestration', path: '/admin/platform-fees', icon: 'request_quote', color: 'teal-4', badge: 'Fees', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Fee Assessments (read-only)', path: '/admin/platform-fees/assessments', icon: 'fact_check', color: 'teal-3' },
+        { label: 'Fee Distribution', path: '/admin/platform-fees/distribution', icon: 'account_tree', color: 'teal-3' }
       ]
     
     case 'governance':
@@ -1006,9 +1010,12 @@ const activeNavigationTree = computed(() => {
         { label: 'Pending KYC Documents', path: '/admin/kyc-pending', icon: 'pending_actions', color: 'amber-4', badge: 'Review', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
-        { label: 'Agent Governance & Onboarding', path: '/admin/agents', icon: 'support_agent', color: 'amber-4', badge: 'Field Ops', badgeBg: 'amber-10', badgeColor: 'amber-2' },
-        { label: 'Agent Commissions & Billing', path: '/admin/agents/commissions', icon: 'account_balance_wallet', color: 'green-4' },
-        { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Institute Governance & Onboarding', path: '/admin/agents', icon: 'support_agent', color: 'amber-4', badge: 'Field Ops', badgeBg: 'amber-10', badgeColor: 'amber-2' },
+        { label: 'Fee Stakeholders', path: '/admin/platform-fees/stakeholders', icon: 'groups', color: 'teal-3' },
+        { label: 'Fee Withdrawals (readiness)', path: '/admin/platform-fees/withdrawals', icon: 'outbox', color: 'teal-3' },
+        { label: 'Institute Webhooks', path: '/admin/agent-webhooks', icon: 'webhook', color: 'teal-3' },
+        { label: 'Payment Alerts', path: '/admin/payment-alerts', icon: 'notifications_active', color: 'orange-4' },
+        { label: 'Enterprise Billing (subscriptions)', path: '/admin/billing', icon: 'payments', color: 'grey-5' },
         { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' },
         { label: 'Contact Maintenance', path: '/admin/contact', icon: 'contact_phone', color: 'grey-4' }
       ]
@@ -1094,9 +1101,10 @@ const getMenuDescription = (label) => {
     'Pending KYC Documents': 'Review every CAC certificate and valid ID card waiting for operator approval.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
     'Tenant Orchestration': 'Authoritatively manage backend feature flags, reactive JSON branding tokens, and tier consumption limits.',
-    'Agent Governance & Onboarding': 'Provision field agents, monitor commissions, and manage terminal onboarding delegation credentials.',
-    'Agent Commissions & Billing': 'Configure Revenue Sharing and Onboarding Fees for Agents across the platform.',
-    'Enterprise Billing & Fees': 'Govern subscription plans, transaction processing fees, settlement splits, and live treasury logs.',
+    'Institute Governance & Onboarding': 'Provision institutes, monitor commissions, and manage terminal onboarding delegation credentials.',
+    'Institute Commissions & Billing': 'Configure Revenue Sharing and Onboarding Fees for Institutes across the platform.',
+    'Platform Fee Orchestration': 'Persisted platform transaction fee profiles, draft versions, and publish control. Not school billing.',
+    'Enterprise Billing (subscriptions)': 'Subscription plan mock. Not the platform fee orchestration catalog.',
     'EMV POS Gateway': 'Live switchboard for routing EMV card transactions between Cpoint-Kimono (HTTPS REST), Medusa (ISO8583 TCP), and NIBSS — with real-time failover, terminal key cache management, and a full transaction log.'
   }
   return descriptions[label] || 'Access and govern this administrative module.'

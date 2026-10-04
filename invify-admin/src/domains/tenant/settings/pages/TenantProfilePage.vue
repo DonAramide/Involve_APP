@@ -644,6 +644,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { api, adminApi } from '../../../../api';
 import { evaluatePasswordPolicy } from '../../../../utils/passwordPolicy';
+import { promptCheckerMfa } from '../../../../utils/promptCheckerMfa';
 import PasswordStrengthHints from '../../../../components/PasswordStrengthHints.vue';
 
 const $q = useQuasar();
@@ -1005,12 +1006,13 @@ const applySavedBank = (row) => {
   localStorage.setItem('tenant_bank_account', JSON.stringify(saved));
 };
 
-const persistBankToApi = async (saved) => {
+const persistBankToApi = async (saved, otp) => {
   const res = await adminApi.saveTenantPayoutSettings({
     account_number: saved.accountNumber,
     bank_name: saved.bankName,
     account_name: saved.accountName,
     bank_code: saved.bankCode || undefined,
+    otp,
   });
   const row = res.data?.settings || res.data;
   if (row?.account_number || row?.accountNumber) applySavedBank(row);
@@ -1037,6 +1039,15 @@ const loadBankAccount = async () => {
 };
 
 const saveBankAccount = async () => {
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: '2FA required',
+    message: 'Enter the 6-digit code from your authenticator app to save the corporate bank account used for dispatches.',
+    okLabel: 'Verify & save',
+  });
+  if (!otp) {
+    $q.notify({ type: 'warning', message: 'Bank details were not saved. A 2FA code is required.' });
+    return;
+  }
   saving.value.bank = true;
   try {
     const saved = {
@@ -1044,7 +1055,7 @@ const saveBankAccount = async () => {
       accountNumber: bank.value.accountNumber,
       accountName: bank.value.accountName,
     };
-    await persistBankToApi(saved);
+    await persistBankToApi(saved, otp);
     $q.notify({
       type: 'positive',
       message: 'Bank account saved. The school app can use this account for withdrawals.',
@@ -1053,7 +1064,7 @@ const saveBankAccount = async () => {
   } catch (err) {
     $q.notify({
       type: 'negative',
-      message: err.response?.data?.error || 'Could not save bank account.',
+      message: err.response?.data?.message || err.response?.data?.error || 'Could not save bank account.',
       icon: 'error',
     });
   } finally {

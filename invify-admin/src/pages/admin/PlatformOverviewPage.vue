@@ -561,7 +561,9 @@ const quickActions = ref([
   { label: 'Workflow Studio', icon: 'account_tree', route: '/automation/workflows' },
   { label: 'System Settings', icon: 'tune', route: '/admin/config' },
   { label: 'Security Center', icon: 'security', route: '/governance/quarantine' },
-  { label: 'Billing & Licensing', icon: 'payments', route: '/admin/billing' }
+  { label: 'Platform Fee Orchestration', icon: 'request_quote', route: '/admin/platform-fees' },
+  { label: 'Fee Assessments', icon: 'fact_check', route: '/admin/platform-fees/assessments' },
+  { label: 'Fee Distribution', icon: 'account_tree', route: '/admin/platform-fees/distribution' }
 ])
 
 const tenantMatrixColumns = [

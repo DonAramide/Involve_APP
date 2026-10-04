@@ -16,21 +16,21 @@
         <div class="text-caption text-muted">Available Balance</div>
         <div class="text-h4 text-weight-bold text-green-4">
           <q-spinner v-if="loading" size="sm" />
-          <span v-else>${{ (walletData.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
+          <span v-else>₦{{ (walletData.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
         </div>
       </div>
       <div class="col panel-card bg-panel border-muted rounded-borders q-pa-md column op-gap-4 border-left-amber">
         <div class="text-caption text-muted">Pending Settlement</div>
         <div class="text-h4 text-weight-bold text-amber-4">
           <q-spinner v-if="loading" size="sm" />
-          <span v-else>${{ (walletData.pending_clearance || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
+          <span v-else>₦{{ (walletData.pending_clearance || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
         </div>
       </div>
       <div class="col panel-card bg-panel border-muted rounded-borders q-pa-md column op-gap-4 border-left-cyan">
         <div class="text-caption text-muted">Total Lifetime Earnings</div>
         <div class="text-h4 text-weight-bold text-cyan-3">
           <q-spinner v-if="loading" size="sm" />
-          <span v-else>${{ (walletData.total_earned || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
+          <span v-else>₦{{ (walletData.total_earned || 0).toLocaleString(undefined, {minimumFractionDigits: 2}) }}</span>
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@
               <td class="q-pa-sm text-metric-mono text-muted" style="font-size: 10px;">{{ t.id.substring(0, 8).toUpperCase() }}</td>
               <td class="q-pa-sm text-main">{{ t.description || t.transaction_type }}</td>
               <td class="q-pa-sm text-right text-weight-bold" :class="t.amount > 0 ? 'text-green-4' : 'text-red-4'">
-                {{ t.amount > 0 ? '+' : '' }}${{ Math.abs(t.amount).toFixed(2) }}
+                {{ t.amount > 0 ? '+' : '' }}₦{{ Math.abs(t.amount).toFixed(2) }}
               </td>
               <td class="q-pa-sm text-right">
                 <q-badge :color="t.status === 'COMPLETED' ? 'green-9' : 'amber-9'" :text-color="t.status === 'COMPLETED' ? 'green-3' : 'amber-3'">

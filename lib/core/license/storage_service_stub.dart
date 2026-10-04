@@ -33,4 +33,6 @@ class StorageService {
   static Future<bool> isOnlineSyncEnabled() async => true;
   static Future<void> setOnlineInvoiceUpdateEnabled(bool enabled) async {}
   static Future<bool> isOnlineInvoiceUpdateEnabled() async => true;
+  static Future<void> markLinkedDeviceDashboardDefaultsPending() async {}
+  static Future<bool> consumeLinkedDeviceDashboardDefaultsPending() async => false;
 }

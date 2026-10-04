@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../artifacts/p62-staging-pack/backend-dist",
+    "declaration": false,
+    "sourceMap": true
+  },
+  "include": [
+    "src/controllers/platform-fee-assessments.controller.ts",
+    "src/services/platform-fee-assessments.service.ts",
+    "src/services/fee-shadow-integration.ts",
+    "src/modules/fee-orchestration/FeeOrchestrator.ts",
+    "src/modules/fee-orchestration/FeeResolver.ts",
+    "src/modules/fee-orchestration/index.ts",
+    "src/modules/fee-orchestration/stores/SupabaseFeeAssessmentStore.ts",
+    "src/modules/fee-orchestration/stores/SupabaseFeeProfileCatalog.ts"
+  ]
+}

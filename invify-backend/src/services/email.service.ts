@@ -2,6 +2,7 @@ import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import { IntegrationVaultService } from './integration-vault.service';
 import { BuildVariantService } from '../config/build-variant';
+import { buildTermBillSubject } from './pdf.service';
 
 dotenv.config();
 
@@ -22,13 +23,42 @@ export class EmailService {
 
     this.isInitializing = true;
     try {
-      // 1. Try to fetch from Enterprise Integration Vault
-      let smtpPass = await IntegrationVaultService.getDecryptedCredential('ZOHO_SMTP', 'PRODUCTION', undefined, 'SMTP_PASSWORD');
-      let smtpUser = await IntegrationVaultService.getDecryptedCredential('ZOHO_SMTP', 'PRODUCTION', undefined, 'SMTP_USER');
-      
-      // 2. Fallback to .env if missing in Vault
-      if (!smtpPass) smtpPass = process.env.SMTP_PASSWORD || '';
-      if (!smtpUser) smtpUser = process.env.SMTP_USER || 'support@invify.org';
+      const variant = BuildVariantService.getInstance();
+      const vaultEnvs = variant.isStaging()
+        ? ['STAGING', 'PRODUCTION']
+        : variant.isProd()
+          ? ['PRODUCTION']
+          : ['LOCAL', 'STAGING', 'PRODUCTION'];
+
+      let smtpPass = '';
+      let smtpUser = '';
+      for (const envName of vaultEnvs) {
+        try {
+          if (!smtpPass) {
+            smtpPass =
+              (await IntegrationVaultService.getDecryptedCredential(
+                'ZOHO_SMTP',
+                envName,
+                undefined,
+                'SMTP_PASSWORD',
+              )) || '';
+          }
+          if (!smtpUser) {
+            smtpUser =
+              (await IntegrationVaultService.getDecryptedCredential(
+                'ZOHO_SMTP',
+                envName,
+                undefined,
+                'SMTP_USER',
+              )) || '';
+          }
+        } catch (vaultErr: any) {
+          console.warn('[EmailService] Vault SMTP lookup failed for', envName, vaultErr?.message || vaultErr);
+        }
+      }
+
+      if (!smtpPass) smtpPass = process.env.SMTP_PASSWORD || process.env.STAGING_SMTP_PASSWORD || '';
+      if (!smtpUser) smtpUser = process.env.SMTP_USER || process.env.STAGING_SMTP_USER || 'support@invify.org';
 
       this.transporter = nodemailer.createTransport({
         host: 'smtp.zoho.com',
@@ -46,7 +76,13 @@ export class EmailService {
     }
   }
 
-  private async sendMail(to: string, subject: string, rawHtml: string, extraAttachments: any[] = []): Promise<boolean> {
+  private async sendMail(
+    to: string,
+    subject: string,
+    rawHtml: string,
+    extraAttachments: any[] = [],
+    options?: { fromName?: string; skipLogo?: boolean },
+  ): Promise<boolean> {
     try {
       const transporter = await this.getTransporter();
       
@@ -70,7 +106,7 @@ export class EmailService {
       const attachments: any[] = [...extraAttachments];
       let logoHtml = '';
 
-      if (fs.existsSync(logoPath)) {
+      if (!options?.skipLogo && fs.existsSync(logoPath)) {
         attachments.push({
           filename: 'logo.png',
           path: logoPath,
@@ -80,14 +116,15 @@ export class EmailService {
       }
 
       const html = `
-        <div style="font-family: 'Times New Roman', Times, serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; color: #333; max-width: 640px; margin: 0 auto; padding: 20px;">
           ${logoHtml}
           ${rawHtml}
         </div>
       `;
 
+      const fromName = (options?.fromName || 'Invify Support').replace(/"/g, '');
       await transporter.sendMail({
-        from: `"Invify Support" <${user}>`,
+        from: `"${fromName}" <${user}>`,
         to,
         subject,
         html,
@@ -317,6 +354,118 @@ export class EmailService {
     return this.sendMail(to, subject, body, this.userManualAttachment(pdfPath, pdfName));
   }
 
+  private escapeHtml(value: string): string {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private agentActionButton(href: string, label: string): string {
+    return `
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${href}" style="background-color: #00838f; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; display: inline-block;">
+            ${label}
+          </a>
+        </div>
+        <p style="font-size: 12px; color: #888; word-break: break-all;">
+          If the button does not work, copy this link into your browser:<br>${href}
+        </p>
+    `;
+  }
+
+  public async sendAgentWelcomeEmail(
+    to: string,
+    options: { name: string; agentCode: string; setPasswordLink: string; loginUrl: string },
+  ): Promise<boolean> {
+    const subject = 'Welcome to Invify - Activate Your Agent Account';
+    const name = this.escapeHtml(options.name || to.split('@')[0]);
+    const agentCode = this.escapeHtml(options.agentCode);
+    const loginUrl = this.escapeHtml(options.loginUrl);
+
+    const body = `
+      <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="color: #006064; margin-bottom: 8px; font-size: 24px;">Welcome to the Invify Agent Network, ${name}!</h2>
+        <p style="font-size: 15px; color: #444;">
+          An Invify administrator has created your field agent account. To get started, set your password using the secure link below.
+        </p>
+
+        <div style="background-color: #f0f7f8; border: 1px solid #cfe3e6; border-radius: 8px; padding: 20px; margin: 24px 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #333;">
+            <tr>
+              <td style="padding: 6px 0; font-weight: bold; width: 140px;">Agent Code:</td>
+              <td style="padding: 6px 0; font-family: monospace; font-size: 15px; color: #006064; font-weight: bold;">${agentCode}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-weight: bold;">Login Email:</td>
+              <td style="padding: 6px 0; font-family: monospace; font-size: 15px; color: #006064;">${this.escapeHtml(to)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; font-weight: bold;">Agent Portal:</td>
+              <td style="padding: 6px 0;"><a href="${loginUrl}" style="color: #00838f; text-decoration: none; font-weight: 600;">${loginUrl}</a></td>
+            </tr>
+          </table>
+        </div>
+
+        ${this.agentActionButton(options.setPasswordLink, 'Set My Password &rarr;')}
+
+        <p style="font-size: 13px; color: #555;">
+          ⚠️ For your security this link can be used once and expires after a short time. If it has expired, open the Agent Portal and choose <strong>Forgot Password</strong> to receive a new one.
+        </p>
+
+        <p style="font-size: 14px; color: #666; margin-top: 30px;">
+          If you were not expecting this email, you can ignore it or contact <a href="mailto:support@invify.org" style="color: #00838f;">support@invify.org</a>.
+        </p>
+
+        <p style="font-size: 14px; color: #333; margin-top: 20px;">
+          Best regards,<br>
+          <strong>Invify Agent Operations</strong><br>
+          <span style="color: #888; font-size: 12px;">support@invify.org</span>
+        </p>
+      </div>
+    `;
+
+    return this.sendMail(to, subject, body);
+  }
+
+  public async sendAgentPasswordResetEmail(
+    to: string,
+    options: { name: string; setPasswordLink: string; loginUrl: string },
+  ): Promise<boolean> {
+    const subject = 'Reset Your Invify Agent Password';
+    const name = this.escapeHtml(options.name || to.split('@')[0]);
+
+    const body = `
+      <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="color: #006064; margin-bottom: 8px; font-size: 22px;">Password reset requested</h2>
+        <p style="font-size: 15px; color: #444;">
+          Hello <strong>${name}</strong>, we received a request to reset the password for your Invify agent account.
+        </p>
+
+        ${this.agentActionButton(options.setPasswordLink, 'Choose a New Password &rarr;')}
+
+        <p style="font-size: 13px; color: #555;">
+          This link can be used once and expires after a short time. After resetting, sign in at
+          <a href="${this.escapeHtml(options.loginUrl)}" style="color: #00838f;">${this.escapeHtml(options.loginUrl)}</a>.
+        </p>
+
+        <p style="font-size: 13px; color: #777; margin-top: 25px;">
+          🔒 If you did not request this, you can ignore this email — your password will not change.
+        </p>
+
+        <p style="font-size: 14px; color: #333; margin-top: 20px;">
+          Best regards,<br>
+          <strong>Invify Agent Operations</strong><br>
+          <span style="color: #888; font-size: 12px;">support@invify.org</span>
+        </p>
+      </div>
+    `;
+
+    return this.sendMail(to, subject, body);
+  }
+
   public async sendProfileUpdateEmail(
     to: string,
     options: {
@@ -511,6 +660,247 @@ export class EmailService {
     `;
 
     return this.sendMail(to, subject, body);
+  }
+
+  private formatNgnHtml(amount: number): string {
+    const n = Number(amount) || 0;
+    return `&#8358;${n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  public safePdfFilename(studentName: string, invoiceNumber?: string): string {
+    const base = `Fee-Bill-${studentName || 'Student'}-${invoiceNumber || 'bill'}`
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80);
+    return `${base || 'Fee-Bill'}.pdf`;
+  }
+
+  /**
+   * Individual parent term-fee bill with a downloadable PDF attachment.
+   */
+  public async sendTermBillEmail(
+    to: string,
+    bill: {
+      schoolName: string;
+      schoolAddress?: string;
+      schoolPhone?: string;
+      schoolEmail?: string;
+      parentName?: string;
+      studentName: string;
+      admissionNumber?: string;
+      className: string;
+      invoiceNumber: string;
+      items: { name: string; quantity?: number; amount: number }[];
+      total: number;
+      dueDate?: string;
+      termName?: string;
+      academicYearName?: string;
+      virtualAccountNumber?: string;
+      virtualAccountBank?: string;
+      virtualAccountName?: string;
+      paymentAccountKind?: 'parent' | 'school';
+      bankName?: string;
+      accountNumber?: string;
+      accountName?: string;
+      issuedAt?: string;
+    },
+    pdfBuffer: Buffer,
+  ): Promise<boolean> {
+    const school = this.escapeHtml(bill.schoolName || 'School');
+    const parent = this.escapeHtml(bill.parentName || 'Parent / Guardian');
+    const student = this.escapeHtml(bill.studentName || 'Student');
+    const className = this.escapeHtml(bill.className || '');
+    const admission = this.escapeHtml(bill.admissionNumber || '—');
+    const invoiceNo = this.escapeHtml(bill.invoiceNumber || '—');
+    const termLabel = [bill.termName, bill.academicYearName].filter(Boolean).map((v) => this.escapeHtml(String(v))).join(' · ');
+    const due = this.escapeHtml(bill.dueDate || '');
+    const issued = this.escapeHtml(bill.issuedAt || new Date().toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    }));
+
+    const itemRows = (Array.isArray(bill.items) ? bill.items : []).map((item) => `
+      <tr>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${this.escapeHtml(item.name || 'Fee item')}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #475569;">${Number(item.quantity ?? 1)}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600; color: #0f172a;">${this.formatNgnHtml(Number(item.amount) || 0)}</td>
+      </tr>
+    `).join('');
+
+    const useParentAccount = !!(bill.virtualAccountNumber || bill.paymentAccountKind === 'parent');
+    const useSchoolAccount = !useParentAccount && !!(bill.accountNumber || bill.bankName);
+    let paymentBlock = '';
+    if (useParentAccount || useSchoolAccount) {
+      const heading = useParentAccount ? 'Parent dedicated account' : 'School account';
+      const intro = useParentAccount
+        ? `Please pay this bill into your dedicated parent account below. Use <strong>${student}</strong> as the payment reference.`
+        : `This parent does not have a dedicated account. Please pay into the school account below. Use <strong>${student}</strong> as the payment reference.`;
+      const rows = useParentAccount
+        ? [
+            bill.virtualAccountName ? `<tr><td style="padding: 4px 0; color: #64748b;">Account name</td><td style="padding: 4px 0; font-weight: 600;">${this.escapeHtml(bill.virtualAccountName)}</td></tr>` : '',
+            bill.virtualAccountBank ? `<tr><td style="padding: 4px 0; color: #64748b;">Bank</td><td style="padding: 4px 0; font-weight: 600;">${this.escapeHtml(bill.virtualAccountBank)}</td></tr>` : '',
+            bill.virtualAccountNumber ? `<tr><td style="padding: 4px 0; color: #64748b;">Account number</td><td style="padding: 4px 0; font-family: monospace; font-weight: 700; font-size: 16px; color: #0e7490;">${this.escapeHtml(bill.virtualAccountNumber)}</td></tr>` : '',
+          ].join('')
+        : [
+            bill.accountName ? `<tr><td style="padding: 4px 0; color: #64748b;">Account name</td><td style="padding: 4px 0; font-weight: 600;">${this.escapeHtml(bill.accountName)}</td></tr>` : '',
+            bill.bankName ? `<tr><td style="padding: 4px 0; color: #64748b;">Bank</td><td style="padding: 4px 0; font-weight: 600;">${this.escapeHtml(bill.bankName)}</td></tr>` : '',
+            bill.accountNumber ? `<tr><td style="padding: 4px 0; color: #64748b;">Account number</td><td style="padding: 4px 0; font-family: monospace; font-weight: 700; font-size: 16px; color: #0e7490;">${this.escapeHtml(bill.accountNumber)}</td></tr>` : '',
+          ].join('');
+      paymentBlock = `
+        <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 16px 18px; margin: 22px 0;">
+          <h3 style="margin: 0 0 8px 0; color: #0f766e; font-size: 14px;">${heading}</h3>
+          <p style="margin: 0 0 10px 0; font-size: 13px; color: #334155;">${intro}</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">${rows}</table>
+        </div>
+      `;
+    }
+
+    const subject = buildTermBillSubject(bill.schoolName, bill.studentName, bill.className);
+    const body = `
+      <div style="border-top: 6px solid #0e7490; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="padding: 22px 22px 8px 22px; text-align: center; background: #f8fafc;">
+          <h1 style="margin: 0; font-size: 18px; color: #0f172a; letter-spacing: 0.3px;">${school}</h1>
+          ${bill.schoolAddress ? `<p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b;">${this.escapeHtml(bill.schoolAddress)}</p>` : ''}
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">
+            ${[bill.schoolPhone, bill.schoolEmail].filter(Boolean).map((v) => this.escapeHtml(String(v))).join(' · ')}
+          </p>
+          <p style="margin: 14px 0 0 0; font-size: 13px; font-weight: 700; color: #0e7490; letter-spacing: 1px;">OFFICIAL TERM FEE BILL</p>
+        </div>
+        <div style="padding: 22px;">
+          <p style="font-size: 14px; color: #334155; margin-top: 0;">Dear <strong>${parent}</strong>,</p>
+          <p style="font-size: 14px; color: #334155;">
+            Please find below the term fee bill for <strong>${student}</strong>
+            ${className ? ` in <strong>${className}</strong>` : ''}.
+            A downloadable PDF copy is attached to this email.
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0 20px 0;">
+            <tr>
+              <td style="padding: 4px 0; color: #64748b; width: 140px;">Student</td>
+              <td style="padding: 4px 0; font-weight: 600; color: #0f172a;">${student}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #64748b;">Admission No.</td>
+              <td style="padding: 4px 0; color: #0f172a;">${admission}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #64748b;">Class</td>
+              <td style="padding: 4px 0; color: #0f172a;">${className || '—'}</td>
+            </tr>
+            ${termLabel ? `<tr><td style="padding: 4px 0; color: #64748b;">Term</td><td style="padding: 4px 0; color: #0f172a;">${termLabel}</td></tr>` : ''}
+            <tr>
+              <td style="padding: 4px 0; color: #64748b;">Invoice No.</td>
+              <td style="padding: 4px 0; color: #0f172a;">${invoiceNo}</td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 0; color: #64748b;">Issued</td>
+              <td style="padding: 4px 0; color: #0f172a;">${issued}</td>
+            </tr>
+            ${due ? `<tr><td style="padding: 4px 0; color: #64748b;">Due date</td><td style="padding: 4px 0; color: #0f172a;">${due}</td></tr>` : ''}
+          </table>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: #0e7490; color: #ffffff;">
+                <th style="padding: 9px 10px; text-align: left; font-weight: 600;">Items to pay</th>
+                <th style="padding: 9px 10px; text-align: right; font-weight: 600;">Qty</th>
+                <th style="padding: 9px 10px; text-align: right; font-weight: 600;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRows}
+            </tbody>
+            <tfoot>
+              <tr style="background: #ecfeff;">
+                <td colspan="2" style="padding: 10px; font-weight: 700; color: #0e7490;">Total payable</td>
+                <td style="padding: 10px; text-align: right; font-weight: 700; color: #0e7490; font-size: 15px;">${this.formatNgnHtml(Number(bill.total) || 0)}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          ${paymentBlock}
+
+          <p style="font-size: 12px; color: #64748b; margin-top: 8px;">
+            📎 <strong>Downloadable bill:</strong> Open the attached PDF to save or print this invoice.
+          </p>
+          <p style="font-size: 13px; color: #334155; margin-top: 18px;">
+            Thank you,<br/>
+            <strong>${school}</strong><br/>
+            <span style="color: #94a3b8; font-size: 12px;">Sent via Invify School Finance</span>
+          </p>
+        </div>
+      </div>
+    `;
+
+    return this.sendMail(
+      to,
+      subject,
+      body,
+      [{
+        filename: this.safePdfFilename(bill.studentName, bill.invoiceNumber),
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }],
+      { fromName: bill.schoolName || 'School Finance', skipLogo: true },
+    );
+  }
+
+  public activationPdfFilename(businessName: string): string {
+    const base = `Invify-Terminal-Activation-${businessName || 'Tenant'}`
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80);
+    return `${base || 'Invify-Terminal-Activation'}.pdf`;
+  }
+
+  /**
+   * Approved terminal activation, with a downloadable PDF the tenant can save.
+   */
+  public async sendTerminalActivationEmail(
+    to: string,
+    activation: {
+      businessName: string;
+      mode?: string;
+      plan?: string;
+      durationDays?: number;
+      expiry?: string;
+      activationCode: string;
+      deviceSuffix?: string;
+    },
+    pdfBuffer: Buffer,
+  ): Promise<boolean> {
+    const business = this.escapeHtml(activation.businessName || 'your business');
+    const code = this.escapeHtml(activation.activationCode || '');
+    const plan = this.escapeHtml(activation.plan || '—');
+    const mode = this.escapeHtml(activation.mode || '—');
+    const expiry = this.escapeHtml(activation.expiry || '—');
+    const days = Number(activation.durationDays) || 0;
+    const body = `
+      <p>Hello,</p>
+      <p>Support has approved a terminal activation for <strong>${business}</strong>.</p>
+      <p>The downloadable activation file is attached to this email. The PDF includes the activation key and a QR code of that key. Scan the QR code or type the key on the terminal.</p>
+      <p style="font-size: 13px; color: #475569;">Activation key</p>
+      <p style="font-family: monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #0f172a;">${code}</p>
+      <table style="font-size: 14px; color: #334155;">
+        <tr><td style="padding: 4px 16px 4px 0; color: #64748b;">Mode</td><td>${mode}</td></tr>
+        <tr><td style="padding: 4px 16px 4px 0; color: #64748b;">Plan</td><td>${plan}</td></tr>
+        <tr><td style="padding: 4px 16px 4px 0; color: #64748b;">Validity</td><td>${days} days</td></tr>
+        <tr><td style="padding: 4px 16px 4px 0; color: #64748b;">Expiration</td><td>${expiry}</td></tr>
+      </table>
+      <p style="font-size: 12px; color: #64748b;">This key works once. Keep the attached file private.</p>
+      <p>Thank you,<br/>Invify Support</p>
+    `;
+    return this.sendMail(
+      to,
+      `Invify terminal activation for ${activation.businessName || 'your business'}`,
+      body,
+      [{
+        filename: this.activationPdfFilename(activation.businessName),
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }],
+    );
   }
 }
 

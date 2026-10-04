@@ -90,20 +90,16 @@
       </div>
 
       <!-- Workspace Panels -->
-      <q-tab-panels v-model="activeTab" animated class="bg-transparent col" keep-alive>
+      <q-tab-panels v-model="activeTab" animated class="bg-transparent col column" keep-alive style="min-height: 420px">
         
         <!-- CHART OF ACCOUNTS -->
-        <q-tab-panel name="coa" class="q-pa-none column">
+        <q-tab-panel name="coa" class="q-pa-none column" style="min-height: 420px">
           <div class="q-pa-sm bg-subpanel border-bottom row justify-between items-center text-caption font-mono text-muted">
-            <div>Hierarchical representation of the Invify GL architecture.</div>
-            <q-btn flat dense size="sm" icon="add" label="Add Account" color="amber-4" />
+            <div>Invify chart of accounts. Live balances overlay postings when they exist.</div>
+            <q-btn flat dense size="sm" icon="add" label="Add Account" color="amber-4" disable />
           </div>
-          <q-scroll-area class="col q-pa-md">
-            <div v-if="!coaNodes.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
-              No chart of accounts configured in live data.
-            </div>
+          <div class="col q-pa-md" style="overflow: auto; min-height: 360px;">
             <q-tree
-              v-else
               :nodes="coaNodes"
               node-key="id"
               default-expand-all
@@ -120,23 +116,22 @@
                 </div>
               </template>
             </q-tree>
-          </q-scroll-area>
+          </div>
         </q-tab-panel>
 
         <!-- JOURNAL EXPLORER -->
-        <q-tab-panel name="journal" class="q-pa-none column">
+        <q-tab-panel name="journal" class="q-pa-none column" style="min-height: 420px">
           <q-table
             class="bg-transparent text-main flex-grow-1 transaction-table"
             flat
-            :rows="journals"
+            :rows="filteredJournals"
             :columns="journalCols"
             row-key="id"
             dense
             :loading="loading"
             :pagination="{ rowsPerPage: 25 }"
             :rows-per-page-options="[25, 50, 100]"
-            virtual-scroll
-            style="height: 100%;"
+            style="height: 100%; min-height: 360px;"
           >
             <template v-slot:body-cell-id="props">
               <q-td :props="props" class="font-mono text-amber-3 cursor-pointer text-weight-bold" @click="inspectJournal(props.row)">
@@ -150,23 +145,23 @@
                 </q-badge>
               </q-td>
             </template>
+            <template #no-data>
+              <div class="full-width text-center q-pa-xl text-muted font-mono">No journal postings in live data for this filter.</div>
+            </template>
           </q-table>
         </q-tab-panel>
-
-        <!-- LEDGER ENTRIES -->
-        <q-tab-panel name="ledger" class="q-pa-none column">
+        <q-tab-panel name="ledger" class="q-pa-none column" style="min-height: 420px">
           <q-table
             class="bg-transparent text-main flex-grow-1 transaction-table"
             flat
-            :rows="ledgerEntries"
+            :rows="filteredLedgerEntries"
             :columns="ledgerCols"
             row-key="id"
             dense
             :loading="loading"
             :pagination="{ rowsPerPage: 25 }"
             :rows-per-page-options="[25, 50, 100]"
-            virtual-scroll
-            style="height: 100%;"
+            style="height: 100%; min-height: 360px;"
           >
             <template v-slot:body-cell-id="props">
               <q-td :props="props" class="font-mono text-cyan-3 cursor-pointer text-weight-bold" @click="inspectLedger(props.row)">
@@ -188,17 +183,18 @@
                 {{ props.row.type === 'CREDIT' ? currentCurrency.symbol + props.row.amount.toLocaleString() : '-' }}
               </q-td>
             </template>
+            <template #no-data>
+              <div class="full-width text-center q-pa-xl text-muted font-mono">No ledger entries in live data for this filter.</div>
+            </template>
           </q-table>
         </q-tab-panel>
-
-        <!-- ACCOUNT BALANCES -->
-        <q-tab-panel name="balances" class="q-pa-none column">
-          <q-scroll-area class="col q-pa-md">
-            <div v-if="!accountBalances.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
-              No account balances available from live ledger data.
+        <q-tab-panel name="balances" class="q-pa-none column" style="min-height: 420px">
+          <div class="col q-pa-md" style="overflow: auto; min-height: 360px;">
+            <div v-if="!filteredBalances.length" class="full-width text-center q-pa-xl text-muted font-mono">
+              No account balances yet. Postings will appear here as wallet and settlement activity lands.
             </div>
             <div class="row q-col-gutter-md" v-else>
-              <div class="col-12 col-md-6 col-lg-4" v-for="bal in accountBalances" :key="bal.account">
+              <div class="col-12 col-md-6 col-lg-4" v-for="bal in filteredBalances" :key="bal.account">
                 <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                   <div class="row justify-between items-center border-bottom q-pb-sm q-mb-sm">
                     <div class="text-weight-bold" :class="bal.color">{{ bal.account }}</div>
@@ -219,28 +215,34 @@
                 </div>
               </div>
             </div>
-          </q-scroll-area>
-        </q-tab-panel>
-
-        <!-- POSTING HISTORY -->
-        <q-tab-panel name="history" class="q-pa-none column">
-          <div class="q-pa-md flex flex-center full-height">
-            <div class="text-center text-muted font-mono">
-              <q-icon name="history" size="xl" class="q-mb-md opacity-50" />
-              <div>Posting History Archive</div>
-              <div class="text-caption">Historical query layer is starting up...</div>
-            </div>
           </div>
+        </q-tab-panel>
+        <q-tab-panel name="history" class="q-pa-none column" style="min-height: 420px">
+          <q-table
+            class="bg-transparent text-main flex-grow-1 transaction-table"
+            flat
+            :rows="filteredJournals"
+            :columns="historyCols"
+            row-key="id"
+            dense
+            :loading="loading"
+            :pagination="{ rowsPerPage: 25 }"
+            style="min-height: 360px;"
+          >
+            <template #no-data>
+              <div class="full-width text-center q-pa-xl text-muted font-mono">No posting history in live data for this filter.</div>
+            </template>
+          </q-table>
         </q-tab-panel>
 
         <!-- BATCH EXPLORER -->
-        <q-tab-panel name="batches" class="q-pa-none column">
-          <q-scroll-area class="col q-pa-md">
-            <div v-if="!batchExplorer.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
-              No settlement/ledger batches in live data.
+        <q-tab-panel name="batches" class="q-pa-none column" style="min-height: 420px">
+          <div class="col q-pa-md" style="overflow: auto; min-height: 360px;">
+            <div v-if="!filteredBatches.length" class="full-width text-center q-pa-xl text-muted font-mono">
+              No settlement or ledger batches in live data for this filter.
             </div>
             <div class="row q-col-gutter-md" v-else>
-              <div class="col-12 col-md-6 col-lg-4" v-for="batch in batchExplorer" :key="batch.id">
+              <div class="col-12 col-md-6 col-lg-4" v-for="batch in filteredBatches" :key="batch.id">
                 <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                   <div class="row justify-between items-center border-bottom q-pb-sm q-mb-sm">
                     <div class="text-weight-bold text-cyan-3">{{ batch.id }}</div>
@@ -261,7 +263,7 @@
                 </div>
               </div>
             </div>
-          </q-scroll-area>
+          </div>
         </q-tab-panel>
 
       </q-tab-panels>
@@ -375,7 +377,7 @@ import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 
 const $q = useQuasar()
-const activeTab = ref('ledger')
+const activeTab = ref('coa')
 const searchQuery = ref('')
 const loading = ref(false)
 
@@ -390,7 +392,28 @@ const getTypeColor = (type) => {
   return map[type] || 'grey-4'
 }
 
-const coaNodes = ref([])
+const GL_COA = [
+  { id: '1000', label: 'Assets', type: 'ASSET', color: 'cyan-4', icon: 'account_balance', children: [
+    { id: '1100', label: 'Tenant wallets (USER_WALLET)', type: 'ASSET', account: 'USER_WALLET', color: 'cyan-4', icon: 'wallet' },
+    { id: '1200', label: 'Quasar clearing', type: 'ASSET', account: 'QUASAR_CLEARING', color: 'cyan-4', icon: 'sync' },
+    { id: '1300', label: 'Held virtual accounts', type: 'ASSET', account: 'VIRTUAL_ACCOUNT', color: 'cyan-4', icon: 'account_balance_wallet' },
+  ]},
+  { id: '2000', label: 'Liabilities', type: 'LIABILITY', color: 'indigo-4', icon: 'account_balance', children: [
+    { id: '2100', label: 'Merchant payables', type: 'LIABILITY', account: 'MERCHANT_PAYABLE', color: 'indigo-4', icon: 'payments' },
+    { id: '2200', label: 'Parent / customer credit', type: 'LIABILITY', account: 'PARENT_CREDIT', color: 'indigo-4', icon: 'group' },
+  ]},
+  { id: '4000', label: 'Revenue', type: 'REVENUE', color: 'green-4', icon: 'trending_up', children: [
+    { id: '4100', label: 'Platform fees', type: 'REVENUE', account: 'PLATFORM_FEE', color: 'green-4', icon: 'percent' },
+  ]},
+  { id: '5000', label: 'Expenses', type: 'EXPENSE', color: 'red-4', icon: 'trending_down', children: [
+    { id: '5100', label: 'Payouts & sweeps', type: 'EXPENSE', account: 'PAYOUT', color: 'red-4', icon: 'south_west' },
+  ]},
+]
+
+const coaNodes = ref(GL_COA.map((node) => ({
+  ...node,
+  children: (node.children || []).map((c) => ({ ...c })),
+})))
 
 const journalCols = [
   { name: 'id', label: 'JOURNAL ID', field: 'id', align: 'left' },
@@ -414,6 +437,24 @@ const ledgerCols = [
 const ledgerEntries = ref([])
 const batchExplorer = ref([])
 const accountBalances = ref([])
+const historyCols = [
+  { name: 'timestamp', label: 'POSTED AT', field: 'timestamp', align: 'left' },
+  { name: 'id', label: 'JOURNAL / REF', field: 'id', align: 'left' },
+  { name: 'description', label: 'DESCRIPTION', field: 'description', align: 'left' },
+  { name: 'sourceTxnId', label: 'SOURCE TXN', field: 'sourceTxnId', align: 'left' },
+  { name: 'status', label: 'STATUS', field: 'status', align: 'center' },
+]
+
+function matchesSearch(row) {
+  const q = String(searchQuery.value || '').trim().toLowerCase()
+  if (!q) return true
+  return Object.values(row || {}).some((v) => String(v || '').toLowerCase().includes(q))
+}
+
+const filteredLedgerEntries = computed(() => ledgerEntries.value.filter(matchesSearch))
+const filteredJournals = computed(() => journals.value.filter(matchesSearch))
+const filteredBalances = computed(() => accountBalances.value.filter(matchesSearch))
+const filteredBatches = computed(() => batchExplorer.value.filter(matchesSearch))
 
 const drawerOpen = ref(false)
 const selectedLedger = ref(null)
@@ -474,7 +515,7 @@ function mapLedgerRow(row) {
 async function loadLedger() {
   loading.value = true
   try {
-    const res = await adminApi.getLedger()
+    const res = await adminApi.getLedger({ limit: 500 })
     const rows = Array.isArray(res.data) ? res.data : (res.data?.data || [])
     ledgerEntries.value = rows.map(mapLedgerRow)
 
@@ -505,13 +546,42 @@ async function loadLedger() {
       bal.closing += signed
     }
     accountBalances.value = [...byAccount.values()]
-    coaNodes.value = accountBalances.value.map((bal) => ({
-      id: bal.account,
-      label: 'Live ledger account',
-      icon: 'account_balance_wallet',
-      color: bal.type === 'ASSET' ? 'cyan-4' : 'indigo-4',
-      type: bal.type,
-    }))
+    const liveByAccount = new Map(accountBalances.value.map((b) => [String(b.account), b]))
+    const symbol = currentCurrency.value?.symbol || '₦'
+    const decorate = (node) => {
+      const live = liveByAccount.get(node.account) || liveByAccount.get(node.id)
+      const movement = live ? Number(live.closing || live.movement || 0) : 0
+      const label = movement ? `${node.label}  ·  ${symbol}${movement.toLocaleString()}` : node.label
+      return {
+        id: node.id,
+        label,
+        icon: node.icon || 'account_balance_wallet',
+        color: node.color || 'grey-5',
+        type: node.type,
+        children: (node.children || []).map(decorate),
+      }
+    }
+    const known = new Set()
+    for (const root of GL_COA) {
+      known.add(root.id)
+      for (const child of root.children || []) {
+        known.add(child.id)
+        if (child.account) known.add(child.account)
+      }
+    }
+    const extra = accountBalances.value
+      .filter((bal) => !known.has(String(bal.account)))
+      .map((bal) => ({
+        id: `LIVE-${bal.account}`,
+        label: `${bal.account}  ·  ${symbol}${Number(bal.closing || 0).toLocaleString()}`,
+        icon: 'receipt_long',
+        color: 'amber-4',
+        type: bal.type,
+      }))
+    coaNodes.value = [
+      ...GL_COA.map(decorate),
+      ...(extra.length ? [{ id: '9000', label: 'Live unmapped accounts', type: 'ASSET', color: 'grey-5', icon: 'hub', children: extra }] : []),
+    ]
     batchExplorer.value = [...byRef.values()].map((j) => {
       const rows = ledgerEntries.value.filter((e) => e.journalId === j.id)
       const debits = rows.filter((e) => e.type === 'DEBIT').reduce((s, e) => s + Number(e.amount || 0), 0)
@@ -522,6 +592,12 @@ async function loadLedger() {
     console.error('[GlobalLedger] load failed:', e)
     ledgerEntries.value = []
     journals.value = []
+    accountBalances.value = []
+    batchExplorer.value = []
+    coaNodes.value = GL_COA.map((node) => ({
+      ...node,
+      children: (node.children || []).map((c) => ({ ...c })),
+    }))
     $q.notify({
       type: 'negative',
       message: e?.response?.data?.error || e?.response?.data?.message || 'Failed to load live ledger entries'

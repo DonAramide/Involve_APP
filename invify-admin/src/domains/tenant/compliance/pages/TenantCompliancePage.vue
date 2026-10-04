@@ -29,9 +29,12 @@
                 <div class="text-subtitle1 text-weight-bold">{{ slot.title }}</div>
                 <div class="text-caption text-grey-5">{{ slot.hint }}</div>
               </div>
-              <q-chip dense :color="slot.uploaded ? 'green-9' : 'red-9'" text-color="white" size="sm">
-                {{ slot.uploaded ? 'UPLOADED' : 'REQUIRED' }}
+              <q-chip dense :color="slot.chipColor" text-color="white" size="sm">
+                {{ slot.chipLabel }}
               </q-chip>
+            </div>
+            <div v-if="slot.rejected" class="text-caption text-red-4 q-mt-sm">
+              Rejected. Please re-upload. {{ slot.reason }}
             </div>
             <div v-if="slot.url" class="q-mt-sm">
               <a :href="slot.url" target="_blank" class="text-cyan-3 text-caption">Open uploaded file</a>
@@ -43,7 +46,7 @@
               dense
               filled
               :model-value="null"
-              :label="slot.uploaded ? 'Replace file' : 'Choose file'"
+              :label="slot.rejected ? 'Re-upload file' : (slot.uploaded ? 'Replace file' : 'Choose file')"
               accept="image/*,.pdf"
               :loading="slot.busy"
               @update:model-value="(file) => uploadDoc(slot.type, file)"
@@ -92,8 +95,12 @@ function tenantId() {
   return localStorage.getItem('tenant_id') || ''
 }
 
+function latestDoc(type) {
+  return documents.value.find((d) => String(d.document_type || '').toUpperCase() === type) || null
+}
+
 function latestUrl(type) {
-  const hit = documents.value.find((d) => String(d.document_type || '').toUpperCase() === type)
+  const hit = latestDoc(type)
   return hit?.url || hit?.document_url || ''
 }
 
@@ -102,19 +109,32 @@ const requiredSlots = computed(() => ([
     type: 'CAC_CERT',
     title: 'CAC certificate',
     hint: 'Certificate of Incorporation or Business Name registration.',
-    uploaded: Boolean(latestUrl('CAC_CERT')),
-    url: latestUrl('CAC_CERT'),
+    ...slotState('CAC_CERT'),
     busy: uploading.value === 'CAC_CERT',
   },
   {
     type: 'GOVT_ID',
     title: 'Valid ID card',
     hint: 'NIN slip, National ID, driver’s licence, or international passport.',
-    uploaded: Boolean(latestUrl('GOVT_ID')),
-    url: latestUrl('GOVT_ID'),
+    ...slotState('GOVT_ID'),
     busy: uploading.value === 'GOVT_ID',
   },
 ]))
+
+function slotState(type) {
+  const hit = latestDoc(type)
+  const status = String(hit?.status || '').toUpperCase()
+  const rejected = status === 'REJECTED'
+  const uploaded = Boolean(hit) && !rejected
+  return {
+    url: latestUrl(type),
+    uploaded,
+    rejected,
+    reason: hit?.rejection_reason || hit?.rejectionReason || '',
+    chipLabel: rejected ? 'REJECTED — RE-UPLOAD' : (status === 'APPROVED' ? 'APPROVED' : (uploaded ? 'UPLOADED' : 'REQUIRED')),
+    chipColor: rejected ? 'red-9' : (status === 'APPROVED' ? 'green-9' : (uploaded ? 'orange-9' : 'red-9')),
+  }
+}
 
 async function loadDocs() {
   const id = tenantId()
@@ -123,9 +143,10 @@ async function loadDocs() {
     const { data } = await adminApi.getTenantKyc(id)
     const rows = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
     documents.value = rows
+    const rejected = rows.some((d) => String(d.status || '').toUpperCase() === 'REJECTED')
     const pending = rows.some((d) => String(d.status || '').toUpperCase() === 'PENDING')
     const approved = rows.length > 0 && rows.every((d) => String(d.status || '').toUpperCase() === 'APPROVED')
-    kycStatus.value = approved ? 'APPROVED' : (rows.length ? (pending ? 'PENDING' : 'SUBMITTED') : 'NOT UPLOADED')
+    kycStatus.value = rejected ? 'REJECTED' : (approved ? 'APPROVED' : (rows.length ? (pending ? 'PENDING' : 'SUBMITTED') : 'NOT UPLOADED'))
   } catch (e) {
     Notify.create({ type: 'negative', message: e?.response?.data?.message || 'Could not load KYC documents' })
   }

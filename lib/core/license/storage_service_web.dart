@@ -18,6 +18,7 @@ class StorageService {
   static const _onboardingThemeColorKey = 'onboarding_theme_color';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
+  static const _linkedDashboardDefaultsKey = 'linked_device_dashboard_defaults';
 
   static Future<void> saveLicense(String licenseData) async {
     await _secureStorage.write(key: _licenseKey, value: licenseData);
@@ -165,5 +166,16 @@ class StorageService {
   static Future<bool> isOnlineInvoiceUpdateEnabled() async {
     final val = await _secureStorage.read(key: _onlineInvoiceUpdateEnabledKey);
     return val != 'false'; // Default to true
+  }
+
+  static Future<void> markLinkedDeviceDashboardDefaultsPending() async {
+    await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: 'true');
+  }
+
+  static Future<bool> consumeLinkedDeviceDashboardDefaultsPending() async {
+    final val = await _secureStorage.read(key: _linkedDashboardDefaultsKey);
+    if (val != 'true') return false;
+    await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: 'false');
+    return true;
   }
 }

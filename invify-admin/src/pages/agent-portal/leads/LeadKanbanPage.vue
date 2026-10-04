@@ -70,7 +70,7 @@ const fetchLeads = async () => {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
       $q.notify({ type: 'negative', message: 'Not authenticated. Please log in.' })
-      router.push('/agent/login')
+      router.push('/institute/login')
       return
     }
 

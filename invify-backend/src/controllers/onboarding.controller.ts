@@ -4,8 +4,6 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { verificationService, VerificationService } from '../services/verification.service';
 import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisioning.service';
 import jwt from 'jsonwebtoken';
-import { BuildVariantService } from '../config/build-variant';
-import { IntegrationVaultService } from '../services/integration-vault.service';
 import { resolveOnboardingVerification } from '../services/onboarding-settings.service';
 import {
   deviceIdsMatch,
@@ -19,25 +17,113 @@ import { claimUnassignedDeviceForTenant } from '../utils/claim-unassigned-device
 import { newSelfServeTenantPlan } from '../utils/new-tenant-plan';
 import { issueDeviceLinkQr, WEB_ISSUER_DEVICE_ID } from '../utils/device-link-qr';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { mergeDeviceInfo, ORIGIN_CUSTOMER, ORIGIN_INVIFY, originOfDevice } from '../utils/device-origin';
+import { lookupAgentCode, normalizeAgentCode } from '../utils/agent-code';
 
-async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
-  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
-  if (envKey) return envKey;
+/**
+ * Non-expiring device JWT for a tablet linked by QR. Signed as the tenant
+ * owner when one exists so API calls resolve to that owner's profile.
+ */
+export async function signLinkedDeviceToken(tenantId: string, deviceId: string): Promise<string | null> {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 16) return null;
 
+  let ownerId: string | null = null;
+  let ownerEmail = '';
   try {
-    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
-    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
-    if (vaultKey) return vaultKey;
-  } catch (err: any) {
-    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
+    const { data } = await supabaseAdmin
+      .from('users')
+      .select('id, email')
+      .eq('tenant_id', tenantId)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle();
+    ownerId = data?.id ? String(data.id) : null;
+    ownerEmail = data?.email ? String(data.email) : '';
+  } catch (e: any) {
+    console.warn('[signLinkedDeviceToken] owner lookup failed:', e?.message);
   }
 
-  const variant = BuildVariantService.getInstance();
-  if (variant.isProd() || variant.isStaging()) {
-    throw new Error('QUASAR_API_KEY is required in staging/production');
+  const subject = ownerId || require('crypto').randomUUID();
+  return jwt.sign(
+    {
+      sub: subject,
+      id: subject,
+      email: ownerEmail,
+      role: 'owner',
+      tenantId,
+      deviceId,
+    },
+    secret,
+  );
+}
+
+async function ensureOwnerUserRow(opts: {
+  id?: string | null;
+  tenantId: string;
+  name: string;
+  email: string;
+}): Promise<string | null> {
+  const email = String(opts.email || '').trim().toLowerCase();
+  const name = String(opts.name || '').trim() || email;
+  if (!email || !opts.tenantId) return opts.id || null;
+
+  const { data: existing } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .ilike('email', email)
+    .maybeSingle();
+  if (existing?.id) {
+    await supabaseAdmin
+      .from('users')
+      .update({
+        tenant_id: opts.tenantId,
+        name,
+        role: 'owner',
+        is_active: true,
+      })
+      .eq('id', existing.id);
+    return existing.id;
   }
 
-  return 'demo-key';
+  const id = opts.id || require('crypto').randomUUID();
+  const full = await supabaseAdmin.from('users').insert({
+    id,
+    tenant_id: opts.tenantId,
+    name,
+    email,
+    role: 'owner',
+    require_password_reset: false,
+    is_active: true,
+  });
+  if (!full.error) return id;
+
+  const slim = await supabaseAdmin.from('users').insert({
+    id,
+    tenant_id: opts.tenantId,
+    email,
+    role: 'owner',
+  });
+  if (!slim.error) return id;
+  console.warn('[OnboardingController] Owner user insert failed:', slim.error.message || full.error.message);
+  return opts.id || null;
+}
+
+async function onboardingDeviceOriginFields(deviceId: string): Promise<{
+  device_category: string;
+  device_info: Record<string, any>;
+}> {
+  const { data: existing } = await supabaseAdmin
+    .from('devices')
+    .select('device_info, device_category, tenant_id')
+    .eq('device_id', deviceId)
+    .maybeSingle();
+  const keepInvify = Boolean(existing) && originOfDevice(existing) === 'INVIFY_UPLOADED';
+  const origin = keepInvify ? ORIGIN_INVIFY : ORIGIN_CUSTOMER;
+  return {
+    device_category: keepInvify ? 'COMPANY_DEVICE' : 'USER_DEVICE',
+    device_info: mergeDeviceInfo(existing?.device_info, {}, origin),
+  };
 }
 
 function generateTenantCode(phone: string | undefined | null): string {
@@ -188,26 +274,7 @@ export class OnboardingController {
 
 
       let generatedVa: any = null;
-      try {
-        const platformApiKey = await resolvePlatformApiKey(tenant.id);
-        const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-        const quasar = new QuasarServiceModule(platformApiKey);
-        const va = await quasar.createVirtualAccount({
-          childId: tenant.id, parentId: 'platform-admin-owner-id', currency: 'NGN',
-          email: email || `billing@tenant-${tenant.id.substring(0, 8)}.invify.app`,
-          firstName: businessName.split(' ')[0],
-          lastName: businessName.split(' ').slice(1).join(' ') || 'Business',
-          parentShareBps: 0, metadata: { type: 'tenant_operating_account' }
-        });
-        generatedVa = va;
-        await supabaseAdmin.from('tenants').update({
-          virtual_account_number: va.accountNumber,
-          virtual_account_bank: va.bankName,
-          virtual_account_status: 'ACTIVE'
-        }).eq('id', tenant.id);
-      } catch (vaError: any) {
-        console.error('[OnboardingController] VA generation failed (non-fatal):', vaError.message);
-      }
+      // School virtual accounts wait until a maker proposes activation and a different admin checker-approves.
 
       if (!password || String(password).length < 8) {
         res.status(400).json({ success: false, error: 'A strong password (min 8 characters) is required' });
@@ -471,6 +538,40 @@ export class OnboardingController {
   }
 
   /**
+   * GET/POST /auth/check-agent-code and /api/auth/check-agent-code
+   * Public lookup used during tablet onboarding.
+   */
+  public static async checkAgentCode(req: Request, res: Response): Promise<void> {
+    try {
+      const raw = req.method === 'GET'
+        ? req.query.code || req.query.agentCode || req.query.agent_code
+        : req.body?.code || req.body?.agentCode || req.body?.agent_code;
+      const lookup = await lookupAgentCode(raw);
+      res.status(lookup.valid ? 200 : 404).json({
+        valid: lookup.valid,
+        exists: lookup.exists,
+        isDefault: lookup.isDefault,
+        code: lookup.code || normalizeAgentCode(raw),
+        agentName: lookup.agentName || null,
+        status: lookup.status || null,
+        error: lookup.error || null,
+        message: lookup.valid
+          ? lookup.isDefault
+            ? 'Invify default agent confirmed.'
+            : 'Agent code is valid.'
+          : lookup.error || 'This agent code does not exist',
+      });
+    } catch (error: any) {
+      console.error('[OnboardingController] checkAgentCode error:', error.message);
+      res.status(500).json({
+        valid: false,
+        exists: false,
+        error: 'Could not verify this agent code. Please try again.',
+      });
+    }
+  }
+
+  /**
    * POST /auth/send-email-otp
    */
   public static async sendEmailOtp(req: Request, res: Response): Promise<void> {
@@ -672,7 +773,16 @@ export class OnboardingController {
       const tenantCode = generateTenantCode(phone);
       const normalizedPhone = (phone || '').replace(/\D/g, '');
       const normalizedType = (industry || 'retail').toLowerCase();
-      const effectiveAgentCode = (agentCode && agentCode.trim()) ? agentCode.trim().toUpperCase() : 'AAA000';
+      const agentLookup = await lookupAgentCode(agentCode);
+      if (!agentLookup.valid) {
+        res.status(400).json({
+          success: false,
+          code: 'INVALID_AGENT_CODE',
+          error: agentLookup.error || 'This agent code does not exist',
+        });
+        return;
+      }
+      const effectiveAgentCode = agentLookup.code;
       const effectiveDeviceId = isUsableDeviceId(deviceId) ? normalizeDeviceId(deviceId) : null;
       const effectiveLocation = location || (streetAddress ? `${streetAddress}${state ? ', ' + state : ''}${country ? ', ' + country : ''}` : null);
 
@@ -858,29 +968,15 @@ export class OnboardingController {
           
           if (!authError && authData.user) {
             finalUserId = authData.user.id;
-            // Insert into public.users
-            await supabaseAdmin.from('users').insert({
-              id: finalUserId,
-              tenant_id: finalTenantId,
-              name: `${firstName} ${lastName}`,
-              email,
-              role: 'owner',
-              require_password_reset: false
-            });
           } else {
             console.warn('[OnboardingController] Auth user creation failed or user exists:', authError?.message);
-            const { error: fallbackUserErr } = await supabaseAdmin.from('users').insert({
-              id: require('crypto').randomUUID(),
-              tenant_id: finalTenantId,
-              name: `${firstName} ${lastName}`.trim() || email,
-              email,
-              role: 'owner',
-              require_password_reset: false,
-            });
-            if (fallbackUserErr) {
-              console.warn('[OnboardingController] Fallback owner user insert failed:', fallbackUserErr.message);
-            }
           }
+          finalUserId = await ensureOwnerUserRow({
+            id: finalUserId,
+            tenantId: finalTenantId,
+            name: `${firstName || ''} ${lastName || ''}`.trim() || email,
+            email,
+          });
         } catch (err: any) {
           console.error('[OnboardingController] Exception creating auth user:', err.message);
         }
@@ -930,6 +1026,7 @@ export class OnboardingController {
           platform: 'android',
           device_name: `${firstName} ${lastName}`.trim() || effectiveDeviceId,
           last_seen: new Date().toISOString(),
+          ...await onboardingDeviceOriginFields(effectiveDeviceId),
         }, { onConflict: 'device_id' }).then(({ error: fleetErr }) => {
           if (fleetErr) console.warn('[OnboardingController] devices fleet upsert failed (non-fatal):', fleetErr.message);
         });
@@ -940,6 +1037,7 @@ export class OnboardingController {
           status: 'ACTIVE',
           is_active: true,
           last_seen: new Date().toISOString(),
+          ...await onboardingDeviceOriginFields(effectiveDeviceId),
         }, { onConflict: 'device_id' }).then(({ error: fleetErr }) => {
           if (fleetErr) console.warn('[OnboardingController] devices last_seen refresh failed (non-fatal):', fleetErr.message);
         });
@@ -967,6 +1065,7 @@ export class OnboardingController {
         return;
       }
       const deviceSubject = finalUserId || emailDevice.userId || require('crypto').randomUUID();
+      // Device tokens never expire: tablets must keep working with no re-login.
       const offlineToken = jwt.sign(
         {
           sub: deviceSubject,
@@ -976,8 +1075,7 @@ export class OnboardingController {
           tenantId: finalTenantId,
           deviceId: effectiveDeviceId,
         },
-        process.env.JWT_SECRET,
-        { expiresIn: '30d' }
+        process.env.JWT_SECRET
       );
 
       res.status(201).json({
@@ -1096,9 +1194,18 @@ export class OnboardingController {
       // Get current device count
       const { data: tenant } = await supabaseAdmin
         .from('tenants')
-        .select('device_count, name')
+        .select('device_count, name, type')
         .eq('id', tenantId)
         .single();
+
+      const offlineToken = await signLinkedDeviceToken(tenantId, linkedDeviceId);
+      if (!offlineToken) {
+        res.status(503).json({
+          success: false,
+          error: 'JWT_SECRET is not configured; cannot issue device tokens',
+        });
+        return;
+      }
 
       const claimed = await claimUnassignedDeviceForTenant({
         tenantId,
@@ -1123,8 +1230,10 @@ export class OnboardingController {
           tenantId,
           deviceNumber: claimed.deviceNumber,
           businessName: tenant?.name,
+          businessMode: tenant?.type,
           trialEndsAt,
           overrodeUnassigned: claimed.overrodeUnassigned,
+          offlineToken,
         });
         return;
       }
@@ -1167,7 +1276,9 @@ export class OnboardingController {
         tenantId,
         deviceNumber: newDeviceNumber,
         businessName: tenant?.name,
+        businessMode: tenant?.type,
         trialEndsAt,
+        offlineToken,
       });
     } catch (error: any) {
       console.error('[OnboardingController] linkDevice error:', error.message);

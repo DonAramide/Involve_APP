@@ -688,6 +688,14 @@ class _InvolveAppState extends State<InvolveApp> {
         () => resolveAuthToken(widget.dependencies.securityService);
 
     // Attempt to connect immediately with cached or updated details
+    if (await TerminalSyncService.linkedDeviceBootstrapPending()) {
+      try {
+        await TerminalSyncService.bootstrapLinkedDeviceFromAdmin(deviceId: deviceId);
+      } catch (e) {
+        debugPrint('[Socket Initialization] linked device bootstrap failed: $e');
+      }
+    }
+
     socketService.initializeSocket(
       AppConfig.baseUrl,
       tenantId: config?.tenantId,

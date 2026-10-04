@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import '../../domain/repositories/school_repository.dart';
 import '../../domain/services/student_csv_import.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
@@ -447,7 +448,7 @@ class _StudentListPageState extends State<StudentListPage> {
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
                     if (value == 'edit') {
-                      _showStudentDialog(context, student: student);
+                      _openStudentEditor(context, student);
                     } else if (value == 'profile') {
                       Navigator.push(
                         context,
@@ -751,6 +752,26 @@ class _StudentListPageState extends State<StudentListPage> {
     bloc.add(ImportStudentsEvent(parsed.students, parentAddresses: parsed.parentAddresses));
   }
 
+  Future<void> _openStudentEditor(BuildContext context, Student student) async {
+    Student full = student;
+    if (student.id != null) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      try {
+        final loaded = await context.read<SchoolRepository>().getStudentById(student.id!);
+        if (loaded != null) full = loaded;
+      } catch (e) {
+        debugPrint('[Students] Failed to load full student for edit: $e');
+      }
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (!context.mounted) return;
+    _showStudentDialog(context, student: full);
+  }
+
   void _showStudentDialog(BuildContext context, {Student? student}) {
     final formKey = GlobalKey<FormState>();
     final firstNameController = TextEditingController(text: student?.firstName);
@@ -761,17 +782,39 @@ class _StudentListPageState extends State<StudentListPage> {
     );
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
+    final parentEmailController = TextEditingController();
     final notesController = TextEditingController(text: student?.notes);
     final schoolState = context.read<SchoolBloc>().state;
     SchoolParent? initialParent;
-    if (student?.parentId != null) {
-      initialParent = schoolState.parents.firstWhereOrNull((p) => p.id == student!.parentId);
+    if (student != null) {
+      if (student.parentId != null) {
+        initialParent = schoolState.parents.firstWhereOrNull((p) => p.id == student.parentId);
+      }
+      if (initialParent == null && student.hasParent) {
+        final key = student.parentKey;
+        initialParent = schoolState.parents.firstWhereOrNull((p) => p.parentKey == key);
+      }
+      if (initialParent == null && (student.parentPhone ?? '').trim().isNotEmpty) {
+        final phoneDigits = (student.parentPhone ?? '').replaceAll(RegExp(r'\D'), '');
+        initialParent = schoolState.parents.firstWhereOrNull((p) {
+          final pDigits = (p.phone ?? '').replaceAll(RegExp(r'\D'), '');
+          return pDigits.isNotEmpty && phoneDigits.isNotEmpty &&
+              (pDigits == phoneDigits ||
+                  (pDigits.length >= 10 &&
+                      phoneDigits.length >= 10 &&
+                      pDigits.substring(pDigits.length - 10) ==
+                          phoneDigits.substring(phoneDigits.length - 10)));
+        });
+      }
     }
-    if (initialParent == null && student != null && student.hasParent) {
-      final key = student.parentKey;
-      initialParent = schoolState.parents.firstWhereOrNull(
-        (p) => '${p.fullName.trim()}|${(p.phone ?? '').trim()}' == key || ((p.phone ?? '').trim().isNotEmpty && (p.phone ?? '').trim() == (student.parentPhone ?? '').trim()),
-      );
+    if (initialParent != null) {
+      if ((parentNameController.text).trim().isEmpty) {
+        parentNameController.text = initialParent.fullName;
+      }
+      if ((parentPhoneController.text).trim().isEmpty && (initialParent.phone ?? '').trim().isNotEmpty) {
+        parentPhoneController.text = initialParent.phone!;
+      }
+      parentEmailController.text = (initialParent.email ?? '').trim();
     }
 
     final streetController = TextEditingController();
@@ -848,10 +891,14 @@ class _StudentListPageState extends State<StudentListPage> {
             .whereType<int>(),
     };
     int? selectedClassId = student?.classId;
-    String? selectedDepartment = student?.department;
-    String? selectedGender = student?.gender;
+    if (selectedClassId != null && !schoolState.classes.any((c) => c.id == selectedClassId)) {
+      selectedClassId = null;
+    }
+    String? selectedDepartment = _normalizeDepartment(student?.department);
+    String? selectedGender = _normalizeGender(student?.gender);
     Uint8List? selectedImage = student?.image;
     DateTime? selectedDob = student?.dateOfBirth;
+    int? selectedYearId = student?.academicYearId ?? schoolState.activeYear?.id;
     final ImagePicker picker = ImagePicker();
     context.read<SchoolBloc>().add(ResetSchoolStatus());
 
@@ -986,7 +1033,7 @@ class _StudentListPageState extends State<StudentListPage> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: selectedGender,
+                          value: ['Male', 'Female', 'Other'].contains(selectedGender) ? selectedGender : null,
                           decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
                           items: ['Male', 'Female', 'Other']
                               .map((g) => DropdownMenuItem(value: g, child: Text(g)))
@@ -999,7 +1046,7 @@ class _StudentListPageState extends State<StudentListPage> {
                             return Column(
                               children: [
                                 DropdownButtonFormField<int>(
-                                  value: selectedClassId,
+                                  value: state.classes.any((c) => c.id == selectedClassId) ? selectedClassId : null,
                                   decoration: const InputDecoration(labelText: 'Class *', border: OutlineInputBorder()),
                                   items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
                                   onChanged: (val) => setDialogState(() => selectedClassId = val),
@@ -1007,7 +1054,9 @@ class _StudentListPageState extends State<StudentListPage> {
                                 ),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
-                                  value: selectedDepartment,
+                                  value: ['Science', 'Art', 'Commerce'].contains(selectedDepartment)
+                                      ? selectedDepartment
+                                      : null,
                                   decoration: const InputDecoration(labelText: 'Department (Science/Art/Commerce)', border: OutlineInputBorder()),
                                   items: [
                                     const DropdownMenuItem<String>(value: null, child: Text('None')),
@@ -1016,6 +1065,19 @@ class _StudentListPageState extends State<StudentListPage> {
                                   ],
                                   onChanged: (val) => setDialogState(() => selectedDepartment = val),
                                 ),
+                                if (state.academicYears.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  DropdownButtonFormField<int>(
+                                    value: state.academicYears.any((y) => y.id == selectedYearId)
+                                        ? selectedYearId
+                                        : null,
+                                    decoration: const InputDecoration(labelText: 'Academic Year', border: OutlineInputBorder()),
+                                    items: state.academicYears
+                                        .map((y) => DropdownMenuItem(value: y.id, child: Text(y.name)))
+                                        .toList(),
+                                    onChanged: (val) => setDialogState(() => selectedYearId = val),
+                                  ),
+                                ],
                               ],
                             );
                           },
@@ -1061,6 +1123,7 @@ class _StudentListPageState extends State<StudentListPage> {
                                   if (match == null) return;
                                   parentNameController.text = match.name;
                                   parentPhoneController.text = match.phone;
+                                  parentEmailController.text = match.email ?? parentEmailController.text;
                                   if (match.address != null && match.address!.trim().isNotEmpty) {
                                     applyAddressString(match.address);
                                   }
@@ -1084,6 +1147,26 @@ class _StudentListPageState extends State<StudentListPage> {
                           controller: parentNameController, 
                           decoration: const InputDecoration(labelText: 'Parent/Guardian Name *', border: OutlineInputBorder()),
                           validator: (val) => val == null || val.isEmpty ? 'Parent Name is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: parentEmailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Parent Email',
+                            hintText: 'parent@email.com',
+                            prefixIcon: Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) {
+                            final email = (v ?? '').trim();
+                            if (email.isEmpty) return null;
+                            if (!email.contains('@') || !email.contains('.')) {
+                              return 'Enter a valid email';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -1324,6 +1407,7 @@ class _StudentListPageState extends State<StudentListPage> {
                                     parentName: parentNameController.text,
                                     parentPhone: parentPhoneController.text,
                                     classId: selectedClassId,
+                                    academicYearId: selectedYearId,
                                     image: selectedImage,
                                     dateOfBirth: selectedDob,
                                     gender: selectedGender,
@@ -1338,6 +1422,7 @@ class _StudentListPageState extends State<StudentListPage> {
                                     parentName: parentNameController.text,
                                     parentPhone: parentPhoneController.text,
                                     classId: selectedClassId!,
+                                    academicYearId: selectedYearId,
                                     image: selectedImage,
                                     dateOfBirth: selectedDob,
                                     gender: selectedGender,
@@ -1360,6 +1445,7 @@ class _StudentListPageState extends State<StudentListPage> {
                               if (country.isNotEmpty) addressParts.add(country);
 
                               final fullAddress = addressParts.join(', ');
+                              final parentEmail = parentEmailController.text.trim();
                               final parentAddress = fullAddress.isEmpty ? null : fullAddress;
 
                               if (student == null) {
@@ -1367,12 +1453,14 @@ class _StudentListPageState extends State<StudentListPage> {
                                       newStudent,
                                       alsoAssignStudentIds: alsoAssignIds.toList(),
                                       parentAddress: parentAddress,
+                                      parentEmail: parentEmail.isEmpty ? null : parentEmail,
                                     ));
                               } else {
                                 context.read<SchoolBloc>().add(UpdateStudentEvent(
                                       newStudent,
                                       alsoAssignStudentIds: alsoAssignIds.toList(),
                                       parentAddress: parentAddress,
+                                      parentEmail: parentEmail.isEmpty ? null : parentEmail,
                                     ));
                               }
                             }
@@ -1456,43 +1544,62 @@ class _StudentListPageState extends State<StudentListPage> {
   }
 
   List<_ExistingParent> _uniqueParents(List<Student> students, [List<SchoolParent> schoolParents = const []]) {
-    final parentAddressMap = <String, String>{};
+    final parentByKey = <String, SchoolParent>{};
+    final parentByPhone = <String, SchoolParent>{};
     for (final p in schoolParents) {
-      if (p.address != null && p.address!.trim().isNotEmpty) {
-        final name = p.fullName.trim();
-        final phone = (p.phone ?? '').trim();
-        final key = '$name|$phone';
-        parentAddressMap[key] = p.address!.trim();
-        if (phone.isNotEmpty) {
-          parentAddressMap[phone] = p.address!.trim();
-        }
-      }
+      parentByKey[p.parentKey] = p;
+      final digits = (p.phone ?? '').replaceAll(RegExp(r'\D'), '');
+      if (digits.isNotEmpty) parentByPhone[digits] = p;
     }
 
     final byKey = <String, _ExistingParent>{};
     for (final s in students) {
       if (!s.hasParent) continue;
+      final schoolParent = parentByKey[s.parentKey] ??
+          parentByPhone[(s.parentPhone ?? '').replaceAll(RegExp(r'\D'), '')];
+      final addr = (schoolParent?.address ?? '').trim().isEmpty ? null : schoolParent!.address!.trim();
+      final email = (schoolParent?.email ?? '').trim().isEmpty ? null : schoolParent!.email!.trim();
       final existing = byKey[s.parentKey];
-      final addr = parentAddressMap[s.parentKey] ??
-          (s.parentPhone != null ? parentAddressMap[s.parentPhone!.trim()] : null);
       if (existing == null) {
         byKey[s.parentKey] = _ExistingParent(
           key: s.parentKey,
           name: s.parentName!.trim(),
           phone: (s.parentPhone ?? '').trim(),
           address: addr,
+          email: email,
           childCount: 1,
         );
       } else {
         byKey[s.parentKey] = existing.copyWith(
           childCount: existing.childCount + 1,
           address: existing.address ?? addr,
+          email: existing.email ?? email,
         );
       }
     }
     final list = byKey.values.toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return list;
+  }
+
+  static String? _normalizeGender(String? raw) {
+    final v = (raw ?? '').trim().toLowerCase();
+    if (v.isEmpty) return null;
+    if (v == 'male' || v == 'm') return 'Male';
+    if (v == 'female' || v == 'f') return 'Female';
+    if (v == 'other') return 'Other';
+    if (raw == 'Male' || raw == 'Female' || raw == 'Other') return raw;
+    return raw;
+  }
+
+  static String? _normalizeDepartment(String? raw) {
+    final v = (raw ?? '').trim().toLowerCase();
+    if (v.isEmpty) return null;
+    if (v == 'science') return 'Science';
+    if (v == 'art' || v == 'arts' || v == 'art/humanities' || v == 'humanities') return 'Art';
+    if (v == 'commerce' || v == 'commercial' || v == 'business') return 'Commerce';
+    if (raw == 'Science' || raw == 'Art' || raw == 'Commerce') return raw;
+    return raw;
   }
 
   void _showSiblingPicker(
@@ -1560,6 +1667,7 @@ class _ExistingParent {
   final String name;
   final String phone;
   final String? address;
+  final String? email;
   final int childCount;
 
   const _ExistingParent({
@@ -1567,15 +1675,17 @@ class _ExistingParent {
     required this.name,
     required this.phone,
     this.address,
+    this.email,
     required this.childCount,
   });
 
-  _ExistingParent copyWith({int? childCount, String? address}) {
+  _ExistingParent copyWith({int? childCount, String? address, String? email}) {
     return _ExistingParent(
       key: key,
       name: name,
       phone: phone,
       address: address ?? this.address,
+      email: email ?? this.email,
       childCount: childCount ?? this.childCount,
     );
   }

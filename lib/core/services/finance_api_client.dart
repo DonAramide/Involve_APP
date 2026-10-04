@@ -34,7 +34,10 @@ class FinanceApiException implements Exception {
 
 class UnauthorizedException extends FinanceApiException {
   const UnauthorizedException()
-      : super(message: 'Session expired. Please log in again.', statusCode: 401);
+      : super(
+          message: 'The server could not verify this device. Please try again.',
+          statusCode: 401,
+        );
 }
 
 class NetworkException extends FinanceApiException {
@@ -49,6 +52,17 @@ class ServerException extends FinanceApiException {
 // ── Auth Interceptor ───────────────────────────────────────────────────────────
 
 /// Injects the Supabase JWT token into every request's Authorization header.
+class FormDataContentTypeInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.data is FormData) {
+      options.headers.remove('Content-Type');
+      options.contentType = Headers.multipartFormDataContentType;
+    }
+    handler.next(options);
+  }
+}
+
 class JwtInterceptor extends Interceptor {
   final Future<String?> Function() getToken;
 
@@ -108,11 +122,14 @@ class PlanGatingInterceptor extends Interceptor {
         options.path.contains('/api/auth/') ||
         options.path.contains('/api/school/bulk-sync') ||
         options.path.contains('/api/school/payments/sync') ||
+        options.path.contains('/api/school/term-bills') ||
         options.path.contains('/api/inventory/products/bulk-sync') ||
         options.path.contains('/api/v1/crm/customers/bulk-sync') ||
         options.path.contains('/api/staff/bulk-sync') ||
         options.path.contains('/api/staff') ||
         options.path.contains('/api/v1/finance/invoices/bulk-sync') ||
+        options.path.contains('/api/tenant/kyc') ||
+        options.path.contains('/api/admin/upload-cac') ||
         options.path.contains('/api/admin/claude-backup') ||
         options.path.contains('/api/mobile/terminal/sync')) {
       return super.onRequest(options, handler);
@@ -362,6 +379,7 @@ class FinanceApiClient {
 
     // Order matters: auth → tenant → plan gating → error handling → logging
     _dio.interceptors.addAll([
+      FormDataContentTypeInterceptor(),
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
       DeviceInterceptor(),

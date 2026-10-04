@@ -273,9 +273,9 @@ const rawItems = [
   },
   {
     id: 'cmd-rev-gov',
-    label: 'Enterprise Revenue & Platform Billing Governance',
-    description: 'Global tariff splits, transactional margin controls, variable commissions, and live payout splits.',
-    route: '/admin/billing',
+    label: 'Platform Fee Orchestration',
+    description: 'Persisted POS/VA/SMS/AI/Treasury fee profiles, draft versions, and publish RPC. Not school billing.',
+    route: '/admin/platform-fees',
     domain: 'governance',
     icon: 'payments',
     avatarBg: 'teal-10',
@@ -283,6 +283,32 @@ const rawItems = [
     isCommand: true,
     permission: 'read_tenant',
     keywords: ['billing', 'revenue', 'tariff', 'commission', 'fees', 'charges', 'splits', 'payout']
+  },
+  {
+    id: 'cmd-fee-assessments',
+    label: 'Fee Assessments (read-only)',
+    description: 'Shadow and live fee assessment list, detail, and reconciliation. No mutations.',
+    route: '/admin/platform-fees/assessments',
+    domain: 'governance',
+    icon: 'fact_check',
+    avatarBg: 'teal-10',
+    avatarColor: 'teal-2',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['assessments', 'shadow', 'fee', 'reconciliation']
+  },
+  {
+    id: 'cmd-fee-distribution',
+    label: 'Fee Distribution',
+    description: 'Assessed platform/processor/service/agent shares. Control-plane only. No real payout.',
+    route: '/admin/platform-fees/distribution',
+    domain: 'governance',
+    icon: 'account_tree',
+    avatarBg: 'teal-10',
+    avatarColor: 'teal-2',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['distribution', 'stakeholder', 'payable', 'withdrawal readiness']
   },
   {
     id: 'cmd-1',

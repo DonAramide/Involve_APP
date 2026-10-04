@@ -11,6 +11,11 @@ router.get(
   checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
   ExecutiveFinanceController.getSummary,
 );
+router.post(
+  '/quasar-resync',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']),
+  ExecutiveFinanceController.resyncQuasar,
+);
 router.get('/stats/payouts', ExecutiveFinanceController.getPayoutStats);
 router.get('/settlement-phases', ExecutiveFinanceController.getSettlementPhases);
 

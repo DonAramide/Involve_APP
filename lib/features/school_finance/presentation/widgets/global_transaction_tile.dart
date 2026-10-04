@@ -3,6 +3,7 @@ import '../../domain/entities/financial_transaction.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import '../pages/payment_transaction_details_page.dart';
 import '../pages/student_finance_profile.dart';
 
 class GlobalTransactionTile extends StatelessWidget {
@@ -24,16 +25,24 @@ class GlobalTransactionTile extends StatelessWidget {
       onTap: () {
         final metaId = '${transaction.metadata['student_id'] ?? transaction.metadata['studentId'] ?? ''}'.trim();
         final walletId = transaction.walletId.trim();
-        final studentId = metaId.isNotEmpty
+        const notAStudent = {'fee', 'school', 'quasar', 'local'};
+        final studentId = metaId.isNotEmpty && !notAStudent.contains(metaId)
             ? metaId
-            : (walletId.isNotEmpty && walletId != 'school' && walletId != 'quasar')
+            : (walletId.isNotEmpty && !notAStudent.contains(walletId))
                 ? walletId
                 : '';
-        if (studentId.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No student linked to this payment yet.'),
-              behavior: SnackBarBehavior.floating,
+        final isVaPayment = transaction.metadata['quasar'] == true ||
+            transaction.metadata['fee'] == true ||
+            walletId == 'fee' ||
+            walletId == 'quasar' ||
+            '${transaction.metadata['virtualAccountNumber'] ?? transaction.metadata['accountNumber'] ?? ''}'
+                .trim()
+                .isNotEmpty;
+        if (studentId.isEmpty || isVaPayment) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PaymentTransactionDetailsPage(transaction: transaction),
             ),
           );
           return;

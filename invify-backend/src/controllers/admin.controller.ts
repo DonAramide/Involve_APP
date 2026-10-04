@@ -13,9 +13,11 @@ import {
   sanitizeTenantUpdates,
   withoutOptionalTenantColumns,
 } from '../utils/sanitize-tenant-updates';
+import { isMakerCheckerApply, submitSupportChange } from '../services/maker-checker.service';
 import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { displayableDeviceId } from '../utils/device-identity';
 import { planNameFromIndex } from '../utils/paid-license';
+import { canApproveTerminalActivation } from '../utils/terminal-activation-approval';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
 import {
@@ -32,6 +34,8 @@ import {
   unsettledCardByTenant,
   virtualAccountMatches,
 } from '../utils/virtual-account-funds';
+import { tenantInstitutePortService } from '../services/tenant-institute-port.service';
+import { loadActivationGate, virtualAccountGenerationBlockReason } from '../modules/financial-platform/activation/activation-gate';
 
 function isPlatformFinanceOperator(user: any): boolean {
   const role = String(user?.role || '').toLowerCase()
@@ -94,6 +98,14 @@ async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   }
 
   return 'demo-key';
+}
+
+async function rejectUnlessMakerCheckerApproved(res: Response, tenantId: string): Promise<boolean> {
+  const { gate } = await loadActivationGate(tenantId);
+  const blocked = virtualAccountGenerationBlockReason(gate);
+  if (!blocked) return false;
+  res.status(403).json({ error: blocked, code: 'MAKER_CHECKER_REQUIRED' });
+  return true;
 }
 
 export class AdminController {
@@ -331,6 +343,26 @@ export class AdminController {
   static async updateGlobalSettings(req: Request, res: Response) {
     try {
       const updates = req.body;
+      if (
+        updates &&
+        Object.prototype.hasOwnProperty.call(updates, 'quasar_base_url') &&
+        !isMakerCheckerApply(req)
+      ) {
+        const row = submitSupportChange(req, {
+          domain: 'pos_switchboard',
+          action: 'quasar_base_url',
+          summary: `Quasar switch URL → ${String(updates.quasar_base_url || '(cleared)')}`,
+          body: { quasar_base_url: updates.quasar_base_url },
+        });
+        delete updates.quasar_base_url;
+        if (!Object.keys(updates).length) {
+          return res.status(202).json({
+            pending: true,
+            id: row.id,
+            message: 'Submitted. Only support@iips.app can approve this change.',
+          });
+        }
+      }
       const operatorId = (req as any).user?.id || null;
       
       // Update the local global_settings.json file cache
@@ -555,9 +587,9 @@ export class AdminController {
         }
 
         if (matchingTenantIds.length > 0) {
-          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,id.in.(${matchingTenantIds.join(',')})`);
+          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,owner_email.ilike.%${name}%,id.in.(${matchingTenantIds.join(',')})`);
         } else {
-          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%`);
+          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,owner_email.ilike.%${name}%`);
         }
       }
 
@@ -586,6 +618,10 @@ export class AdminController {
       }
 
       // Flatten: pull the primary device (device_number=1) fields up to the tenant row
+      const instituteByTenant = await tenantInstitutePortService
+        .ownershipMap((data || []).map((t: any) => String(t.id)))
+        .catch(() => new Map());
+
       const enriched = (data || []).map((tenant: any) => {
         const devices: any[] = tenant.device_registrations || [];
         // Sort by device_number so device #1 is primary
@@ -603,10 +639,18 @@ export class AdminController {
           };
           devices.push(primary);
         }
+        const institute = instituteByTenant.get(String(tenant.id));
+        const pendingPort = tenant?.settings?.institute_port?.proposal?.status === 'pending';
         return {
           ...tenant,
           device_id: displayableDeviceId(primary?.device_id),
-          agent_code: primary?.agent_code ?? null,
+          device_agent_code: primary?.agent_code ?? null,
+          agent_code: institute?.agent_code || tenant.agent_code || primary?.agent_code || null,
+          institute_id: institute?.id || null,
+          institute_code: institute?.agent_code || tenant.agent_code || null,
+          institute_name: institute?.name || null,
+          institute_is_default: institute ? institute.isDefault : !tenant.agent_code,
+          institute_port_pending: pendingPort,
           location: primary?.location || tenant.location || null,
           device_count: tenant.device_count || devices.length || (primary ? 1 : 0),
           // Keep raw array for potential future use
@@ -833,39 +877,7 @@ export class AdminController {
       // Senior Practice: Auto-create wallet for the new tenant
       await supabaseAdmin.from('wallets').insert({ tenant_id: data.id, balance: 0 });
 
-      // Generate Virtual Account for Tenant using Quasar SDK
-      try {
-        const platformApiKey = await resolvePlatformApiKey(data.id);
-        const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-        const quasar = new QuasarServiceModule(platformApiKey);
-        
-        const platformId = 'platform-admin-owner-id'; // Constant platform parent ID
-        
-        const va = await quasar.createVirtualAccount({
-          childId: data.id,
-          parentId: platformId,
-          currency: 'NGN',
-          email: `billing@tenant-${data.id.substring(0,8)}.invify.app`,
-          firstName: name.split(' ')[0],
-          lastName: name.split(' ').slice(1).join(' ') || 'Business',
-          parentShareBps: 0,
-          metadata: { type: 'tenant_operating_account' }
-        });
-        
-        // Save VA details to the tenant record
-        await supabaseAdmin
-          .from('tenants')
-          .update({
-            virtual_account_number: va.accountNumber,
-            virtual_account_bank: va.bankName,
-            virtual_account_status: 'ACTIVE'
-          })
-          .eq('id', data.id);
-          
-      } catch (vaError: any) {
-        console.error('[AdminController] Failed to generate Virtual Account for tenant:', vaError.message);
-        // We don't block tenant creation if VA generation fails, just log it.
-      }
+      // Virtual accounts wait for maker propose + a different admin's checker approval.
 
       return res.status(201).json(data);
     } catch (error: any) {
@@ -1247,25 +1259,70 @@ export class AdminController {
         console.warn('[AdminController] device_registrations unavailable:', devErr.message);
       }
 
-      const certificates = (certRes.data || []).map((a: any) => ({
-        code: a.activation_code,
-        deviceId: a.device_id,
-        plan_index: a.plan_index,
-        plan: String(planNameFromIndex(a.plan_index) || 'basic').toUpperCase(),
-        duration: `${a.duration_days} Days`,
-        expiry: a.expires_at
-          ? new Date(a.expires_at).toLocaleDateString()
-          : new Date(new Date(a.created_at).getTime() + Number(a.duration_days || 0) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        status: a.is_used ? 'USED' : 'ACTIVE',
-        createdBy: a.created_by || null,
-        createdAt: a.created_at || null,
-      }));
+      const viewerEmail = String(user?.email || '').trim().toLowerCase();
+      const certificates = (certRes.data || []).map((a: any) => {
+        const hidden = a.status === 'awaiting_approval' || a.status === 'rejected';
+        const status =
+          a.status === 'awaiting_approval'
+            ? 'AWAITING APPROVAL'
+            : a.status === 'rejected'
+              ? 'REJECTED'
+              : a.is_used
+                ? 'USED'
+                : 'ACTIVE';
+        return {
+          id: a.id,
+          code: hidden ? null : a.activation_code,
+          deviceId: a.device_id,
+          plan_index: a.plan_index,
+          plan: String(planNameFromIndex(a.plan_index) || 'basic').toUpperCase(),
+          duration: `${a.duration_days} Days`,
+          expiry: a.expires_at
+            ? new Date(a.expires_at).toLocaleDateString()
+            : new Date(new Date(a.created_at).getTime() + Number(a.duration_days || 0) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          status,
+          createdBy: a.created_by || null,
+          createdAt: a.created_at || null,
+          canApprove: hidden && a.status === 'awaiting_approval' && canApproveTerminalActivation(viewerEmail, a.created_by).ok,
+        };
+      });
 
       const rawUsers = usersRes.data || [];
       const tenant = hydrateTenantOwnerContact(tenantRes.data, rawUsers, registeredDevices);
 
+      let institutePort = null;
+      try {
+        institutePort = await tenantInstitutePortService.getSnapshot(id);
+      } catch (portErr: any) {
+        console.warn('[AdminController] institute port snapshot failed (non-fatal):', portErr.message);
+      }
+
+      let paymentAlerts: any[] = [];
+      try {
+        const { PaymentAlertTrailService } = await import('../services/payment-alert-trail.service');
+        paymentAlerts = await PaymentAlertTrailService.listForTenant(id);
+      } catch (alertErr: any) {
+        console.warn('[AdminController] payment alert trail unavailable:', alertErr.message);
+      }
+
+      let quasarHeld: number | null = null;
+      try {
+        const { QfsQuasarBridgeService } = await import('../services/qfs-quasar-bridge.service');
+        const { sumQuasarSandboxBalancesNaira } = await import('../utils/virtual-account-funds');
+        const accounts = await Promise.race([
+          QfsQuasarBridgeService.listAccounts(id),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Quasar balance lookup timed out')), 2500);
+          }),
+        ]);
+        quasarHeld = sumQuasarSandboxBalancesNaira(accounts || []);
+      } catch (quasarErr: any) {
+        console.warn('[AdminController] Quasar held balance unavailable:', quasarErr.message);
+      }
+
       return res.status(200).json({
         tenant,
+        institutePort,
         users: rawUsers.map((u: any) => ({
           ...u,
           // Surface tenant phone on owner rows when users.phone column is empty
@@ -1293,6 +1350,8 @@ export class AdminController {
             account: tx.account,
           })),
           virtualAccounts: [],
+          paymentAlerts,
+          quasarHeld,
           allWallets: walletRow.data
             ? [{
                 id: walletRow.data.id,
@@ -1325,9 +1384,10 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = await resolvePlatformApiKey(tenant.id);
-      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-      const quasar = new QuasarServiceModule(platformApiKey);
+      if (await rejectUnlessMakerCheckerApproved(res, tenant.id)) return;
+
+      const { getQuasarService } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarService(tenant.id, { tenantIntegrationOnly: true });
       const platformId = 'platform-admin-owner-id';
       
       const va = await quasar.createVirtualAccount({
@@ -1364,6 +1424,7 @@ export class AdminController {
   static async provisionStudentVirtualAccount(req: Request, res: Response) {
     try {
       const { id, studentId } = req.params;
+      if (await rejectUnlessMakerCheckerApproved(res, id)) return;
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
@@ -1427,6 +1488,7 @@ export class AdminController {
   static async provisionCustomerVirtualAccount(req: Request, res: Response) {
     try {
       const { id, customerId } = req.params;
+      if (await rejectUnlessMakerCheckerApproved(res, id)) return;
 
       // Get customer from database to use actual information and enforce it's fully populated
       const { data: customer, error: customerErr } = await supabaseAdmin
@@ -1513,11 +1575,16 @@ export class AdminController {
     try {
       const { tenantId, startDate, endDate, reference } = req.query;
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isSuperAdmin = role === 'super_admin';
+      const roles = String(user?.role || '')
+        .toLowerCase()
+        .split(/[,\s]+/)
+        .filter(Boolean);
+      const isPlatform = roles.some((r) =>
+        ['super_admin', 'admin', 'internal_staff', 'admin_finance'].includes(r),
+      );
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
 
-      if (!isSuperAdmin) {
+      if (!isPlatform) {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
         }
@@ -1526,7 +1593,7 @@ export class AdminController {
         }
       }
 
-      const scopedTenantId = !isSuperAdmin ? user.tenantId : (tenantId || undefined);
+      const scopedTenantId = !isPlatform ? user.tenantId : (tenantId || undefined);
 
       const applyFilters = (query: any, { allowReference = true } = {}) => {
         let next = query;
@@ -1537,25 +1604,7 @@ export class AdminController {
         return next.order('created_at', { ascending: false }).limit(limit);
       };
 
-      const primary = await applyFilters(
-        supabaseAdmin.from('ledger_entries').select('*'),
-      );
-
-      if (!primary.error) {
-        return res.status(200).json(primary.data || []);
-      }
-
-      console.warn(
-        '[AdminController] listLedger ledger_entries failed, using transactions_log:',
-        primary.error.message,
-      );
-
-      const fallback = await applyFilters(
-        supabaseAdmin.from('transactions_log').select('*'),
-      );
-      if (fallback.error) throw fallback.error;
-
-      const rows = (fallback.data || []).map((row: any) => {
+      const mapTxn = (row: any) => {
         const typeRaw = String(row.type || row.entry_type || 'CREDIT').toUpperCase();
         const isDebit = ['DEBIT', 'WITHDRAWAL', 'SWEEP', 'PAYOUT'].some((k) =>
           typeRaw.includes(k),
@@ -1564,11 +1613,42 @@ export class AdminController {
           ...row,
           type: isDebit ? 'DEBIT' : 'CREDIT',
           amount: Number(row.amount || 0),
-          journal_id: row.reference || row.id,
+          journal_id: row.reference || row.journal_id || row.id,
           account: row.account || row.wallet_id || 'USER_WALLET',
         };
-      });
-      return res.status(200).json(rows);
+      };
+
+      const primary = await applyFilters(
+        supabaseAdmin.from('ledger_entries').select('*'),
+      );
+      const ledgerRows = primary.error ? [] : (primary.data || []);
+      if (primary.error) {
+        console.warn(
+          '[AdminController] listLedger ledger_entries failed, using transactions_log:',
+          primary.error.message,
+        );
+      }
+      if (ledgerRows.length) {
+        return res.status(200).json(ledgerRows);
+      }
+
+      const fallback = await applyFilters(
+        supabaseAdmin.from('transactions_log').select('*'),
+        { allowReference: true },
+      );
+      if (!fallback.error && (fallback.data || []).length) {
+        return res.status(200).json((fallback.data || []).map(mapTxn));
+      }
+
+      const payments = await applyFilters(
+        supabaseAdmin.from('payments').select('*'),
+        { allowReference: true },
+      );
+      if (!payments.error && (payments.data || []).length) {
+        return res.status(200).json((payments.data || []).map(mapTxn));
+      }
+
+      return res.status(200).json([]);
     } catch (error: any) {
       console.error('[AdminController] listLedger Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -1766,7 +1846,7 @@ export class AdminController {
         .limit(1000)
       let tenantQuery = supabaseAdmin
         .from('tenants')
-        .select('id, name, type, virtual_account_number, virtual_account_bank, virtual_account_name, virtual_account_status')
+        .select('id, name, type, virtual_account_number, virtual_account_bank, virtual_account_status')
         .not('virtual_account_number', 'is', null)
         .limit(500)
       let txnQuery = supabaseAdmin
@@ -1819,7 +1899,7 @@ export class AdminController {
           holderId: t.id,
           accountNumber: t.virtual_account_number,
           bankName: t.virtual_account_bank || 'Quasar',
-          accountName: t.virtual_account_name || t.name,
+          accountName: t.name,
           status: t.virtual_account_status || 'ACTIVE',
           balance: pending.get(String(t.virtual_account_number).trim()) || 0,
         })
@@ -1886,17 +1966,39 @@ export class AdminController {
         }
       }
 
+      const { applySyncedVirtualAccounts } = await import('../services/virtual-account-inventory')
+      const merged = await applySyncedVirtualAccounts(rows, names)
       return res.status(200).json({
-        rows,
+        rows: merged,
         summary: {
-          accounts: rows.length,
-          withBalance: rows.filter((r) => Number(r.balance) > 0).length,
-          pending: Number(rows.reduce((s, r) => s + Number(r.balance || 0), 0).toFixed(2)),
+          accounts: merged.length,
+          withBalance: merged.filter((r) => Number(r.balance) > 0).length,
+          pending: Number(merged.reduce((s, r) => s + Number(r.balance || 0), 0).toFixed(2)),
+          quasar: Number(merged.reduce((s, r) => s + Number(r.quasarBalance || 0), 0).toFixed(2)),
         },
       })
     } catch (error: any) {
       console.error('[AdminController] listVirtualAccounts Error:', error.message)
       return res.status(500).json({ error: error.message || 'Failed to load virtual accounts' })
+    }
+  }
+
+  /**
+   * POST /api/admin/virtual-accounts/refresh
+   * Pull every Quasar virtual account and store it so the inventory table matches Quasar.
+   */
+  static async refreshVirtualAccounts(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      if (!isPlatformFinanceOperator(user)) {
+        return res.status(403).json({ error: 'Platform finance access required' })
+      }
+      const { refreshAllQuasarVirtualAccounts } = await import('../services/virtual-account-inventory')
+      const result = await refreshAllQuasarVirtualAccounts()
+      return res.status(200).json(result)
+    } catch (error: any) {
+      console.error('[AdminController] refreshVirtualAccounts Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to refresh virtual accounts' })
     }
   }
 
@@ -1914,7 +2016,7 @@ export class AdminController {
         supabaseAdmin.from('customers').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
         supabaseAdmin.from('users').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
         supabaseAdmin.from('students').select('id, first_name, last_name, tenant_id, school_id, virtual_account_number, virtual_account_bank').eq('virtual_account_number', accountNumber).limit(1),
-        supabaseAdmin.from('tenants').select('id, name, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('tenants').select('id, name, virtual_account_number, virtual_account_bank').eq('virtual_account_number', accountNumber).limit(1),
       ])
 
       const customer = customerRes.data?.[0]
@@ -1929,7 +2031,7 @@ export class AdminController {
           : student
             ? { holderType: 'Student', holderName: `${student.first_name || ''} ${student.last_name || ''}`.trim(), holderId: student.id, tenantId: student.tenant_id || student.school_id, bankName: student.virtual_account_bank, accountName: `${student.first_name || ''} ${student.last_name || ''}`.trim() }
             : tenantOwner
-              ? { holderType: 'Tenant', holderName: tenantOwner.name, holderId: tenantOwner.id, tenantId: tenantOwner.id, bankName: tenantOwner.virtual_account_bank, accountName: tenantOwner.virtual_account_name || tenantOwner.name }
+              ? { holderType: 'Tenant', holderName: tenantOwner.name, holderId: tenantOwner.id, tenantId: tenantOwner.id, bankName: tenantOwner.virtual_account_bank, accountName: tenantOwner.name }
               : null
 
       if (owner?.tenantId && !isPlatform && String(user?.tenantId) !== String(owner.tenantId)) {

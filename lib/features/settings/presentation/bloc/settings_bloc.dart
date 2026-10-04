@@ -11,6 +11,7 @@ import '../../../../core/license/storage_service.dart';
 import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
 import '../../domain/entities/settings.dart';
+import '../../../dashboard/domain/dashboard_menu_catalog.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -81,6 +82,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       }
       
       await backupService.syncData(bytes);
+      await _retainRestoredBusinessMode();
       
       emit(state.copyWith(
         isImporting: false, 
@@ -96,6 +98,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(isImporting: true, error: null, successMessage: null));
     try {
       await backupService.syncData(event.bytes);
+      await _retainRestoredBusinessMode();
       
       emit(state.copyWith(
         isImporting: false, 
@@ -104,6 +107,17 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       ));
     } catch (e) {
       emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
+    }
+  }
+
+  /// LoadSettings re-applies the stored onboarding industry on every start, so
+  /// it must match the restored mode or the restart would revert it.
+  Future<void> _retainRestoredBusinessMode() async {
+    try {
+      final restored = await repository.getSettings();
+      await StorageService.setOnboardingIndustry(restored.normalizedBusinessMode);
+    } catch (e) {
+      debugPrint('SettingsBloc: could not retain restored business mode: $e');
     }
   }
 
@@ -126,6 +140,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     try {
       final success = await backupService.importDatabase(event.path);
       if (success) {
+        // The imported database carries its own business mode; clear the
+        // onboarding override so LoadSettings does not replace it on restart.
+        await StorageService.setOnboardingIndustry('');
         emit(state.copyWith(
           isImporting: false, 
           successMessage: 'Database restored successfully! App is restarting...',
@@ -200,6 +217,26 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           if (workingSettings.primaryColor == factoryBlue) {
             workingSettings = workingSettings.copyWith(primaryColor: storedColor);
           }
+        }
+
+        final linkedName = event.linkedBusinessName?.trim() ?? '';
+        if (linkedName.isNotEmpty && linkedName != workingSettings.organizationName) {
+          workingSettings = workingSettings.copyWith(organizationName: linkedName);
+        }
+        final linkedModeRaw = event.linkedBusinessMode?.trim() ?? '';
+        if (linkedModeRaw.isNotEmpty) {
+          final linkedMode = AppSettings.modeFromOnboarding(linkedModeRaw);
+          if (workingSettings.normalizedBusinessMode != linkedMode) {
+            workingSettings = workingSettings.copyWith(businessMode: linkedMode);
+          }
+        }
+
+        final applyLinkedDashboard =
+            await StorageService.consumeLinkedDeviceDashboardDefaultsPending();
+        if (applyLinkedDashboard) {
+          workingSettings = workingSettings.copyWith(
+            hiddenDashboardIcons: DashboardMenuCatalog.hideableIds(),
+          );
         }
 
         // Save if any changes were made during load/migration

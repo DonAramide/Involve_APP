@@ -21,6 +21,9 @@ class TransactionModel extends FinancialTransaction {
     
     // Extract metadata and inject joined student data
     final Map<String, dynamic> metadata = Map<String, dynamic>.from(json['metadata'] ?? {});
+    if (json['virtualAccountNumber'] != null) {
+      metadata['virtualAccountNumber'] ??= json['virtualAccountNumber'];
+    }
     if (json['students'] != null) {
       metadata['student_id'] = json['student_id'];
       metadata['student_name'] = '${json['students']['first_name']} ${json['students']['last_name']}';

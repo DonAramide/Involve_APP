@@ -1,4 +1,4 @@
-import { supabase } from '../../../db/supabase';
+import { supabaseAdmin as supabase } from '../../../db/supabase';
 
 function isMissingRelationError(error: any): boolean {
   const code = String(error?.code || '');
@@ -82,6 +82,25 @@ export class AgentRepository {
       throw error;
     }
     return data;
+  }
+
+  async findConflict(email: string, agentCode: string): Promise<'email' | 'code' | null> {
+    const [byEmail, byCode] = await Promise.all([
+      supabase.from('agents').select('id').ilike('email', email.replace(/[\\%_]/g, '\\$&')).limit(1),
+      supabase.from('agents').select('id').eq('agent_code', agentCode).limit(1),
+    ]);
+
+    for (const result of [byEmail, byCode]) {
+      if (result.error) {
+        if (isMissingRelationError(result.error)) {
+          throw new AgentSchemaUnavailableError(result.error.message);
+        }
+        throw result.error;
+      }
+    }
+    if ((byEmail.data || []).length) return 'email';
+    if ((byCode.data || []).length) return 'code';
+    return null;
   }
 
   /**

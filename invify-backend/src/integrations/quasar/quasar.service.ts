@@ -165,16 +165,17 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Initiating payout for tenant: ${params.metadata.tenantId}`);
-      if (this.apiKey.startsWith('sk_test_')) {
-        console.log('[QuasarSDK] Test API key detected. Routing to sandbox transfers...');
-        return await this.client.createSandboxTransfer({
-          ...params,
-          currency: 'NGN'
-        });
-      }
+      // Bank payouts use POST /transfers. The sandbox transfer route is virtual-account
+      // to virtual-account and rejects a bank `destination` ("property destination should not exist").
       return await this.client.createTransfer({
-        ...params,
-        currency: 'NGN'
+        amount: params.amount,
+        reference: params.reference,
+        currency: 'NGN',
+        destination: {
+          account_number: params.destination.account_number,
+          bank_code: params.destination.bank_code,
+          account_name: params.destination.account_name,
+        },
       });
     } catch (error: any) {
       console.error('[QuasarSDK] initiateTransfer failed:', error.message);

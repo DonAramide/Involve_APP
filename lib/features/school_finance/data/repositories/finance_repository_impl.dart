@@ -82,6 +82,7 @@ class FinanceRepositoryImpl implements IFinanceRepository {
           sales['vaTransfer'],
     );
     final quasar = _n(data['quasarCollected'] ?? data['totalQuasarCollected']);
+    final status = '${data['quasarBalanceStatus'] ?? 'ok'}';
     return SchoolFinancialSummary(
       totalRevenue: _n(data['totalRevenue'] ?? data['totalCollected']),
       outstandingFees: _n(
@@ -95,6 +96,11 @@ class FinanceRepositoryImpl implements IFinanceRepository {
       vaTransferCollected: va,
       cashCollected: _n(data['cashCollected'] ?? sales['cash']),
       quasarCollected: quasar > 0.001 ? quasar : card + va,
+      quasarLiveBalance: data['quasarLiveBalance'] == null
+          ? null
+          : _n(data['quasarLiveBalance']),
+      invifyLoggedVa: _n(data['invifyLoggedVa']),
+      quasarBalanceStatus: status,
     );
   }
 

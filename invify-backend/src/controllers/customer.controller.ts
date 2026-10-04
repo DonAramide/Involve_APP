@@ -505,37 +505,12 @@ export class CustomerController {
       }
 
       const rows = WebHookFormatVaTxns(txns || [], va);
-      const invifyLogged = roundNaira(
-        rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
-      );
       const quasarBalance = await lookupQuasarVaBalanceNaira(tenantId, va);
       for (const row of rows) {
         row.metadata = {
           ...(row.metadata || {}),
-          quasarBalance,
-          invifyLogged,
+          liveBalance: quasarBalance,
         };
-      }
-      const gap = roundNaira(quasarBalance - invifyLogged);
-      if (gap > 0.009) {
-        rows.unshift({
-          id: `reconcile:${va}`,
-          amount: gap,
-          type: 'CREDIT',
-          reference: `qfs:${va}:reconcile:${quasarBalance.toFixed(2)}`,
-          status: 'SUCCESS',
-          createdAt: new Date().toISOString(),
-          metadata: {
-            virtualAccountNumber: va,
-            accountNumber: va,
-            amountNaira: gap,
-            paidVia: 'parent_account',
-            reconcile: true,
-            senderName: 'Quasar',
-            quasarBalance,
-            invifyLogged,
-          },
-        });
       }
       return res.status(200).json(rows);
     } catch (error: any) {
@@ -589,7 +564,7 @@ export class CustomerController {
 
         const idempotencyKey = crypto.randomUUID();
         const ledgerRef = `SWEEP-VA-${accountNumber.substring(0, 6)}`;
-        await supabaseAdmin.rpc('process_ledger_double_entry', {
+        await supabaseAdmin.rpc('process_ledger_double_entry_text', {
           p_tenant_id: tenantId,
           p_idempotency_key: idempotencyKey,
           p_reference: ledgerRef,

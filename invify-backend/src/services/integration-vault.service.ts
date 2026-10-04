@@ -123,10 +123,11 @@ export class IntegrationVaultService {
         credQuery = credQuery.eq('key_name', keyName);
       }
 
-      credQuery = credQuery.limit(1);
-      const { data, error: credErr } = await credQuery.maybeSingle();
-      if (!credErr && data) {
-        cred = data;
+      credQuery = credQuery.order('created_at', { ascending: false }).limit(1);
+      const { data, error: credErr } = await credQuery;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!credErr && row) {
+        cred = row;
         break;
       }
     }

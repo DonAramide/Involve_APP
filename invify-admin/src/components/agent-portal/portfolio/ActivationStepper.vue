@@ -50,7 +50,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { api } from 'boot/axios'
+import axios from 'axios'
 import { useQuasar } from 'quasar'
 
 const props = defineProps({
@@ -98,17 +98,21 @@ const formatState = (state) => {
 const advanceStage = async () => {
   loading.value = true
   try {
-    await api.post(`/agent/merchant/${props.merchantId}/activation/advance`)
+    const token = localStorage.getItem('invify_agent_token')
+    await axios.post(
+      `/api/agent/merchant/${props.merchantId}/activation/advance`,
+      {},
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    )
     $q.notify({ type: 'positive', message: 'Stage advanced successfully', position: 'top-right' })
-    // We optimistically advance or we emit an event to refresh
     const nextIndex = currentStep.value + 1
     if (nextIndex < states.length) {
       currentStatus.value = states[nextIndex]
     }
     emit('updated')
   } catch (err) {
-    console.error('Failed to advance stage', err)
-    $q.notify({ type: 'negative', message: 'Failed to advance stage', position: 'top-right' })
+    const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to advance stage'
+    $q.notify({ type: 'negative', message: msg, position: 'top-right' })
   } finally {
     loading.value = false
   }

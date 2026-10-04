@@ -318,7 +318,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
           ),
           const SizedBox(height: 2),
           Text(
-            'Card payment + VA transfer, counted together',
+            'Live Quasar VA + card payments counted together',
             style: TextStyle(
               fontSize: 12,
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -344,6 +344,23 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
               cell('Quasar', summary.quasarCardAndTransfer, Colors.teal),
             ],
           ),
+          if (summary.needsVaInvestigation) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB91C1C),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Investigate: Invify logged ${CurrencyFormatter.formatWithSymbol(summary.invifyLoggedVa)} '
+                'is higher than live Quasar ${CurrencyFormatter.formatWithSymbol(summary.quasarLiveBalance ?? summary.vaTransferCollected)}. '
+                'This is usually a double sync (tablet + webhook). Showing live Quasar.',
+                style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.35),
+              ),
+            ),
+          ],
         ],
       ),
     );

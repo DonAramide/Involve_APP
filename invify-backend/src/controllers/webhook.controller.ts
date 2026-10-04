@@ -13,6 +13,9 @@ import { FinancialDisputeService } from '../services/financial-dispute.service';
 import { isParentCustomerId, pickParentOwnedAttribution } from '../utils/parent-va-routing';
 import { WalletService } from '../services/wallet.service';
 import { roundNaira } from '../utils/virtual-account-funds';
+import { FeeShadowIntegration } from '../services/fee-shadow-integration';
+import { PayoutReversalService } from '../services/payout-reversal.service';
+import { PaymentAlertTrailService } from '../services/payment-alert-trail.service';
 
 function isSandboxVaCredit(event: any): boolean {
   return (
@@ -390,9 +393,9 @@ export class WebhookController {
       // 6. PROCESS STATE UPDATES OR LOG DEPOSITS
       if (transaction) {
         if (status === 'success') {
-          await WebhookController._handleSuccess(resolvedTenantId!, resolvedWalletId!, reference, amount, idempotencyKey, event, transaction.type);
+          await WebhookController._handleSuccess(resolvedTenantId!, resolvedWalletId!, reference, amount, idempotencyKey, event, transaction.type, transaction.status);
         } else if (status === 'failed') {
-          await WebhookController._handleFailure(resolvedTenantId!, resolvedWalletId!, reference, event, transaction.type);
+          await WebhookController._handleFailure(resolvedTenantId!, resolvedWalletId!, reference, event, transaction.type, transaction.status);
         }
       } else {
         // Direct virtual account deposit
@@ -475,6 +478,11 @@ export class WebhookController {
                 provider: 'quasar',
                 metadata: { source: 'quasar_webhook', type: 'deposit', sandbox: isSandbox }
               });
+              await FeeShadowIntegration.afterVaInwardResult(true, {
+                tenantId: resolvedTenantId,
+                amountNaira: creditAmount,
+                reference,
+              });
               try {
                 const derived = await WalletService.getBalance(resolvedTenantId);
                 await supabaseAdmin
@@ -488,16 +496,15 @@ export class WebhookController {
               console.warn(`[Webhook] No Invify wallet for tenant ${resolvedTenantId}; logged deposit without ledger for ${reference}`);
             }
 
-            // Emit live updates over socket.io (tenant room + broadcast fallback for local/sandbox)
+            // Keep resending to this tenant until a device acknowledges the socket.
             try {
               const { io } = require('../app');
-              if (io) {
-                const payload = {
-                  type: 'payment.success',
-                  reference,
-                  tenantId: resolvedTenantId,
+              await PaymentAlertTrailService.recordAndEmit(io, {
+                tenantId: resolvedTenantId,
+                reference,
+                amount: creditAmount,
+                payload: {
                   walletId: resolvedWalletId,
-                  amount: creditAmount,
                   customerId: resolvedCustomerId,
                   studentId: resolvedStudentId,
                   metadata: {
@@ -516,19 +523,11 @@ export class WebhookController {
                           ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
                         }
                       : {}),
-                  }
-                };
-                io.to(`tenant:${resolvedTenantId}`).emit('payment.success', payload);
-                // Never fan out payment alerts to room "all" — that notifies every online device.
-                // Offline devices recover via /api/finance/missed-payments catch-up on reconnect.
-                console.log(
-                  `[Socket.io] Emitted payment.success to tenant:${resolvedTenantId} for ref ${reference}`,
-                );
-              } else {
-                console.warn('[Socket.io] io instance unavailable — deposit notification not pushed');
-              }
+                  },
+                },
+              });
             } catch (e: any) {
-              console.error('[Socket.io] Failed to emit deposit.success:', e.message);
+              console.error('[PaymentAlert] Failed to record deposit alert:', e.message);
             }
 
             // Push / in-app notification path used by checkout success flow
@@ -743,29 +742,56 @@ export class WebhookController {
   /**
    * Performs the double-entry write and updates transaction status.
    */
-  private static async _handleSuccess(tenantId: string, walletId: string, reference: string, amount: number, idempotencyKey: string, event: any, type: string = 'payment') {
+  private static async _handleSuccess(tenantId: string, walletId: string, reference: string, amount: number, idempotencyKey: string, event: any, type: string = 'payment', priorStatus?: string | null) {
     console.log(`[Webhook] Processing success for ${type} ref: ${reference}`);
 
-    // 1. Write double-entry ledger (Rules-compliant)
-    const entries = type === 'payout' 
-      ? [
-          { account: "SCHOOL_WALLET", type: "DEBIT" as const, amount },
-          { account: "EXTERNAL_BANK", type: "CREDIT" as const, amount }
-        ]
-      : [
-          { account: "QUASAR_CLEARING", type: "DEBIT" as const, amount },
-          { account: "USER_WALLET", type: "CREDIT" as const, amount }
-        ];
+    if (type === 'payout') {
+      // Wallet was debited (USER_WALLET → EXTERNAL_BANK) at initiation; success moves no money.
+      if (String(priorStatus || '').toUpperCase() === 'SUCCESS') {
+        console.log(`[Webhook] Payout ${reference} already SUCCESS. Skipping.`);
+        return;
+      }
+      const verdict = await PayoutReversalService.settlementState(tenantId, reference);
+      if (verdict !== 'RESERVED') {
+        console.error(`[Webhook] Payout success for ${reference} needs reconciliation: ${verdict}`);
+        await AuditService.log({
+          eventType: 'payout.reconciliation_required' as any,
+          reference,
+          tenantId,
+          payload: { reason: verdict, webhook_status: 'success', amount, event_data: event.data },
+        });
+        return;
+      }
+    } else {
+      await LedgerService.createDoubleEntry({
+        idempotencyKey,
+        tenantId,
+        reference,
+        entries: [
+          { account: 'QUASAR_CLEARING', type: 'DEBIT', amount },
+          { account: 'USER_WALLET', type: 'CREDIT', amount },
+        ],
+        actorId: 'SYSTEM_WEBHOOK',
+        provider: 'quasar',
+        metadata: { source: 'quasar_webhook', type }
+      });
+    }
 
-    await LedgerService.createDoubleEntry({
-      idempotencyKey,
-      tenantId,
-      reference,
-      entries: entries as any,
-      actorId: 'SYSTEM_WEBHOOK',
-      provider: 'quasar',
-      metadata: { source: 'quasar_webhook', type }
-    });
+    const vaEvent =
+      event?.event === 'virtual_account.credit' ||
+      event?.event === 'virtual_account.funded' ||
+      type === 'CREDIT' ||
+      type === 'DEPOSIT' ||
+      type === 'INWARD' ||
+      type === 'INWARD_PAYMENT' ||
+      type === 'VIRTUAL_ACCOUNT_CREDIT';
+    if (type !== 'payout' && vaEvent) {
+      await FeeShadowIntegration.afterVaInwardResult(true, {
+        tenantId,
+        amountNaira: Number(amount),
+        reference,
+      });
+    }
 
     // 2. Update Transaction Status → SUCCESS
     await supabaseAdmin
@@ -824,22 +850,34 @@ export class WebhookController {
       payload: { amount, type, event_data: event.data }
     });
 
-    // 6. Emit via Socket.io to the tenant room!
+    // 6. Credits stay on the alert trail until a device acknowledges the socket.
+    // Payouts remain a single socket emit.
     try {
       const { io } = require('../app');
-      if (io) {
-        io.to(`tenant:${tenantId}`).emit('payment.success', {
-          type: type === 'payout' ? 'payout.success' : 'payment.success',
-          reference,
+      if (type === 'payout') {
+        if (io) {
+          io.to(`tenant:${tenantId}`).emit('payment.success', {
+            type: 'payout.success',
+            reference,
+            tenantId,
+            walletId,
+            amount,
+            metadata: event.data?.metadata || {},
+          });
+        }
+      } else {
+        await PaymentAlertTrailService.recordAndEmit(io, {
           tenantId,
-          walletId,
+          reference,
           amount,
-          metadata: event.data?.metadata || {}
+          payload: {
+            walletId,
+            metadata: event.data?.metadata || {},
+          },
         });
-        console.log(`[Socket.io] Emitted payment.success to room tenant:${tenantId} for ref ${reference}`);
       }
     } catch (e: any) {
-      console.error('[Socket.io] Failed to emit payment.success via Socket.io:', e.message);
+      console.error('[PaymentAlert] Failed to emit payment alert:', e.message);
     }
 
     console.log(`[Event] Emit payment.success for ${reference}`);
@@ -848,9 +886,36 @@ export class WebhookController {
   /**
    * Updates transaction status to FAILED.
    */
-  private static async _handleFailure(tenantId: string, walletId: string, reference: string, event: any, type: string = 'payment') {
+  private static async _handleFailure(tenantId: string, walletId: string, reference: string, event: any, type: string = 'payment', priorStatus?: string | null) {
     console.log(`[Webhook] Processing failure for ${type} ref: ${reference}`);
-    
+    const prior = String(priorStatus || '').toUpperCase();
+
+    if (type === 'payout') {
+      if (prior === 'SUCCESS') {
+        // Restoring funds after a confirmed success could create money; route to a human.
+        console.error(`[Webhook] Payout ${reference} failed after SUCCESS — reconciliation required.`);
+        await AuditService.log({
+          eventType: 'payout.reconciliation_required' as any,
+          reference,
+          tenantId,
+          payload: { reason: 'FAILED_AFTER_SUCCESS', event_data: event.data },
+        });
+        return;
+      }
+      // Idempotent: deterministic key, amount taken from the original debit.
+      // Runs even on a repeated FAILED webhook so a crash between status update and reversal self-heals.
+      await PayoutReversalService.reverseFailedPayout({
+        tenantId,
+        reference,
+        reason: String(event?.data?.reason || event?.data?.message || event?.event || 'payout.failed'),
+        source: 'WEBHOOK_PAYOUT_FAILED',
+      });
+      if (prior === 'FAILED') {
+        console.log(`[Webhook] Payout ${reference} already FAILED. Reversal ensured; skipping notifications.`);
+        return;
+      }
+    }
+
     await supabaseAdmin
       .from('transactions_log')
       .update({ status: 'FAILED', processed_at: new Date().toISOString() })

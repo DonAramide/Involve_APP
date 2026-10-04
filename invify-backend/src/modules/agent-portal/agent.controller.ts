@@ -1,54 +1,13 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../../app';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { supabase } from '../../db/supabase';
-import { BuildVariantService } from '../../config/build-variant';
+import { supabase, supabaseAdmin } from '../../db/supabase';
 
 import { agentRepository } from './repositories/agent.repository';
 import { evaluatePasswordPolicy } from '../../utils/password-policy';
-
-const s3Client = new S3Client({
-  endpoint: process.env.CONTABO_ENDPOINT || '',
-  region: process.env.CONTABO_REGION || 'usc1',
-  credentials: {
-    accessKeyId: process.env.CONTABO_ACCESS_KEY || '',
-    secretAccessKey: process.env.CONTABO_SECRET_KEY || ''
-  },
-  forcePathStyle: true
-});
-
-async function uploadBase64ToContabo(base64Data: string, prefix: string, fileName: string): Promise<string> {
-  const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-  if (!matches || matches.length !== 3) {
-    if (base64Data.startsWith('http')) return base64Data;
-    throw new Error('Invalid file format. Upload requires valid base64 stream.');
-  }
-
-  const contentType = matches[1];
-  const buffer = Buffer.from(matches[2], 'base64');
-  const objectKey = `agents/${prefix}/${fileName}_${Date.now()}.${contentType.split('/')[1] || 'png'}`;
-  
-  const bucket = process.env.CONTABO_BUCKET;
-  await s3Client.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: objectKey,
-    Body: buffer,
-    ContentType: contentType,
-    ACL: process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true' ? 'public-read' : 'private'
-  }));
-
-  let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
-  if (baseUrl) {
-    if (!baseUrl.endsWith('/')) baseUrl += '/';
-    return `${baseUrl}${objectKey}`;
-  } else {
-    let endpointUrl = process.env.CONTABO_ENDPOINT || '';
-    if (!endpointUrl.endsWith('/')) endpointUrl += '/';
-    const tenantPrefix = '0d205683f3b543beb7298e9b68e26b0f:';
-    return `${endpointUrl}${tenantPrefix}${bucket}/${objectKey}`;
-  }
-}
+import { uploadBase64ToContabo } from './utils/kyc-storage';
+import { agentAccessService } from './services/agent-access.service';
+import { loadAgentFeeReadModel, loadAttributedTenantIds } from './services/agent-fee-read-model';
 
 
 
@@ -105,98 +64,59 @@ const defaultMasterAgent: Agent = {
 export class AgentController {
   
   /**
-   * Request password reset for an agent
+   * Request password reset for an agent.
+   * Always answers with the same message so the endpoint cannot be used to probe which emails are agents.
    */
   static async forgotPassword(req: Request, res: Response) {
+    const genericReply = {
+      success: true,
+      message: 'If an agent account exists for this email, password reset instructions have been sent.',
+    };
     try {
-      const { email } = req.body;
+      const email = String(req.body?.email || '').trim().toLowerCase();
       if (!email) {
         return res.status(400).json({ success: false, message: 'Email is required' });
       }
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: BuildVariantService.getInstance().getAgentPortalUrl(),
-      });
+      const { data: agent } = await supabaseAdmin
+        .from('agents')
+        .select('id, email, first_name, last_name, status')
+        .eq('email', email)
+        .is('deleted_at', null)
+        .maybeSingle();
 
-      if (error) {
-        return res.status(400).json({ success: false, message: error.message });
+      if (agent && agent.status !== 'TERMINATED') {
+        const sent = await agentAccessService.sendPasswordReset(agent.email, `${agent.first_name} ${agent.last_name}`.trim());
+        if (!sent) console.warn(`[AgentForgotPassword] Reset email could not be delivered for agent ${agent.id}`);
       }
 
-      return res.json({ success: true, message: 'Password reset instructions have been sent to your email.' });
+      return res.json(genericReply);
     } catch (err: any) {
-      console.error('[AgentForgotPassword] Error:', err);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      console.error('[AgentForgotPassword] Error:', err?.message || err);
+      return res.json(genericReply);
     }
   }
 
-  // ==========================================
-  // ADMIN ROUTES
-  // ==========================================
-  
   /**
-   * Onboard a new agent (called by Super Admin)
+   * Complete a password set/reset from the one-time link sent by email.
    */
-  static async onboardAgent(req: Request, res: Response) {
+  static async resetPassword(req: Request, res: Response) {
     try {
-      const { agentCode, name, email, phone, whatsappNumber, address, passportImage, idCard } = req.body;
-      
-      if (!agentCode || !name || !email) {
-        return res.status(400).json({ success: false, message: 'Agent code, name, and email are required' });
+      const tokenHash = String(req.body?.token_hash || '').trim();
+      const password = String(req.body?.password || '');
+      if (!tokenHash || !password) {
+        return res.status(400).json({ success: false, message: 'Reset token and new password are required' });
       }
 
-      const { data: existing } = await supabase.from('agents').select('id').eq('agent_code', agentCode).single();
-      if (existing) {
-        return res.status(400).json({ success: false, message: 'Agent code already exists' });
+      const result = await agentAccessService.completePasswordSet(tokenHash, password, req.body?.email);
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, message: result.message });
       }
 
-      // Create Supabase Auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: agentCode, // Default password
-        email_confirm: true,
-        user_metadata: { role: 'AGENT', name }
-      });
-
-      if (authError || !authData.user) {
-        return res.status(500).json({ success: false, message: 'Failed to create agent authentication record: ' + authError?.message });
-      }
-
-      const firstName = name.split(' ')[0] || name;
-      const lastName = name.split(' ').slice(1).join(' ') || 'Agent';
-
-      // Insert into agents table
-      const { data: agentData, error: dbError } = await supabase.from('agents').insert({
-        auth_user_id: authData.user.id,
-        agent_code: agentCode,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        status: 'ACTIVE'
-      }).select().single();
-
-      if (dbError || !agentData) {
-        return res.status(500).json({ success: false, message: 'Failed to create agent record in database' });
-      }
-
-      // Insert into agent_profiles
-      await supabase.from('agent_profiles').insert({
-        agent_id: agentData.id,
-        address: address || '',
-        kyc_status: 'PENDING'
-      });
-
-      return res.status(201).json({ 
-        success: true, 
-        message: 'Agent onboarded successfully',
-        agent: {
-          id: agentData.id,
-          agentCode: agentData.agent_code,
-          name: `${agentData.first_name} ${agentData.last_name}`
-        }
-      });
+      return res.json({ success: true, message: 'Your password has been set. You can now sign in.', email: result.email });
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
+      console.error('[AgentResetPassword] Error:', err?.message || err);
+      return res.status(500).json({ success: false, message: 'Could not set password. Please request a new link.' });
     }
   }
 
@@ -238,12 +158,51 @@ export class AgentController {
         });
       }
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError || !authData.session) {
+      let authData: any = null;
+      let authError: any = null;
+      try {
+        const result = await supabase.auth.signInWithPassword({ email, password });
+        authData = result.data;
+        authError = result.error;
+      } catch (networkErr: any) {
+        authError = networkErr;
+      }
+
+      if (authError || !authData?.session) {
+        const msg = String(authError?.message || authError || '');
+        const code = authError?.code || authError?.cause?.code;
+        const connectivity =
+          code === 'UND_ERR_CONNECT_TIMEOUT' ||
+          /fetch failed|ConnectTimeout|timeout|network|ENOTFOUND|ECONNREFUSED|offline/i.test(
+            `${msg} ${authError?.cause?.message || ''}`,
+          );
+        if (connectivity) {
+          return res.status(503).json({
+            success: false,
+            error: 'AUTH_SERVICE_UNAVAILABLE',
+            message: 'No internet connection. Institute login needs a network connection to Auth.',
+            retryable: true,
+          });
+        }
         return res.status(401).json({ success: false, message: 'Invalid agent credentials' });
       }
 
-      const { data: agent, error: agentError } = await supabase.from('agents').select('*').eq('auth_user_id', authData.user.id).single();
+      let { data: agent, error: agentError } = await supabaseAdmin
+        .from('agents')
+        .select('*')
+        .eq('auth_user_id', authData.user.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if ((!agent || agentError) && email) {
+        const byEmail = await supabaseAdmin
+          .from('agents')
+          .select('*')
+          .ilike('email', String(email).trim())
+          .is('deleted_at', null)
+          .maybeSingle();
+        agent = byEmail.data;
+        agentError = byEmail.error;
+      }
       
       if (agentError || !agent) {
         return res.status(403).json({ success: false, message: 'Access forbidden. Agent profile not found.' });
@@ -265,17 +224,42 @@ export class AgentController {
         status: 'ACTIVE'
       });
 
+      const { data: agentProfile } = await supabaseAdmin
+        .from('agent_profiles')
+        .select('mfa_enabled')
+        .eq('agent_id', agent.id)
+        .maybeSingle();
+      const mfaEnabled = Boolean(agentProfile?.mfa_enabled);
+
       return res.status(200).json({
         success: true,
+        mfaRequired: mfaEnabled,
         token: authData.session.access_token,
         agent: {
           id: agent.id,
           email: agent.email,
           agentCode: agent.agent_code,
-          name: `${agent.first_name} ${agent.last_name}`
+          agent_code: agent.agent_code,
+          name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email,
+          first_name: agent.first_name,
+          last_name: agent.last_name,
+          phone: agent.phone || agent.phone_number || null,
+          status: agent.status,
+          kycStatus: agent.kyc_status || null,
+          created_at: agent.created_at,
+          profile: { mfa_enabled: mfaEnabled },
         }
       });
     } catch (err: any) {
+      const msg = String(err?.message || err || '');
+      if (/fetch failed|ConnectTimeout|timeout|network|ENOTFOUND|ECONNREFUSED/i.test(msg)) {
+        return res.status(503).json({
+          success: false,
+          error: 'AUTH_SERVICE_UNAVAILABLE',
+          message: 'No internet connection. Institute login needs a network connection to Auth.',
+          retryable: true,
+        });
+      }
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -460,20 +444,55 @@ export class AgentController {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
-      // 1. Resolve Agent
-      const { data: agent, error } = await supabase.from('agents').select('*').eq('auth_user_id', authUser.id).single();
-      
+      let { data: agent, error } = await supabaseAdmin
+        .from('agents')
+        .select('*')
+        .eq('auth_user_id', authUser.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if ((!agent || error) && authUser.agentId) {
+        const byId = await supabaseAdmin
+          .from('agents')
+          .select('*')
+          .eq('id', authUser.agentId)
+          .is('deleted_at', null)
+          .maybeSingle();
+        agent = byId.data;
+        error = byId.error;
+      }
+      if ((!agent || error) && authUser.email) {
+        const byEmail = await supabaseAdmin
+          .from('agents')
+          .select('*')
+          .ilike('email', String(authUser.email).trim())
+          .is('deleted_at', null)
+          .maybeSingle();
+        agent = byEmail.data;
+        error = byEmail.error;
+      }
+
       if (error || !agent) {
-        return res.status(403).json({ success: false, message: 'Agent profile not found. Access forbidden.' });
+        return res.status(403).json({ success: false, message: 'Institute profile not found. Access forbidden.' });
       }
 
       const agentId = agent.id;
+      const agentCode = String(agent.agent_code || '').trim();
+      const attributed = await loadAttributedTenantIds(agentId, agentCode).catch(() => ({
+        tenantIds: [] as string[],
+        attributedTenants: [] as any[],
+      }));
+      const ownedTenantIds = attributed.tenantIds;
 
       // 2. Fetch Core Data (Fault Tolerant)
       
-      // Tenants
-      const { data: tenants } = await supabase.from('agent_tenants').select('*').eq('agent_id', agentId);
-      const allTenants = tenants || [];
+      // Tenants: agent_tenants plus tenants.agent_code attribution (no second relationship table)
+      const { data: tenants } = await supabaseAdmin
+        .from('agent_tenants')
+        .select('*')
+        .eq('agent_id', agentId)
+        .is('deleted_at', null);
+      const linkedTenants = tenants || [];
+      const allTenants = attributed.attributedTenants.length ? attributed.attributedTenants : linkedTenants;
       const now = new Date();
       
       const thisMonthTenants = allTenants.filter((t: any) => new Date(t.created_at).getMonth() === now.getMonth() && new Date(t.created_at).getFullYear() === now.getFullYear());
@@ -497,7 +516,7 @@ export class AgentController {
         limitedMode: false
       };
 
-      const { data: leads, error: leadsErr } = await supabase.from('agent_leads').select('*').eq('agent_id', agentId);
+      const { data: leads, error: leadsErr } = await supabaseAdmin.from('agent_leads').select('*').eq('agent_id', agentId);
       if (leadsErr) {
         pipeline.limitedMode = true;
         pipeline.kycSubmitted = allTenants.filter((t: any) => t.status === 'PENDING').length;
@@ -513,18 +532,18 @@ export class AgentController {
       }
 
       // Wallet & Commissions
-      const { data: wallet } = await supabase.from('agent_wallets').select('*').eq('agent_id', agentId).single();
-      const { data: ledger } = await supabase.from('wallet_ledger').select('*').eq('agent_id', agentId).order('created_at', { ascending: false }).limit(5);
-      const { data: commissions } = await supabase.from('commission_events').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
+      const { data: wallet } = await supabaseAdmin.from('agent_wallets').select('*').eq('agent_id', agentId).maybeSingle();
+      const { data: ledger } = await supabaseAdmin.from('wallet_ledger').select('*').eq('agent_id', agentId).order('created_at', { ascending: false }).limit(5);
+      const { data: commissions } = await supabaseAdmin.from('commission_events').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
       
       // Reputation
-      const { data: reputation } = await supabase.from('agent_reputation_summary').select('*').eq('agent_id', agentId).single();
-      const { count: rankCount } = await supabase.from('agent_reputation_summary').select('agent_id', { count: 'exact', head: true }).gt('trust_score', reputation?.trust_score || 0);
+      const { data: reputation } = await supabaseAdmin.from('agent_reputation_summary').select('*').eq('agent_id', agentId).maybeSingle();
+      const { count: rankCount } = await supabaseAdmin.from('agent_reputation_summary').select('agent_id', { count: 'exact', head: true }).gt('trust_score', reputation?.trust_score || 0);
       const rank = (rankCount || 0) + 1;
       
       // Terminals & Devices
       let terminalMetrics = { assigned: 0, activated: 0, pending: 0, offline: 0, activationRate: 0, syncSuccessRate: 100, lastAssigned: null };
-      const { data: terminals, error: termErr } = await supabase.from('pos_terminals').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
+      const { data: terminals, error: termErr } = await supabaseAdmin.from('pos_terminals').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
       if (!termErr && terminals && terminals.length > 0) {
         terminalMetrics.assigned = terminals.length;
         terminalMetrics.activated = terminals.filter((t: any) => t.status === 'ACTIVE').length;
@@ -536,7 +555,7 @@ export class AgentController {
       }
 
       let deviceMetrics = { assigned: 0, activated: 0, pending: 0, offline: 0, activationRate: 0, deploymentSuccess: 0, offlineRate: 0, lastActivated: null };
-      const { data: devices, error: devErr } = await supabase.from('agent_devices').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
+      const { data: devices, error: devErr } = await supabaseAdmin.from('agent_devices').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
       if (!devErr && devices && devices.length > 0) {
         deviceMetrics.assigned = devices.length;
         deviceMetrics.activated = devices.filter((d: any) => d.status === 'ACTIVE').length;
@@ -565,22 +584,51 @@ export class AgentController {
 
       // Attendance
       let attendance = { enabled: true, status: 'Active', checkIn: '08:00 AM', location: 'Unknown', hours: '0h', score: 100, message: '' };
-      const { data: attData, error: attErr } = await supabase.from('agent_attendance').select('*').eq('agent_id', agentId).single();
+      const { data: attData, error: attErr } = await supabaseAdmin.from('agent_attendance').select('*').eq('agent_id', agentId).maybeSingle();
       if (attErr) {
         attendance = { enabled: false, status: 'Offline', checkIn: '', location: '', hours: '', score: 0, message: 'Attendance tracking will be enabled once the Workforce Management module is deployed.' };
       }
 
       const recentMerchants = allTenants.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+      const feeOrchestration = await loadAgentFeeReadModel(agentCode, ownedTenantIds, agentId).catch(() => ({
+        assessed_kobo: 0,
+        pending_payable_kobo: 0,
+        recent: [],
+      }));
+      const pendingOnboarding = allTenants.filter((t: any) => {
+        const status = String(t.status || '').toUpperCase();
+        return status === 'PENDING' || status === 'ONBOARDING' || status === 'PENDING_APPROVAL';
+      }).length;
+      const activeTenants = allTenants.filter((t: any) => String(t.status || '').toUpperCase() === 'ACTIVE').length;
 
       const payload = {
         success: true,
+        identity: {
+          id: agent.id,
+          agent_code: agentCode,
+          name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.name,
+          email: agent.email || null,
+          phone: agent.phone || agent.phone_number || null,
+          status: agent.status || null,
+          agent_type: agent.agent_type || agent.type || null,
+          institution: agent.institution_name || agent.bank_name || agent.institution || null,
+          date_joined: agent.created_at || null,
+          kyc_status: agent.kyc_status || null,
+          territory: territoryName || null,
+        },
         kpis: {
           totalMerchants: { value: allTenants.length, trend: 'Insufficient History' },
+          totalTenants: { value: allTenants.length, trend: 'Insufficient History' },
+          activeTenants: { value: activeTenants, trend: 'Insufficient History' },
+          pendingOnboarding: { value: pendingOnboarding, trend: 'Insufficient History' },
           thisMonth: { value: thisMonthTenants.length, trend: calcGrowth(thisMonthTenants.length, lastMonthTenants.length) },
           activeDevices: { value: deviceMetrics.activated, trend: 'Insufficient History' },
           activeTerminals: { value: terminalMetrics.activated, trend: 'Insufficient History' },
           earnedCommissions: { value: wallet?.total_earned || 0, trend: calcGrowth(wallet?.total_earned || 0, 0) },
-          availableBalance: { value: wallet?.available_balance || 0, trend: 'No change' },
+          assessedCommissionKobo: { value: Number((feeOrchestration as any).assessed_kobo || 0), trend: 'SHADOW' },
+          pendingCommissionKobo: { value: Number((feeOrchestration as any).pending_payable_kobo || 0), trend: 'NOT YET AVAILABLE' },
+          availableCommissionKobo: { value: 0, trend: 'NOT YET AVAILABLE' },
+          availableBalance: { value: wallet?.available_balance || 0, trend: 'Legacy wallet' },
           reputationScore: { value: reputation?.score || 0, trend: 'No change' }
         },
         targets: {
@@ -606,11 +654,14 @@ export class AgentController {
           summary: {
             availableBalance: wallet?.available_balance || 0,
             pendingEarnings: wallet?.pending_balance || 0,
+            pendingBalance: wallet?.pending_balance || 0,
             totalEarnings: wallet?.total_earned || 0
           },
           ledger: ledger || [],
-          recentCommissions: (commissions || []).slice(0, 5)
+          recentCommissions: (commissions || []).slice(0, 5),
+          payout_execution_enabled: Boolean((feeOrchestration as any).payout_execution_enabled),
         },
+        feeOrchestration,
         portfolioHealth: {
           healthy: allTenants.filter((t: any) => t.status === 'ACTIVE').length,
           attentionRequired: allTenants.filter((t: any) => t.status === 'SUSPENDED' || t.status === 'PENDING').length,
@@ -626,7 +677,7 @@ export class AgentController {
         recentMerchants: recentMerchants,
         analytics: {
           merchantGrowth: [], // Kept empty to trigger new empty state logic
-          commissionTrend: [],
+          commissionTrend: ((feeOrchestration as any).charts?.commission_by_day || []).map((d: any) => Number(d.assessed_kobo || 0)),
           activationFunnel: [
             pipeline.prospects + pipeline.contacted + pipeline.kycSubmitted + pipeline.approved + pipeline.activated,
             pipeline.kycSubmitted + pipeline.approved + pipeline.activated,
@@ -641,7 +692,6 @@ export class AgentController {
         },
         quickActions: [
           { label: 'Create Lead', route: '/agent/coming-soon/create-lead', icon: 'person_add' },
-          { label: 'Register Merchant', route: '/agent/coming-soon/register-merchant', icon: 'storefront' },
           { label: 'Upload KYC', route: '/agent/coming-soon/upload-kyc', icon: 'file_upload' },
           { label: 'Assign Device', route: '/agent/coming-soon/assign-device', icon: 'devices' },
           { label: 'Assign Terminal', route: '/agent/coming-soon/assign-terminal', icon: 'point_of_sale' },

@@ -16,7 +16,7 @@
         </div>
       </div>
       
-      <q-btn outline color="amber-4" label="Return to Dashboard" @click="$router.push('/agent/dashboard')" class="q-mt-md" />
+      <q-btn outline color="amber-4" label="Return to Dashboard" @click="$router.push('/institute/dashboard')" class="q-mt-md" />
     </div>
   </q-page>
 </template>

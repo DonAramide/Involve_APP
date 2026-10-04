@@ -11,6 +11,9 @@ export interface ExecutiveSummaryDTO {
   totalQuasarRemitted?: number;
   pendingQuasarRemittance?: number;
   pendingVirtualAccountFunds?: number;
+  quasarLiveBalance?: number | null;
+  invifyLoggedVa?: number;
+  quasarBalanceStatus?: 'ok' | 'quasar_ahead' | 'invify_overstated';
   unsweptVirtualAccount?: {
     total: number;
     customer: number;
@@ -67,6 +70,9 @@ export class FinanceRepository {
           totalQuasarRemitted: data.totalQuasarRemitted || 0,
           pendingQuasarRemittance: data.pendingQuasarRemittance || 0,
           pendingVirtualAccountFunds: data.pendingVirtualAccountFunds || 0,
+          quasarLiveBalance: data.quasarLiveBalance ?? null,
+          invifyLoggedVa: data.invifyLoggedVa || 0,
+          quasarBalanceStatus: data.quasarBalanceStatus || 'ok',
           unsweptVirtualAccount: data.unsweptVirtualAccount || {
             total: data.pendingVirtualAccountFunds || 0,
             customer: 0,

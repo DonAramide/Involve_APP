@@ -190,6 +190,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from 'src/api'
+import { promptCheckerMfa } from 'src/utils/promptCheckerMfa'
 import { userFacingApiError } from 'src/utils/userFacingApiError'
 
 const $q = useQuasar()
@@ -369,9 +370,19 @@ async function approveCase(row) {
     cancel: true,
     persistent: true,
   }).onOk(async () => {
+    const otp = await promptCheckerMfa($q.dialog, {
+      title: 'Checker 2FA required',
+      message: 'Enter your authenticator code to approve this debit.',
+      okLabel: 'Verify & approve',
+    })
+    if (!otp) {
+      $q.notify({ type: 'warning', message: 'Approval cancelled. 2FA code is required.' })
+      return
+    }
     try {
       const res = await adminApi.approveFinancialDispute(row.id, {
         comment: isRetry ? 'Retry finalize from Refunds & Chargebacks' : 'Approved from Refunds & Chargebacks',
+        otp,
       })
       const data = res?.data || res
       if (data?.waitingQuasar) {
@@ -408,8 +419,18 @@ async function rejectCase(row) {
     cancel: true,
     persistent: true,
   }).onOk(async (reason) => {
+    const otp = await promptCheckerMfa($q.dialog, {
+      title: 'Checker 2FA required',
+      message: 'Enter your authenticator code to reject this case.',
+      okLabel: 'Verify & reject',
+      okColor: 'red-6',
+    })
+    if (!otp) {
+      $q.notify({ type: 'warning', message: 'Rejection cancelled. 2FA code is required.' })
+      return
+    }
     try {
-      await adminApi.rejectFinancialDispute(row.id, { reason })
+      await adminApi.rejectFinancialDispute(row.id, { reason, otp })
       $q.notify({ type: 'info', message: 'Case rejected. No money moved.' })
       await fetchCases()
     } catch (err) {

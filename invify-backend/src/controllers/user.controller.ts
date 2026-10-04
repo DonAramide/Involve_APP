@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
 import { AuditArchiveService } from '../services/audit-archive.service';
 import { BuildVariantService } from '../config/build-variant';
+import { holdForSupportApproval } from '../services/maker-checker.service';
 
 
 
@@ -62,6 +63,14 @@ export class UserController {
    * Create a platform user. Note: Actual Auth Record must be in Supabase.
    */
   static async createUser(req: Request, res: Response) {
+    const held = await holdForSupportApproval(req, res, {
+      domain: 'staff_management',
+      action: 'user_create',
+      target: String(req.body?.email || '').trim().toLowerCase(),
+      summary: `Add staff ${String(req.body?.name || req.body?.email || '').trim() || 'user'}`,
+      body: req.body || {},
+    });
+    if (held) return;
     const { id, name, email, role, tenantId } = req.body;
     const currentUser = (req as any).user;
 
@@ -213,6 +222,15 @@ export class UserController {
    * Update role or status.
    */
   static async updateUser(req: Request, res: Response) {
+    const held = await holdForSupportApproval(req, res, {
+      domain: 'staff_management',
+      action: 'user_update',
+      target: String(req.params?.id || ''),
+      summary: `Update staff ${String(req.body?.name || req.body?.email || req.params?.id || '').trim()}`,
+      body: req.body || {},
+      params: { id: req.params?.id },
+    });
+    if (held) return;
     const { id } = req.params;
     const updates = { ...(req.body || {}) };
     const currentUser = (req as any).user;
@@ -385,6 +403,14 @@ export class UserController {
    * Clears TOTP enrollment so the user must re-enroll 2FA on next login.
    */
   static async resetUserMfa(req: Request, res: Response) {
+    const held = await holdForSupportApproval(req, res, {
+      domain: 'staff_management',
+      action: 'user_reset_mfa',
+      target: String(req.params?.id || ''),
+      summary: `Reset 2FA for staff ${String(req.params?.id || '')}`,
+      params: { id: req.params?.id },
+    });
+    if (held) return;
     const { id } = req.params;
     const currentUser = (req as any).user;
 
@@ -452,6 +478,27 @@ export class UserController {
       console.error('[UserController] resetUserMfa Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
+  }
+
+  static async resetStaffPassword(req: Request, res: Response) {
+    const userId = String(req.params?.id || '').trim();
+    const newPassword = String(req.body?.newPassword || '');
+    if (!userId) return res.status(400).json({ error: 'User id is required' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+    const held = await holdForSupportApproval(req, res, {
+      domain: 'staff_management',
+      action: 'user_reset_password',
+      target: userId,
+      summary: `Reset password for staff ${userId}`,
+      body: { newPassword },
+      params: { id: userId },
+    });
+    if (held) return;
+    const { AuthController } = await import('./auth.controller');
+    (req as any).body = { userId, newPassword };
+    return AuthController.resetPassword(req, res);
   }
 
   static async listDevices(req: Request, res: Response) {

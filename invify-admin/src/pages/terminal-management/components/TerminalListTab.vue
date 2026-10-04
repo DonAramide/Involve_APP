@@ -19,7 +19,62 @@
 
     <q-tab-panels v-model="inventoryTab" animated>
       <q-tab-panel name="tablets">
-        <q-table :rows="tablets" :columns="tabletCols" row-key="id" :loading="loading" flat bordered>
+        <div class="row items-center q-gutter-sm q-mb-md">
+          <q-select
+            v-model="filterOrigin"
+            :options="originOptions"
+            dense filled emit-value map-options
+            label="Origin"
+            style="min-width: 200px;"
+          />
+          <q-select
+            v-model="filterModel"
+            :options="modelOptions"
+            dense filled emit-value map-options
+            label="Filter by model"
+            clearable
+            use-input
+            input-debounce="0"
+            style="min-width: 200px;"
+          />
+          <q-input
+            v-model="createdFrom"
+            type="date"
+            dense filled
+            label="Created from"
+            style="min-width: 170px;"
+          />
+          <q-input
+            v-model="createdTo"
+            type="date"
+            dense filled
+            label="Created to"
+            style="min-width: 170px;"
+          />
+          <q-btn
+            v-if="filterOrigin || filterModel || createdFrom || createdTo"
+            dense flat size="sm"
+            icon="filter_list_off"
+            color="grey-5"
+            @click="resetTabletFilters"
+          >
+            <q-tooltip>Clear filters</q-tooltip>
+          </q-btn>
+          <q-space />
+          <div class="text-caption text-grey">{{ filteredTablets.length }} devices</div>
+        </div>
+        <q-table :rows="filteredTablets" :columns="tabletCols" row-key="id" :loading="loading" flat bordered>
+          <template v-slot:body-cell-origin="props">
+            <q-td :props="props">
+              <q-badge
+                :color="props.row.origin === 'INVIFY_UPLOADED' ? 'teal-9' : 'orange-9'"
+                text-color="white"
+                class="text-weight-bold"
+              >
+                {{ props.row.origin_label || (props.row.origin === 'INVIFY_UPLOADED' ? 'Invify uploaded' : 'Customer incoming') }}
+              </q-badge>
+            </q-td>
+          </template>
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <q-btn flat round dense color="primary" icon="edit" @click="openEditDialog('tablets', props.row)" />
@@ -78,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { terminalApi } from 'src/api/terminalApi'
 import { userFacingApiError } from 'src/utils/userFacingApiError'
@@ -97,10 +152,52 @@ const mpos = ref([])
 const printers = ref([])
 const tids = ref([])
 
+const filterOrigin = ref(null)
+const filterModel = ref(null)
+const createdFrom = ref('')
+const createdTo = ref('')
+
+const originOptions = [
+  { label: 'All origins', value: null },
+  { label: 'Invify uploaded', value: 'INVIFY_UPLOADED' },
+  { label: 'Customer incoming', value: 'CUSTOMER_INCOMING' },
+]
+
+const modelOptions = computed(() => {
+  const names = Array.from(new Set((tablets.value || []).map((row) => String(row.model || '').trim()).filter(Boolean))).sort()
+  return [{ label: 'All models', value: null }, ...names.map((name) => ({ label: name, value: name }))]
+})
+
+const dayKey = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
+const filteredTablets = computed(() => {
+  return (tablets.value || []).filter((row) => {
+    if (filterOrigin.value && row.origin !== filterOrigin.value) return false
+    if (filterModel.value && String(row.model || '') !== filterModel.value) return false
+    const created = dayKey(row.created_at)
+    if (createdFrom.value && created && created < createdFrom.value) return false
+    if (createdTo.value && created && created > createdTo.value) return false
+    return true
+  })
+})
+
+const resetTabletFilters = () => {
+  filterOrigin.value = null
+  filterModel.value = null
+  createdFrom.value = ''
+  createdTo.value = ''
+}
+
 const tabletCols = [
   { name: 'device_id', label: 'Device ID', field: 'device_id', align: 'left' },
   { name: 'model', label: 'Model', field: 'model', align: 'left' },
   { name: 'serial_number', label: 'Serial Number', field: 'serial_number', align: 'left' },
+  { name: 'origin', label: 'Origin', field: 'origin_label', align: 'left' },
   { name: 'created_at', label: 'Created At', field: 'created_at', align: 'left' },
   { name: 'actions', label: 'Actions', field: 'actions', align: 'center' }
 ]
@@ -140,7 +237,22 @@ const fetchData = async () => {
 
     if (inventoryTab.value === 'tablets') {
       const { data } = await terminalApi.getTablets()
-      tablets.value = unwrap(data)
+      tablets.value = unwrap(data).map((row) => {
+        if (row.origin) return row
+        const info = typeof row.device_info === 'object' && row.device_info ? row.device_info : {}
+        const tagged = String(info.origin || info.source || '').toUpperCase()
+        const origin =
+          tagged.includes('INVIFY') ||
+          String(row.device_category || '').toUpperCase() === 'COMPANY_DEVICE' ||
+          !row.tenant_id
+            ? 'INVIFY_UPLOADED'
+            : 'CUSTOMER_INCOMING'
+        return {
+          ...row,
+          origin,
+          origin_label: origin === 'INVIFY_UPLOADED' ? 'Invify uploaded' : 'Customer incoming',
+        }
+      })
     } else if (inventoryTab.value === 'mpos') {
       const { data } = await terminalApi.getMpos()
       mpos.value = unwrap(data)

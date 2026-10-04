@@ -103,10 +103,18 @@
 
       <template v-slot:body-cell-agent_code="props">
         <q-td :props="props" class="text-center">
-          <span v-if="props.row.agent_code" class="text-weight-bold" style="font-family: monospace; font-size: 12px; color: #34d399;">
-            {{ props.row.agent_code }}
-          </span>
-          <span v-else class="text-grey-6" style="font-size: 11px;">N/A</span>
+          <div v-if="props.row.institute_code || props.row.agent_code" class="text-weight-bold" style="font-family: monospace; font-size: 12px; color: #34d399;">
+            {{ props.row.institute_code || props.row.agent_code }}
+          </div>
+          <div v-else class="text-grey-6" style="font-size: 11px;">AAA000 DEFAULT</div>
+          <q-badge
+            v-if="props.row.institute_port_pending"
+            color="amber-8"
+            text-color="black"
+            label="PORT PENDING"
+            class="q-mt-xs"
+            style="font-size: 9px;"
+          />
         </q-td>
       </template>
 
@@ -226,7 +234,7 @@ const columns = [
   { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
   { name: 'device_serial', label: 'DEVICE ID', field: row => row.device_id || 'UNASSIGNED', align: 'left', sortable: true },
   { name: 'device_count', label: 'DEVICES', field: row => row.device_count || 1, align: 'center', sortable: true },
-  { name: 'agent_code', label: 'AGENT CODE', field: row => row.agent_code || 'N/A', align: 'center', sortable: true },
+  { name: 'agent_code', label: 'INSTITUTE', field: row => row.institute_code || row.agent_code || 'AAA000', align: 'center', sortable: true },
   { name: 'location', label: 'LOCATION', field: row => row.location || 'N/A', align: 'left', sortable: true },
   { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
   { name: 'plan_expires_at', label: 'EXPIRY DATE', field: row => row.plan_expires_at || null, align: 'center', sortable: true },

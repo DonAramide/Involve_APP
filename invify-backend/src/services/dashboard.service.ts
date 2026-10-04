@@ -237,7 +237,8 @@ export class DashboardService {
           return {
             id,
             name: row.name,
-            revenue: row.revenue || formatNgn(stats?.volume || 0),
+            // The SQL view still prefixes revenue with "$". Always show naira from the last 24h.
+            revenue: formatNgn(stats?.volume || 0),
             score: Number(row.score ?? Math.min(99, 60 + (stats?.count || 0))),
             risk: row.risk || (String(match?.status || '').toLowerCase() === 'active' ? 'Low' : 'Medium'),
             growth: row.growth || `${stats?.count || 0} tx/24h`,

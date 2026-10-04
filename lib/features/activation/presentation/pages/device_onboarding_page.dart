@@ -25,6 +25,8 @@ import '../utils/onboarding_draft_store.dart';
 import '../../data/nigeria_states_lgas.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/services/socket_service.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 
 class _EmailAccountCheck {
@@ -41,6 +43,18 @@ class _EmailAccountCheck {
   final List<String> registeredDevices;
 
   bool get isConflict => exists && !sameDevice;
+}
+
+class _AgentCodeCheck {
+  const _AgentCodeCheck({
+    required this.valid,
+    this.error,
+    this.agentName,
+  });
+
+  final bool valid;
+  final String? error;
+  final String? agentName;
 }
 
 class DeviceOnboardingPage extends StatefulWidget {
@@ -82,7 +96,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   bool _isLoading = false;
   bool _isCapturingTelemetry = false;
   bool _isCheckingEmail = false;
+  bool _isCheckingAgent = false;
   String? _emailCheckError;
+  String? _agentCodeError;
+  static const _invifyDefaultAgentCode = 'AAA000';
   String? _capturedDeviceId;
   String? _capturedGpsLocation;
   int _currentStep = 0;
@@ -118,6 +135,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     super.initState();
     _emailController.addListener(_onEmailChanged);
     _emailFocusNode.addListener(_onEmailFocusChanged);
+    _agentCodeController.addListener(_onAgentCodeChanged);
     _phoneController.addListener(_syncWhatsAppFromMobile);
     _pingServer();
     _restoreDraft().then((_) {
@@ -128,6 +146,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   void _onEmailChanged() {
     if (_emailCheckError != null) {
       setState(() => _emailCheckError = null);
+    }
+  }
+
+  void _onAgentCodeChanged() {
+    if (_agentCodeError != null) {
+      setState(() => _agentCodeError = null);
     }
   }
 
@@ -272,7 +296,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   }
 
   void _goToStep(int step) {
-    if (_currentStep == 1 && step > 1 && _emailCheckError != null) {
+    if (_currentStep == 1 && step > 1 && (_emailCheckError != null || _agentCodeError != null)) {
       _formKey.currentState?.validate();
       return;
     }
@@ -716,8 +740,147 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     );
   }
 
+  Future<bool> _askUseInvifyDefaultAgent() async {
+    final useDefault = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: const Color(0xFF6366F1).withOpacity(0.5)),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.badge_outlined, color: Color(0xFF818CF8), size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Use Invify default institute?',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'No institute code was entered. Would you like to use Invify\'s default institute code AAA000?',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text(
+              'Enter a code',
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text(
+              'Use AAA000',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    return useDefault == true;
+  }
+
+  Future<_AgentCodeCheck> _validateAgentCode(String code) async {
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      return const _AgentCodeCheck(valid: false, error: 'Institute code is required');
+    }
+    if (!RegExp(r'^[A-Z0-9-]{3,20}$').hasMatch(normalized)) {
+      return const _AgentCodeCheck(valid: false, error: 'Enter a valid institute code');
+    }
+
+    setState(() => _isCheckingAgent = true);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      validateStatus: (status) => status != null && status < 500,
+    ));
+    final urls = [
+      '${AppConfig.baseUrl}/api/auth/check-agent-code',
+      '${AppConfig.baseUrl}/auth/check-agent-code',
+      if (AppConfig.baseUrl.contains(':3004')) ...[
+        '${AppConfig.baseUrl3000}/api/auth/check-agent-code',
+        '${AppConfig.baseUrl3000}/auth/check-agent-code',
+      ],
+    ];
+
+    try {
+      for (final url in urls) {
+        try {
+          final res = await dio.post(url, data: {'agentCode': normalized, 'code': normalized});
+          if (res.data is! Map) continue;
+          final data = res.data as Map;
+          if (data['valid'] == true) {
+            return _AgentCodeCheck(
+              valid: true,
+              agentName: data['agentName']?.toString(),
+            );
+          }
+          if (res.statusCode == 404 || data['valid'] == false) {
+            return _AgentCodeCheck(
+              valid: false,
+              error: (data['error'] ?? data['message'] ?? 'This institute code does not exist').toString(),
+            );
+          }
+        } catch (e) {
+          debugPrint('[CheckAgent] $url failed: $e');
+        }
+      }
+      if (normalized == _invifyDefaultAgentCode) {
+        return const _AgentCodeCheck(valid: true, agentName: 'Invify');
+      }
+      return const _AgentCodeCheck(
+        valid: false,
+        error: 'Could not verify this institute code. Check your connection.',
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingAgent = false);
+    }
+  }
+
+  Future<bool> _ensureAgentCodeReady() async {
+    var code = _agentCodeController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      final useDefault = await _askUseInvifyDefaultAgent();
+      if (!useDefault || !mounted) {
+        setState(() => _agentCodeError = 'Institute code is required');
+        _formKey.currentState?.validate();
+        return false;
+      }
+      _agentCodeController.text = _invifyDefaultAgentCode;
+      code = _invifyDefaultAgentCode;
+      setState(() => _agentCodeError = null);
+    }
+
+    final check = await _validateAgentCode(code);
+    if (!mounted) return false;
+    if (!check.valid) {
+      setState(() => _agentCodeError = check.error ?? 'This institute code does not exist');
+      _formKey.currentState?.validate();
+      return false;
+    }
+    if (_agentCodeController.text.trim().toUpperCase() != code) {
+      _agentCodeController.text = code;
+    }
+    setState(() => _agentCodeError = null);
+    return true;
+  }
+
   Future<void> _submitOnboarding({required bool isTrial}) async {
-    if (_isLoading || _isCapturingTelemetry || _isCheckingEmail) return;
+    if (_isLoading || _isCapturingTelemetry || _isCheckingEmail || _isCheckingAgent) return;
 
     if (!_formKey.currentState!.validate()) {
       setState(() => _currentStep = 1);
@@ -742,6 +905,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         _formKey.currentState!.validate();
         await _showExistingEmailDialog(email, emailCheck);
       }
+      return;
+    }
+
+    final agentReady = await _ensureAgentCodeReady();
+    if (!agentReady || !mounted) {
+      if (mounted) setState(() => _currentStep = 1);
       return;
     }
 
@@ -787,7 +956,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'businessName': _businessNameController.text.trim(),
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
-        'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim().toUpperCase(),
+        'agentCode': _agentCodeController.text.trim().toUpperCase(),
         'deviceId': deviceId,
         'location': gpsLocation,
         'country': _selectedCountry,
@@ -1137,7 +1306,27 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             enabled: !_whatsappSameAsMobile,
           ),
           const SizedBox(height: 20),
-          _buildTextField(_agentCodeController, 'Agent Code (Optional)', Icons.badge, isRequired: false),
+          _buildTextField(
+            _agentCodeController,
+            'Institute Code',
+            Icons.badge,
+            isRequired: false,
+            helperText: 'Required. Leave blank to choose Invify default AAA000.',
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 20,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9-]')),
+              UpperCaseTextFormatter(),
+            ],
+            customValidator: (_) {
+              if (_agentCodeError != null) return _agentCodeError;
+              final typed = _agentCodeController.text.trim();
+              if (typed.isNotEmpty && !RegExp(r'^[A-Za-z0-9-]{3,20}$').hasMatch(typed)) {
+                return 'Enter a valid institute code';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 24),
           const Align(
             alignment: Alignment.centerLeft,
@@ -1270,6 +1459,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     VoidCallback? onToggleObscure,
     FocusNode? focusNode,
     Widget? suffixIcon,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
   }) {
     final obscure = isPassword ? (isObscured ?? _obscurePassword) : false;
     return TextFormField(
@@ -1277,13 +1469,15 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       focusNode: focusNode,
       style: const TextStyle(color: Colors.white),
       obscureText: obscure,
+      textCapitalization: textCapitalization,
       keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
-      inputFormatters: isPhone ? PhoneNumberInput.formatters : null,
-      maxLength: isPhone ? PhoneNumberInput.maxDigits : null,
+      inputFormatters: isPhone ? PhoneNumberInput.formatters : inputFormatters,
+      maxLength: isPhone ? PhoneNumberInput.maxDigits : maxLength,
       decoration: InputDecoration(
         labelText: label,
         helperText: helperText,
         helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+        counterText: (!isPhone && maxLength != null) ? '' : null,
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
         prefixIcon: Icon(icon, color: const Color(0xFF818CF8)),
         suffixIcon: suffixIcon ?? (isPassword
@@ -1734,7 +1928,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           else
             const SizedBox.shrink(),
           ElevatedButton(
-            onPressed: (_isCapturingTelemetry || _isCheckingEmail)
+            onPressed: (_isCapturingTelemetry || _isCheckingEmail || _isCheckingAgent)
                 ? null
                 : () async {
               if (_currentStep == 1) {
@@ -1750,6 +1944,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                   await _showExistingEmailDialog(email, check);
                   return;
                 }
+                final agentReady = await _ensureAgentCodeReady();
+                if (!agentReady || !mounted) return;
               }
               if (!mounted) return;
               if (_currentStep == 2) {
@@ -1782,6 +1978,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             child: Text(
               _isCheckingEmail && _currentStep == 1
                   ? 'CHECKING EMAIL…'
+                  : _isCheckingAgent && _currentStep == 1
+                      ? 'CHECKING AGENT…'
                   : _isCapturingTelemetry && _currentStep == 2
                       ? 'GETTING GPS & DEVICE ID…'
                       : 'NEXT STEP',
@@ -1798,7 +1996,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: (_isLoading || _isCapturingTelemetry)
+            onPressed: (_isLoading || _isCapturingTelemetry || _isCheckingAgent)
                 ? null
                 : () => _submitOnboarding(isTrial: true),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -1832,6 +2030,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     _phoneController.removeListener(_syncWhatsAppFromMobile);
     _phoneController.dispose();
     _whatsappController.dispose();
+    _agentCodeController.removeListener(_onAgentCodeChanged);
     _agentCodeController.dispose();
     _streetController.dispose();
     _stateController.dispose();
@@ -1970,6 +2169,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ];
 
         bool linkSuccess = false;
+        String? linkedBusinessName;
+        String? linkedBusinessMode;
+        String? linkedOfflineToken;
         String errorMessage = 'Failed to link device';
 
         for (final url in urls) {
@@ -1984,6 +2186,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             });
             if (response.statusCode == 200 && response.data['success'] == true) {
               linkSuccess = true;
+              linkedBusinessName = response.data['businessName']?.toString();
+              linkedBusinessMode = response.data['businessMode']?.toString();
+              linkedOfflineToken = response.data['offlineToken']?.toString();
               break;
             }
           } catch (e) {
@@ -2000,14 +2205,49 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         if (linkSuccess) {
           final security = SecurityService();
           await security.setTenantId(tenantId);
+          if (linkedOfflineToken != null && linkedOfflineToken.isNotEmpty) {
+            await security.setOfflineToken(linkedOfflineToken);
+            await SocketService().initializeSocket(
+              AppConfig.baseUrl,
+              tenantId: tenantId,
+              deviceId: deviceId,
+              businessName: linkedBusinessName,
+              token: linkedOfflineToken,
+            );
+          }
           await StorageService.setOnboardingCompleted(true);
           await StorageService.saveTrialStartDate(DateTime.now());
-          settingsBloc.add(LoadSettings());
+          await StorageService.markLinkedDeviceDashboardDefaultsPending();
+          if (linkedBusinessMode != null && linkedBusinessMode.isNotEmpty) {
+            await OnboardingNavigator.persistOnboardingPreferences(industry: linkedBusinessMode);
+          }
+          settingsBloc.add(LoadSettings(
+            linkedBusinessName: linkedBusinessName,
+            linkedBusinessMode: linkedBusinessMode,
+          ));
 
           if (!mounted) return;
+          await TerminalSyncService.markLinkedDeviceBootstrapPending();
+          var bootstrapNote =
+              'Users and the admin password will load when this tablet is online.';
+          try {
+            final bootstrap = await TerminalSyncService.bootstrapLinkedDeviceFromAdmin(
+              deviceId: deviceId,
+            );
+            if (bootstrap.adminPassword || bootstrap.staff > 0) {
+              bootstrapNote =
+                  'Loaded ${bootstrap.staff} user${bootstrap.staff == 1 ? '' : 's'} and the admin password from the admin portal.';
+            } else {
+              bootstrapNote =
+                  'Linked. No portal users or admin password were found yet.';
+            }
+          } catch (e) {
+            debugPrint('[LinkDevice] admin bootstrap failed: $e');
+          }
+          if (!mounted) return;
           ScaffoldMessenger.of(this.context).showSnackBar(
-            const SnackBar(
-              content: Text('Device linked successfully! 3-day trial activated.'),
+            SnackBar(
+              content: Text('Device linked. $bootstrapNote'),
               backgroundColor: Colors.green,
             ),
           );
@@ -2037,6 +2277,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ),
       );
     }
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }
 

@@ -30,6 +30,7 @@ import type {
 import { supabaseAdmin as supabase } from '../db/supabase';
 import { TerminalAuditService } from './terminal-audit.service';
 import { BuildVariantService } from '../config/build-variant';
+import { FeeShadowIntegration } from './fee-shadow-integration';
 
 import {
   unpackPosMessage,
@@ -1237,7 +1238,14 @@ export class PosService {
     }
 
     await this.updateTransaction(pendingId, params, response);
-    return response;
+    return FeeShadowIntegration.afterPosResult(response, {
+      tenantId: params.tenantId,
+      amountNaira: params.amount,
+      rrn: response?.rrn,
+      stan: (response as any)?.stan,
+      terminalId: params.terminalId,
+      txId: pendingId,
+    });
   }
 
   static async recordDeviceTransaction(params: {
@@ -1422,7 +1430,15 @@ export class PosService {
       }
     }
 
-    return { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
+    const recorded = { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
+    return FeeShadowIntegration.afterPosResult(recorded, {
+      tenantId: params.tenantId,
+      amountNaira: params.amount,
+      rrn: entry.rrn,
+      stan: entry.stan,
+      terminalId: params.terminalId,
+      txId,
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

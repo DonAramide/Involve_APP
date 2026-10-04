@@ -230,8 +230,18 @@ class SocketService {
           return;
         }
         _showBroadcastBanner(data['message']);
-        
-        // Save broadcast to history
+        if (data['type']?.toString() == 'payment') {
+          try {
+            await NotificationInbox.removeReceivedPayment(
+              reference: data['reference']?.toString(),
+              message: data['message']?.toString(),
+            );
+          } catch (e) {
+            debugPrint('Error clearing received payment notice: $e');
+          }
+          return;
+        }
+
         try {
           await NotificationInbox.add(
             message: data['message'].toString(),
@@ -266,27 +276,31 @@ class SocketService {
 
     _socket!.on('payment.success', (data) {
       debugPrint('[SocketService] payment.success received: $data');
-      // Defense-in-depth: ignore payments for other tenants if payload includes tenantId.
-      try {
-        final map = data is Map
-            ? Map<String, dynamic>.from(data as Map)
-            : <String, dynamic>{};
-        final eventTenant = map['tenantId']?.toString();
-        if (eventTenant != null &&
-            eventTenant.isNotEmpty &&
-            _lastTenantId != null &&
-            _lastTenantId!.isNotEmpty &&
-            eventTenant != _lastTenantId) {
-          debugPrint(
-            '[SocketService] Ignoring payment.success for other tenant '
-            '$eventTenant (this device=$_lastTenantId)',
-          );
-          return;
-        }
-      } catch (_) {}
-      unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess(data));
-      unawaited(PaymentCatchUpService.instance.markSeenFromLivePayment(data));
-      unawaited(_showPaymentSuccessBanner(data));
+      final map = data is Map
+          ? Map<String, dynamic>.from(data as Map)
+          : <String, dynamic>{};
+      final eventTenant = map['tenantId']?.toString();
+      if (eventTenant != null &&
+          eventTenant.isNotEmpty &&
+          _lastTenantId != null &&
+          _lastTenantId!.isNotEmpty &&
+          eventTenant != _lastTenantId) {
+        debugPrint(
+          '[SocketService] Ignoring payment.success for other tenant '
+          '$eventTenant (this device=$_lastTenantId)',
+        );
+        return;
+      }
+      _ackPaymentAlert(map);
+      final reference = map['reference']?.toString().trim() ?? '';
+      unawaited(() async {
+        final shouldNotify = reference.isEmpty
+            ? true
+            : await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        await CustomerWalletCreditService.instance.applyPaymentSuccess(data);
+        await PaymentCatchUpService.instance.markSeenFromLivePayment(data);
+        if (shouldNotify) await _showPaymentSuccessBanner(data, alreadyClaimed: true);
+      }());
     });
 
     _socket!.on('emergency_lock', (data) async {
@@ -766,13 +780,19 @@ class SocketService {
     );
   }
 
-  Future<void> _showPaymentSuccessBanner(dynamic data) async {
+  void _ackPaymentAlert(Map<String, dynamic> map) {
+    final reference = map['reference']?.toString().trim() ?? '';
+    if (reference.isEmpty || _socket == null) return;
+    _socket!.emit('payment.alert.ack', {'reference': reference});
+  }
+
+  Future<void> _showPaymentSuccessBanner(dynamic data, {bool alreadyClaimed = false}) async {
     try {
       final map = data is Map
           ? Map<String, dynamic>.from(data as Map)
           : <String, dynamic>{};
       final reference = map['reference']?.toString().trim() ?? '';
-      if (reference.isNotEmpty) {
+      if (!alreadyClaimed && reference.isNotEmpty) {
         final shouldNotify =
             await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
         if (!shouldNotify) {
@@ -806,13 +826,9 @@ class SocketService {
           : amountNum.toStringAsFixed(2);
 
       final message = '₦$formatted received from $sender';
-      unawaited(NotificationInbox.add(
+      unawaited(NotificationInbox.removeReceivedPayment(
+        reference: reference,
         message: message,
-        type: 'payment',
-        extra: {
-          'reference': reference.isEmpty ? null : reference,
-          'amount': amountNum,
-        },
       ));
       unawaited(DeviceNotificationService.showPayment(
         message: message,

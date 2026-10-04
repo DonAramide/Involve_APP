@@ -112,6 +112,10 @@ const IDLE_EXEMPT_PREFIXES = [
   '/agent/login',
   '/agent/signup',
   '/agent/success',
+  '/institute/login',
+  '/institute/signup',
+  '/institute/reset-password',
+  '/institute/success',
 ];
 
 export function hasAnyAuthenticatedSession() {
@@ -200,7 +204,7 @@ export function consumeIdleLogoutNotice() {
 
 export function resolveIdleLoginPath(pathname) {
   const path = String(pathname || '');
-  if (path.toLowerCase().startsWith('/agent')) return '/agent/login';
+  if (path.toLowerCase().startsWith('/agent') || path.toLowerCase().startsWith('/institute')) return '/institute/login';
   return loginPathForContext({ pathname: path });
 }
 

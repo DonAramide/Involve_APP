@@ -7,6 +7,8 @@ import { S3Client } from '@aws-sdk/client-s3';
 export const DEFAULT_CONTABO_BUCKET = 'iips.stargazer.bucket';
 export const DEFAULT_CONTABO_ENDPOINT = 'https://usc1.contabostorage.com';
 export const DEFAULT_CONTABO_REGION = 'usc1';
+/** Contabo Object Storage account id used in public path-style URLs: /{accountId}:{bucket}/key */
+export const DEFAULT_CONTABO_STORAGE_TENANT = '0d205683f3b543beb7298e9b68e26b0f';
 
 /**
  * Contabo Object Storage is path-style at {region}.contabostorage.com.
@@ -31,6 +33,53 @@ export function resolveContaboEndpoint(): string {
 
 export function resolveContaboBucket(): string {
   return (process.env.CONTABO_BUCKET || DEFAULT_CONTABO_BUCKET).trim();
+}
+
+export function resolveContaboStorageTenant(): string {
+  return firstNonEmpty(
+    process.env.CONTABO_TENANT_ID,
+    process.env.CONTABO_CUSTOMER_ID,
+    DEFAULT_CONTABO_STORAGE_TENANT,
+  );
+}
+
+/** Browser GET path uses `{accountId}:{bucket}`, not the bare bucket name. */
+export function resolveContaboPublicBucketSegment(): string {
+  const bucket = resolveContaboBucket();
+  const tenant = resolveContaboStorageTenant();
+  if (!bucket) return tenant;
+  if (bucket.includes(':')) return bucket;
+  if (tenant && !bucket.startsWith(`${tenant}:`)) return `${tenant}:${bucket}`;
+  return bucket;
+}
+
+/**
+ * Contabo returns 401 for https://{region}.contabostorage.com/{bucket}/key.
+ * The working public form is https://{region}.contabostorage.com/{accountId}:{bucket}/key.
+ */
+export function rewritePublicContaboUrl(url: string): string {
+  const raw = String(url || '').trim();
+  if (!raw) return raw;
+  try {
+    const parsed = new URL(raw);
+    if (!/contabostorage\.com$/i.test(parsed.hostname)) return raw;
+    const bucket = resolveContaboBucket();
+    const segment = resolveContaboPublicBucketSegment();
+    if (!segment) return raw;
+    const parts = parsed.pathname.replace(/^\/+/, '').split('/').filter(Boolean);
+    if (parts.length === 0) return raw;
+    const first = decodeURIComponent(parts[0]);
+    if (first.includes(':')) return raw;
+    if (bucket && first === bucket) {
+      parts[0] = segment;
+    } else {
+      parts.unshift(segment);
+    }
+    parsed.pathname = `/${parts.join('/')}`;
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string {
@@ -92,14 +141,18 @@ export function contaboObjectPath(bucket: string, key: string): string {
   return `/${bucket}/${keyPath}`;
 }
 
-/** Public HTTPS URL of an object, matching the path-style PUT used by putContaboObject. */
+/** Public HTTPS URL of an object. PUT still uses /{bucket}/key; browsers need /{accountId}:{bucket}/key. */
 export function publicContaboObjectUrl(key: string): string {
   const objectKey = String(key || '').replace(/^\/+/, '');
   const configured = (process.env.CONTABO_PUBLIC_BASE_URL || '').trim();
   if (configured) {
-    return `${configured.replace(/\/+$/, '')}/${objectKey}`;
+    return rewritePublicContaboUrl(`${configured.replace(/\/+$/, '')}/${objectKey}`);
   }
-  return `${resolveContaboEndpoint()}${contaboObjectPath(resolveContaboBucket(), objectKey)}`;
+  return `${resolveContaboEndpoint()}/${resolveContaboPublicBucketSegment()}/${objectKey
+    .split('/')
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join('/')}`;
 }
 
 export function formatContaboNetworkError(error: unknown): string {

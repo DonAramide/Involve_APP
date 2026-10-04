@@ -52,7 +52,17 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     super.initState();
     _name = widget.item?.name ?? '';
     _priceController.text = widget.item == null ? '0' : (widget.item!.price % 1 == 0 ? widget.item!.price.toInt().toString() : widget.item!.price.toString());
-    _costPriceController.text = widget.item == null ? '0' : (widget.item!.costPrice % 1 == 0 ? widget.item!.costPrice.toInt().toString() : widget.item!.costPrice.toString());
+    if (widget.item == null) {
+      final mode = context.read<SettingsBloc>().state.settings?.businessMode;
+      _costPriceController.text = mode == 'school' ? '' : '0';
+    } else if (widget.item!.costPrice == 0) {
+      final mode = widget.item!.businessMode;
+      _costPriceController.text = mode == 'school' ? '' : '0';
+    } else {
+      _costPriceController.text = widget.item!.costPrice % 1 == 0
+          ? widget.item!.costPrice.toInt().toString()
+          : widget.item!.costPrice.toString();
+    }
     _barcodeController.text = widget.item?.barcode ?? '';
     _stockQty = widget.item?.stockQty ?? 0;
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
@@ -393,14 +403,17 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 keyboardType: TextInputType.number,
                 validator: (val) => InputValidator.validateNumber(val, term.sellingPriceLabel),
               ),
-              if (_type == 'product') ...[
+              if (_type == 'product' || term.businessMode == 'school') ...[
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _costPriceController,
-                  decoration: InputDecoration(labelText: '${term.costPriceLabel} (Optional)'),
+                  decoration: InputDecoration(
+                    labelText: '${term.costPriceLabel} (Optional)',
+                    hintText: term.businessMode == 'school' ? 'Leave blank if not used' : null,
+                  ),
                   keyboardType: TextInputType.number,
                   validator: (val) {
-                    if (val == null || val.isEmpty || val == '0' || val == '0.0') return null;
+                    if (val == null || val.trim().isEmpty || val == '0' || val == '0.0') return null;
                     
                     final costErr = InputValidator.validateNumber(val, term.costPriceLabel);
                     if (costErr != null) return costErr;
@@ -469,7 +482,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       _formGeneration++;
       _name = '';
       _priceController.text = '0';
-      _costPriceController.text = '0';
+      _costPriceController.text = settings.businessMode == 'school' ? '' : '0';
       _barcodeController.clear();
       _stockQty = 0;
       _legacyCategory = ItemCategory.drink;

@@ -75,7 +75,22 @@ function applyGovernorOverlay() {
   }
 }
 
+function overlayEnvFile(envPath: string): boolean {
+  if (!fs.existsSync(envPath)) return false;
+  const parsed = dotenv.parse(fs.readFileSync(envPath));
+  for (const [key, value] of Object.entries(parsed)) {
+    const trimmed = String(value ?? '').trim();
+    if (trimmed) process.env[key] = trimmed;
+  }
+  return true;
+}
+
 function applySecretAliases() {
+  const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  const variant = (process.env.BUILD_VARIANT || '').trim().toUpperCase();
+  const skipStagingUrlAlias =
+    nodeEnv === 'development' || nodeEnv === 'local' || variant === 'LOCAL';
+
   const copies: Array<[string, string]> = [
     ['STAGING_JWT_SECRET', 'JWT_SECRET'],
     ['STAGING_SUPABASE_JWT_SECRET', 'SUPABASE_JWT_SECRET'],
@@ -92,6 +107,7 @@ function applySecretAliases() {
     ['CONTABO_SECRET_ACCESS_KEY', 'CONTABO_SECRET_KEY'],
   ];
   for (const [from, to] of copies) {
+    if (skipStagingUrlAlias && from === 'STAGING_SUPABASE_URL' && to === 'SUPABASE_URL') continue;
     if (!envValue(to) && envValue(from)) {
       process.env[to] = process.env[from];
     }
@@ -108,8 +124,25 @@ export function loadEnv(): string {
   if (loadedFile) return loadedFile;
 
   const cwd = process.cwd();
+  const initialNodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  const allowLocalOverlay = initialNodeEnv === '' || initialNodeEnv === 'development' || initialNodeEnv === 'local';
+
   for (const envPath of resolveSystemEnvFileCandidates()) {
     loadFileIfPresent(envPath);
+  }
+
+  if (allowLocalOverlay) {
+    const baseEnv = path.resolve(cwd, '.env');
+    const altEnv = path.resolve(cwd, 'env');
+    let loaded = '';
+    if (loadFileIfPresent(baseEnv)) loaded = '.env';
+    else if (loadFileIfPresent(altEnv)) loaded = 'env';
+    const overlaid = overlayEnvFile(path.resolve(cwd, '.env.local'));
+    applySecretAliases();
+    applyGovernorOverlay();
+    loadedFile = overlaid ? (loaded ? `${loaded}+.env.local` : '.env.local') : loaded || '.env';
+    console.log(`[env] Loaded ${loadedFile}`);
+    return loadedFile;
   }
 
   const candidates = resolveEnvFileCandidates();

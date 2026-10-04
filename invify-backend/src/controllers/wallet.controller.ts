@@ -41,11 +41,14 @@ export class WalletController {
 
       const { startDate, endDate, status } = req.query;
       const transactions = await WalletService.getTransactions(tenantId, { startDate, endDate, status });
+      const presentation = WalletService.presentWalletHistory(transactions);
 
       return res.status(200).json({
         tenantId,
         count: transactions.length,
-        transactions
+        transactions: presentation.transactions,
+        inbound: presentation.inbound,
+        outbound: presentation.outbound,
       });
     } catch (error: any) {
       console.error('[WalletController] getTransactions Error:', error.message);

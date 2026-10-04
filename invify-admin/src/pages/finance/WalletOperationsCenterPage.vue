@@ -131,7 +131,7 @@
               <q-tab name="settlement" label="Settlement" />
               <q-tab name="merchant" label="Merchant" />
               <q-tab name="school" label="School" />
-              <q-tab name="agent" label="Agent" />
+              <q-tab name="agent" label="Institute" />
             </q-tabs>
           </div>
           

@@ -550,78 +550,24 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                     ),
                     const SizedBox(height: 18),
 
-                    if (!_cacDocumentUploaded || !_idDocumentUploaded) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.primary.withOpacity(0.25)),
-                        ),
-                        child: Text(
-                          'Please upload your CAC certificate and a valid ID card (NIN, National ID, driver’s licence, or passport).',
-                          style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withOpacity(0.8)),
-                        ),
-                      ),
-                    ],
-                    Text(
-                      'CAC certificate',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                    _buildKycRequestCard(
+                      title: '1. CAC certificate',
+                      subtitle: 'Certificate of Incorporation or Business Name registration.',
+                      uploaded: _cacDocumentUploaded,
+                      colorScheme: colorScheme,
+                      onGallery: () => _uploadKycDocument('CAC_CERT', ImageSource.gallery),
+                      onCamera: () => _uploadKycDocument('CAC_CERT', ImageSource.camera),
                     ),
-                    const SizedBox(height: 6),
-                    if (_cacDocumentUploaded)
-                      const Text('CAC uploaded', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600))
-                    else
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _uploadKycDocument('CAC_CERT', ImageSource.gallery),
-                              icon: const Icon(Icons.photo_library, size: 16),
-                              label: const Text('Upload Gallery'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _uploadKycDocument('CAC_CERT', ImageSource.camera),
-                              icon: const Icon(Icons.camera_alt, size: 16),
-                              label: const Text('Capture Camera'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Valid ID card',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                    const SizedBox(height: 12),
+                    _buildKycRequestCard(
+                      title: '2. Valid ID card',
+                      subtitle: 'NIN slip, National ID, driver’s licence, or international passport.',
+                      uploaded: _idDocumentUploaded,
+                      colorScheme: colorScheme,
+                      onGallery: () => _uploadKycDocument('GOVT_ID', ImageSource.gallery),
+                      onCamera: () => _uploadKycDocument('GOVT_ID', ImageSource.camera),
                     ),
-                    const SizedBox(height: 6),
-                    if (_idDocumentUploaded)
-                      const Text('ID uploaded', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600))
-                    else
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _uploadKycDocument('GOVT_ID', ImageSource.gallery),
-                              icon: const Icon(Icons.photo_library, size: 16),
-                              label: const Text('Upload Gallery'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _uploadKycDocument('GOVT_ID', ImageSource.camera),
-                              icon: const Icon(Icons.camera_alt, size: 16),
-                              label: const Text('Capture Camera'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
                     // Save Profile Details Button
                     SizedBox(
@@ -1259,7 +1205,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
       }, message: documentType == 'CAC_CERT' ? 'Uploading CAC certificate...' : 'Uploading ID card...');
     } catch (e) {
       if (mounted) {
-        _showToast('Error uploading document: $e');
+        _showToast(e.toString().replaceFirst('Exception: ', ''));
       }
     }
   }
@@ -1487,12 +1433,97 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     );
   }
 
+  Widget _buildKycRequestCard({
+    required String title,
+    required String subtitle,
+    required bool uploaded,
+    required ColorScheme colorScheme,
+    required VoidCallback onGallery,
+    required VoidCallback onCamera,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: uploaded ? Colors.green.withOpacity(0.45) : colorScheme.primary.withOpacity(0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: colorScheme.onSurface)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (uploaded ? Colors.green : Colors.red).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  uploaded ? 'UPLOADED' : 'REQUIRED',
+                  style: TextStyle(
+                    color: uploaded ? Colors.green : Colors.red,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withOpacity(0.65))),
+          if (!uploaded) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onGallery,
+                    icon: const Icon(Icons.photo_library, size: 16),
+                    label: const Text('Upload Gallery'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onCamera,
+                    icon: const Icon(Icons.camera_alt, size: 16),
+                    label: const Text('Capture Camera'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveProfileDetails(BuildContext context, SettingsState state) async {
     FocusScope.of(context).unfocus();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final settingsBloc = context.read<SettingsBloc>();
     final messenger = ScaffoldMessenger.of(context);
+
+    if (!_cacDocumentUploaded || !_idDocumentUploaded) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            !_idDocumentUploaded
+                ? 'A valid ID card is required (NIN, National ID, driver’s licence, or passport).'
+                : 'CAC certificate is still required.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
+      );
+    }
 
     if (state.settings != null) {
       final updatedSettings = state.settings!.copyWith(

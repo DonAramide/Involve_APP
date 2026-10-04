@@ -101,7 +101,7 @@ String? _mapSensitive(String text) {
       t.contains('bearer') ||
       t.contains('unauthenticated') ||
       t.contains('access token')) {
-    return 'Your session expired. Please sign in again.';
+    return 'The server could not verify this device. Please try again.';
   }
   if (t.contains('financial_platform_unprovisioned') ||
       t.contains('financial platform') ||
@@ -232,7 +232,7 @@ String _messageForStatus(int? status, String fallback) {
     case 400:
       return 'Request could not be completed. Please check your details and try again.';
     case 401:
-      return 'Your session expired. Please sign in again.';
+      return 'The server could not verify this device. Please try again.';
     case 403:
       return 'You do not have permission to do that.';
     case 404:

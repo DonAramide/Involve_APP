@@ -51,6 +51,13 @@ export interface FeeConfiguration {
   
   // Specificity
   overrides: FeeOverride[];
+
+  /** Platform fee orchestration (not school billing). */
+  transactionType?: string;
+  platformBps?: number;
+  processorBps?: number;
+  serviceBps?: number;
+  agentBps?: number;
 }
 
 export enum SubscriptionTier {

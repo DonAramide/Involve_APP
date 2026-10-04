@@ -25,6 +25,16 @@
         <q-btn
           outline
           size="xs"
+          color="cyan-4"
+          icon="sync"
+          label="Refresh from Quasar"
+          class="text-caption text-weight-bold"
+          :loading="syncing"
+          @click="refreshFromQuasar"
+        />
+        <q-btn
+          outline
+          size="xs"
           color="grey-6"
           icon="refresh"
           label="Refresh"
@@ -62,6 +72,11 @@
         :loading="loading"
         :pagination="{ rowsPerPage: 25 }"
       >
+        <template #body-cell-quasarBalance="props">
+          <q-td :props="props" class="text-metric-mono">
+            {{ props.row.quasarBalance == null ? '—' : `₦${formatMoney(props.row.quasarBalance)}` }}
+          </q-td>
+        </template>
         <template #body-cell-balance="props">
           <q-td :props="props" class="text-metric-mono">
             ₦{{ formatMoney(props.row.balance) }}
@@ -125,6 +140,7 @@ import { userFacingApiError } from '../../utils/userFacingApiError'
 
 const $q = useQuasar()
 const loading = ref(false)
+const syncing = ref(false)
 const rows = ref([])
 const search = ref('')
 const txnOpen = ref(false)
@@ -139,6 +155,7 @@ const columns = [
   { name: 'accountNumber', label: 'NUBAN', field: 'accountNumber', align: 'left', sortable: true },
   { name: 'bankName', label: 'Bank', field: 'bankName', align: 'left' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
+  { name: 'quasarBalance', label: 'Quasar Bal.', field: 'quasarBalance', align: 'right', sortable: true },
   { name: 'balance', label: 'Pending Bal.', field: 'balance', align: 'right', sortable: true },
   { name: 'actions', label: '', field: 'actions', align: 'right' },
 ]
@@ -167,6 +184,27 @@ function formatDate(value) {
     return new Date(value).toLocaleString()
   } catch {
     return String(value)
+  }
+}
+
+async function refreshFromQuasar() {
+  syncing.value = true
+  try {
+    const res = await adminApi.refreshVirtualAccounts()
+    const data = res?.data || {}
+    const failed = Array.isArray(data.failed) ? data.failed.length : 0
+    const saved = Number(data.saved || 0)
+    $q.notify({
+      type: failed ? 'warning' : 'positive',
+      message: failed
+        ? `Updated ${saved} Quasar accounts. ${failed} tenant${failed === 1 ? '' : 's'} could not be read.`
+        : `Updated ${saved} Quasar accounts.`,
+    })
+    await loadRows()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: userFacingApiError(err, 'Failed to refresh virtual accounts') })
+  } finally {
+    syncing.value = false
   }
 }
 

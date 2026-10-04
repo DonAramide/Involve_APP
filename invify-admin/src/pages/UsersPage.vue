@@ -8,7 +8,7 @@
           Staff Management
           <q-badge color="indigo-5" align="middle" class="text-subtitle1 q-ml-sm">{{ filteredUsers.length }}</q-badge>
         </h1>
-        <div class="text-grey-6">Manage teachers, assign roles, and invite new colleagues.</div>
+        <div class="text-grey-6">Manage teachers, assign roles, and invite new colleagues. Changes wait for approval. Only support@iips.app can approve.</div>
       </div>
       <div class="col-auto">
         <q-btn color="indigo-7" icon="person_add" label="Invite Teacher" @click="showInvite = true" class="q-px-md glossy" />
@@ -23,6 +23,8 @@
         />
       </div>
     </div>
+
+    <MakerCheckerQueue ref="staffApprovals" domain="staff_management" @changed="fetchUsers" />
 
     <!-- Filters header -->
     <q-card class="bg-blue-grey-10 q-mb-lg shadow-2 border-indigo">
@@ -62,8 +64,9 @@
       row-key="id"
       :loading="loading"
       flat bordered dark
-      class="bg-blue-grey-10 shadow-2 rounded-borders"
-      :pagination="{ rowsPerPage: 15 }"
+      class="bg-blue-grey-10 shadow-2 rounded-borders q-mb-xl"
+      v-model:pagination="tablePagination"
+      :rows-per-page-options="[15, 25, 50, 0]"
     >
       <template v-slot:no-data>
         <div class="full-width row flex-center text-white q-pa-md bg-red-10 border-red rounded-borders" v-if="errorMessage">
@@ -80,11 +83,11 @@
         <q-td :props="props">
           <div class="row items-center">
             <q-avatar size="sm" :color="props.row.is_active ? 'indigo-6' : 'grey-8'" class="q-mr-sm">
-              {{ props.row.name.charAt(0).toUpperCase() }}
+              {{ userInitial(props.row) }}
             </q-avatar>
             <div class="column">
-               <span class="text-weight-bold">{{ props.row.name }}</span>
-               <span class="text-caption text-grey-6">{{ props.row.email }}</span>
+               <span class="text-weight-bold">{{ displayName(props.row) }}</span>
+               <span class="text-caption text-grey-6">{{ props.row.email || '—' }}</span>
             </div>
           </div>
         </q-td>
@@ -97,7 +100,7 @@
             text-color="white" 
             size="sm" dense
           >
-            {{ String(props.value || '').replaceAll('_', ' ').toUpperCase() }}
+            {{ displayAccessLevel(props.value) }}
           </q-chip>
         </q-td>
       </template>
@@ -217,8 +220,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
-import axios from 'axios'
-import { joinApiUrl } from '../config/env'
+import MakerCheckerQueue from '../components/MakerCheckerQueue.vue'
 
 const $q = useQuasar()
 
@@ -240,8 +242,38 @@ const showInvite = ref(false)
 const inviteEmail = ref('')
 const sending = ref(false)
 const lastInviteLink = ref('')
+const staffApprovals = ref(null)
+
+const noteIfPending = async (data, appliedMessage) => {
+  if (data?.pending) {
+    $q.notify({ type: 'info', message: data.message })
+    await staffApprovals.value?.refresh()
+    return true
+  }
+  if (appliedMessage) $q.notify({ type: 'positive', message: appliedMessage })
+  return false
+}
 
 const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null, resetMfa: true })
+
+const tablePagination = ref({
+  sortBy: 'name',
+  descending: false,
+  page: 1,
+  rowsPerPage: 15,
+})
+
+function displayName(user) {
+  const name = String(user?.name || '').trim()
+  if (name) return name
+  const email = String(user?.email || '').trim()
+  return email || 'Unnamed user'
+}
+
+function userInitial(user) {
+  const label = displayName(user)
+  return label.charAt(0).toUpperCase()
+}
 
 const isPlatformRole = (role) => {
   if (!role) return false;
@@ -298,6 +330,7 @@ const ROLE_CATALOG = [
   { label: 'Admin Ops', value: 'admin_ops' },
   { label: 'Admin Executive', value: 'admin_executive' },
   { label: 'Admin Deploy', value: 'admin_deploy' },
+  { label: 'Institute', value: 'agent' },
   { label: 'Owner', value: 'owner' },
   { label: 'Tenant Admin', value: 'tenant_admin' },
   { label: 'Admin', value: 'admin' },
@@ -306,6 +339,7 @@ const ROLE_CATALOG = [
 ]
 
 function prettyRoleLabel(role) {
+  if (String(role || '').toLowerCase() === 'agent') return 'Institute'
   const known = ROLE_CATALOG.find((r) => r.value === role)
   if (known) return known.label
   return String(role || '')
@@ -313,6 +347,11 @@ function prettyRoleLabel(role) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+function displayAccessLevel(role) {
+  if (String(role || '').toLowerCase() === 'agent') return 'INSTITUTE'
+  return String(role || '').replaceAll('_', ' ').toUpperCase()
 }
 
 const roleOptions = computed(() => {
@@ -336,6 +375,7 @@ const roleColors = {
   'admin_ops': 'blue-9',
   'admin_executive': 'purple-9',
   'admin_deploy': 'cyan-9',
+  'agent': 'amber-9',
   'owner': 'blue-grey-7',
   'tenant_admin': 'indigo-10',
   'admin': 'blue-grey-8',
@@ -353,6 +393,10 @@ const filteredUsers = computed(() => {
     const matchesRole = selectedRole.value === 'all' || roleVal === selectedRole.value;
     return matchesSearch && matchesRole;
   });
+})
+
+watch([searchText, selectedRole, selectedTenant], () => {
+  tablePagination.value = { ...tablePagination.value, page: 1 }
 })
 
 const tenantList = computed(() => (Array.isArray(tenants.value) ? tenants.value : []))
@@ -397,6 +441,11 @@ const inviteMember = async () => {
   sending.value = true
   try {
     const { data } = await adminApi.sendInvite({ email: inviteEmail.value.trim() })
+    if (await noteIfPending(data, '')) {
+      showInvite.value = false
+      inviteEmail.value = ''
+      return
+    }
     if (data.inviteLink) {
       lastInviteLink.value = data.inviteLink
       $q.notify({ type: 'info', message: 'Invitation link generated.' })
@@ -449,21 +498,29 @@ const saveUser = async () => {
       tenantId: isPlatform ? null : form.value.tenantId
     }
     if (isEditing.value) {
-      await adminApi.updateUser(form.value.id, { 
+      const { data } = await adminApi.updateUser(form.value.id, { 
         name: form.value.name.trim(), 
         role: form.value.role, 
         tenant_id: isPlatform ? null : form.value.tenantId,
         reset_mfa: !!form.value.resetMfa,
       })
-      $q.notify({
-        type: 'positive',
-        message: form.value.resetMfa
+      const pending = await noteIfPending(
+        data,
+        form.value.resetMfa
           ? 'User updated and 2FA reset. They must re-enroll on next login.'
           : 'User updated successfully.',
-      })
+      )
+      if (pending) {
+        modalVisible.value = false
+        return
+      }
     } else {
-      await adminApi.createUser(payload)
-      $q.notify({ type: 'positive', message: 'User access created successfully.' })
+      const { data } = await adminApi.createUser(payload)
+      const pending = await noteIfPending(data, 'User access created successfully.')
+      if (pending) {
+        modalVisible.value = false
+        return
+      }
     }
     modalVisible.value = false
     fetchUsers()
@@ -477,9 +534,9 @@ const saveUser = async () => {
 
 const toggleStatus = async (user) => {
   try {
-    await adminApi.updateUser(user.id, { is_active: !user.is_active })
-    $q.notify({ type: 'positive', message: `User status updated to ${!user.is_active ? 'Active' : 'Inactive'}` })
-    fetchUsers()
+    const { data } = await adminApi.updateUser(user.id, { is_active: !user.is_active })
+    const pending = await noteIfPending(data, `User status updated to ${!user.is_active ? 'Active' : 'Inactive'}`)
+    if (!pending) fetchUsers()
   } catch (error) {
     $q.notify({ type: 'negative', message: 'Failed to update user status.' })
   }
@@ -488,7 +545,7 @@ const toggleStatus = async (user) => {
 const forceResetPassword = (user) => {
   $q.dialog({
     title: 'Direct Passphrase Reset',
-    message: `Enter the new secure passphrase for ${user.name} (${user.email}). No OTP verification code required.`,
+    message: `Enter the new secure passphrase for ${displayName(user)} (${user.email || 'no email'}). No OTP verification code required.`,
     prompt: {
       model: '',
       type: 'password',
@@ -503,11 +560,8 @@ const forceResetPassword = (user) => {
       return
     }
     try {
-      await axios.post(joinApiUrl('/api/auth/reset-password'), {
-        userId: user.id,
-        newPassword: newPassword
-      })
-      $q.notify({ type: 'positive', message: `Password for ${user.name} has been successfully force-reset.` })
+      const { data } = await adminApi.resetUserPassword(user.id, { newPassword })
+      await noteIfPending(data, `Password for ${user.name} has been successfully force-reset.`)
     } catch (err) {
       $q.notify({ type: 'negative', message: 'Failed to reset passphrase directly.' })
     }
@@ -517,18 +571,15 @@ const forceResetPassword = (user) => {
 const forceResetMfa = (user) => {
   $q.dialog({
     title: 'Reset 2FA',
-    message: `Clear authenticator enrollment for ${user.name} (${user.email})? They will be required to set up 2FA again on next login.`,
+    message: `Clear authenticator enrollment for ${displayName(user)} (${user.email || 'no email'})? They will be required to set up 2FA again on next login.`,
     cancel: true,
     dark: true,
     persistent: true,
     ok: { label: 'Reset 2FA', color: 'deep-orange-6' },
   }).onOk(async () => {
     try {
-      await adminApi.resetUserMfa(user.id)
-      $q.notify({
-        type: 'positive',
-        message: `2FA reset for ${user.name}. They must re-enroll on next login.`,
-      })
+      const { data } = await adminApi.resetUserMfa(user.id)
+      await noteIfPending(data, `2FA reset for ${user.name}. They must re-enroll on next login.`)
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to reset 2FA.'
       $q.notify({ type: 'negative', message: msg })

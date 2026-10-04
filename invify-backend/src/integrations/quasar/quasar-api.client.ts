@@ -191,6 +191,7 @@ export class QuasarApiClient {
           const response = await this.http.request<QFPResponse<T>>({
             ...config,
             headers: { ...config.headers, ...headers },
+            maxRetries: noRetry ? 0 : this.options.maxRetries,
             ...(reqOpts.timeoutMs ? { timeout: reqOpts.timeoutMs } : {}),
           });
 

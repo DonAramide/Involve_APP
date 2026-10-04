@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PosService } from '../services/pos.service';
 import { supabase } from '../db/supabase';
+import { holdForSupportApproval } from '../services/maker-checker.service';
 
 export class PosController {
   static async processTransaction(req: Request, res: Response) {
@@ -96,6 +97,14 @@ export class PosController {
 
   static async updateRoutingConfig(req: Request, res: Response) {
     try {
+      const reasonText = String(req.body?.reason || req.headers['x-audit-reason'] || 'Updated POS routing configuration');
+      const held = await holdForSupportApproval(req, res, {
+        domain: 'pos_switchboard',
+        action: 'routing_config',
+        summary: reasonText,
+        body: req.body || {},
+      });
+      if (held) return;
       const { config, adminId, reason } = req.body;
       const actualConfig = config || req.body;
       const actualAdminId = adminId || req.headers['x-admin-id'] as string || 'Admin';

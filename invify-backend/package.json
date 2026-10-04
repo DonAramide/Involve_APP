@@ -64,7 +64,8 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testMatch": [
-      "**/test/**/*.test.ts"
+      "**/test/**/*.test.ts",
+      "**/src/modules/fee-orchestration/**/*.test.ts"
     ],
     "setupFiles": [
       "<rootDir>/test/jest.setup.ts"

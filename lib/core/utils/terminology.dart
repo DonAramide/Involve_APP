@@ -70,7 +70,7 @@ extension BusinessTerminology on AppSettings {
   }
 
   String get newSaleLabel {
-    if (businessMode == 'school') return 'NEW TERM BILL';
+    if (businessMode == 'school') return 'BILL';
     if (businessMode == 'services') return 'NEW JOB / INVOICE';
     return 'NEW INVOICE';
   }

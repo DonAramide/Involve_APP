@@ -42,7 +42,7 @@ class SchoolSetupPage extends StatelessWidget {
               Tab(text: 'Years', icon: Icon(Icons.calendar_today)),
               Tab(text: 'Terms', icon: Icon(Icons.segment)),
               Tab(text: 'Classes', icon: Icon(Icons.class_)),
-              Tab(text: 'Payments', icon: Icon(Icons.payments_outlined)),
+              Tab(text: 'Payment Plan', icon: Icon(Icons.payments_outlined)),
             ],
           ),
         ),

@@ -943,6 +943,7 @@
         <q-card-section class="q-pa-lg">
           <div class="text-caption text-grey-4 q-mb-md">Specify a clear operational audit justification for rejecting this payout.</div>
           <q-input v-model="rejectDialog.reason" type="textarea" label="Rejection Reason" dark filled autogrow label-color="red-3" class="font-mono text-red-3 custom-input" />
+          <q-input v-model="rejectDialog.otp" label="2FA / authenticator code" dark filled maxlength="8" autocomplete="one-time-code" class="q-mt-md" hint="Required for checker rejection" />
         </q-card-section>
         <q-card-actions align="right" class="bg-grey-10 q-pa-md">
           <q-btn flat label="Cancel" color="grey-5" v-close-popup />
@@ -1288,6 +1289,7 @@ const { currentCurrency } = useCurrency();
 import { ref, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { adminApi, commissionApi } from 'src/api';
+import { promptCheckerMfa } from '../../utils/promptCheckerMfa';
 
 const $q = useQuasar();
 
@@ -1332,7 +1334,7 @@ const approvalColumns = [
   { name: 'actions', label: '', align: 'right' }
 ];
 
-const rejectDialog = ref({ show: false, id: null, reason: '' });
+const rejectDialog = ref({ show: false, id: null, reason: '', otp: '' });
 const clawbackDialog = ref({ show: false, agent: null, amount: 0, reason: 'FRAUD', justification: '' });
 
 // Tab 3 (Audit & History State)
@@ -1681,7 +1683,16 @@ const syncAllData = async () => {
 // Payout Approval Actions
 const approveTicket = async (ticketId) => {
   try {
-    const res = await commissionApi.approveCommission(ticketId);
+    const otp = await promptCheckerMfa($q.dialog, {
+      title: 'Checker 2FA required',
+      message: 'Enter your authenticator code to approve this commission payout.',
+      okLabel: 'Verify & approve',
+    })
+    if (!otp) {
+      $q.notify({ color: 'warning', message: 'Approval cancelled. 2FA code is required.' })
+      return
+    }
+    const res = await commissionApi.approveCommission(ticketId, { otp });
     if (res.data?.success) {
       $q.notify({ color: 'positive', message: 'Commission ticket approved and balances synchronized.', icon: 'check' });
       syncAllData();
@@ -1692,13 +1703,20 @@ const approveTicket = async (ticketId) => {
 };
 
 const promptRejection = (ticketId) => {
-  rejectDialog.value = { show: true, id: ticketId, reason: '' };
+  rejectDialog.value = { show: true, id: ticketId, reason: '', otp: '' };
 };
 
 const submitRejection = async () => {
   if (!rejectDialog.value.reason) return;
+  if (String(rejectDialog.value.otp || '').trim().length < 6) {
+    $q.notify({ color: 'warning', message: 'Enter your 2FA authenticator code to reject.' });
+    return;
+  }
   try {
-    const res = await commissionApi.rejectCommission(rejectDialog.value.id, { reason: rejectDialog.value.reason });
+    const res = await commissionApi.rejectCommission(rejectDialog.value.id, {
+      reason: rejectDialog.value.reason,
+      otp: String(rejectDialog.value.otp).trim(),
+    });
     if (res.data?.success) {
       $q.notify({ color: 'orange-8', message: 'Commission ticket rejected successfully', icon: 'cancel' });
       rejectDialog.value.show = false;

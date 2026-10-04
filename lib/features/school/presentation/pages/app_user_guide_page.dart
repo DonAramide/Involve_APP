@@ -155,7 +155,7 @@ class AppUserGuidePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionTitle('1. Core Dashboard Functions'),
-          _buildFeatureItem('NEW TERM BILL', 'Issue receipts to students. Search for students, select fees, and process payments.', Icons.receipt_long, Colors.cyan),
+          _buildFeatureItem('BILL', 'Issue receipts to students. Search for students, select fees, and process payments.', Icons.receipt_long, Colors.cyan),
           _buildFeatureItem('FEE MANAGEMENT', 'Dashboard for all billing activities. Supports batch billing and history.', Icons.payments, Colors.orange),
           _buildTipBox('Carry Forward Logic', 'The system automatically detects outstanding balances from previous terms and adds them to new bills.'),
           _buildSectionTitle('2. Administration'),
@@ -300,7 +300,7 @@ class AppUserGuidePage extends StatelessWidget {
             pw.SizedBox(height: 20),
             pw.Header(level: 1, text: 'Core Functions'),
             if (mode == 'school') ...[
-              pw.Bullet(text: 'NEW TERM BILL: Issue receipts to students.'),
+              pw.Bullet(text: 'BILL: Issue receipts to students.'),
               pw.Bullet(text: 'FEE MANAGEMENT: Dashboard for billing and batch operations.'),
               pw.Bullet(text: 'STUDENT DIRECTORY: Manage enrollment and parent contacts.'),
               pw.Bullet(text: 'RESULT ENTRY: Scoring and grade calculation.'),

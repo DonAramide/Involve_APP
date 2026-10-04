@@ -114,11 +114,46 @@ export const adminApi = {
   createTenant: (data) => api.post('/api/admin/tenants', data),
   updateTenant: (id, data) => api.patch(`/api/admin/tenants/${id}`, data),
   getTenantDetails: (id) => api.get(`/api/admin/tenants/${id}/details`),
+  getTenantInstitutePort: (id) => api.get(`/api/admin/tenants/${id}/institute-port`),
+  proposeTenantInstitutePort: (id, data) => api.post(`/api/admin/tenants/${id}/institute-port/propose`, data || {}),
+  approveTenantInstitutePort: (id, data) => api.post(`/api/admin/tenants/${id}/institute-port/approve`, data || {}),
+  rejectTenantInstitutePort: (id, data) => api.post(`/api/admin/tenants/${id}/institute-port/reject`, data || {}),
   pingTenantIdentity: (id) => api.post(`/api/admin/tenants/${id}/ping-identity`),
   pingMissingTenantIdentities: () => api.post('/api/admin/tenants/ping-missing-identity'),
   getVerificationLog: (params) => api.get('/api/admin/verification-log', { params }),
   getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
   listPendingKycDocuments: (params) => api.get('/api/admin/kyc/documents', { params }),
+  listPlatformFeeProfiles: () => api.get('/api/admin/platform-fees'),
+  listPlatformFeeAgents: () => api.get('/api/admin/platform-fees/agents'),
+  getPlatformFeeProfile: (transactionType, params) =>
+    api.get(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}`, { params }),
+  savePlatformFeeDraft: (transactionType, data) =>
+    api.put(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}/draft`, data),
+  proposePlatformFeePublish: (transactionType, data) =>
+    api.post(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}/propose`, data || {}),
+  rejectPlatformFeePublish: (transactionType, data) =>
+    api.post(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}/reject`, data || {}),
+  publishPlatformFeeVersion: (transactionType, data) =>
+    api.post(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}/publish`, data || {}),
+  previewPlatformFee: (transactionType, data) =>
+    api.post(`/api/admin/platform-fees/${encodeURIComponent(transactionType)}/preview`, data),
+  getPlatformFeeAgentCommission: (params) => api.get('/api/admin/platform-fees/agent-commission', { params }),
+  listPlatformFeeAssessments: (params) => api.get('/api/admin/platform-fees/assessments', { params }),
+  getPlatformFeeAssessment: (assessmentId) =>
+    api.get(`/api/admin/platform-fees/assessments/${encodeURIComponent(assessmentId)}`),
+  getPlatformFeeReconciliation: (params) => api.get('/api/admin/platform-fees/reconciliation', { params }),
+  getPlatformFeeDistribution: (params) => api.get('/api/admin/platform-fees/distribution', { params }),
+  listFeeStakeholders: (params) => api.get('/api/admin/platform-fees/stakeholders', { params }),
+  createFeeStakeholder: (data) => api.post('/api/admin/platform-fees/stakeholders', data),
+  getFeeStakeholder: (id) => api.get(`/api/admin/platform-fees/stakeholders/${encodeURIComponent(id)}`),
+  updateFeeStakeholder: (id, data) => api.patch(`/api/admin/platform-fees/stakeholders/${encodeURIComponent(id)}`, data),
+  listFeeStakeholderPayables: (id) => api.get(`/api/admin/platform-fees/stakeholders/${encodeURIComponent(id)}/payables`),
+  listFeeStakeholderSettlements: (id) => api.get(`/api/admin/platform-fees/stakeholders/${encodeURIComponent(id)}/settlements`),
+  listFeeWithdrawals: () => api.get('/api/admin/platform-fees/withdrawals'),
+  getFeeWithdrawal: (id) => api.get(`/api/admin/platform-fees/withdrawals/${encodeURIComponent(id)}`),
+  createFeeWithdrawal: (data) => api.post('/api/admin/platform-fees/withdrawals', data),
+  approveFeeWithdrawal: (id) => api.post(`/api/admin/platform-fees/withdrawals/${encodeURIComponent(id)}/approve`),
+  rejectFeeWithdrawal: (id, data) => api.post(`/api/admin/platform-fees/withdrawals/${encodeURIComponent(id)}/reject`, data || {}),
   reviewKycDocument: (id, data) => api.patch(`/api/admin/kyc/documents/${id}`, data),
   uploadTenantKyc: (data) => api.post('/api/tenant/kyc/upload', data, {
     timeout: 120000,
@@ -128,7 +163,8 @@ export const adminApi = {
   // Financial Platform Tenant Operations
   getFinancialPlatformHealth: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`),
   getFinancialPlatformAudit: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/audit`),
-  activateFinancialPlatform: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/activate`),
+  activateFinancialPlatform: (tenantId, data) =>
+    api.post(`/api/v1/tenants/${tenantId}/financial-platform/activate`, data || {}),
   getFinancialPlatformActivationGate: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/activation-gate`),
   recordFinancialPlatformManualCheck: (tenantId, data) =>
     api.post(`/api/v1/tenants/${tenantId}/financial-platform/manual-checks`, data),
@@ -143,6 +179,9 @@ export const adminApi = {
   getLedger: (params) => api.get('/api/admin/ledger', { params }),
   getTenantPayables: (params) => api.get('/api/admin/tenant-payables', { params }),
   getVirtualAccounts: (params) => api.get('/api/admin/virtual-accounts', { params }),
+  refreshVirtualAccounts: () => api.post('/api/admin/virtual-accounts/refresh'),
+  listPaymentAlerts: () => api.get('/api/admin/payment-alerts'),
+  repushPaymentAlert: (id) => api.post(`/api/admin/payment-alerts/${encodeURIComponent(id)}/repush`),
   getVirtualAccountTransactions: (accountNumber) =>
     api.get(`/api/admin/virtual-accounts/${encodeURIComponent(accountNumber)}/transactions`),
   // Legacy alias kept for older builds
@@ -161,12 +200,16 @@ export const adminApi = {
   createUser: (data) => api.post('/api/admin/users', data),
   updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
   resetUserMfa: (id) => api.post(`/api/admin/users/${id}/reset-mfa`),
+  resetUserPassword: (id, data) => api.post(`/api/admin/users/${id}/reset-password`, data),
   sendInvite: (data) => api.post('/admin/invites', data),
   getProfile: () => api.get('/api/admin/profile'),
   updateProfile: (data) => api.patch('/api/admin/profile', data),
   changePassword: (data) => api.post('/api/auth/change-password', data),
   getGlobalSettings: () => api.get('/api/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/api/admin/settings', data),
+  listMakerChecker: (domain) => api.get('/api/admin/maker-checker', { params: { domain } }),
+  approveMakerChecker: (id) => api.post(`/api/admin/maker-checker/${id}/approve`),
+  rejectMakerChecker: (id) => api.post(`/api/admin/maker-checker/${id}/reject`),
   listQuasarIntegrations: () => api.get('/api/admin/quasar/integrations'),
   getQuasarHealth: () => api.get('/api/admin/quasar/health'),
   pingQuasar: () => api.get('/api/admin/quasar/health/live'),
@@ -265,6 +308,8 @@ export const deviceApi = {
   // Bare /devices/* is not proxied on production and returns HTTP 405 from the SPA host.
   getActivations: () => api.get('/api/devices/activations'),
   createActivation: (data) => api.post('/api/devices/activations', data),
+  approveActivation: (id) => api.post(`/api/devices/activations/${id}/approve`),
+  rejectActivation: (id) => api.post(`/api/devices/activations/${id}/reject`),
   validateCode: (data) => api.post('/api/devices/validate', data),
   updateDevice: (id, data) => api.patch(`/api/devices/${id}`, data),
   resetActivation: (code, data) => api.patch(`/api/devices/activations/${code}/reset`, data),
@@ -273,7 +318,7 @@ export const deviceApi = {
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
   getDeviceTelemetry: (deviceId) => api.get(`/api/devices/${deviceId}/telemetry`),
   getDeviceAlerts: (deviceId) => api.get(`/api/devices/${deviceId}/alerts`),
-  sendDeviceCommand: (deviceId, data) => api.post(`/api/devices/${deviceId}/command`, data),
+  sendDeviceCommand: (deviceId, data) => api.post(`/api/devices/${encodeURIComponent(deviceId)}/commands`, data),
 };
 
 export const billingApi = {
@@ -283,6 +328,7 @@ export const billingApi = {
 
 export const financeApi = {
   getExecutiveSummary: () => api.get('/api/v1/finance/executive-summary'),
+  resyncQuasar: () => api.post('/api/v1/finance/quasar-resync'),
   getWalletBalance: () => api.get('/api/v1/wallet'),
   getWalletTransactions: () => api.get('/api/v1/wallet/transactions'),
   getDailyRevenue: (params) => api.get('/api/finance/daily-revenue', { params }),
@@ -399,7 +445,7 @@ export const searchApi = {
 
 export const commissionApi = {
   getApprovals: () => api.get('/admin/commissions/approvals'),
-  approveCommission: (id) => api.post(`/admin/commissions/approvals/${id}/approve`),
+  approveCommission: (id, data) => api.post(`/admin/commissions/approvals/${id}/approve`, data || {}),
   rejectCommission: (id, data) => api.post(`/admin/commissions/approvals/${id}/reject`, data),
   executeClawback: (data) => api.post('/admin/commissions/clawback', data),
   getAuditHistory: () => api.get('/admin/commissions/audit'),

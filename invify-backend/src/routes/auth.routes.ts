@@ -13,6 +13,8 @@ const otpRateLimiter = rateLimit({
 
 router.get('/check-email', OnboardingController.checkEmail);
 router.post('/check-email', OnboardingController.checkEmail);
+router.get('/check-agent-code', OnboardingController.checkAgentCode);
+router.post('/check-agent-code', OnboardingController.checkAgentCode);
 router.post('/send-email-otp', otpRateLimiter, OnboardingController.sendEmailOtp);
 router.post('/verify-email-otp', otpRateLimiter, OnboardingController.verifyEmailOtp);
 router.post('/send-whatsapp-otp', otpRateLimiter, OnboardingController.sendWhatsappOtp);

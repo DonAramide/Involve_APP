@@ -4,11 +4,11 @@
     <div class="panel-card bg-panel border-muted rounded-borders q-pa-md column op-gap-16" style="width: 100%; max-width: 400px;">
       <div class="text-center column op-gap-4">
         <q-icon name="support_agent" size="xl" color="amber-4" class="self-center q-mb-sm" />
-        <div class="text-operator-title text-weight-bold" style="font-size: 18px;">AGENT AUTHORIZATION</div>
-        <div class="text-caption text-muted">Enter your email and password to authenticate</div>
+        <div class="text-operator-title text-weight-bold" style="font-size: 18px;">INSTITUTE LOGIN</div>
+        <div class="text-caption text-muted">Sign in with your Institute email and password</div>
       </div>
 
-      <q-form @submit="handleLogin" class="column op-gap-12 q-mt-md" v-if="!requirePasswordChange">
+      <q-form @submit="handleLogin" class="column op-gap-12 q-mt-md" v-if="!requirePasswordChange && !mfaRequired">
         <q-input
           v-model="email"
           dark filled dense
@@ -53,9 +53,32 @@
             color="amber-4"
             label="Don't have an account? Sign up"
             class="text-caption text-weight-regular"
-            to="/agent/signup"
+            to="/institute/signup"
           />
         </div>
+      </q-form>
+
+      <q-form @submit="completeMfaLogin" class="column op-gap-12 q-mt-md" v-else-if="mfaRequired">
+        <div class="text-caption text-muted text-center">
+          Enter the 6-digit code from your authenticator app to finish Institute sign-in.
+        </div>
+        <q-input
+          v-model="mfaCode"
+          dark filled dense
+          label="2FA code"
+          maxlength="6"
+          class="bg-panel-darker"
+        />
+        <q-btn
+          type="submit"
+          color="amber-4"
+          text-color="black"
+          label="Verify 2FA"
+          class="text-weight-bold q-mt-sm"
+          :loading="loading"
+          :disable="mfaCode.length < 6"
+        />
+        <q-btn flat color="grey-4" label="Back to login" no-caps @click="cancelMfaLogin" />
       </q-form>
 
       <!-- Password Change Flow -->
@@ -219,7 +242,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
@@ -227,9 +250,10 @@ import { stampIdleActivity } from '../../auth/idleLogout'
 import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 
-const email = ref('')
+const email = ref(String(route.query.email || ''))
 const password = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
@@ -239,6 +263,10 @@ const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 
 const requirePasswordChange = ref(false)
+const mfaRequired = ref(false)
+const mfaCode = ref('')
+const pendingMfaToken = ref('')
+const pendingMfaAgent = ref(null)
 const loading = ref(false)
 const agentCode = ref('')
 
@@ -325,7 +353,7 @@ const submitResolution = async () => {
     resolutionAddress.value = ''
     resolutionPhone.value = ''
     resolutionWhatsapp.value = ''
-    router.push('/agent/success')
+    router.push('/institute/success')
   } catch (err) {
     const msg = err.response?.data?.message || err.message
     $q.notify({ type: 'negative', message: `Submission failed: ${msg}`, position: 'top-right' })
@@ -351,16 +379,30 @@ const handleLogin = async () => {
       requirePasswordChange.value = true
       agentCode.value = res.data.agentCode || ''
       $q.notify({ type: 'info', message: 'Password change required', position: 'top-right' })
+    } else if (res.data.mfaRequired) {
+      pendingMfaToken.value = res.data.token || ''
+      pendingMfaAgent.value = res.data.agent || null
+      mfaCode.value = ''
+      mfaRequired.value = true
+      $q.notify({ type: 'info', message: 'Enter your 2FA authenticator code', position: 'top-right' })
     } else {
       localStorage.setItem('invify_agent_token', res.data.token)
       localStorage.setItem('invify_agent_info', JSON.stringify(res.data.agent))
       stampIdleActivity()
-      router.push('/agent/dashboard')
+      router.push('/institute/dashboard')
     }
   } catch (err) {
     const errData = err.response?.data
-    // If the server returns a 403 Forbidden for a suspended agent
-    if (err.response?.status === 403 && errData) {
+    const status = err.response?.status
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      $q.notify({ type: 'warning', message: 'No internet connection. You cannot sign in while offline.', position: 'top-right' })
+    } else if (!err.response || status === 503 || errData?.error === 'AUTH_SERVICE_UNAVAILABLE') {
+      $q.notify({
+        type: 'warning',
+        message: errData?.message || 'No internet connection. Institute login needs a network connection.',
+        position: 'top-right',
+      })
+    } else if (status === 403 && errData) {
       suspensionAction.value = errData.requiredAction || 'ALL'
       if (suspensionAction.value === 'NONE') {
         suspensionAction.value = 'ALL'
@@ -369,9 +411,38 @@ const handleLogin = async () => {
       suspensionMessage.value = errData.message || 'Your account is suspended.'
       showResolveDialog.value = true
     } else {
-      const msg = err.response?.data?.message || err.message
+      const msg = errData?.message || err.message
       $q.notify({ type: 'negative', message: `Login failed: ${msg}`, position: 'top-right' })
     }
+  } finally {
+    loading.value = false
+  }
+}
+
+const cancelMfaLogin = () => {
+  mfaRequired.value = false
+  mfaCode.value = ''
+  pendingMfaToken.value = ''
+  pendingMfaAgent.value = null
+}
+
+const completeMfaLogin = async () => {
+  if (!pendingMfaToken.value || mfaCode.value.length < 6) return
+  loading.value = true
+  try {
+    await axios.post('/api/agent/login/mfa', { code: mfaCode.value }, {
+      headers: { Authorization: `Bearer ${pendingMfaToken.value}` },
+    })
+    localStorage.setItem('invify_agent_token', pendingMfaToken.value)
+    localStorage.setItem('invify_agent_info', JSON.stringify(pendingMfaAgent.value || {}))
+    stampIdleActivity()
+    router.push('/institute/dashboard')
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.message || 'Invalid 2FA code',
+      position: 'top-right',
+    })
   } finally {
     loading.value = false
   }
@@ -405,7 +476,7 @@ const handleChangePassword = async () => {
     stampIdleActivity()
     
     $q.notify({ type: 'positive', message: 'Password updated successfully', position: 'top-right' })
-    router.push('/agent/dashboard')
+    router.push('/institute/dashboard')
   } catch (err) {
     const msg = err.response?.data?.message || err.message
     $q.notify({ type: 'negative', message: `Update failed: ${msg}`, position: 'top-right' })

@@ -44,7 +44,7 @@
               <div class="text-h4 text-weight-bolder text-white">{{ performance.total_leads || 0 }}</div>
             </q-card-section></q-card>
             <q-card class="col bg-panel border-muted"><q-card-section>
-              <div class="text-caption text-muted text-weight-bold text-uppercase">Total Merchants</div>
+              <div class="text-caption text-muted text-weight-bold text-uppercase">Total Tenants</div>
               <div class="text-h4 text-weight-bolder text-white">{{ performance.total_merchants || 0 }}</div>
             </q-card-section></q-card>
             <q-card class="col bg-panel border-muted"><q-card-section>
@@ -60,7 +60,7 @@
             </q-card-section></q-card>
             <q-card class="col bg-panel border-muted"><q-card-section>
               <div class="text-caption text-muted text-weight-bold text-uppercase">Commissions Earned</div>
-              <div class="text-h4 text-weight-bolder text-amber-4">${{ (performance.commissions_earned || 0).toLocaleString() }}</div>
+              <div class="text-h4 text-weight-bolder text-amber-4">₦{{ (performance.commissions_earned || 0).toLocaleString() }}</div>
             </q-card-section></q-card>
           </div>
         </template>
@@ -131,23 +131,55 @@ const fetchAnalytics = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
+    if (!token) {
+      $q.notify({ type: 'negative', message: 'Not authenticated. Please log in.' })
+      return
+    }
     const headers = { Authorization: `Bearer ${token}` }
-    
-    const [perfRes, terrRes, riskRes, statusRes] = await Promise.all([
-      axios.get('/api/analytics/performance', { headers }),
-      axios.get('/api/analytics/territory', { headers }),
-      axios.get('/api/analytics/risk-signals', { headers }),
-      // Keeping refresh-status as a relative path if it exists
-      axios.get('/api/analytics/refresh-status', { headers }).catch(() => ({ data: { data: null } }))
-    ])
-    
-    // Bind the first element of the returned arrays to the component refs
-    performance.value = perfRes.data?.data?.performance?.[0] || null
-    territory.value = terrRes.data?.data?.[0] || null
-    riskSignals.value = riskRes.data?.data || []
-    refreshStatus.value = statusRes.data?.data || null
+    const dashRes = await axios.get('/api/agent/dashboard', { headers })
+    const d = dashRes.data || {}
+    const assigned = Number(d.territory?.merchants || d.kpis?.totalTenants?.value || 0)
+    const activated = Number(d.pipeline?.activated || d.kpis?.activeTenants?.value || 0)
+    const devices = d.deployments?.devices || {}
+    const terminals = d.deployments?.terminals || {}
+
+    performance.value = {
+      total_leads: Number(d.pipeline?.prospects || 0) + Number(d.pipeline?.contacted || 0),
+      total_merchants: assigned,
+      merchant_activations: activated,
+      devices_assigned: Number(devices.assigned || 0),
+      terminals_assigned: Number(terminals.assigned || 0),
+      commissions_earned: Number(d.kpis?.earnedCommissions?.value || 0),
+    }
+    territory.value = {
+      territory: d.territory?.name || d.identity?.territory || null,
+      activation_rate: assigned ? Math.round((activated / assigned) * 100) : Number(devices.activationRate || 0),
+      deployment_success_rate: Number(devices.deploymentSuccess || terminals.activationRate || 0),
+    }
+    const risks = []
+    if (Number(terminals.offline || 0) > 0) {
+      risks.push({
+        signal_type: 'OFFLINE_TERMINALS',
+        description: `${terminals.offline} terminals are offline`,
+        count: terminals.offline,
+        severity: 'WARNING',
+      })
+    }
+    if (Number(d.pipeline?.kycSubmitted || 0) > 0) {
+      risks.push({
+        signal_type: 'KYC_BACKLOG',
+        description: `${d.pipeline.kycSubmitted} tenants awaiting KYC`,
+        count: d.pipeline.kycSubmitted,
+        severity: Number(d.pipeline.kycSubmitted) > 5 ? 'CRITICAL' : 'WARNING',
+      })
+    }
+    riskSignals.value = risks
+    refreshStatus.value = { status: 'SUCCESS', refresh_completed_at: new Date().toISOString() }
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load intelligence data' })
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to load intelligence data',
+    })
   } finally {
     loading.value = false
   }

@@ -149,9 +149,9 @@ export class QuasarPlatformClient {
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) return false;
-      // Network/auth errors — don't treat as "exists"
+      // Auth and transport failures are not "missing". Callers must not delete the checkpoint.
       console.warn(`[QuasarPlatformClient] verifyTenantExists(${tenantId}) failed:`, err?.message);
-      return false;
+      throw err;
     }
   }
 

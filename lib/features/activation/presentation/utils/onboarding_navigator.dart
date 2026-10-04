@@ -105,7 +105,7 @@ class OnboardingNavigator {
             'streetAddress': payload['streetAddress'],
             // Device identity fields
             'deviceId': payload['deviceId'],
-            'agentCode': payload['agentCode'] ?? 'AAA000',
+            'agentCode': payload['agentCode'],
             'location': payload['location'],
           });
           

@@ -70,7 +70,7 @@
         <q-btn type="submit" dense color="cyan-3" text-color="black" label="PROVISION AGENT & VERIFY KYC" :loading="loading" class="q-mt-md text-weight-bold full-width" />
         
         <div class="row justify-center q-mt-sm">
-          <q-btn flat color="cyan-3" label="Already have an account? Login" class="text-caption text-weight-regular" to="/agent/login" />
+          <q-btn flat color="cyan-3" label="Already have an account? Login" class="text-caption text-weight-regular" to="/institute/login" />
         </div>
       </q-form>
     </div>
@@ -176,7 +176,7 @@ const handleSignup = async () => {
     const res = await axios.post('/api/agent/register', payload)
     
     $q.notify({ type: 'positive', message: res.data.message || 'Registration submitted successfully! Please wait for approval.', position: 'top-right' })
-    router.push('/agent/success')
+    router.push('/institute/success')
   } catch (err) {
     const msg = err.response?.data?.message || err.message
     $q.notify({ type: 'negative', message: `Registration failed: ${msg}`, position: 'top-right' })

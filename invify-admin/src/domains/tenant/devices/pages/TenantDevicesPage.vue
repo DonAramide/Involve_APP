@@ -77,7 +77,7 @@
 
         <q-card-section class="column items-center op-gap-12 text-center">
           <div class="text-caption text-grey-5">
-            On the new tablet, open Invify, tap <span class="text-indigo-3 text-weight-bold">Link device to existing profile</span>, then scan this code. It expires in 3 minutes.
+            On the new tablet, open Invify, tap <span class="text-indigo-3 text-weight-bold">Link device to existing profile</span>, then scan this code. It expires in 3 minutes. After the scan, the tablet loads this portal's users, their sign-in codes, and the admin password.
           </div>
 
           <div v-if="generating" class="q-py-xl column items-center op-gap-12">

@@ -1,6 +1,7 @@
 // invify-backend/src/modules/billing-governance/FinancialRuleEngine.ts
 
 import { FeeConfiguration, FeeType, FeeOverride } from '../../contracts/billing/FeeStructures';
+import { rawFeeKobo } from '../fee-orchestration/FeeCalculator';
 
 export interface FeeCalculationContext {
   tenantId: string;
@@ -128,5 +129,19 @@ export class FinancialRuleEngine {
     }
     
     return r / m;
+  }
+
+  /**
+   * Raw (pre min/max) fee in integer kobo for fee orchestration.
+   * Integer half-even arithmetic only — never routed through naira floats.
+   */
+  public static calculateRawFeeKobo(input: {
+    method: 'FLAT' | 'PERCENTAGE' | 'HYBRID';
+    transactionAmountKobo: number;
+    percentageBps: number;
+    flatAmountKobo: number;
+    tenantId?: string;
+  }): number {
+    return rawFeeKobo(input);
   }
 }

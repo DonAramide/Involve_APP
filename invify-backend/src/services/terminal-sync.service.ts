@@ -213,7 +213,9 @@ export class TerminalSyncService {
     }
 
     let tenantDetails = deviceRecord?.tenants || null;
-    if (!tenantDetails && resolvedTenantId) {
+    // Always re-read the tenant row. The device join omits system_access_password,
+    // and a replacement tablet needs that admin password.
+    if (resolvedTenantId) {
       try {
         const { data: tenant } = await supabaseAdmin
           .from('tenants')
@@ -222,7 +224,7 @@ export class TerminalSyncService {
           )
           .eq('id', resolvedTenantId)
           .maybeSingle();
-        tenantDetails = tenant;
+        if (tenant) tenantDetails = { ...(tenantDetails || {}), ...tenant };
       } catch (_) {}
     }
     if (tenantDetails) {

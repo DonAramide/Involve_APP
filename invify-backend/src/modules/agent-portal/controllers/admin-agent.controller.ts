@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { agentService } from '../services/agent.service';
 import { AgentSchemaUnavailableError } from '../repositories/agent.repository';
+import { AgentAccessError } from '../services/agent-access.service';
 
 function mapAgentRow(row: any) {
   if (!row) return null;
@@ -53,18 +54,21 @@ export class AdminAgentController {
       const ipAddress = req.ip;
       const userAgent = req.headers['user-agent'];
 
-      const newAgent = await agentService.onboardAgent(
+      const { agent, welcomeEmailSent } = await agentService.onboardAgent(
         creatorId, 
-        req.body,
+        req.body || {},
         ipAddress,
         userAgent
       );
 
       return res.status(201).json({
         success: true,
-        message: 'Agent successfully onboarded and invitation dispatched',
-        data: mapAgentRow(newAgent),
-        agent: mapAgentRow(newAgent),
+        welcomeEmailSent,
+        message: welcomeEmailSent
+          ? `Agent onboarded. Welcome email with a set-password link sent to ${agent.email}.`
+          : 'Agent onboarded, but the welcome email could not be sent. Use "Resend invite" to try again.',
+        data: mapAgentRow(agent),
+        agent: mapAgentRow(agent),
       });
     } catch (err: any) {
       if (err instanceof AgentSchemaUnavailableError || err?.code === 'AGENT_SCHEMA_UNAVAILABLE') {
@@ -74,8 +78,32 @@ export class AdminAgentController {
           message: 'Cannot provision agents until the agent portal schema is applied to this database',
         });
       }
+      if (err instanceof AgentAccessError) {
+        return res.status(err.status).json({ success: false, message: err.message });
+      }
       console.error('[AdminAgentController] Error onboarding agent:', err);
       return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Re-send the welcome / set-password email
+   * POST /admin/agents/:id/resend-invite
+   */
+  static async resendInvite(req: Request, res: Response) {
+    try {
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+      const sent = await agentService.resendInvite(req.params.id, actorId, req.ip, req.headers['user-agent']);
+      if (!sent) {
+        return res.status(502).json({ success: false, message: 'The invitation email could not be sent. Check SMTP settings and try again.' });
+      }
+      return res.json({ success: true, message: 'Invitation email re-sent.' });
+    } catch (err: any) {
+      if (err instanceof AgentAccessError) {
+        return res.status(err.status).json({ success: false, message: err.message });
+      }
+      console.error('[AdminAgentController] Error resending invite:', err?.message || err);
+      return res.status(500).json({ success: false, message: err?.message || 'Failed to resend invite' });
     }
   }
 

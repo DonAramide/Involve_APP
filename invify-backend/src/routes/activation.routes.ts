@@ -51,6 +51,8 @@ router.get('/api/agent-portal/profile/get', authenticate, validateDto, ProfileCo
 router.patch('/api/agent-portal/profile/update', authenticate, validateDto, ProfileController.updateProfile);
 router.get('/api/agent-portal/rbac/listRoles', authenticate, validateDto, RbacController.listRoles);
 router.patch('/api/agent-portal/tenant/updateActivation', authenticate, validateDto, TenantController.updateActivation);
+router.post('/api/agent/merchant/:id/activation/advance', authenticate, TenantController.advance);
+router.post('/agent/merchant/:id/activation/advance', authenticate, TenantController.advance);
 router.post('/api/agent-portal/territory/create', authenticate, validateDto, TerritoryController.create);
 router.get('/api/agent-portal/territory/list', authenticate, validateDto, TerritoryController.list);
 router.patch('/api/agent-portal/territory/update', authenticate, validateDto, TerritoryController.update);
@@ -125,8 +127,23 @@ router.get('/api/agent/profile/id-card', authenticate, ProfileController.getQrCo
 router.post('/api/agent/security/change-password', authenticate, SecurityController.changePassword);
 router.post('/api/agent/security/mfa/enable', authenticate, SecurityController.enableMfa);
 router.post('/api/agent/security/mfa/verify', authenticate, SecurityController.verifyMfa);
+router.post('/api/agent/login/mfa', authenticate, SecurityController.confirmLoginMfa);
 router.post('/api/agent/security/mfa/disable', authenticate, SecurityController.disableMfa);
 router.get('/api/agent/security/sessions', authenticate, SecurityController.getSessions);
 router.delete('/api/agent/security/sessions/:id', authenticate, SecurityController.revokeSession);
+
+import { AgentWebhookController } from '../modules/agent-portal/controllers/agent-webhook.controller';
+router.get('/api/agent/commission', authenticate, AgentWebhookController.sessionCommission);
+router.get('/api/agent/developer', authenticate, AgentWebhookController.snapshot);
+router.put('/api/agent/developer/webhook', authenticate, AgentWebhookController.saveWebhook);
+router.post('/api/agent/developer/webhook/enable', authenticate, AgentWebhookController.enable);
+router.post('/api/agent/developer/webhook/disable', authenticate, AgentWebhookController.disable);
+router.post('/api/agent/developer/webhook/test', authenticate, AgentWebhookController.test);
+router.post('/api/agent/developer/webhook/rotate', authenticate, financialRateLimiter, AgentWebhookController.rotateWebhook);
+router.post('/api/agent/developer/api-credentials/rotate', authenticate, financialRateLimiter, AgentWebhookController.rotateApi);
+router.get('/api/agent/developer/deliveries', authenticate, AgentWebhookController.deliveries);
+router.get('/api/agent/v1/commission', AgentWebhookController.v1Commission);
+router.get('/api/agent/v1/withdrawals', AgentWebhookController.v1Withdrawals);
+router.post('/api/agent/v1/withdrawals', financialRateLimiter, AgentWebhookController.v1Withdrawals);
 
 export default router;

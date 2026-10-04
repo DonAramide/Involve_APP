@@ -134,13 +134,12 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   }
 
   void _showNotification(dynamic amount, String studentName, String reference) {
-    final message = '₦$amount received from $studentName!';
-    unawaited(PaymentAlertSound.play());
-    unawaited(NotificationInbox.add(
-      message: message,
-      type: 'payment',
-      extra: {'reference': reference},
-    ));
+        final message = '₦$amount received from $studentName!';
+        unawaited(PaymentAlertSound.play());
+        unawaited(NotificationInbox.removeReceivedPayment(
+          reference: reference,
+          message: message,
+        ));
     unawaited(DeviceNotificationService.showPayment(
       message: message,
       reference: reference.isEmpty ? null : reference,

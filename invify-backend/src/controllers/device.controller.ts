@@ -6,6 +6,9 @@ import { applyPaidLicenseToTenant, paidLicenseFromActivation } from '../utils/pa
 import { GovAuditService } from '../services/gov-audit.service';
 import { authenticator } from 'otplib';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { mergeDeviceInfo, ORIGIN_CUSTOMER, ORIGIN_INVIFY, originOfDevice } from '../utils/device-origin';
+import { canApproveTerminalActivation, TERMINAL_ACTIVATION_APPROVER } from '../utils/terminal-activation-approval';
+import { deliverApprovedTerminalActivation } from '../services/terminal-activation-delivery';
 
 function isNetworkTimeout(error: any): boolean {
   return (
@@ -14,6 +17,32 @@ function isNetworkTimeout(error: any): boolean {
     error.message?.includes('timeout') ||
     error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT'
   );
+}
+
+async function findTenantDevice(deviceId: string, tenantId: string) {
+  const id = String(deviceId || '').trim();
+  if (!id || !tenantId) return null;
+  const { data: byDevice } = await supabaseAdmin
+    .from('devices')
+    .select('device_id, tenant_id')
+    .eq('tenant_id', tenantId)
+    .ilike('device_id', id)
+    .maybeSingle();
+  if (byDevice) return byDevice;
+  const { data: byRow } = await supabaseAdmin
+    .from('devices')
+    .select('device_id, tenant_id, id')
+    .eq('tenant_id', tenantId)
+    .eq('id', id)
+    .maybeSingle();
+  if (byRow) return byRow;
+  const { data: registration } = await supabaseAdmin
+    .from('device_registrations')
+    .select('device_id, tenant_id')
+    .eq('tenant_id', tenantId)
+    .ilike('device_id', id)
+    .maybeSingle();
+  return registration || null;
 }
 
 export class DeviceController {
@@ -79,17 +108,30 @@ export class DeviceController {
       const mergedDevices = Array.from(byId.values());
 
       const tenantIds = Array.from(new Set(mergedDevices.map(d => d.tenant_id).filter(Boolean)));
-      const tenantsMap = new Map<string, { name: string; plan: string }>();
+      const tenantsMap = new Map<string, { name: string; plan: string; plan_expires_at: string | null; owner_email: string | null }>();
 
       if (tenantIds.length > 0) {
-        const { data: tenants, error: tenError } = await supabaseAdmin
+        let { data: tenants, error: tenError } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, plan')
+          .select('id, name, plan, plan_expires_at, owner_email')
           .in('id', tenantIds);
+        if (tenError && String(tenError.message || '').toLowerCase().includes('plan_expires_at')) {
+          const retry = await supabaseAdmin
+            .from('tenants')
+            .select('id, name, plan')
+            .in('id', tenantIds);
+          tenants = retry.data;
+          tenError = retry.error;
+        }
 
         if (!tenError && tenants) {
           tenants.forEach(t => {
-            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+            tenantsMap.set(t.id, {
+              name: t.name,
+              plan: t.plan,
+              plan_expires_at: t.plan_expires_at || null,
+              owner_email: t.owner_email || null,
+            });
           });
         }
       }
@@ -183,7 +225,7 @@ export class DeviceController {
         role.startsWith('admin_');
 
       // 1. Fetch activations raw data (tenant-scoped for non-platform operators)
-      let actQuery = supabase.from('device_activations').select('*');
+      let actQuery = supabaseAdmin.from('device_activations').select('*');
       if (!isPlatform) {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
@@ -196,26 +238,42 @@ export class DeviceController {
 
       // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
       const tenantIds = Array.from(new Set((activations || []).map(a => a.tenant_id).filter(Boolean)));
-      const tenantsMap = new Map<string, { name: string; plan: string }>();
+      const tenantsMap = new Map<string, { name: string; plan: string; owner_email: string | null }>();
 
       if (tenantIds.length > 0) {
-        const { data: tenants, error: tenError } = await supabase
+        const { data: tenants, error: tenError } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, plan')
+          .select('id, name, plan, owner_email')
           .in('id', tenantIds);
 
         if (!tenError && tenants) {
           tenants.forEach(t => {
-            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+            tenantsMap.set(t.id, { name: t.name, plan: t.plan, owner_email: t.owner_email || null });
           });
         }
       }
 
       // 3. Map tenant details back to activations matching the shape expected by the frontend
-      const enrichedActivations = (activations || []).map(activation => ({
-        ...activation,
-        tenants: tenantsMap.get(activation.tenant_id) || null,
-      }));
+      const viewer = String(user?.email || '').trim().toLowerCase();
+      const enrichedActivations = (activations || []).map(activation => {
+        const hidden =
+          activation.status === 'awaiting_approval' || activation.status === 'rejected';
+        const decision = canApproveTerminalActivation(viewer, activation.created_by);
+        const awaiting = activation.status === 'awaiting_approval';
+        return {
+          ...activation,
+          activation_code: hidden ? null : activation.activation_code,
+          tenants: tenantsMap.get(activation.tenant_id) || null,
+          canApprove: awaiting && decision.ok,
+          approvalNote: !awaiting
+            ? null
+            : decision.ok
+              ? null
+              : viewer === TERMINAL_ACTIVATION_APPROVER
+                ? 'You requested this code, so a different support@iips.app sign-in must approve it.'
+                : 'Waiting for support@iips.app',
+        };
+      });
 
       return res.status(200).json(enrichedActivations);
     } catch (error: any) {
@@ -329,7 +387,7 @@ export class DeviceController {
             device_suffix: deviceSuffix || '0',
             device_id: null, // No generated device identifier at creation time
             is_used: false,
-            status: 'pending',
+            status: 'awaiting_approval',
             created_by: creatorEmail,
             expires_at: expiresAtIso
           })
@@ -343,9 +401,11 @@ export class DeviceController {
           planIndex: Number(planIndex) || 0,
           deviceSuffix: deviceSuffix || '0',
         });
-        return res.status(201).json({ 
-          activation_code: data.activation_code,
-          expires_at: data.expires_at
+        return res.status(201).json({
+          id: data.id,
+          status: 'awaiting_approval',
+          expires_at: data.expires_at,
+          message: 'Waiting for support@iips.app to approve this terminal activation. The code stays hidden until then.',
         });
       } catch (dbErr: any) {
         if (isNetworkTimeout(dbErr)) {
@@ -367,6 +427,122 @@ export class DeviceController {
       console.error('[DeviceController] createActivation Error:', error.message);
       await logGenerateAudit('failed', { error: error.message });
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /devices/activations/:id/approve
+   * Checker: support@iips.app only, and not the maker.
+   */
+  static async approveActivation(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation request not found' });
+      if (row.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: 'This activation is not waiting for approval' });
+      }
+
+      const decision = canApproveTerminalActivation(user?.email, row.created_by);
+      if (!decision.ok) return res.status(403).json({ error: decision.error });
+
+      const { data: updated, error: updateErr } = await supabaseAdmin
+        .from('device_activations')
+        .update({ status: 'pending' })
+        .eq('id', id)
+        .eq('status', 'awaiting_approval')
+        .select()
+        .maybeSingle();
+      if (updateErr) throw updateErr;
+      if (!updated) return res.status(409).json({ error: 'This activation was already reviewed' });
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'APPROVE_ACTIVATION_CODE',
+          user_email: user.email,
+          user_name: user.name || user.email,
+          ip_address: req.socket.remoteAddress || '127.0.0.1',
+          target: updated.activation_code,
+          status: 'success',
+          tenant_id: updated.tenant_id,
+          metadata: { maker: row.created_by },
+        });
+      } catch (_) {}
+
+      let emailSent = false;
+      let emailedTo: string | null = null;
+      let emailError: string | undefined;
+      try {
+        const delivery = await deliverApprovedTerminalActivation(updated);
+        emailSent = delivery.sent;
+        emailedTo = delivery.to;
+        emailError = delivery.error;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'The activation file could not be emailed.';
+        console.error('[DeviceController] activation email failed:', emailError);
+      }
+
+      return res.status(200).json({
+        success: true,
+        id: updated.id,
+        status: 'pending',
+        activation_code: updated.activation_code,
+        expires_at: updated.expires_at,
+        emailSent,
+        emailedTo,
+        emailError: emailSent ? undefined : emailError,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] approveActivation Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to approve activation' });
+    }
+  }
+
+  /**
+   * POST /devices/activations/:id/reject
+   */
+  static async rejectActivation(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('id, status, created_by, tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation request not found' });
+      if (row.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: 'This activation is not waiting for approval' });
+      }
+
+      const decision = canApproveTerminalActivation(user?.email, row.created_by);
+      if (!decision.ok) return res.status(403).json({ error: decision.error });
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('device_activations')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+        .eq('status', 'awaiting_approval');
+      if (updateErr) throw updateErr;
+
+      return res.status(200).json({ success: true, id, status: 'rejected' });
+    } catch (error: any) {
+      console.error('[DeviceController] rejectActivation Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to reject activation' });
     }
   }
 
@@ -407,6 +583,15 @@ export class DeviceController {
 
       if (!activation) {
         return res.status(400).json({ error: 'Invalid activation code' });
+      }
+
+      if (activation.status === 'awaiting_approval') {
+        return res.status(400).json({
+          error: 'This activation code is waiting for approval from support@iips.app.',
+        });
+      }
+      if (activation.status === 'rejected') {
+        return res.status(400).json({ error: 'This activation code was rejected.' });
       }
 
       let updatedActivation: any = null;
@@ -861,7 +1046,29 @@ export class DeviceController {
         }
       }
 
-      // Step 2: Upsert device record in Supabase
+      // Step 2: Upsert device. New onboard that is not already in inventory is customer incoming.
+      let existingDevice: any = null;
+      try {
+        const { data } = await supabaseAdmin
+          .from('devices')
+          .select('*')
+          .eq('device_id', resolvedDeviceId)
+          .maybeSingle();
+        existingDevice = data || null;
+      } catch (lookupErr: any) {
+        console.warn('[DeviceController] existing device lookup failed:', lookupErr.message);
+      }
+
+      const alreadyListed = Boolean(existingDevice);
+      const existingOrigin = existingDevice ? originOfDevice(existingDevice) : null;
+      const isInvifyFleet = alreadyListed && existingOrigin === 'INVIFY_UPLOADED';
+      if (isInvifyFleet) {
+        deviceCategory = 'COMPANY_DEVICE';
+      } else if (!alreadyListed) {
+        deviceCategory = 'USER_DEVICE';
+      }
+      const originTag = isInvifyFleet || deviceCategory === 'COMPANY_DEVICE' ? ORIGIN_INVIFY : ORIGIN_CUSTOMER;
+
       const deviceRecord = {
         device_id: resolvedDeviceId,
         tenant_id: tenantId,
@@ -869,7 +1076,7 @@ export class DeviceController {
         device_role: deviceRole,
         status: 'active',
         device_suffix: deviceInfo?.deviceSuffix || null,
-        device_info: deviceInfo || null,
+        device_info: mergeDeviceInfo(existingDevice?.device_info, deviceInfo || {}, originTag),
         theme_color: themeColor || null,
         inventory_record_id: inventoryRecordId,
         device_name: deviceInfo?.model || deviceInfo?.deviceName || resolvedDeviceId,
@@ -944,21 +1151,15 @@ export class DeviceController {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
         }
-        const { data: owned, error: ownErr } = await supabase
-          .from('devices')
-          .select('device_id')
-          .eq('device_id', deviceId)
-          .eq('tenant_id', user.tenantId)
-          .maybeSingle();
-        if (ownErr) throw ownErr;
+        const owned = await findTenantDevice(deviceId, user.tenantId);
         if (!owned) {
           return res.status(404).json({ error: 'Device not found' });
         }
       }
 
-      const { data, error } = await supabase.from('device_status').select('*').eq('device_id', deviceId).single();
+      const { data, error } = await supabaseAdmin.from('device_status').select('*').eq('device_id', deviceId).maybeSingle();
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json(data || { device_id: deviceId, status: 'unknown' });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
@@ -978,21 +1179,20 @@ export class DeviceController {
         role.startsWith('admin_');
       if (!isPlatform) {
         const tenantId = resolveAuthoritativeTenantId(req);
-        const { data: owned, error: ownErr } = await supabase
-          .from('devices')
-          .select('device_id')
-          .eq('device_id', deviceId)
-          .eq('tenant_id', tenantId)
-          .maybeSingle();
-        if (ownErr) throw ownErr;
+        const owned = await findTenantDevice(deviceId, tenantId);
         if (!owned) {
           return res.status(404).json({ error: 'Device not found' });
         }
       }
 
-      const { data, error } = await supabase.from('device_telemetry').select('*').eq('device_id', deviceId).order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await supabaseAdmin
+        .from('device_telemetry')
+        .select('*')
+        .eq('device_id', deviceId)
+        .order('created_at', { ascending: false })
+        .limit(50);
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json(data || []);
     } catch (error: any) {
       const status = error.status || 500;
       return res.status(status).json({ error: error.message });
@@ -1111,7 +1311,7 @@ export class DeviceController {
       const byDeviceId = await supabaseAdmin
         .from('devices')
         .select('*')
-        .eq('device_id', rawId)
+        .ilike('device_id', rawId)
         .maybeSingle();
       const byRowId = byDeviceId.data
         ? byDeviceId
@@ -1121,7 +1321,7 @@ export class DeviceController {
         const { data: registration } = await supabaseAdmin
           .from('device_registrations')
           .select('*')
-          .eq('device_id', rawId)
+          .ilike('device_id', rawId)
           .maybeSingle();
         if (registration) {
           device = {

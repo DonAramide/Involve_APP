@@ -129,7 +129,7 @@
               <q-separator vertical class="q-mx-sm bg-dark" />
               <q-tab name="merchant" label="Merchant" />
               <q-tab name="school" label="School" />
-              <q-tab name="agent" label="Agent" />
+              <q-tab name="agent" label="Institute" />
               <q-tab name="mpos" label="MPOS" />
               <q-tab name="softpos" label="SoftPOS" />
             </q-tabs>

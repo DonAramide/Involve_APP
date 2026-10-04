@@ -12,13 +12,13 @@
           <q-select
             v-model="form.tenantId"
             :options="tenantOptions"
-            label="Select Merchant"
+            label="Select Tenant"
             outlined
             dark
             dense
             emit-value
             map-options
-            :rules="[val => !!val || 'Merchant selection is required']"
+            :rules="[val => !!val || 'Tenant selection is required']"
           />
           
           <q-input 
@@ -75,7 +75,7 @@ const open = async (assignmentMode: 'DEVICE' | 'TERMINAL') => {
       value: t.id
     }))
   } catch (err: any) {
-    $q.notify({ type: 'negative', message: 'Failed to load merchants' })
+    $q.notify({ type: 'negative', message: 'Failed to load tenants' })
   } finally {
     loading.value = false
   }

@@ -3,9 +3,11 @@ import {
   createContaboS3Client,
   formatContaboPutError,
   formatContaboNetworkError,
+  publicContaboObjectUrl,
   putContaboObject,
   resolveContaboCredentials,
   resolveContaboEndpoint,
+  rewritePublicContaboUrl,
 } from '../src/utils/contabo-s3';
 
 describe('resolveContaboEndpoint', () => {
@@ -112,5 +114,47 @@ describe('Contabo SigV4 PUT helpers', () => {
       if (originalAwsSecret === undefined) delete process.env.AWS_SECRET_ACCESS_KEY;
       else process.env.AWS_SECRET_ACCESS_KEY = originalAwsSecret;
     }
+  });
+});
+
+describe('public Contabo object URLs', () => {
+  const original = {
+    endpoint: process.env.CONTABO_ENDPOINT,
+    bucket: process.env.CONTABO_BUCKET,
+    tenant: process.env.CONTABO_TENANT_ID,
+    customer: process.env.CONTABO_CUSTOMER_ID,
+    publicBase: process.env.CONTABO_PUBLIC_BASE_URL,
+  };
+
+  afterEach(() => {
+    process.env.CONTABO_ENDPOINT = original.endpoint;
+    process.env.CONTABO_BUCKET = original.bucket;
+    process.env.CONTABO_TENANT_ID = original.tenant;
+    process.env.CONTABO_CUSTOMER_ID = original.customer;
+    process.env.CONTABO_PUBLIC_BASE_URL = original.publicBase;
+  });
+
+  test('browser URL uses accountId:bucket, not the bare bucket', () => {
+    delete process.env.CONTABO_PUBLIC_BASE_URL;
+    process.env.CONTABO_ENDPOINT = 'https://usc1.contabostorage.com';
+    process.env.CONTABO_BUCKET = 'iips.stargazer.bucket';
+    process.env.CONTABO_TENANT_ID = '0d205683f3b543beb7298e9b68e26b0f';
+    expect(
+      publicContaboObjectUrl('tenants/526b1fb4-393b-4982-b6b1-83bbc3cd3080/cac/1790380909367.jpg'),
+    ).toBe(
+      'https://usc1.contabostorage.com/0d205683f3b543beb7298e9b68e26b0f:iips.stargazer.bucket/tenants/526b1fb4-393b-4982-b6b1-83bbc3cd3080/cac/1790380909367.jpg',
+    );
+  });
+
+  test('rewrites stored URLs that omitted the Contabo account prefix', () => {
+    process.env.CONTABO_BUCKET = 'iips.stargazer.bucket';
+    process.env.CONTABO_TENANT_ID = '0d205683f3b543beb7298e9b68e26b0f';
+    expect(
+      rewritePublicContaboUrl(
+        'https://usc1.contabostorage.com/iips.stargazer.bucket/tenants/526b1fb4-393b-4982-b6b1-83bbc3cd3080/cac/1790380909367.jpg',
+      ),
+    ).toBe(
+      'https://usc1.contabostorage.com/0d205683f3b543beb7298e9b68e26b0f:iips.stargazer.bucket/tenants/526b1fb4-393b-4982-b6b1-83bbc3cd3080/cac/1790380909367.jpg',
+    );
   });
 });

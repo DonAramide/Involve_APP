@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import 'parent_profile_page.dart';
@@ -16,12 +17,38 @@ class ParentListPage extends StatefulWidget {
 class _ParentListPageState extends State<ParentListPage> {
   String _query = '';
   int? _classFilter;
+  bool _adminUnlocked = false;
+  bool _accessPrompted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requireAdminAccess());
+  }
+
+  Future<void> _requireAdminAccess() async {
+    if (_accessPrompted || !mounted) return;
+    _accessPrompted = true;
+    final authorised = await requireSystemAccess(
+      context,
+      purpose:
+          'The Parents directory requires admin System Access. Enter the password to continue.',
+    );
+    if (!mounted) return;
+    if (authorised != true) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() => _adminUnlocked = true);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Parents')),
-      body: BlocBuilder<SchoolBloc, SchoolState>(
+      body: !_adminUnlocked
+          ? const InvifyLoadingIndicator(message: 'WAITING FOR ADMIN ACCESS...')
+          : BlocBuilder<SchoolBloc, SchoolState>(
         builder: (context, state) {
           if (state.isLoading && state.parents.isEmpty) {
             return const InvifyLoadingIndicator(message: 'LOADING PARENTS...');

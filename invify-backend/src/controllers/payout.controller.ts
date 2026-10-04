@@ -316,11 +316,34 @@ export class PayoutController {
         success: true,
         message: staffId ? 'Staff salary payout initiated successfully' : 'Payout initiated successfully',
         reference: result.reference,
-        status: result.status
+        status: result.status,
+        quote: (result as any).quote || null,
+        requested_amount: (result as any).quote?.requested_amount,
+        service_fee: (result as any).quote?.service_fee,
+        total_required: (result as any).quote?.total_required,
       });
     } catch (error: any) {
       console.error('[PayoutController] initiatePayout error:', error.message);
-      return res.status(error.status || 400).json({ error: error.message });
+      if (error.code === 'INSUFFICIENT_BALANCE' && error.quote) {
+        return res.status(402).json({
+          error: error.message,
+          code: 'INSUFFICIENT_BALANCE',
+          ...error.quote,
+        });
+      }
+      return res.status(error.status || 400).json({ error: error.message, code: error.code });
+    }
+  }
+
+  static async quote(req: Request, res: Response) {
+    try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const amount = Number(req.body?.amount ?? req.query?.amount);
+      const { TreasuryFeeService } = await import('../services/treasury-fee.service');
+      const quote = await TreasuryFeeService.quote(tenantId, amount);
+      return res.status(200).json(quote);
+    } catch (error: any) {
+      return res.status(error.status || 400).json({ error: error.message, code: error.code });
     }
   }
 

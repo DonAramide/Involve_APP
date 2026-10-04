@@ -249,7 +249,9 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
       const original = error.config || {};
 
       if (status === 403) {
-        if (Notify) {
+        const code = String(error.response?.data?.error || error.response?.data?.code || '');
+        const mfaStepUp = /^(INVALID_MFA|MFA_REQUIRED|MFA_NOT_ENABLED|PROFILE_NOT_PROVISIONED)$/.test(code);
+        if (Notify && !mfaStepUp) {
           Notify.create({
             type: 'warning',
             message:

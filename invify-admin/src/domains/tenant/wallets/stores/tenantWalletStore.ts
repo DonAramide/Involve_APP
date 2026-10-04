@@ -69,7 +69,7 @@ export const useTenantWalletStore = defineStore('tenantWallet', {
         this.ledgerLogs = [];
       }
     },
-    async dispatchPayout(): Promise<string> {
+    async dispatchPayout(extra?: { otp?: string; manual?: boolean }): Promise<string> {
       if (!this.withdrawalAmount || this.withdrawalAmount <= 0) {
         return Promise.reject('Specify a valid transfer amount.');
       }
@@ -80,7 +80,11 @@ export const useTenantWalletStore = defineStore('tenantWallet', {
       this.withdrawing = true;
       try {
         const { adminApi } = await import('../../../../api');
-        const res = await adminApi.initiatePayout({ amount: this.withdrawalAmount });
+        const res = await adminApi.initiatePayout({
+          amount: this.withdrawalAmount,
+          otp: extra?.otp,
+          manual: extra?.manual === true,
+        });
         
         const reference = res.data?.reference || 'SW-SYSTEM';
         const msg = `Withdrawal of ${this.withdrawalAmount.toLocaleString()} successfully routed to corporate node. Reference: ${reference}`;
@@ -90,7 +94,7 @@ export const useTenantWalletStore = defineStore('tenantWallet', {
         await this.loadTreasuryData(); // Refresh UI
         return msg;
       } catch (err: any) {
-        const errMsg = err.response?.data?.error || err.message || 'Failed to process withdrawal';
+        const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to process withdrawal';
         return Promise.reject(errMsg);
       } finally {
         this.withdrawing = false;

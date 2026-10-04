@@ -23,6 +23,7 @@ class StorageService {
   static const _mposTerminalIdKey = 'mpos_terminal_id';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
+  static const _linkedDashboardDefaultsKey = 'linked_device_dashboard_defaults';
 
   static const _encryptionKey = 0xAF;
 
@@ -394,6 +395,36 @@ class StorageService {
       }
     }
     return value != 'false'; // Default to true
+  }
+
+  static Future<void> markLinkedDeviceDashboardDefaultsPending() async {
+    const value = 'true';
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: value);
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> consumeLinkedDeviceDashboardDefaultsPending() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _linkedDashboardDefaultsKey);
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    if (value != 'true') return false;
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: 'false');
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      await file.writeAsString('false');
+    }
+    return true;
   }
 
   static Future<File> _getDesktopFile(String fileName) async {

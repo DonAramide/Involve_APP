@@ -85,9 +85,14 @@ function netByVirtualAccount(txns: any[]): {
 
     const va = extractVaFromMetadata(tx.metadata);
     const ref = String(tx.reference || tx.id || '').trim();
-    const key = `${va || 'NOVA'}:${ref || `${type}:${amount}:${tx.created_at || ''}`}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const ts = Date.parse(String(tx.created_at || ''));
+    const bucket = Number.isFinite(ts) ? Math.floor(ts / 120000) : String(tx.created_at || '');
+    const keys = [
+      ref ? `ref:${va || 'NOVA'}:${ref}` : '',
+      `fuzzy:${va || 'NOVA'}:${isIn ? 'IN' : 'OUT'}:${amount}:${bucket}`,
+    ].filter(Boolean);
+    if (keys.some((k) => seen.has(k))) continue;
+    keys.forEach((k) => seen.add(k));
 
     if (!va) {
       if (isIn) noVaInbound += amount;

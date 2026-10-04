@@ -7,6 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
 
 /// Terminal configuration synced from the Invify backend.
 class TerminalConfig {
@@ -456,11 +458,57 @@ class TerminalSyncService {
   }
 
   /// Persist tenant-admin recovery password for System Access.
-  static Future<void> applySystemAccessPasswordFromConfig(TerminalConfig config) async {
+  ///
+  /// [replaceLocalAdminPassword] is for a newly linked replacement tablet:
+  /// the portal password becomes the device System Access password and the
+  /// super-admin password, so the factory default is not left in place.
+  static Future<void> applySystemAccessPasswordFromConfig(
+    TerminalConfig config, {
+    bool replaceLocalAdminPassword = false,
+  }) async {
     final password = config.systemAccessPassword;
     if (password == null || password.isEmpty) return;
-    await SecurityService().setRecoveryPassword(password);
-    debugPrint('[TerminalSync] System access recovery password synced from tenant admin');
+    final security = SecurityService();
+    await security.setRecoveryPassword(password);
+    if (replaceLocalAdminPassword) {
+      await security.setPassword(password);
+      await security.setSuperAdminPassword(password);
+    }
+    debugPrint('[TerminalSync] System access password synced from tenant admin');
+  }
+
+  static const _linkedBootstrapKey = 'linked_device_admin_bootstrap_pending';
+
+  static Future<void> markLinkedDeviceBootstrapPending() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_linkedBootstrapKey, true);
+  }
+
+  static Future<bool> linkedDeviceBootstrapPending() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_linkedBootstrapKey) == true;
+  }
+
+  /// Pull portal users (with sign-in codes) and the admin password onto this tablet.
+  static Future<({bool adminPassword, int staff})> bootstrapLinkedDeviceFromAdmin({
+    required String deviceId,
+  }) async {
+    final config = await syncTerminalConfig(deviceId: deviceId);
+    final password = config.systemAccessPassword;
+    final hasPassword = password != null && password.isNotEmpty;
+    await applySystemAccessPasswordFromConfig(
+      config,
+      replaceLocalAdminPassword: hasPassword,
+    );
+    var staff = 0;
+    final sl = GetIt.instance;
+    if (sl.isRegistered<StaffRepositoryImpl>()) {
+      staff = await sl.get<StaffRepositoryImpl>().pullCloudGovernance();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_linkedBootstrapKey, false);
+    debugPrint('[TerminalSync] Replacement bootstrap: adminPassword=$hasPassword staff=$staff');
+    return (adminPassword: hasPassword, staff: staff);
   }
 }
 

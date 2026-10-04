@@ -35,7 +35,7 @@ void main() {
         Exception('Generation failed: Missing or malformed Authorization header'),
         fallback: 'Could not generate the lesson note. Please try again.',
       );
-      expect(msg, 'Your session expired. Please sign in again.');
+      expect(msg, 'The server could not verify this device. Please try again.');
       expect(msg.toLowerCase(), isNot(contains('authorization')));
     });
 

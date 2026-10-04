@@ -32,6 +32,17 @@ export class StudentService {
         throw new Error(`Student ${studentId} not found`);
       }
 
+      const { loadActivationGate, virtualAccountGenerationBlockReason } = await import(
+        '../modules/financial-platform/activation/activation-gate'
+      );
+      const { gate } = await loadActivationGate(schoolId);
+      const blocked = virtualAccountGenerationBlockReason(gate);
+      if (blocked) {
+        const err = new Error(blocked) as Error & { code?: string };
+        err.code = 'MAKER_CHECKER_REQUIRED';
+        throw err;
+      }
+
       // 3. Resolve Quasar Service (Multi-Tenant)
       const quasar = await getQuasarService(schoolId);
 

@@ -13,19 +13,19 @@
         <div class="row items-center op-gap-8">
           <q-btn flat dense icon="close" @click="close" color="grey-5" />
           <div class="text-operator-title text-weight-bold" style="font-size: 16px;">
-            MERCHANT DETAIL
+            TENANT DETAIL
           </div>
         </div>
         <q-badge color="amber-4" text-color="black">{{ merchant.status || 'UNKNOWN' }}</q-badge>
       </div>
       
       <div class="col custom-scrollbar overflow-auto q-pa-md column op-gap-16">
-        <!-- Merchant Info -->
+        <!-- Tenant Info -->
         <div class="bg-panel border-muted rounded-borders q-pa-md">
           <div class="text-h6 text-weight-bold text-main q-mb-sm">{{ merchant.business_name || merchant.businessName }}</div>
           <div class="row op-gap-16 text-caption text-muted q-mb-sm">
             <div><strong>Industry:</strong> {{ merchant.industry_type || merchant.industry || 'N/A' }}</div>
-            <div><strong>Volume:</strong> ${{ (merchant.volume || 0).toLocaleString() }}</div>
+            <div><strong>Volume:</strong> ₦{{ (merchant.volume || 0).toLocaleString() }}</div>
           </div>
           <div class="row items-center op-gap-8">
             <q-linear-progress :value="(merchant.health || 0) / 100" color="green-4" track-color="grey-9" style="width: 100px" />
@@ -35,7 +35,7 @@
 
         <!-- Activation Stepper -->
         <ActivationStepper 
-          :merchant-id="merchant.id" 
+          :merchant-id="merchant.id || merchant.tenant_id" 
           :initial-status="merchant.activation_status || merchant.activationStatus || 'REGISTRATION'" 
           @updated="onUpdated"
         />

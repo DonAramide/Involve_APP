@@ -33,6 +33,21 @@ function hashStaffPin(code: string): string {
   return crypto.createHash('sha256').update(String(code) + PIN_SALT).digest('hex');
 }
 
+/**
+ * Pin stored for a tablet sync. A portal-locked pin wins. Otherwise a
+ * 64-char hash from the device is kept so a replacement tablet can sign in.
+ */
+export function resolveIncomingPinHash(
+  raw: any,
+  existingHash: string | null,
+  portalLocked: boolean,
+): string | null {
+  if (portalLocked && existingHash) return existingHash;
+  const incoming = String(raw?.pinHash || raw?.pin_hash || '').trim().toLowerCase();
+  if (/^[a-f0-9]{64}$/.test(incoming)) return incoming;
+  return existingHash || null;
+}
+
 function normalizeRole(raw: any): string {
   const role = String(raw || 'STAFF').trim().toUpperCase();
   return ALLOWED_ROLES.has(role) ? role : 'STAFF';
@@ -209,7 +224,7 @@ export class StaffController {
             virtual_account_number: raw.collectionAccountNumber || null,
             virtual_account_bank: raw.collectionBankName || null,
             virtual_account_name: raw.collectionAccountName || null,
-            pin_hash: existing?.pin_hash || null,
+            pin_hash: resolveIncomingPinHash(raw, existing?.pin_hash || null, portalLocked),
             governance_locked: portalLocked,
             updated_at: new Date().toISOString(),
             created_at: existing?.created_at || new Date().toISOString(),

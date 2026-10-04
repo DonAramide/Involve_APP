@@ -10,6 +10,7 @@
         <div class="text-caption text-secondary font-sans letter-spacing-1">
           Processor-Grade Routing Governance, SLA Governance &amp; Key Distribution
         </div>
+        <div class="text-caption text-amber-5 q-mt-xs">Saves wait for approval. Only support@iips.app can approve.</div>
       </div>
       <div class="col-12 col-md-auto row q-gutter-sm items-center justify-end q-mt-sm-only">
         <!-- Live Status Badge -->
@@ -19,6 +20,8 @@
         <q-btn unelevated color="purple-8" icon="refresh" label="Reload Switchboard" @click="loadAll" :loading="loading" :dark="prefs.isDarkMode" class="animate-pulse" />
       </div>
     </div>
+
+    <MakerCheckerQueue ref="posApprovals" domain="pos_switchboard" @changed="loadAll" />
 
     <!-- ── Overview KPI Cards ────────────────────────────────────── -->
     <div class="row q-col-gutter-md q-mb-lg">
@@ -1027,6 +1030,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 import { posApi, adminApi } from '../api'
+import MakerCheckerQueue from '../components/MakerCheckerQueue.vue'
 import ApexCharts from 'vue3-apexcharts'
 
 const apexchart = ApexCharts
@@ -1037,6 +1041,7 @@ const { prefs } = useOperatorPreferences()
 // ── State ──────────────────────────────────────────────────────────
 const activeTab  = ref('hosts')
 const loading    = ref(false)
+const posApprovals = ref(null)
 const history    = ref([])
 const showTxDialog = ref(false)
 const selectedTx   = ref(null)
@@ -1075,7 +1080,13 @@ const saveQuasarBaseUrl = async () => {
     const normalized = String(quasarBaseUrl.value || '').trim()
       ? normalizeQuasarBase(quasarBaseUrl.value)
       : ''
-    await adminApi.updateGlobalSettings({ quasar_base_url: normalized })
+    const saved = await adminApi.updateGlobalSettings({ quasar_base_url: normalized })
+    if (saved.data?.pending) {
+      $q.notify({ type: 'info', message: saved.data.message })
+      await posApprovals.value?.refresh()
+      await loadQuasarBaseUrl()
+      return
+    }
     quasarBaseUrl.value = normalized
     $q.notify({
       type: 'positive',
@@ -1630,6 +1641,12 @@ const saveConfig = async (reason = 'Updated POS routing configuration') => {
       adminId: 'SuperAdmin',
       reason
     })
+    if (res.data?.pending) {
+      $q.notify({ type: 'info', message: res.data.message })
+      await posApprovals.value?.refresh()
+      await loadAll()
+      return
+    }
     const broadcasted = res.data?.broadcasted === true
     const version = res.data?.configVersion
     $q.notify({

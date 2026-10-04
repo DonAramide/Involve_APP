@@ -165,6 +165,13 @@ describe('UAT-API-05 | Public Endpoints — No Auth Required', () => {
     expect(SERVER_RESPONDED).toContain(res.status)
   })
 
+  test('POST /auth/check-agent-code — public agent lookup is registered', async () => {
+    const res = await request(app).post('/auth/check-agent-code').send({ agentCode: 'AAA000' })
+    console.log('[EVIDENCE] POST /auth/check-agent-code →', res.status)
+    expect(res.status).not.toBe(404)
+    expect(SERVER_RESPONDED).toContain(res.status)
+  })
+
   test('POST /public/onboarding/signup — route registered and responds', async () => {
     const res = await request(app).post('/public/onboarding/signup').send({})
     console.log('[EVIDENCE] POST /public/onboarding/signup →', res.status)

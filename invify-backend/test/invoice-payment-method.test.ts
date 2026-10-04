@@ -76,6 +76,32 @@ describe('splitUnsweptVirtualAccountFunds', () => {
     expect(split.total).toBe(4.5);
   });
 
+  test('collapses tablet-sync + webhook credits of the same VA/amount in a 2-minute window', () => {
+    const createdAt = '2026-09-28T10:00:00.000Z';
+    const split = splitUnsweptVirtualAccountFunds({
+      customerVas: ['900555'],
+      staffVas: [],
+      transactions: [
+        {
+          type: 'CREDIT',
+          amount: 101,
+          reference: 'tablet-sync-abc',
+          created_at: createdAt,
+          metadata: { accountNumber: '900555' },
+        },
+        {
+          type: 'CREDIT',
+          amount: 101,
+          reference: 'webhook-xyz',
+          created_at: '2026-09-28T10:00:40.000Z',
+          metadata: { virtualAccountNumber: '900555' },
+        },
+      ],
+    });
+    expect(split.customer).toBe(101);
+    expect(split.total).toBe(101);
+  });
+
   test('counts parent virtual accounts as Quasar-held funds', () => {
     const split = splitUnsweptVirtualAccountFunds({
       customerVas: [],

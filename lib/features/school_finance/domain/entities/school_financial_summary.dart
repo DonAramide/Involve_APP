@@ -14,6 +14,12 @@ class SchoolFinancialSummary extends Equatable {
   final double cashCollected;
   /// Quasar collective = card + VA transfer.
   final double quasarCollected;
+  /// Live PSP VA total (null when Quasar could not be queried).
+  final double? quasarLiveBalance;
+  /// Invify transactions_log unswept VA (can be doubled by tablet + webhook).
+  final double invifyLoggedVa;
+  /// ok | quasar_ahead | invify_overstated
+  final String quasarBalanceStatus;
 
   const SchoolFinancialSummary({
     required this.totalRevenue,
@@ -26,7 +32,12 @@ class SchoolFinancialSummary extends Equatable {
     this.vaTransferCollected = 0,
     this.cashCollected = 0,
     this.quasarCollected = 0,
+    this.quasarLiveBalance,
+    this.invifyLoggedVa = 0,
+    this.quasarBalanceStatus = 'ok',
   });
+
+  bool get needsVaInvestigation => quasarBalanceStatus == 'invify_overstated';
 
   double get quasarCardAndTransfer =>
       quasarCollected > 0.001 ? quasarCollected : cardCollected + vaTransferCollected;
@@ -43,5 +54,8 @@ class SchoolFinancialSummary extends Equatable {
         vaTransferCollected,
         cashCollected,
         quasarCollected,
+        quasarLiveBalance,
+        invifyLoggedVa,
+        quasarBalanceStatus,
       ];
 }

@@ -46,8 +46,22 @@ export function peekAlg(token: string): string {
   }
 }
 
+/**
+ * Tablet device tokens (HS256 with a `deviceId` claim) must never expire.
+ * Older ones were issued with a 30-day `exp`, so expiry is ignored for them;
+ * the signature is still verified.
+ */
 function verifyHs(token: string, secret: string): jwt.JwtPayload | string {
-  return jwt.verify(token, secret);
+  try {
+    return jwt.verify(token, secret);
+  } catch (e: any) {
+    if (e?.name !== 'TokenExpiredError') throw e;
+    const payload = jwt.verify(token, secret, { ignoreExpiration: true });
+    if (payload && typeof payload === 'object' && (payload as any).deviceId) {
+      return payload;
+    }
+    throw e;
+  }
 }
 
 /**

@@ -143,13 +143,12 @@ class PaymentCatchUpService {
           'metadata': metadata,
         };
 
-        final credited =
-            await CustomerWalletCreditService.instance.applyPaymentSuccess(payload);
-
-        // Once we've shown a notification for this reference, never resend it
-        // on reconnect / catch-up / VA refresh.
+        // Claim before the ledger write. Otherwise the new row looks like a
+        // duplicate and the tablet stays silent.
         final shouldNotify =
             await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        final credited =
+            await CustomerWalletCreditService.instance.applyPaymentSuccess(payload);
         if (!shouldNotify) {
           debugPrint('[PaymentCatchUp] Skip re-notify for $reference');
           continue;
@@ -160,16 +159,9 @@ class PaymentCatchUpService {
                 'a payer')
             .toString();
         final formatted = amount.toStringAsFixed(2);
-        await NotificationInbox.add(
-          message: credited
-              ? '₦$formatted received from $sender (synced)'
-              : '₦$formatted payment while offline · $sender',
-          type: 'payment',
-          extra: {
-            'reference': reference,
-            'amount': amount,
-            'catchUp': true,
-          },
+        await NotificationInbox.removeReceivedPayment(
+          reference: reference,
+          message: '₦$formatted received from $sender',
         );
 
         unawaited(DeviceNotificationService.showPayment(
@@ -267,6 +259,7 @@ class PaymentCatchUpService {
         final amount = _nairaFromRow(map, metadata);
         final reference = '${map['reference'] ?? ''}'.trim();
         if (amount <= 0 || reference.isEmpty) continue;
+        if (reference.contains(':reconcile:')) continue;
         metadata['virtualAccountNumber'] ??= va;
         metadata['accountNumber'] ??= va;
         final credited = await CustomerWalletCreditService.instance.applyPaymentSuccess({
@@ -278,16 +271,17 @@ class PaymentCatchUpService {
           'metadata': metadata,
         });
         if (credited) applied++;
-        final qb = metadata['quasarBalance'];
-        if (qb is num && qb.toDouble() > quasarBalance) {
-          quasarBalance = qb.toDouble();
+        final live = metadata['liveBalance'];
+        if (live is num && live.toDouble() > quasarBalance) {
+          quasarBalance = live.toDouble();
         }
       }
       if (quasarBalance > 0) {
-        applied += await CustomerWalletCreditService.instance.applyQuasarBalanceGap(
+        final aligned = await CustomerWalletCreditService.instance.recalculateParentCredit(
           accountNumber: va,
           quasarBalance: quasarBalance,
         );
+        if (aligned) applied++;
       }
       return applied;
     } catch (e) {

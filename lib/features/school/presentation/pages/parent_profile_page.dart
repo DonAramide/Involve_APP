@@ -34,6 +34,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
+import 'parent_credit_breakdown_page.dart';
 import 'student_profile_page.dart';
 
 class ParentProfilePage extends StatefulWidget {
@@ -258,6 +259,20 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                       'Parent credit',
                       CurrencyFormatter.formatWithSymbol(parent.creditBalance),
                       Colors.indigo,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ParentCreditBreakdownPage(
+                              parent: parent,
+                              schoolRepository: context.read<SchoolBloc>().repository,
+                            ),
+                          ),
+                        );
+                        if (!context.mounted) return;
+                        context.read<SchoolBloc>().add(LoadSchoolData());
+                        setState(() => _historyTick++);
+                      },
                     ),
                   ),
                 ],
@@ -1104,14 +1119,15 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                             return;
                           }
 
-                          if (method == 'Cash') {
-                            final authorised = await requireSystemAccess(
-                              context,
-                              purpose:
-                                  'Cash posting requires admin System Access. Enter the password to record this credit.',
-                            );
-                            if (authorised != true) return;
-                          }
+                          final authorised = await requireSystemAccess(
+                            context,
+                            purpose: method == 'POS'
+                                ? 'Card funding requires admin confirmation. Enter the System Access password to charge this parent account.'
+                                : method == 'Company Account'
+                                    ? 'Recording a school-account transfer requires admin confirmation. Enter the System Access password to post this credit.'
+                                    : 'Funding a parent account requires admin confirmation. Enter the System Access password to record this credit.',
+                          );
+                          if (authorised != true) return;
 
                           if (method == 'POS') {
                             if (config == null ||
@@ -1589,20 +1605,32 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     );
   }
 
-  Widget _statCard(String label, String value, Color color) {
+  Widget _statCard(String label, String value, Color color, {VoidCallback? onTap}) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
-            ),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color),
+              ),
+              if (onTap != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Tap for breakdown',
+                    style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
