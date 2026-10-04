@@ -229,8 +229,14 @@ export class PosService {
         console.error('[POS Service] Supabase error loading config:', error.message);
         // Do NOT bootstrap-save on read errors — that can wipe a good prior revision.
         this.tryHydrateFromLegacyJson();
-        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'staging') {
-          console.warn('[POS Service] Development/Test/Staging mode — using in-memory/legacy config (no overwrite).');
+        const message = String(error.message || '');
+        if (
+          process.env.NODE_ENV === 'development' ||
+          process.env.NODE_ENV === 'test' ||
+          process.env.NODE_ENV === 'staging' ||
+          message.toLowerCase().includes('jwt issued at future')
+        ) {
+          console.warn('[POS Service] Using in-memory/legacy config after Supabase read error (no overwrite).');
         } else {
           throw new Error(`[POS Service] Failed to load routing config from Supabase: ${error.message}`);
         }
