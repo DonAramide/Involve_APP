@@ -152,3 +152,38 @@ export const checkTenantPermission = (requiredPermission: string) => {
     next();
   };
 };
+
+const BILLING_PERMISSION_ROLES: Record<string, string[]> = {
+  'billing.view': ['super_admin', 'admin_finance', 'admin_treasury', 'admin_executive'],
+  'billing.create_obligation': ['super_admin', 'admin_finance'],
+  'billing.post_payment': ['super_admin', 'admin_finance'],
+  'billing.reverse_payment': ['super_admin'],
+  'billing.manage_plan': ['super_admin', 'admin_finance'],
+  'billing.manage_subscription': ['super_admin', 'admin_finance'],
+  'billing.export': ['super_admin', 'admin_finance', 'admin_executive'],
+};
+
+/** Platform Tenant Billing & Collections. Tenant operators never pass. */
+export const checkBillingPermission = (requiredPermission: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json({ error: 'Unauthenticated' });
+    const userRoles = parseRoles(user.role);
+    if (
+      userRoles.includes('owner') ||
+      userRoles.includes('tenant_admin') ||
+      userRoles.includes('tenant_operator') ||
+      userRoles.includes('cashier') ||
+      userRoles.includes('finance_staff') ||
+      userRoles.includes('teacher')
+    ) {
+      return res.status(403).json({ error: 'Forbidden: tenant isolation — billing collections is platform-only' });
+    }
+    if (userRoles.includes('super_admin')) return next();
+    const allowed = BILLING_PERMISSION_ROLES[requiredPermission] || [];
+    if (userRoles.some((r) => allowed.includes(r))) return next();
+    const explicit: string[] = user.permissions || [];
+    if (explicit.includes(requiredPermission)) return next();
+    return res.status(403).json({ error: `Forbidden: Missing required permission: ${requiredPermission}` });
+  };
+};

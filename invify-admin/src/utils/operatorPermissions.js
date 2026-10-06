@@ -36,6 +36,8 @@ const PLATFORM_SCOPE = {
     'view_deployment_queue', 'view_governance_queue', 'approve_finance',
     'approve_operations', 'approve_deployment', 'approve_governance',
     'read_observability_staging', 'read_finance',
+    'billing.view', 'billing.create_obligation', 'billing.post_payment',
+    'billing.reverse_payment', 'billing.manage_plan', 'billing.manage_subscription', 'billing.export',
     'FEE_DISTRIBUTION_VIEW', 'STAKEHOLDER_VIEW', 'STAKEHOLDER_MANAGE',
     'WITHDRAWAL_VIEW', 'WITHDRAWAL_REQUEST', 'WITHDRAWAL_APPROVE',
     'SETTLEMENT_VIEW', 'SETTLEMENT_APPROVE',
@@ -44,11 +46,14 @@ const PLATFORM_SCOPE = {
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',
     'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications',
     'create_requests', 'view_finance_queue', 'approve_finance', 'read_finance',
+    'billing.view', 'billing.create_obligation', 'billing.post_payment',
+    'billing.manage_plan', 'billing.manage_subscription', 'billing.export',
   ],
   ADMIN_TREASURY: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',
     'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications',
     'create_requests', 'view_finance_queue', 'approve_finance', 'read_finance',
+    'billing.view', 'billing.export',
   ],
   ADMIN_RISK: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',
@@ -65,6 +70,7 @@ const PLATFORM_SCOPE = {
     'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence',
     'soc_communications', 'create_requests', 'view_finance_queue',
     'view_operations_queue', 'approve_finance', 'approve_operations', 'read_finance',
+    'billing.view', 'billing.export',
   ],
   ADMIN_DEPLOY: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',

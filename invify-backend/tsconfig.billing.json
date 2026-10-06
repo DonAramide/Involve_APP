@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "skipLibCheck": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/modules/tenant-billing/**/*.ts",
+    "src/controllers/tenant-billing.controller.ts",
+    "src/middleware/rbac.middleware.ts"
+  ]
+}

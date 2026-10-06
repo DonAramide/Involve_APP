@@ -49,6 +49,7 @@ import { TenantInstitutePortController } from './controllers/tenant-institute-po
 import { PlatformFeeProfilesController } from './controllers/platform-fee-profiles.controller';
 import { PlatformFeeAssessmentsController } from './controllers/platform-fee-assessments.controller';
 import { PlatformFeeDistributionController } from './controllers/platform-fee-distribution.controller';
+import { attachTenantBillingRoutes } from './modules/tenant-billing/register-routes';
 import { AgentWebhookController } from './modules/agent-portal/controllers/agent-webhook.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { WalletController } from './controllers/wallet.controller';
@@ -534,6 +535,7 @@ registerCollisionAdmin('get', '/agent-webhooks', authenticate, checkRole(platfor
 registerCollisionAdmin('get', '/agent-webhooks/:agentId/deliveries', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminDeliveries);
 registerCollisionAdmin('post', '/agent-webhooks/:agentId/enable', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminEnable);
 registerCollisionAdmin('post', '/agent-webhooks/:agentId/disable', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminDisable);
+
 app.get('/api/tenant/:id/kyc', authenticate, TenantKycController.getKycDocuments);
 
 const deviceLinkQrLimiter = rateLimit({
@@ -640,6 +642,7 @@ app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'ad
 app.post('/api/admin/virtual-account/init', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.initVirtualAccountEngine);
 
 import { MfaController } from './controllers/mfa.controller';
+import { CompanyTransferAuthController } from './controllers/company-transfer-auth.controller';
 app.post('/api/mfa/generate', authenticate, MfaController.generate);
 app.post('/api/mfa/enable', authenticate, MfaController.enable);
 
@@ -729,6 +732,7 @@ app.get('/devices/activations', authenticate, DeviceController.getActivations);
 app.post('/devices/activations', authenticate, DeviceController.createActivation);
 app.post('/devices/activations/:id/approve', authenticate, DeviceController.approveActivation);
 app.post('/devices/activations/:id/reject', authenticate, DeviceController.rejectActivation);
+app.post('/devices/activations/:id/resend-email', authenticate, DeviceController.resendActivationEmail);
 app.post('/devices/validate', DeviceController.validateCode);
 app.post('/devices/onboard', authenticate, DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
@@ -739,6 +743,7 @@ app.get('/api/devices/activations', authenticate, DeviceController.getActivation
 app.post('/api/devices/activations', authenticate, DeviceController.createActivation);
 app.post('/api/devices/activations/:id/approve', authenticate, DeviceController.approveActivation);
 app.post('/api/devices/activations/:id/reject', authenticate, DeviceController.rejectActivation);
+app.post('/api/devices/activations/:id/resend-email', authenticate, DeviceController.resendActivationEmail);
 app.post('/api/devices/validate', DeviceController.validateCode);
 app.post('/api/devices/onboard', authenticate, DeviceController.onboardDevice);
 app.patch('/api/devices/:id', authenticate, DeviceController.updateDevice);
@@ -930,6 +935,19 @@ app.post('/api/payout/resolve-account', authenticate, checkRole(['super_admin', 
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSummary);
 app.get('/api/finance/school-dashboard', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolDashboard);
+app.post('/api/finance/withdrawable/sync', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), async (req, res) => {
+  try {
+    const { resolveAuthoritativeTenantId } = await import('./utils/finance-tenant');
+    const tenantId = resolveAuthoritativeTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: 'Tenant context missing' });
+    const { QuasarWithdrawableService } = await import('./services/quasar-withdrawable.service');
+    const credits = Array.isArray(req.body?.credits) ? req.body.credits : [];
+    const available = await QuasarWithdrawableService.sync(String(tenantId), credits);
+    return res.status(200).json({ ok: true, withdrawable: available });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to sync withdrawable funds' });
+  }
+});
 app.get('/api/finance/daily-revenue', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getDailyRevenue);
 app.get('/api/finance/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolTransactions);
 app.get('/api/finance/student/:studentId/summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getStudentSummary);
@@ -1097,6 +1115,11 @@ app.get('/api/finance/virtual-account/:studentId', authenticate, StudentControll
 app.post('/api/finance/student-virtual-account/:studentId', authenticate, StudentController.provisionStudentVirtualAccount);
 app.post('/api/finance/customer-virtual-account/:customerId', authenticate, CustomerController.getVirtualAccount);
 app.post('/api/finance/staff-virtual-account/:userId', authenticate, CustomerController.getStaffVirtualAccount);
+app.post(
+  '/api/finance/company-transfer/authorize',
+  authenticate,
+  CompanyTransferAuthController.authorize,
+);
 app.get('/api/finance/virtual-accounts', authenticate, CustomerController.listTenantVirtualAccounts);
 app.get('/api/finance/virtual-accounts/:accountNumber/transactions', authenticate, CustomerController.getVirtualAccountTransactions);
 app.post('/api/finance/virtual-accounts/:accountNumber/sweep', authenticate, CustomerController.sweepVirtualAccountFunds);
@@ -1113,6 +1136,12 @@ app.get(
   authenticate,
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolSyncController.getRoster,
+);
+app.get(
+  '/api/school/billing',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolSyncController.getBilling,
 );
 
 // School payments + disputes (device Cash/POS → tenant admin web)
@@ -1302,6 +1331,8 @@ app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'i
     return res.status(500).json({ success: false, message: err.message });
   }
 });
+
+attachTenantBillingRoutes(app);
 
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {

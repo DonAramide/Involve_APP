@@ -911,6 +911,7 @@ const activeNavigationTree = computed(() => {
       
     case 'finance':
       return [
+        { label: 'Billing & Collections', path: '/finance/tenant-billing', icon: 'receipt_long', color: 'amber-4', badge: 'AR', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Transactions', path: '/finance/transactions', icon: 'sync_alt', color: 'cyan-4', badge: 'INVESTIGATE', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
         { label: 'Financial Ledger', path: '/finance/ledger', icon: 'account_balance_wallet', color: 'amber-4', badge: 'SOURCE', badgeBg: 'amber-10', badgeColor: 'amber-3' },
         { label: 'Reconciliation', path: '/finance/reconciliation', icon: 'fact_check', color: 'green-4' },
@@ -1054,6 +1055,7 @@ const getMenuDescription = (label) => {
     'Ingestion Pipelines': 'Configure event collectors, stream mapping logic, log indexing parameters, and downstream storage routing profiles.',
 
     // Finance
+    'Billing & Collections': 'Invify Box installments, subscriptions, and commercial AR. Separate from POS/VA/withdrawal fee orchestration.',
     'Transactions': 'Cross-channel transaction investigation, ledger mapping, and fraud anomaly traces.',
     'Financial Ledger': 'Double-entry ledger chart of accounts, immutable journal explorer, and posting parity checks.',
     'Reconciliation': 'Settlement matching, exception queue management, and cross-ledger reconciliation rules.',
