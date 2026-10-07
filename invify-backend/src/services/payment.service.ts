@@ -19,6 +19,68 @@ import * as path from 'path';
  * - Quasar SDK orchestration
  * - Transaction persistence (PENDING state)
  */
+function inferPayoutBankCode(row: any): string {
+  const code = String(row?.bank_code || row?.bankCode || '').trim();
+  if (code) return code;
+  const name = String(row?.bank_name || row?.bankName || '').toLowerCase();
+  if (!name) return '';
+  if (name.includes('opay')) return '999992';
+  if (name.includes('palmpay')) return '999991';
+  if (name.includes('moniepoint')) return '50515';
+  if (name.includes('kuda')) return '50211';
+  if (name.includes('access')) return '044';
+  if (name.includes('gtbank') || name.includes('guaranty trust')) return '058';
+  if (name.includes('first bank')) return '011';
+  if (name.includes('uba') || name.includes('united bank')) return '033';
+  if (name.includes('zenith')) return '057';
+  return '';
+}
+
+function normalizeLoadedBank(row: any) {
+  if (!row) return null;
+  const account_number = String(row.account_number || row.accountNumber || '').trim();
+  const account_name = String(row.account_name || row.accountName || '').trim();
+  const bank_name = String(row.bank_name || row.bankName || '').trim();
+  const bank_code = inferPayoutBankCode(row);
+  if (!account_number) return null;
+  return { ...row, account_number, account_name, bank_name, bank_code };
+}
+
+async function loadTenantPayoutBank(tenantId: string) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('payout_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!error) {
+      const row = normalizeLoadedBank(data);
+      if (row) return row;
+    }
+  } catch (_) { /* fall through */ }
+
+  try {
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('settings')
+      .eq('id', tenantId)
+      .maybeSingle();
+    const fromTenant = normalizeLoadedBank((tenant?.settings as any)?.payout);
+    if (fromTenant) return fromTenant;
+  } catch (_) { /* fall through */ }
+
+  try {
+    const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
+    if (fs.existsSync(filePath)) {
+      const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return normalizeLoadedBank(allSettings[tenantId]);
+    }
+  } catch (err) {
+    console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
+  }
+  return null;
+}
+
 export class PaymentService {
   /**
    * Creates a payment intent.
@@ -142,6 +204,54 @@ export class PaymentService {
   }
 
   /**
+   * Card payments and virtual-account money already used on a bill are the
+   * tenant's withdrawable funds. The school wallet can still be ₦0 until that
+   * amount is recognized, so a payout of those funds credits the shortfall
+   * and the treasury lock then debits it.
+   */
+  private static async fundQuasarWithdrawal(
+    tenantId: string,
+    quote: { total_required: number; service_fee: number; requested_amount: number },
+    idempotencyKey: string,
+  ) {
+    const { QuasarWithdrawableService } = await import('./quasar-withdrawable.service');
+    const settleable = await QuasarWithdrawableService.available(tenantId);
+    const round2 = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+    if (round2(settleable) + 0.009 < round2(quote.total_required)) {
+      const err: any = new Error(
+        `Insufficient balance for requested amount plus service fee. Available ₦${settleable.toFixed(2)}, this withdrawal needs ₦${quote.total_required} (₦${quote.requested_amount} plus ₦${quote.service_fee} fee).`,
+      );
+      err.status = 402;
+      err.code = 'INSUFFICIENT_BALANCE';
+      err.quote = { ...quote, available_balance: settleable, sufficient: false };
+      throw err;
+    }
+
+    const { data: walletRow } = await supabaseAdmin
+      .from('wallets')
+      .select('balance')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const walletBalance = Number(walletRow?.balance || 0);
+    const shortfall = round2(Math.max(0, quote.total_required - walletBalance));
+    if (shortfall <= 0.009) return;
+
+    const { error } = await supabaseAdmin.rpc('process_ledger_double_entry_text', {
+      p_tenant_id: tenantId,
+      p_idempotency_key: `quasar-settle:${idempotencyKey}`,
+      p_reference: `QSET-${idempotencyKey.replace(/[^A-Za-z0-9]/g, '').slice(-16)}`,
+      p_entries: [
+        { account: 'USER_WALLET', type: 'CREDIT', amount: shortfall },
+        { account: 'QUASAR_SETTLEMENT', type: 'DEBIT', amount: shortfall },
+      ],
+      p_metadata: { source: 'quasar_withdrawable', quasarCap: true, amount: shortfall },
+    });
+    if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
+      throw new Error(`Could not apply withdrawable funds: ${error.message}`);
+    }
+  }
+
+  /**
    * Initiates a fund sweep (payout) to the school's bank account,
    * or to an explicit destination (e.g. staff salary).
    * Path: POST /payments/payout
@@ -189,29 +299,9 @@ export class PaymentService {
 
     // 1. Fetch tenant bank details when no explicit destination
     if (!bankDetails) {
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('payout_settings')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .single();
-
-        if (!error && data) {
-          bankDetails = data;
-        }
-      } catch (err) {}
-
-      if (!bankDetails) {
-        try {
-          const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
-          if (fs.existsSync(filePath)) {
-            const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            bankDetails = allSettings[tenantId] || null;
-          }
-        } catch (err) {
-          console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
-        }
-      }
+      bankDetails = await loadTenantPayoutBank(tenantId);
+    } else {
+      bankDetails = normalizeLoadedBank(bankDetails) || bankDetails;
     }
 
     if (!bankDetails?.account_number || !bankDetails?.bank_code || !bankDetails?.account_name) {
@@ -229,12 +319,17 @@ export class PaymentService {
       ? `payout:${tenantId}:${options.idempotencyKey}`
       : `payout:${reference}`;
 
-    const requestedAmount = Math.round(amount);
-    const quote = await TreasuryFeeService.quote(tenantId, requestedAmount);
-    const version = quote.fee_profile_version_id ? await TreasuryFeeService.resolve(tenantId) : null;
-    const feeEntries = version ? TreasuryFeeService.feeCreditEntriesNaira(version, quote.service_fee) : [];
+        const round2 = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+        const requestedAmount = round2(amount);
+        const quote = await TreasuryFeeService.quote(tenantId, requestedAmount);
+        const version = quote.fee_profile_version_id ? await TreasuryFeeService.resolve(tenantId) : null;
+        const feeEntries = version ? TreasuryFeeService.feeCreditEntriesNaira(version, quote.service_fee) : [];
 
-    // 3. Atomic lock: balance >= requested + treasury fee. External amount stays requested.
+        if (options?.metadata?.quasarCap === true) {
+          await PaymentService.fundQuasarWithdrawal(tenantId, quote, idempotencyKey);
+        }
+
+        // 3. Atomic lock: balance >= requested + treasury fee. External amount stays requested.
     const { data: ledgerRes, error: ledgerError } = await supabaseAdmin.rpc('request_treasury_withdrawal_with_fee', {
       p_tenant_id: tenantId,
       p_idempotency_key: idempotencyKey,
@@ -345,7 +440,19 @@ export class PaymentService {
       throw new Error(`Failed to initiate transfer with Quasar: ${error.message}`);
     }
 
-    // 5. Store transaction record (PENDING)
+    // 5. Store transaction record — open until transfer.success / GET SUCCESS.
+    // AWAITING_APPROVAL / PENDING / PROCESSING must not be marked paid.
+    const {
+      normalizeQuasarTransferStatus,
+      invifyStatusFromQuasar,
+    } = require('./payout-status.service');
+    const quasarStatus = normalizeQuasarTransferStatus(
+      (transfer as any)?.status || (transfer as any)?.data?.status || 'PENDING',
+    );
+    const openStatus = invifyStatusFromQuasar(quasarStatus) || 'PENDING';
+    const initialStatus =
+      openStatus === 'SUCCESS' || openStatus === 'FAILED' ? 'PENDING' : openStatus;
+
     const { error: txError } = await supabaseAdmin
       .from('transactions_log')
       .insert({
@@ -355,9 +462,10 @@ export class PaymentService {
         amount: requestedAmount,
         provider: 'quasar',
         type: 'payout',
-        status: 'PENDING',
+        status: initialStatus,
         metadata: {
-          quasar_transfer_id: transfer.reference,
+          quasar_transfer_id: transfer.reference || (transfer as any)?.id || null,
+          quasar_status: quasarStatus,
           destination: bankDetails.account_number,
           bank_name: bankDetails.bank_name || null,
           payout_type: payoutType,
@@ -383,6 +491,7 @@ export class PaymentService {
         amount,
         bankDetails: bankDetails.account_number,
         payoutType,
+        quasarStatus,
         ...(options?.metadata || {}),
       },
     });
@@ -396,7 +505,7 @@ export class PaymentService {
 
     return {
       reference,
-      status: 'PENDING',
+      status: initialStatus,
       transfer,
       quote,
     };

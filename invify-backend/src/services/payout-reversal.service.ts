@@ -12,7 +12,10 @@ import { LedgerService } from './ledger.service';
  * never from webhook payloads, so a failure can only restore what was debited.
  */
 
-export type PayoutReversalSource = 'SYNC_TRANSFER_REJECTED' | 'WEBHOOK_PAYOUT_FAILED';
+export type PayoutReversalSource =
+  | 'SYNC_TRANSFER_REJECTED'
+  | 'WEBHOOK_PAYOUT_FAILED'
+  | 'POLL_PAYOUT_FAILED';
 
 export type PayoutReversalResult =
   | { status: 'REVERSED'; amountKobo: number; idempotencyKey: string }
@@ -37,10 +40,15 @@ const NON_DEFINITIVE_HTTP = new Set([408, 409, 423, 425, 429]);
  */
 export function isDefinitiveTransferRejection(error: any): boolean {
   const status = Number(
-    error?.response?.status ?? error?.statusCode ?? error?.status ?? error?.responseCode,
+    error?.response?.status ?? error?.statusCode ?? error?.status ?? error?.httpStatus ?? error?.responseCode,
   );
-  if (!Number.isInteger(status)) return false;
-  return status >= 400 && status < 500 && !NON_DEFINITIVE_HTTP.has(status);
+  if (Number.isInteger(status) && status >= 400 && status < 500 && !NON_DEFINITIVE_HTTP.has(status)) {
+    return true;
+  }
+  // Quasar validation failures arrive as QuasarApiError with the provider message
+  // and sometimes without a numeric HTTP status. No money has left.
+  const message = String(error?.message || '');
+  return /must be an object|should not exist|must be a|validation failed/i.test(message);
 }
 
 function isUniqueViolation(error: any): boolean {

@@ -16,6 +16,49 @@ import { roundNaira } from '../utils/virtual-account-funds';
 import { FeeShadowIntegration } from '../services/fee-shadow-integration';
 import { PayoutReversalService } from '../services/payout-reversal.service';
 import { PaymentAlertTrailService } from '../services/payment-alert-trail.service';
+import {
+  PayoutStatusService,
+  resolveTransferOutcome,
+} from '../services/payout-status.service';
+
+function firstWebhookText(...values: unknown[]): string {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+/** Quasar VA credits now include senderName and senderBankName. */
+function vaSenderFromEvent(event: any): { senderName: string; senderBank: string } {
+  const data = event?.data || {};
+  const meta = data.metadata || event?.metadata || {};
+  const sender = data.sender || meta.sender || {};
+  const senderName =
+    firstWebhookText(
+      data.senderName,
+      data.sender_name,
+      meta.senderName,
+      meta.sender_name,
+      sender.name,
+      sender.senderName,
+    ) || 'Unknown Sender';
+  const senderBank =
+    firstWebhookText(
+      data.senderBankName,
+      data.sender_bank_name,
+      meta.senderBankName,
+      meta.sender_bank_name,
+      data.senderBank,
+      data.sender_bank,
+      meta.senderBank,
+      meta.sender_bank,
+      sender.bankName,
+      sender.senderBankName,
+      data.bankName,
+    ) || 'Unknown Bank';
+  return { senderName, senderBank };
+}
 
 function isSandboxVaCredit(event: any): boolean {
   return (
@@ -385,6 +428,39 @@ export class WebhookController {
 
       // 5. IDEMPOTENCY CHECK
       const idempotencyKey = `quasar:${reference}:credit`;
+      const isPayoutRow = String(transaction?.type || '').toLowerCase() === 'payout';
+      const envelopeId = String(event?.id || '').trim() || null;
+
+      // Transfer payouts: SUCCESS/FAILED/REJECTED (case-insensitive) + envelope.id dedupe.
+      // Approve in Quasar admin does not webhook; reject/fail and success do.
+      if (isPayoutRow) {
+        if (envelopeId && (await PayoutStatusService.envelopeAlreadyProcessed(envelopeId))) {
+          return res.status(200).json({ status: 'already_processed', note: 'envelope' });
+        }
+        const outcome = resolveTransferOutcome({
+          event: event?.event,
+          status: event?.data?.status ?? status,
+        });
+        if (outcome === 'success' || outcome === 'failed' || outcome === 'open') {
+          const applied = await PayoutStatusService.applyOutcome({
+            tenantId: resolvedTenantId!,
+            reference,
+            outcome,
+            quasarStatus: event?.data?.status,
+            reason: event?.data?.reason || event?.data?.message || null,
+            amount: event?.data?.amount ?? amount,
+            source: 'WEBHOOK',
+            envelopeId,
+          });
+          return res.status(200).json({
+            status: applied.applied ? 'processed' : 'already_processed',
+            payoutStatus: applied.status,
+            note: applied.note || null,
+          });
+        }
+        return res.status(200).json({ status: 'ignored', note: 'payout_non_terminal' });
+      }
+
       if (await LedgerService.exists(idempotencyKey)) {
         console.log(`[Idempotency] Already processed ${reference}. Returning success.`);
         return res.status(200).json({ status: 'already_processed' });
@@ -392,9 +468,10 @@ export class WebhookController {
 
       // 6. PROCESS STATE UPDATES OR LOG DEPOSITS
       if (transaction) {
-        if (status === 'success') {
+        const normalizedStatus = String(status || '').trim().toLowerCase();
+        if (normalizedStatus === 'success' || event?.event === 'transfer.success') {
           await WebhookController._handleSuccess(resolvedTenantId!, resolvedWalletId!, reference, amount, idempotencyKey, event, transaction.type, transaction.status);
-        } else if (status === 'failed') {
+        } else if (normalizedStatus === 'failed' || event?.event === 'transfer.failed') {
           await WebhookController._handleFailure(resolvedTenantId!, resolvedWalletId!, reference, event, transaction.type, transaction.status);
         }
       } else {
@@ -415,8 +492,7 @@ export class WebhookController {
           }
 
           const virtualAccountNumber = event.data?.accountNumber || event.data?.virtualAccountNumber || event.data?.metadata?.virtualAccountNumber;
-          const senderName = event.data?.senderName || event.data?.metadata?.senderName || event.data?.accountName || 'Unknown Sender';
-          const senderBank = event.data?.senderBank || event.data?.metadata?.senderBank || event.data?.bankName || 'Unknown Bank';
+          const { senderName, senderBank } = vaSenderFromEvent(event);
           const creditAmount = roundNaira(Number(amount));
           const isSandbox = event?.data?.sandbox === true;
 

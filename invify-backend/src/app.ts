@@ -70,6 +70,7 @@ import { StudentController } from './controllers/student.controller';
 import { SchoolSyncController } from './controllers/school-sync.controller';
 import { SchoolPaymentsController } from './controllers/school-payments.controller';
 import { TermBillsController } from './controllers/term-bills.controller';
+import { ParentBroadcastController } from './controllers/parent-broadcast.controller';
 import { StaffController } from './controllers/staff.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
@@ -1189,6 +1190,18 @@ app.post(
   checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   TermBillsController.downloadPdf,
 );
+app.get(
+  '/api/school/parent-broadcast/audience',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  ParentBroadcastController.audience,
+);
+app.post(
+  '/api/school/parent-broadcast',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  ParentBroadcastController.send,
+);
 
 // POS staff roster + personal salary bank (Flutter Web Sync → tenant admin)
 app.post(
@@ -1829,6 +1842,29 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
         paymentAlertBusy = false;
       });
   }, 3_000);
+
+  // Quasar approve does not fire a webhook — poll open POUT rows via GET /transfers/{reference}.
+  // Narrow status sync only; not the broader ENABLE_INPROCESS_FINANCIAL_WORKERS gate.
+  if (process.env.DISABLE_PAYOUT_STATUS_POLLER !== 'true') {
+    let payoutPollBusy = false;
+    const payoutPollMs = Math.max(30_000, Number(process.env.PAYOUT_STATUS_POLLER_MS) || 60_000);
+    setInterval(() => {
+      if (payoutPollBusy) return;
+      payoutPollBusy = true;
+      import('./services/payout-status.service')
+        .then(({ PayoutStatusService }) => PayoutStatusService.pollOpenPayouts(25))
+        .then((result) => {
+          if (result.applied > 0) {
+            console.log(`[PayoutStatus] polled ${result.checked}, applied ${result.applied}`);
+          }
+        })
+        .catch((err: any) => console.warn('[PayoutStatus] poller failed:', err?.message || err))
+        .finally(() => {
+          payoutPollBusy = false;
+        });
+    }, payoutPollMs);
+    console.log(`[Workers] Payout status poller ENABLED (${payoutPollMs}ms)`);
+  }
 
   server.listen(PORT as number, '0.0.0.0', () => {
     console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);

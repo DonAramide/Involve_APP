@@ -81,7 +81,7 @@ export interface CreatePaymentIntentParams {
 }
 
 export interface CreateTransferParams {
-  amount: number;
+  amount: number | string;
   reference: string;
   currency?: string;
   destination: {
@@ -285,6 +285,11 @@ export class QuasarPaymentsClient {
   /** GET /transfers — List transfers */
   async getTransfers(opts?: RequestOptions): Promise<Transfer[]> {
     return this.client.get<Transfer[]>('/transfers', opts);
+  }
+
+  /** GET /transfers/{reference} — Poll a single transfer by Invify/Quasar reference */
+  async getTransfer(reference: string, opts?: RequestOptions): Promise<Transfer> {
+    return this.client.get<Transfer>(`/transfers/${encodeURIComponent(reference)}`, opts);
   }
 
   // ── POS / MPOS ────────────────────────────────────────────────────────────

@@ -1,6 +1,49 @@
 // src/integrations/quasar/quasar.service.ts
 import { QuasarPaymentsClient } from './quasar-payments.client';
+import { QuasarIntegrationStore } from './quasar-integration.store';
 import * as crypto from 'crypto';
+
+const TRANSFER_TENANT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The live Quasar API key is bound to quasar_integrations.quasar_tenant_id.
+ * metadata.tenantId must be that id, not the Invify school id.
+ */
+async function quasarContextTenantId(invifyTenantId: string): Promise<string> {
+  try {
+    const row = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
+    const quasarTenantId = String(row?.quasar_tenant_id || '').trim();
+    if (TRANSFER_TENANT_UUID.test(quasarTenantId)) return quasarTenantId;
+  } catch (error: any) {
+    console.warn('[QuasarSDK] Quasar tenant lookup failed:', error?.message || error);
+  }
+  return String(invifyTenantId || '').trim();
+}
+
+/** Quasar POST /transfers expects naira as a 4-decimal string, e.g. "1000.0000". */
+function transferAmountNaira(amount: number): string {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('Transfer amount must be greater than zero');
+  }
+  return value.toFixed(4);
+}
+
+/**
+ * Quasar POST /transfers metadata must include tenantId and schoolId as UUIDs.
+ * Extra keys such as `type` are rejected ("metadata.property type should not exist").
+ */
+function plainTransferMetadata(input: Record<string, any> | null | undefined): { tenantId: string; schoolId: string } {
+  const tenantId = String(input?.tenantId || '').trim();
+  const schoolId = String(input?.schoolId || input?.tenantId || '').trim();
+  if (!TRANSFER_TENANT_UUID.test(tenantId)) {
+    throw new Error('metadata.tenantId must be a UUID');
+  }
+  if (!TRANSFER_TENANT_UUID.test(schoolId)) {
+    throw new Error('metadata.schoolId must be a UUID');
+  }
+  return { tenantId, schoolId };
+}
 
 /**
  * QuasarService acts as a clean abstraction over the official Quasar API.
@@ -146,8 +189,19 @@ export class QuasarService {
     return digits.length >= 10 ? `+${digits}` : digits;
   }
 
+  /** GET /transfers/{reference} — polling fallback when approve does not webhook. */
+  async getTransfer(reference: string) {
+    try {
+      return await this.client.getTransfer(String(reference || '').trim());
+    } catch (error: any) {
+      console.error('[QuasarSDK] getTransfer failed:', error.message);
+      throw error;
+    }
+  }
+
   /**
    * Initiates a fund transfer (payout) to an external bank.
+   * Quasar rejects the call unless metadata is a plain object.
    */
   async initiateTransfer(params: {
     amount: number;
@@ -164,18 +218,24 @@ export class QuasarService {
     };
   }) {
     try {
-      console.log(`[QuasarSDK] Initiating payout for tenant: ${params.metadata.tenantId}`);
+      const contextTenantId = await quasarContextTenantId(params.metadata.tenantId);
+      const schoolId = String(params.metadata.schoolId || params.metadata.tenantId || '').trim();
+      console.log(`[QuasarSDK] Initiating payout for tenant context …${contextTenantId.slice(-6)}`);
       // Bank payouts use POST /transfers. The sandbox transfer route is virtual-account
       // to virtual-account and rejects a bank `destination` ("property destination should not exist").
       return await this.client.createTransfer({
-        amount: params.amount,
+        amount: transferAmountNaira(params.amount),
         reference: params.reference,
         currency: 'NGN',
         destination: {
-          account_number: params.destination.account_number,
-          bank_code: params.destination.bank_code,
-          account_name: params.destination.account_name,
+          account_number: String(params.destination.account_number),
+          bank_code: String(params.destination.bank_code),
+          account_name: String(params.destination.account_name),
         },
+        metadata: plainTransferMetadata({
+          tenantId: contextTenantId,
+          schoolId,
+        }),
       });
     } catch (error: any) {
       console.error('[QuasarSDK] initiateTransfer failed:', error.message);

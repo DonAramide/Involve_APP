@@ -74,7 +74,8 @@ function payoutResponse(row: any) {
   const account_number = String(row?.account_number || row?.accountNumber || '').trim();
   const account_name = String(row?.account_name || row?.accountName || '').trim();
   const bank_name = String(row?.bank_name || row?.bankName || '').trim();
-  const bank_code = String(row?.bank_code || row?.bankCode || '').trim();
+  let bank_code = String(row?.bank_code || row?.bankCode || '').trim();
+  if (!bank_code) bank_code = bankCodeFromName(bank_name);
   const settings = { account_number, account_name, bank_name, bank_code };
   return { ...settings, settings };
 }
@@ -254,6 +255,14 @@ export class PayoutController {
       const tenantId = resolveAuthoritativeTenantId(req);
       const { page = 1, limit = 20 } = req.query;
 
+      // Approve in Quasar admin does not webhook — refresh open rows via GET /transfers/{ref}.
+      try {
+        const { PayoutStatusService } = await import('../services/payout-status.service');
+        await PayoutStatusService.pollTenantOpenPayouts(tenantId, 10);
+      } catch (pollErr: any) {
+        console.warn('[PayoutController] status poll skipped:', pollErr?.message || pollErr);
+      }
+
       const from = (Number(page) - 1) * Number(limit);
       const to = from + Number(limit) - 1;
 
@@ -304,14 +313,50 @@ export class PayoutController {
         }
       }
 
-      const result = await PaymentService.createPayout(tenantId, Number(amount), {
+      const payoutOptions = {
         destination: destination || undefined,
         idempotencyKey,
         metadata: {
           ...(metadata || {}),
-          ...(staffId ? { staffId, type: metadata?.type || 'staff_salary' } : {}),
+          ...(staffId ? { staffId, type: metadata?.type || 'staff_salary' } : { quasarCap: true }),
         },
-      });
+      };
+
+      if (!staffId) {
+        const { QuasarWithdrawableService, withTenantWithdrawLock } = await import('../services/quasar-withdrawable.service');
+        const result = await withTenantWithdrawLock(tenantId, async () => {
+          const priced = await withdrawalQuote(tenantId, Number(amount));
+          if (!priced.sufficient) {
+            const err: any = new Error(
+              priced.max_sendable > 0
+                ? `Insufficient withdrawable balance. Available ₦${priced.withdrawable.toFixed(2)}. This withdrawal needs ₦${Number(priced.total_required).toFixed(2)} (₦${Number(amount).toFixed(2)} plus ₦${Number(priced.service_fee).toFixed(2)} fee). You can send up to ₦${priced.max_sendable.toFixed(2)}.`
+                : `Insufficient withdrawable balance. Available ₦${priced.withdrawable.toFixed(2)}. This withdrawal needs ₦${Number(priced.total_required).toFixed(2)} including the service fee.`,
+            );
+            err.code = 'INSUFFICIENT_BALANCE';
+            err.status = 402;
+            err.available = priced.withdrawable;
+            err.quote = priced;
+            throw err;
+          }
+          return PaymentService.createPayout(tenantId, Number(amount), payoutOptions);
+        });
+        try {
+          const available = await QuasarWithdrawableService.available(tenantId);
+          await QuasarWithdrawableService.publish(tenantId, available);
+        } catch (_) {}
+        return res.status(200).json({
+          success: true,
+          message: 'Payout initiated successfully',
+          reference: result.reference,
+          status: result.status,
+          quote: (result as any).quote || null,
+          requested_amount: (result as any).quote?.requested_amount,
+          service_fee: (result as any).quote?.service_fee,
+          total_required: (result as any).quote?.total_required,
+        });
+      }
+
+      const result = await PaymentService.createPayout(tenantId, Number(amount), payoutOptions);
       return res.status(200).json({
         success: true,
         message: staffId ? 'Staff salary payout initiated successfully' : 'Payout initiated successfully',
@@ -339,8 +384,7 @@ export class PayoutController {
     try {
       const tenantId = resolveAuthoritativeTenantId(req);
       const amount = Number(req.body?.amount ?? req.query?.amount);
-      const { TreasuryFeeService } = await import('../services/treasury-fee.service');
-      const quote = await TreasuryFeeService.quote(tenantId, amount);
+      const quote = await withdrawalQuote(tenantId, amount);
       return res.status(200).json(quote);
     } catch (error: any) {
       return res.status(error.status || 400).json({ error: error.message, code: error.code });
@@ -392,4 +436,50 @@ export class PayoutController {
       return res.status(error.status || 400).json({ error: error.message });
     }
   }
+}
+
+function roundPayoutNaira(value: number): number {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+/** Quote against billed card/VA withdrawable, not the internal wallet ledger. */
+async function withdrawalQuote(tenantId: string, amount: number) {
+  const { TreasuryFeeService } = await import('../services/treasury-fee.service');
+  const { QuasarWithdrawableService } = await import('../services/quasar-withdrawable.service');
+  const withdrawable = roundPayoutNaira(await QuasarWithdrawableService.available(tenantId));
+  const requested = roundPayoutNaira(Number(amount) || 0);
+  const seed = requested > 0 ? requested : (withdrawable > 0 ? withdrawable : 1);
+  const quote = await TreasuryFeeService.quote(tenantId, seed);
+  let maxSendable = withdrawable;
+  if (withdrawable > 0) {
+    const atCap = requested > 0 && Math.abs(requested - withdrawable) <= 0.009
+      ? quote
+      : await TreasuryFeeService.quote(tenantId, withdrawable);
+    if (roundPayoutNaira(Number(atCap.total_required)) > withdrawable + 0.009) {
+      maxSendable = roundPayoutNaira(Math.max(0, withdrawable - Number(atCap.service_fee || 0)));
+      if (maxSendable > 0) {
+        const check = await TreasuryFeeService.quote(tenantId, maxSendable);
+        if (roundPayoutNaira(Number(check.total_required)) > withdrawable + 0.009) {
+          maxSendable = roundPayoutNaira(Math.max(0, withdrawable - Number(check.service_fee || 0)));
+        }
+      }
+    }
+  } else {
+    maxSendable = 0;
+  }
+  const total = requested > 0 ? roundPayoutNaira(Number(quote.total_required)) : 0;
+  const sufficient = requested > 0 ? withdrawable + 0.009 >= total : withdrawable > 0;
+  return {
+    ...quote,
+    requested_amount: requested > 0 ? requested : 0,
+    service_fee: requested > 0 ? quote.service_fee : 0,
+    total_required: requested > 0 ? quote.total_required : 0,
+    wallet_balance: quote.available_balance,
+    available_balance: withdrawable,
+    withdrawable,
+    sufficient: requested > 0 ? sufficient : withdrawable > 0,
+    shortfall: requested > 0 ? roundPayoutNaira(Math.max(0, total - withdrawable)) : 0,
+    remaining_balance: requested > 0 && sufficient ? roundPayoutNaira(withdrawable - total) : null,
+    max_sendable: maxSendable,
+  };
 }
