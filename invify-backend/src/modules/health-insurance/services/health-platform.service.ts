@@ -120,13 +120,13 @@ export class HealthPlatformService {
     // Query tenants
     let tenantQuery = supabaseAdmin
       .from('tenants')
-      .select('id, name, business_mode, created_at', { count: 'exact' });
+      .select('id, name, type, created_at', { count: 'exact' });
 
     if (search) {
       tenantQuery = tenantQuery.ilike('name', `%${search}%`);
     }
     if (modeFilter) {
-      tenantQuery = tenantQuery.eq('business_mode', modeFilter);
+      tenantQuery = tenantQuery.eq('type', modeFilter);
     }
 
     const { data: tenants, count, error } = await tenantQuery
@@ -186,12 +186,17 @@ export class HealthPlatformService {
       return {
         id: t.id,
         name: t.name,
-        mode: t.business_mode || 'school',
+        mode: t.type || 'school',
         isEnabled: s?.enabled || false,
+        is_enabled: s?.enabled || false,
         schoolEnabled: s?.school_enabled || false,
         retailEnabled: s?.retail_enabled || false,
         servicesEnabled: s?.services_enabled || false,
+        enrolledCount: membersCountMap.get(t.id) || 0,
+        enrolled_count: membersCountMap.get(t.id) || 0,
         enrolledMembersCount: membersCountMap.get(t.id) || 0,
+        activeCount: policiesCountMap.get(t.id) || 0,
+        active_count: policiesCountMap.get(t.id) || 0,
         activePoliciesCount: policiesCountMap.get(t.id) || 0,
         pendingEnrolmentsCount: pendingCountMap.get(t.id) || 0,
         integrationStatus: s?.enabled ? 'active' : 'disabled'
@@ -279,6 +284,9 @@ export class HealthPlatformService {
       distributionByMode: byMode,
       distributionByCategory: byCategory,
       policiesByStatus: byStatus,
+      byMode: Object.entries(byMode).map(([mode, count]) => ({ mode, count })),
+      byCategory: Object.entries(byCategory).map(([category, count]) => ({ category, count })),
+      byStatus: Object.entries(byStatus).map(([status, count]) => ({ status, count })),
       timestamp: new Date().toISOString()
     };
   }
@@ -330,6 +338,9 @@ export class HealthPlatformService {
     const durationMinutes = Math.min(Math.max(Number(data.durationMinutes) || 60, 10), 480);
 
     if (!userId) throw new Error('Target user ID is required');
+    if (actorUserId === userId) {
+      throw new Error('Dual-authorization required: Administrators cannot create, expand, or approve platform grants for themselves. An independent administrator must issue the grant.');
+    }
     if (!permission) throw new Error('Permission is required');
     if (!reason || reason.trim().length < 5) {
       throw new Error('A valid justification reason (> 5 characters) is mandatory');

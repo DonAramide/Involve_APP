@@ -7,6 +7,7 @@ import { HealthMemberService } from '../src/modules/health-insurance/services/he
 import { HealthGuardianService } from '../src/modules/health-insurance/services/health-guardian.service';
 import { HealthEnrolmentService } from '../src/modules/health-insurance/services/health-enrolment.service';
 import { HealthPlatformService } from '../src/modules/health-insurance/services/health-platform.service';
+import { HealthPlatformController } from '../src/modules/health-insurance/controllers/health-platform.controller';
 import { HealthContext } from '../src/modules/health-insurance/types';
 import { supabaseAdmin } from '../src/db/supabase';
 
@@ -540,6 +541,158 @@ describe('Invify Health & Wellness — Unit & Security Verification', () => {
         expect.objectContaining({
           action: 'platform.grant.revoked',
           platform_reason: 'Session completed and audit concluded'
+        })
+      );
+    });
+
+    it('enforces dual-authorization: rejects grant creation if actor tries to grant to themselves', async () => {
+      await expect(
+        HealthPlatformService.createPlatformGrant('same-user-uuid', {
+          userId: 'same-user-uuid',
+          permission: 'platform.integration.health',
+          durationMinutes: 60,
+          reason: 'Attempting self-elevation'
+        })
+      ).rejects.toThrow('Dual-authorization required: Administrators cannot create, expand, or approve platform grants for themselves');
+    });
+
+    it('selfActivateGrant rejects session activation with 403 when no independent grant exists', async () => {
+      const req: any = {
+        user: { id: 'admin-requester-id' },
+        body: {
+          permission: 'platform.integration.health',
+          reason: 'Routine quarterly health audit session'
+        }
+      };
+      const res: any = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+
+      (supabaseAdmin.from as jest.Mock).mockImplementation((table: string) => {
+        if (table === 'users') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({
+                  data: { id: 'admin-requester-id', email: 'admin@invify.com', role: 'super_admin', is_active: true },
+                  error: null
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_platform_grants') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  is: jest.fn().mockReturnValue({
+                    gt: jest.fn().mockReturnValue({
+                      neq: jest.fn().mockResolvedValue({
+                        data: [], // No independent grant
+                        error: null
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      await HealthPlatformController.selfActivateGrant(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            code: 'INDEPENDENT_AUTHORIZATION_REQUIRED'
+          })
+        })
+      );
+    });
+
+    it('selfActivateGrant activates session and records audit event when independent grant exists', async () => {
+      const auditInsertMock = jest.fn().mockResolvedValue({ error: null });
+
+      const req: any = {
+        user: { id: 'admin-requester-id' },
+        body: {
+          permission: 'platform.integration.health',
+          reason: 'Investigating HMO webhook reconciliation discrepancy'
+        }
+      };
+      const res: any = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+
+      (supabaseAdmin.from as jest.Mock).mockImplementation((table: string) => {
+        if (table === 'users') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({
+                  data: { id: 'admin-requester-id', email: 'admin@invify.com', role: 'super_admin', is_active: true },
+                  error: null
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_platform_grants') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  is: jest.fn().mockReturnValue({
+                    gt: jest.fn().mockReturnValue({
+                      neq: jest.fn().mockResolvedValue({
+                        data: [
+                          {
+                            id: 'independent-grant-uuid',
+                            user_id: 'admin-requester-id',
+                            permission: 'platform.integration.health',
+                            granted_by: 'other-governor-id',
+                            expires_at: new Date(Date.now() + 7200000).toISOString(),
+                            revoked_at: null
+                          }
+                        ],
+                        error: null
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_audit_events') {
+          return { insert: auditInsertMock };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      await HealthPlatformController.selfActivateGrant(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          session: expect.objectContaining({
+            grantId: 'independent-grant-uuid',
+            permission: 'platform.integration.health',
+            grantedBy: 'other-governor-id'
+          })
+        })
+      );
+      expect(auditInsertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'platform.session.activated',
+          platform_reason: 'Investigating HMO webhook reconciliation discrepancy'
         })
       );
     });
