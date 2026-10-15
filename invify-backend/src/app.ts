@@ -50,6 +50,7 @@ import { PlatformFeeProfilesController } from './controllers/platform-fee-profil
 import { PlatformFeeAssessmentsController } from './controllers/platform-fee-assessments.controller';
 import { PlatformFeeDistributionController } from './controllers/platform-fee-distribution.controller';
 import { attachTenantBillingRoutes } from './modules/tenant-billing/register-routes';
+import { attachHealthInsuranceRoutes } from './modules/health-insurance/register-routes';
 import { AgentWebhookController } from './modules/agent-portal/controllers/agent-webhook.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { WalletController } from './controllers/wallet.controller';
@@ -1346,6 +1347,7 @@ app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'i
 });
 
 attachTenantBillingRoutes(app);
+attachHealthInsuranceRoutes(app);
 
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {

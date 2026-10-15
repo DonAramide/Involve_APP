@@ -298,6 +298,7 @@ const industryNavigationTree = computed(() => {
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
       { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
       { label: 'School Payments', path: '/tenant/school-payments', icon: 'payments', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
@@ -313,6 +314,7 @@ const industryNavigationTree = computed(() => {
     return [
       { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' },
       { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: 'RETAIL' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'RETAIL' },
       { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: 'RETAIL' },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' },
       { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: 'RETAIL' }
@@ -320,6 +322,7 @@ const industryNavigationTree = computed(() => {
   } else if (mode === 'services' || mode === 'service' || mode === 'hospitality' || mode === 'invify_services') {
     return [
       { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SERVICE' },
       { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: 'SERVICE' },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'SERVICE' },
       { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: 'SERVICE' },
