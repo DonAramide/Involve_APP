@@ -6,6 +6,7 @@ import { SandboxHealthProviderAdapter } from '../src/modules/health-insurance/ad
 import { HealthMemberService } from '../src/modules/health-insurance/services/health-member.service';
 import { HealthGuardianService } from '../src/modules/health-insurance/services/health-guardian.service';
 import { HealthEnrolmentService } from '../src/modules/health-insurance/services/health-enrolment.service';
+import { HealthPlatformService } from '../src/modules/health-insurance/services/health-platform.service';
 import { HealthContext } from '../src/modules/health-insurance/types';
 import { supabaseAdmin } from '../src/db/supabase';
 
@@ -323,4 +324,225 @@ describe('Invify Health & Wellness — Unit & Security Verification', () => {
       expect(adapter.getCapabilities().enrolmentSubmit).toBe(true);
     });
   });
+
+  // ─── 7. Platform Super Admin Governance & Operator Grants ─────────────────
+  describe('7. Platform Super Admin Governance & Operator Grants', () => {
+    it('HealthPlatformService.getPlatformOverview aggregates cross-tenant counts and financial volume', async () => {
+      const ctx: HealthContext = {
+        tenantId: '00000000-0000-0000-0000-000000000000',
+        userId: 'super-admin-uuid',
+        permissions: ['platform.integration.health'],
+        isPlatformOperator: true,
+        isGuardian: false
+      };
+
+      (supabaseAdmin.from as jest.Mock).mockImplementation((table: string) => {
+        if (table === 'hw_tenant_settings') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ count: 5, error: null })
+            })
+          };
+        }
+        if (table === 'hw_members') {
+          return {
+            select: jest.fn().mockResolvedValue({ count: 120, error: null })
+          };
+        }
+        if (table === 'hw_policies') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                gte: jest.fn().mockReturnValue({
+                  lte: jest.fn().mockResolvedValue({ count: 3, error: null })
+                }),
+                select: jest.fn().mockResolvedValue({ count: 85, error: null })
+              })
+            })
+          };
+        }
+        if (table === 'hw_enrolments') {
+          return {
+            select: jest.fn().mockResolvedValue({
+              data: [
+                { status: 'active' },
+                { status: 'active' },
+                { status: 'awaiting_verification' },
+                { status: 'awaiting_premium_payment' }
+              ],
+              error: null
+            })
+          };
+        }
+        if (table === 'hw_providers') {
+          return {
+            select: jest.fn().mockResolvedValue({
+              data: [
+                { id: 'p1', integration_status: 'verified' },
+                { id: 'p2', integration_status: 'sandbox_active' }
+              ],
+              error: null
+            })
+          };
+        }
+        if (table === 'hw_premium_invoices') {
+          return {
+            select: jest.fn().mockResolvedValue({
+              data: [
+                { total_amount: 1500000, status: 'paid' },
+                { total_amount: 2500000, status: 'issued' }
+              ],
+              error: null
+            })
+          };
+        }
+        if (table === 'hw_payments') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({
+                data: [{ amount: 1500000, status: 'settled' }],
+                error: null
+              })
+            })
+          };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      const overview = await HealthPlatformService.getPlatformOverview(ctx);
+
+      expect(overview.totalEnabledTenants).toBe(5);
+      expect(overview.totalDistinctMembers).toBe(120);
+      expect(overview.enrolmentStatusBreakdown.active).toBe(2);
+      expect(overview.enrolmentStatusBreakdown.awaiting_verification).toBe(1);
+      expect(overview.totalPremiumsBilledKobo).toBe(4000000);
+      expect(overview.totalPremiumsCollectedKobo).toBe(1500000);
+    });
+
+    it('rejects grant creation if justification reason is shorter than 5 characters', async () => {
+      await expect(
+        HealthPlatformService.createPlatformGrant('admin-uuid', {
+          userId: 'target-user-uuid',
+          permission: 'platform.integration.health',
+          durationMinutes: 60,
+          reason: 'test' // 4 chars
+        })
+      ).rejects.toThrow('A valid justification reason (> 5 characters) is mandatory');
+    });
+
+    it('creates platform operator grant and records audit event in hw_audit_events', async () => {
+      const auditInsertMock = jest.fn().mockResolvedValue({ error: null });
+
+      (supabaseAdmin.from as jest.Mock).mockImplementation((table: string) => {
+        if (table === 'users') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                maybeSingle: jest.fn().mockResolvedValue({
+                  data: { id: 'target-user-uuid', email: 'operator@invify.com', is_active: true },
+                  error: null
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_platform_grants') {
+          return {
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({
+                  data: {
+                    id: 'new-grant-id',
+                    user_id: 'target-user-uuid',
+                    permission: 'platform.integration.health',
+                    expires_at: new Date(Date.now() + 3600000).toISOString(),
+                    granted_at: new Date().toISOString()
+                  },
+                  error: null
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_audit_events') {
+          return { insert: auditInsertMock };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      const grant = await HealthPlatformService.createPlatformGrant('super-admin-actor-uuid', {
+        userId: 'target-user-uuid',
+        permission: 'platform.integration.health',
+        durationMinutes: 60,
+        reason: 'Investigating HMO webhook reconciliation discrepancy'
+      });
+
+      expect(grant.id).toBe('new-grant-id');
+      expect(grant.permission).toBe('platform.integration.health');
+      expect(auditInsertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'platform.grant.created',
+          via_platform_access: true,
+          platform_reason: 'Investigating HMO webhook reconciliation discrepancy'
+        })
+      );
+    });
+
+    it('revokes an active platform grant and records audit event in hw_audit_events', async () => {
+      const auditInsertMock = jest.fn().mockResolvedValue({ error: null });
+
+      (supabaseAdmin.from as jest.Mock).mockImplementation((table: string) => {
+        if (table === 'hw_platform_grants') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                maybeSingle: jest.fn().mockResolvedValue({
+                  data: {
+                    id: 'grant-to-revoke-id',
+                    user_id: 'target-user-uuid',
+                    permission: 'platform.tenant_access',
+                    revoked_at: null
+                  },
+                  error: null
+                })
+              })
+            }),
+            update: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                select: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: {
+                      id: 'grant-to-revoke-id',
+                      revoked_at: new Date().toISOString()
+                    },
+                    error: null
+                  })
+                })
+              })
+            })
+          };
+        }
+        if (table === 'hw_audit_events') {
+          return { insert: auditInsertMock };
+        }
+        return { select: jest.fn().mockReturnThis() };
+      });
+
+      const revoked = await HealthPlatformService.revokePlatformGrant(
+        'super-admin-actor-uuid',
+        'grant-to-revoke-id',
+        'Session completed and audit concluded'
+      );
+
+      expect(revoked.id).toBe('grant-to-revoke-id');
+      expect(revoked.revokedAt).toBeTruthy();
+      expect(auditInsertMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'platform.grant.revoked',
+          platform_reason: 'Session completed and audit concluded'
+        })
+      );
+    });
+  });
 });
+

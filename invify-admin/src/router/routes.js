@@ -438,6 +438,7 @@ const routes = [
       { path: 'admin/settings/verification-log', component: () => import('pages/admin/VerificationLogPage.vue'), meta: { workspace: 'admin', title: 'Verification Log', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['otp', 'email', 'verification', 'code', 'onboarding', 'whatsapp'] } },
       { path: 'admin/production-env', component: () => import('pages/admin/ProductionEnvGovernancePage.vue'), meta: { workspace: 'admin', title: 'Production Env Governance', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['production env', 'feature flags', 'real money payouts', 'maker checker'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/health-insurance', component: () => import('pages/admin/HealthInsuranceGovernancePage.vue'), meta: { workspace: 'admin', title: 'Health & Wellness Governance', permission: 'admin_deploy', requiresAuth: true, keywords: ['health', 'insurance', 'wellness', 'hmo', 'governance', 'grants'] } },
 
       // ==========================================
       // QUASAR FINANCIAL SANDBOX (QFS)

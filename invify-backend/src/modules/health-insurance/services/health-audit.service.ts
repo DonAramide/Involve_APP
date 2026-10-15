@@ -46,4 +46,8 @@ export class HealthAuditService {
       console.error('[HealthAuditService] Error recording audit log:', err?.message || err);
     }
   }
+
+  static async recordEvent(params: LogAuditEventParams): Promise<void> {
+    return this.log(params);
+  }
 }

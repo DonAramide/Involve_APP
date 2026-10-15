@@ -46,7 +46,38 @@ export const healthInsuranceApi = {
 
   // Claims
   getClaims: (params) => api.get('/api/v1/health-insurance/claims', { params }),
-  syncClaimStatus: (claimId) => api.post(`/api/v1/health-insurance/claims/sync`, { claimId })
+  syncClaimStatus: (claimId) => api.post(`/api/v1/health-insurance/claims/sync`, { claimId }),
+
+  // Platform Governance (Super Admin Interface C)
+  getPlatformOverview: (reason) => api.get('/api/v1/health-insurance/platform/overview', {
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Routine platform health governance audit' }
+  }),
+  getPlatformTenants: (params, reason) => api.get('/api/v1/health-insurance/platform/tenants', {
+    params,
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Tenant health participation review' }
+  }),
+  getProvidersHealth: (reason) => api.get('/api/v1/health-insurance/platform/providers/health', {
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'HMO provider telemetry check' }
+  }),
+  getCoverageTrends: (reason) => api.get('/api/v1/health-insurance/platform/coverage-trends', {
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform coverage analytics query' }
+  }),
+  getPlatformGrants: (params, reason) => api.get('/api/v1/health-insurance/platform/grants', {
+    params,
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant audit' }
+  }),
+  createPlatformGrant: (data, reason) => api.post('/api/v1/health-insurance/platform/grants', data, {
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant creation' }
+  }),
+  revokePlatformGrant: (grantId, data, reason) => api.post(`/api/v1/health-insurance/platform/grants/${grantId}/revoke`, data, {
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant revocation' }
+  }),
+  getPlatformAuditEvents: (params, reason) => api.get('/api/v1/health-insurance/platform/audit-events', {
+    params,
+    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform health audit review' }
+  }),
+  getMyGrantStatus: () => api.get('/api/v1/health-insurance/platform/grant-status'),
+  selfActivateGrant: (data) => api.post('/api/v1/health-insurance/platform/grants/self-activate', data)
 };
 
 export default healthInsuranceApi;
