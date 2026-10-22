@@ -6,12 +6,66 @@ import { requireHealthPermission } from './guards/health-permission.guard';
 import { requireGuardianLink } from './guards/guardian-access.guard';
 import { HealthController } from './controllers/health.controller';
 import { HealthPlatformController } from './controllers/health-platform.controller';
+import { HmoPortalController } from './controllers/hmo-portal.controller';
+import { requireHmoInstitution } from './guards/hmo-institution.guard';
+
+export function createHmoPortalRouter(): Router {
+  const hmoRouter = Router();
+  hmoRouter.use(authenticate);
+
+  // 1. Overview & KPIs
+  hmoRouter.get('/overview', requireHmoInstitution('hmo.dashboard.view'), HmoPortalController.getOverview);
+
+  // 2. Organization Profile & License Verification
+  hmoRouter.get('/profile', requireHmoInstitution('hmo.dashboard.view'), HmoPortalController.getProfile);
+  hmoRouter.patch('/profile', requireHmoInstitution('hmo.profile.manage'), HmoPortalController.updateProfile);
+
+  // 3. School & Employer Network
+  hmoRouter.get('/schools', requireHmoInstitution('hmo.schools.view'), HmoPortalController.listSchools);
+  hmoRouter.patch('/schools/:tenantId', requireHmoInstitution('hmo.schools.manage'), HmoPortalController.updateSchoolOnboarding);
+
+  // 4. Insurance Plans & Versioned Benefits
+  hmoRouter.get('/plans', requireHmoInstitution('hmo.plans.view'), HmoPortalController.listPlans);
+  hmoRouter.post('/plans', requireHmoInstitution('hmo.plans.manage'), HmoPortalController.createOrVersionPlan);
+  hmoRouter.patch('/plans/:planId/status', requireHmoInstitution('hmo.plans.manage'), HmoPortalController.updatePlanStatus);
+
+  // 5. Member & Enrollment Management
+  hmoRouter.get('/enrollments', requireHmoInstitution('hmo.members.view'), HmoPortalController.listEnrollments);
+  hmoRouter.post('/enrollments/:id/adjudicate', requireHmoInstitution('hmo.members.manage'), HmoPortalController.adjudicateEnrollment);
+
+  // 6. Excel / CSV Integration Centre
+  hmoRouter.get('/excel/mappings', requireHmoInstitution('hmo.batches.view'), HmoPortalController.listExportMappings);
+  hmoRouter.post('/excel/mappings', requireHmoInstitution('hmo.batches.export'), HmoPortalController.saveExportMapping);
+  hmoRouter.get('/excel/batches', requireHmoInstitution('hmo.batches.view'), HmoPortalController.listBatches);
+  hmoRouter.post('/excel/batches', requireHmoInstitution('hmo.batches.export'), HmoPortalController.createBatch);
+  hmoRouter.get('/excel/batches/:batchId/export', requireHmoInstitution('hmo.batches.export'), HmoPortalController.exportBatchCsv);
+  hmoRouter.post('/excel/reconcile', requireHmoInstitution('hmo.batches.reconcile'), HmoPortalController.reconcileResponseSheet);
+
+  // 7. Provider Network (Hospitals, Clinics, Pharmacies, Labs)
+  hmoRouter.get('/facilities', requireHmoInstitution('hmo.providers.view'), HmoPortalController.listFacilities);
+  hmoRouter.post('/facilities', requireHmoInstitution('hmo.providers.manage'), HmoPortalController.saveFacility);
+
+  // 8. Pre-Authorization & Claims
+  hmoRouter.get('/claims', requireHmoInstitution(['hmo.claims.view', 'hmo.preauth.view']), HmoPortalController.listClaimsAndPreAuths);
+  hmoRouter.post('/claims/:id/adjudicate', requireHmoInstitution(['hmo.claims.adjudicate', 'hmo.preauth.adjudicate']), HmoPortalController.adjudicateClaimOrPreAuth);
+
+  // 9. Billing & Premium Reconciliation
+  hmoRouter.get('/billing', requireHmoInstitution('hmo.billing.view'), HmoPortalController.getBillingSummary);
+
+  // 10. HMO Users, RBAC & Audit Logs
+  hmoRouter.get('/users-audit', requireHmoInstitution(['hmo.audit.view', 'hmo.users.manage', 'hmo.dashboard.view']), HmoPortalController.listUsersAndAudit);
+
+  return hmoRouter;
+}
 
 export function createHealthInsuranceRouter(): Router {
   const router = Router();
 
   // Webhook ingress: Authenticated via cryptographic HMAC signature, not Supabase JWT
   router.post('/provider-webhooks/:providerCode', HealthController.handleProviderWebhook);
+
+  // Mount HMO Institution Portal sub-router (enforces its own classification + feature flag check)
+  router.use('/hmo-portal', createHmoPortalRouter());
 
   // All other endpoints require feature flag check AND Supabase user authentication
   router.use(requireHealthInsuranceEnabled);
@@ -88,5 +142,6 @@ export function attachHealthInsuranceRoutes(app: any): void {
   if (!app || app._healthInsuranceRoutesAttached) return;
   app._healthInsuranceRoutesAttached = true;
   app.use('/api/v1/health-insurance', createHealthInsuranceRouter());
-  console.log('[HealthInsurance] Routes attached at /api/v1/health-insurance');
+  app.use('/api/agent/hmo', createHmoPortalRouter());
+  console.log('[HealthInsurance] Routes attached at /api/v1/health-insurance and /api/agent/hmo');
 }

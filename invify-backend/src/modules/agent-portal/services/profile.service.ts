@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../../../db/supabase';
+import { institutionClassificationService } from '../../health-insurance/services/institution-classification.service';
 
 function maskBvn(value: any): string | null {
   const raw = String(value || '').trim();
@@ -7,7 +8,7 @@ function maskBvn(value: any): string | null {
   return raw.length >= 4 ? `***${raw.slice(-4)}` : raw;
 }
 
-function normalizeProfile(agent: any, profile: any, territoryName?: string | null) {
+function normalizeProfile(agent: any, profile: any, territoryName?: string | null, instCtx?: any) {
   const first = String(agent.first_name || '').trim();
   const last = String(agent.last_name || '').trim();
   const name = String(agent.full_name || `${first} ${last}`).trim();
@@ -22,6 +23,15 @@ function normalizeProfile(agent: any, profile: any, territoryName?: string | nul
     phone,
     phone_number: phone,
     territory: territoryName || agent.territory || null,
+    institution_type: instCtx?.institutionType || 'BANK',
+    institutionType: instCtx?.institutionType || 'BANK',
+    portal_mode: instCtx?.portalMode || 'BANK',
+    portalMode: instCtx?.portalMode || 'BANK',
+    institution_id: instCtx?.institutionId || null,
+    institution_name: instCtx?.institutionName || null,
+    hmo_provider_id: instCtx?.hmoProviderId || null,
+    hmo_role: instCtx?.hmoRole || null,
+    hmo_permissions: instCtx?.hmoPermissions || [],
     profile: {
       ...(profile || {}),
       residential_address: address,
@@ -30,7 +40,7 @@ function normalizeProfile(agent: any, profile: any, territoryName?: string | nul
       profile_photo_url: photo,
       bvn_masked: maskBvn(profile?.bvn_masked || profile?.bvn),
       mfa_enabled: Boolean(profile?.mfa_enabled),
-      kyc_status: profile?.kyc_status || 'PENDING',
+      kyc_status: instCtx?.kycStatus || profile?.kyc_status || 'PENDING',
     },
   };
 }
@@ -81,7 +91,11 @@ export class ProfileService {
       territoryName = territory?.name || territory?.territory_code || null;
     }
 
-    return normalizeProfile(agent, profile, territoryName);
+    const instCtx = await institutionClassificationService
+      .resolveForAgentOrUser({ authUserId, email: agent.email, agentRecord: agent })
+      .catch(() => null);
+
+    return normalizeProfile(agent, profile, territoryName, instCtx);
   }
 
   async updateProfile(authUserId: string, payload: any, email?: string) {

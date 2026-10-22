@@ -4,9 +4,15 @@
     <!-- Header -->
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="dashboard" size="sm" color="amber-4" />
+        <q-icon :name="identity.institutionType === 'HMO' ? 'health_and_safety' : 'dashboard'" size="sm" :color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'" />
         <div>
-          <div class="text-operator-title text-weight-bold" style="font-size: 16px;">INSTITUTE PORTAL</div>
+          <div class="row items-center op-gap-8">
+            <div class="text-operator-title text-weight-bold" style="font-size: 16px;">
+              {{ identity.institutionType === 'HMO' ? 'HMO INSTITUTION PORTAL' : 'INSTITUTE PORTAL' }}
+            </div>
+            <q-badge v-if="identity.institutionType === 'HMO'" color="teal-9" text-color="teal-2">HMO</q-badge>
+            <q-badge v-else-if="identity.institutionType" color="amber-9" text-color="amber-2">{{ identity.institutionType }}</q-badge>
+          </div>
           <div class="text-metric-mono text-muted" style="font-size: 10px;">
             {{ identity.agentCode || (loading ? 'Loading…' : 'No Institute code') }}
             <template v-if="identity.status"> // {{ identity.status }}</template>
@@ -21,6 +27,26 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-center col">
+      <q-spinner color="amber-4" size="3em" />
+    </div>
+
+    <!-- HMO OR RESTRICTED INSTITUTION PORTAL VIEW -->
+    <div v-else-if="isHmoOrRestricted" class="col" style="overflow-y: auto;">
+      <HmoInstitutionPortalView
+        :identity="identity"
+        :initial-hmo-dashboard="payload.hmoDashboard || null"
+        :portal-mode="identity.portalMode"
+        :institution-type="identity.institutionType"
+        :approval-status="identity.approvalStatus"
+        :restriction-reason="identity.restrictionReason"
+        @enable-mfa="startMfaSetup"
+      />
+    </div>
+
+    <!-- BANK / AGGREGATOR INSTITUTION PORTAL VIEW (EXISTING UNTOUCHED) -->
+    <template v-else>
     <!-- Tabs Navigation -->
     <div class="shrink-0">
       <q-tabs
@@ -46,13 +72,8 @@
       </q-tabs>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="flex flex-center col">
-      <q-spinner color="amber-4" size="3em" />
-    </div>
-
     <!-- Main Dashboard Panels -->
-    <q-tab-panels v-else v-model="activeTab" animated class="bg-transparent col" style="overflow-y: auto;">
+    <q-tab-panels v-model="activeTab" animated class="bg-transparent col" style="overflow-y: auto;">
       
       <!-- OVERVIEW TAB -->
       <q-tab-panel name="overview" class="q-pa-none column op-gap-16">
@@ -597,6 +618,7 @@
       </q-tab-panel>
 
     </q-tab-panels>
+    </template>
     
     <AgentKYCUploadModal ref="kycModal" />
     <AgentHardwareAssignmentModal ref="hardwareModal" />
@@ -639,6 +661,7 @@ import VueApexCharts from 'vue3-apexcharts'
 import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
 import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
+import HmoInstitutionPortalView from './components/HmoInstitutionPortalView.vue'
 import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
@@ -685,13 +708,38 @@ const identity = computed(() => {
   const parts = String(name || '').split(/\s+/).filter(Boolean)
   const initials = ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase() || '?'
   const joinedRaw = p.date_joined || a.created_at || s.created_at
+  const agentCode = pickInstituteCode(p.agent_code, a.agent_code, a.agentCode, s.agentCode, s.agent_code)
+
+  // Authoritative backend classification takes priority over any stored fallback
+  const institutionType = String(
+    p.institution_type ||
+    p.institutionType ||
+    a.institution_type ||
+    a.institutionType ||
+    (String(agentCode || '').toUpperCase().startsWith('MHMO') ? 'HMO' : 'BANK')
+  ).toUpperCase()
+
+  const portalMode = String(
+    p.portal_mode ||
+    p.portalMode ||
+    a.portal_mode ||
+    a.portalMode ||
+    (institutionType === 'HMO' ? 'HMO' : 'BANK')
+  ).toUpperCase()
+
   return {
     name,
     email,
     phone: p.phone || a.phone || a.phone_number || s.phone || '',
-    agentCode: pickInstituteCode(p.agent_code, a.agent_code, a.agentCode, s.agentCode, s.agent_code),
+    agentCode,
     status: p.status || a.status || s.status || '',
-    institution: p.institution || '',
+    institution: p.institution || a.institution_name || '',
+    institutionType,
+    portalMode,
+    approvalStatus: p.approval_status || p.status || a.status || 'ACTIVE',
+    restrictionReason: p.restriction_reason || '',
+    hmoRole: p.hmo_role || a.hmo_role || 'HMO_ADMIN',
+    hmoPermissions: p.hmo_permissions || a.hmo_permissions || [],
     territory: a.territory || p.territory || '',
     kyc: a.profile?.kyc_status || a.kyc_status || a.kycStatus || p.kyc_status || '',
     mfa: Boolean(a.profile?.mfa_enabled || s.profile?.mfa_enabled),
@@ -700,6 +748,12 @@ const identity = computed(() => {
     joinedLabel: joinedRaw ? new Date(joinedRaw).toLocaleDateString() : '—',
   }
 })
+
+const isHmoOrRestricted = computed(() =>
+  identity.value.institutionType === 'HMO' ||
+  identity.value.portalMode === 'HMO' ||
+  identity.value.portalMode === 'RESTRICTED'
+)
 
 const formatMoney = (num) => {
   const value = Number(num || 0)
@@ -814,6 +868,14 @@ const fetchDashboardData = async () => {
     if (profileRes.status === 'fulfilled' && profileRes.value.data?.data) {
       Object.assign(live, profileRes.value.data.data)
     }
+    if (payload.value?.identity?.institution_type) {
+      live.institution_type = payload.value.identity.institution_type
+      live.institutionType = payload.value.identity.institution_type
+    }
+    if (payload.value?.identity?.portal_mode) {
+      live.portal_mode = payload.value.identity.portal_mode
+      live.portalMode = payload.value.identity.portal_mode
+    }
     const code = pickInstituteCode(
       payload.value?.identity?.agent_code,
       live.agent_code,
@@ -826,6 +888,7 @@ const fetchDashboardData = async () => {
     agentInfo.value = live
     if (Object.keys(live).length) {
       localStorage.setItem('invify_agent_info', JSON.stringify(live))
+      window.dispatchEvent(new CustomEvent('invify-agent-info-updated', { detail: live }))
     }
   } catch (err) {
     console.error('Dashboard fetch failed', err)
