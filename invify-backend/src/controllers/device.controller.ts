@@ -111,10 +111,19 @@ export class DeviceController {
       const tenantsMap = new Map<string, { name: string; plan: string; plan_expires_at: string | null; owner_email: string | null }>();
 
       if (tenantIds.length > 0) {
-        let { data: tenants, error: tenError } = await supabaseAdmin
+        type TenantDeviceSummaryRow = {
+          id: string;
+          name: string;
+          plan: string;
+          plan_expires_at?: string | null;
+          owner_email?: string | null;
+        };
+        const initialTenants = await supabaseAdmin
           .from('tenants')
           .select('id, name, plan, plan_expires_at, owner_email')
           .in('id', tenantIds);
+        let tenants: TenantDeviceSummaryRow[] | null = initialTenants.data;
+        let tenError = initialTenants.error;
         if (tenError && String(tenError.message || '').toLowerCase().includes('plan_expires_at')) {
           const retry = await supabaseAdmin
             .from('tenants')
