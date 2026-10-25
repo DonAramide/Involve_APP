@@ -53,7 +53,7 @@ export class FakeLedgerDb {
   private async rpcNow(fn: string, args: Row): Promise<{ data: any; error: any }> {
     this.rpcCalls.push({ fn, args });
     try {
-      if (fn === 'process_ledger_double_entry') return { data: this.processDoubleEntry(args), error: null };
+      if (fn === 'process_ledger_double_entry' || fn === 'process_ledger_double_entry_text') return { data: this.processDoubleEntry(args), error: null };
       if (fn === 'request_payout_with_lock') return { data: this.requestPayout(args), error: null };
       if (fn === 'request_treasury_withdrawal_with_fee') return { data: this.requestTreasury(args), error: null };
       if (fn === 'post_fee_debit_guarded') return { data: this.postFeeDebit(args), error: null };

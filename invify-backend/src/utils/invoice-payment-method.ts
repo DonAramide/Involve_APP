@@ -20,6 +20,7 @@ export function classifyInvoicePaymentMethod(raw?: string | null): InvoiceRail {
     .replace(/[\s-]+/g, '_');
 
   if (!method) return 'other';
+  if (method.includes('+') || method.includes('/') || method.includes(',')) return 'other';
   if (method === 'wallet' || method === 'customer_wallet') return 'wallet';
   if (method === 'cash' || method.includes('cash')) return 'cash';
   if (method === 'card' || method === 'pos') return 'card';

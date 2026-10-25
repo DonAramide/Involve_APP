@@ -19,6 +19,8 @@ import { issueDeviceLinkQr, WEB_ISSUER_DEVICE_ID } from '../utils/device-link-qr
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import { mergeDeviceInfo, ORIGIN_CUSTOMER, ORIGIN_INVIFY, originOfDevice } from '../utils/device-origin';
 import { lookupAgentCode, normalizeAgentCode } from '../utils/agent-code';
+import { HealthSettingsService } from '../modules/health-insurance/services/health-settings.service';
+
 
 /**
  * Non-expiring device JWT for a tablet linked by QR. Signed as the tenant
@@ -554,13 +556,24 @@ export class OnboardingController {
         code: lookup.code || normalizeAgentCode(raw),
         agentName: lookup.agentName || null,
         status: lookup.status || null,
+        institutionId: lookup.institutionId || null,
+        institutionType: lookup.institutionType || null,
+        hmoProviderId: lookup.hmoProviderId || null,
+        hmoProviderCode: lookup.hmoProviderCode || null,
+        hmoProviderName: lookup.hmoProviderName || null,
+        hmoAssignmentMode: lookup.hmoAssignmentMode || null,
         error: lookup.error || null,
         message: lookup.valid
           ? lookup.isDefault
             ? 'Invify default agent confirmed.'
-            : 'Agent code is valid.'
+            : lookup.institutionType === 'HMO'
+              ? `${lookup.agentName || lookup.code} HMO institution confirmed.`
+              : lookup.institutionType === 'BANK'
+                ? `${lookup.agentName || lookup.code} partner bank confirmed.`
+                : 'Agent code is valid.'
           : lookup.error || 'This agent code does not exist',
       });
+
     } catch (error: any) {
       console.error('[OnboardingController] checkAgentCode error:', error.message);
       res.status(500).json({
@@ -773,7 +786,8 @@ export class OnboardingController {
       const tenantCode = generateTenantCode(phone);
       const normalizedPhone = (phone || '').replace(/\D/g, '');
       const normalizedType = (industry || 'retail').toLowerCase();
-      const agentLookup = await lookupAgentCode(agentCode);
+      const candidateAgentCode = (agentCode && String(agentCode).trim()) ? agentCode : 'AAA000';
+      const agentLookup = await lookupAgentCode(candidateAgentCode);
       if (!agentLookup.valid) {
         res.status(400).json({
           success: false,
@@ -1056,6 +1070,20 @@ export class OnboardingController {
         console.warn('[OnboardingController] Welcome email failed (non-fatal):', emailErr.message);
       }
 
+      // Bind authoritative institution & HMO configuration (LOCKED for MHMO, SELECTABLE for BANK / AAA000 / Private Merchant)
+      try {
+        if (typeof (HealthSettingsService as any)?.bindTenantOnboardingInstitution === 'function') {
+          await (HealthSettingsService as any).bindTenantOnboardingInstitution({
+            tenantId: finalTenantId,
+            tenantType: normalizedType,
+            userId: finalUserId || emailDevice.userId || null,
+            agentLookup,
+          });
+        }
+      } catch (bindErr: any) {
+        console.warn('[OnboardingController] bindTenantOnboardingInstitution warning (non-fatal):', bindErr?.message);
+      }
+
       // Generate offline JWT for local authentication — require explicit secret (no fallback)
       if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
         res.status(503).json({
@@ -1091,6 +1119,10 @@ export class OnboardingController {
         deviceNumber,
         isAdditionalDevice: !isNewTenant,
         sameDevice: emailDevice.sameDevice,
+        institutionType: agentLookup.institutionType || null,
+        hmoAssignmentMode: agentLookup.hmoAssignmentMode || null,
+        hmoProviderId: agentLookup.hmoProviderId || null,
+        hmoProviderCode: agentLookup.hmoProviderCode || null,
         offlineToken,
       });
     } catch (error: any) {
@@ -1098,6 +1130,7 @@ export class OnboardingController {
       res.status(500).json({ success: false, error: 'Internal server error' });
     }
   }
+
 
   /**
    * POST /auth/generate-link-qr

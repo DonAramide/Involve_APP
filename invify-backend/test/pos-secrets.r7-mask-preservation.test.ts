@@ -233,7 +233,7 @@ describe('Phase 32E.1.R7 masked-secret preservation', () => {
     const json = jest.fn();
     const res: any = { status: jest.fn().mockReturnValue({ json }) };
     await PosController.updateRoutingConfig(
-      { body: { config: bodyConfig, adminId: 'r7-ctrl', reason: 'mask-post' } } as any,
+      { body: { config: bodyConfig, adminId: 'r7-ctrl', reason: 'mask-post' }, makerCheckerApply: true } as any,
       res,
     );
     expect(res.status).toHaveBeenCalledWith(200);

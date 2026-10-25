@@ -82,14 +82,17 @@ export class AgentService {
     const firstName = String(data.first_name || fullName.split(' ')[0]).trim();
     const lastName = String(data.last_name || fullName.split(' ').slice(1).join(' ') || 'Agent').trim();
 
-    const rawType = String(data.institutionType || data.institution_type || 'SCHOOL').trim().toUpperCase();
-    if (!CANONICAL_INSTITUTION_TYPES.includes(rawType as any)) {
-      throw new AgentAccessError(
-        `Invalid institution category '${rawType}'. Must be one of: ${CANONICAL_INSTITUTION_TYPES.join(', ')}`,
-        400
-      );
+    const rawType = String(data.institutionType || data.institution_type || '').trim().toUpperCase();
+    let institutionType: CanonicalInstitutionType | null = null;
+    if (rawType) {
+      if (!CANONICAL_INSTITUTION_TYPES.includes(rawType as any)) {
+        throw new AgentAccessError(
+          `Invalid institution category '${rawType}'. Must be one of: ${CANONICAL_INSTITUTION_TYPES.join(', ')}`,
+          400
+        );
+      }
+      institutionType = rawType as CanonicalInstitutionType;
     }
-    const institutionType = rawType as CanonicalInstitutionType;
     const tradingName = String(data.tradingName || data.trading_name || fullName).trim();
 
     // Conditional regulatory requirements validation
@@ -151,7 +154,7 @@ export class AgentService {
           first_name: firstName,
           last_name: lastName,
           phone: data.phone || data.whatsappNumber || null,
-          status: 'PENDING',
+          status: institutionType ? 'PENDING' : 'ACTIVE',
           role_id: optionalUuid(data.role_id),
           territory_id: optionalUuid(data.territory_id),
           supervisor_agent_id: optionalUuid(data.supervisor_agent_id),

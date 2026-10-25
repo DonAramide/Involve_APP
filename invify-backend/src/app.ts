@@ -511,7 +511,7 @@ app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKy
 app.get('/api/admin/kyc/documents', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.listPending);
 app.patch('/api/admin/kyc/documents/:id', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.reviewDocument);
 
-const platformFeeAdminRoles = ['super_admin', 'admin_deploy', 'admin_finance', 'admin_treasury'];
+const platformFeeAdminRoles = ['super_admin', 'admin_deploy'];
 registerCollisionAdmin('get', '/platform-fees', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.list);
 registerCollisionAdmin('get', '/platform-fees/agents', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.listAgents);
 registerCollisionAdmin('get', '/platform-fees/agent-commission', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.agentCommission);
@@ -798,7 +798,7 @@ app.post(
 );
 
 // Terminal Sync (Public / Onboarding for mobile app)
-app.post('/api/mobile/terminal/sync', optionalAuthenticate, TerminalController.mobileSync);
+app.post('/api/mobile/terminal/sync', authenticate, TerminalController.mobileSync);
 app.post('/api/mobile/terminal/keyexchange-success', TerminalController.keyExchangeSuccess);
 app.get('/api/mobile/terminal/status', TerminalController.mobileStatus);
 

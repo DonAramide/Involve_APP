@@ -14,6 +14,7 @@ jest.mock('../src/middleware/auth.middleware', () => ({
     };
     next();
   },
+  optionalAuthenticate: (_req: any, _res: any, next: any) => next(),
 }));
 
 jest.mock('../src/db/supabase', () => {

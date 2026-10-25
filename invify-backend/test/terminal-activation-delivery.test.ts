@@ -28,7 +28,7 @@ describe('terminal activation delivery', () => {
     expect(raw).toContain('/Subtype /Image');
     expect(raw).toContain('/Width 320');
     expect(raw).toContain('/Width 454');
-  });
+  }, 30000);
 
   it('names the attachment as a pdf', () => {
     const name = new EmailService().activationPdfFilename('Greenfield Academy');

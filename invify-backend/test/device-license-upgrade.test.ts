@@ -35,6 +35,7 @@ describe('validateCode upgrades tenant plan', () => {
   });
 
   test('Standard redemption writes plan=standard and plan_expires_at on the tenant', async () => {
+    const futureExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const pendingActivation = {
       activation_code: 'NLDQ-D3QB-6X63-YVZ5-YQNE-R5XE',
       tenant_id: 'tenant-123',
@@ -43,7 +44,7 @@ describe('validateCode upgrades tenant plan', () => {
       plan_index: 1,
       duration_days: 30,
       device_suffix: '0',
-      expires_at: '2026-10-08T01:00:00.000Z',
+      expires_at: futureExpiresAt,
     };
     let capturedTenantUpdate: any = null;
 
@@ -107,7 +108,7 @@ describe('validateCode upgrades tenant plan', () => {
     expect(res.statusCode).toBe(200);
     expect(capturedTenantUpdate).toEqual({
       plan: 'standard',
-      plan_expires_at: '2026-10-08T01:00:00.000Z',
+      plan_expires_at: futureExpiresAt,
     });
     expect(res.body.plan).toBe('standard');
     expect(res.body.tenant.plan).toBe('standard');
