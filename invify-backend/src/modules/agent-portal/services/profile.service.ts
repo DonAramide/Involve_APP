@@ -29,6 +29,8 @@ function normalizeProfile(agent: any, profile: any, territoryName?: string | nul
     portalMode: instCtx?.portalMode || 'BANK',
     institution_id: instCtx?.institutionId || null,
     institution_name: instCtx?.institutionName || null,
+    logo_url: instCtx?.logoUrl || agent.logo_url || profile?.logo_url || null,
+    logoUrl: instCtx?.logoUrl || agent.logo_url || profile?.logo_url || null,
     hmo_provider_id: instCtx?.hmoProviderId || null,
     hmo_role: instCtx?.hmoRole || null,
     hmo_permissions: instCtx?.hmoPermissions || [],

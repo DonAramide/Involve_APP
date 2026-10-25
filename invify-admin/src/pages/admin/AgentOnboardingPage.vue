@@ -135,7 +135,7 @@
             <!-- Official Institution Logo Upload -->
             <div class="bg-panel-darker rounded-borders border-muted q-pa-sm column op-gap-6">
               <div class="row items-center justify-between">
-                <span class="text-caption text-weight-bold text-muted" style="font-size: 10px;">OFFICIAL INSTITUTION LOGO (PNG, JPEG, WebP - MAX 2MB)</span>
+                <span class="text-caption text-weight-bold text-muted" style="font-size: 10px;">OFFICIAL INSTITUTION LOGO (PNG, JPEG, WebP - MAX 3MB, RECOMMENDED 512x512)</span>
                 <span v-if="logoFile" class="text-caption text-cyan-3" style="font-size: 9px;">{{ (logoFile.size / 1024).toFixed(0) }} KB</span>
               </div>
               <div class="row items-center op-gap-12" v-if="logoPreviewUrl">
@@ -367,7 +367,7 @@
                     <q-file
                       v-model="replaceLogoFile"
                       dark filled dense
-                      label="Upload / Replace Logo (PNG/JPEG/WebP, Max 2MB)"
+                      label="Upload / Replace Logo (PNG/JPEG/WebP, Max 3MB, 512x512)"
                       accept="image/png,image/jpeg,image/webp"
                       class="bg-panel text-caption"
                       :loading="updatingLogo"
@@ -723,8 +723,8 @@ const onLogoSelected = (file) => {
     logoPreviewUrl.value = ''
     return
   }
-  if (file.size > 2 * 1024 * 1024) {
-    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 2MB limit.', position: 'top-right' })
+  if (file.size > 3 * 1024 * 1024) {
+    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 3MB limit.', position: 'top-right' })
     logoFile.value = null
     logoPreviewUrl.value = ''
     return
@@ -746,8 +746,8 @@ const clearLogoSelection = () => {
 
 const onReplaceLogoSelected = async (file) => {
   if (!file || !selectedAgent.value) return
-  if (file.size > 2 * 1024 * 1024) {
-    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 2MB limit.', position: 'top-right' })
+  if (file.size > 3 * 1024 * 1024) {
+    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 3MB limit.', position: 'top-right' })
     replaceLogoFile.value = null
     return
   }

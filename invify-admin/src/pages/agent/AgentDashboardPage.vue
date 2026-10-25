@@ -32,8 +32,8 @@
       <q-spinner color="amber-4" size="3em" />
     </div>
 
-    <!-- HMO OR RESTRICTED INSTITUTION PORTAL VIEW -->
-    <div v-else-if="isHmoOrRestricted" class="col" style="overflow-y: auto;">
+    <!-- RESTRICTED INSTITUTION PORTAL VIEW -->
+    <div v-else-if="isRestricted" class="col" style="overflow-y: auto;">
       <HmoInstitutionPortalView
         :identity="identity"
         :initial-hmo-dashboard="payload.hmoDashboard || null"
@@ -45,7 +45,7 @@
       />
     </div>
 
-    <!-- BANK / AGGREGATOR INSTITUTION PORTAL VIEW (EXISTING UNTOUCHED) -->
+    <!-- MAIN INSTITUTION PORTAL (HMO & BANK & OTHERS) -->
     <template v-else>
     <!-- Tabs Navigation -->
     <div class="shrink-0">
@@ -56,13 +56,15 @@
         outside-arrows
         mobile-arrows
         class="bg-panel text-muted rounded-borders border-muted"
-        active-color="amber-4"
-        indicator-color="amber-4"
+        :active-color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'"
+        :indicator-color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'"
         align="left"
         narrow-indicator
       >
+        <q-tab v-if="identity.institutionType === 'HMO'" name="hmo_ops" label="HMO Operations" icon="health_and_safety" no-caps />
+        <q-tab v-if="identity.institutionType === 'HMO'" name="catalog" label="Product Catalogue & Pricing" icon="inventory_2" no-caps />
         <q-tab name="overview" label="Overview" icon="dashboard" no-caps />
-        <q-tab name="tenants" label="Tenants" icon="storefront" no-caps />
+        <q-tab name="tenants" :label="identity.institutionType === 'HMO' ? 'Schools & Tenants' : 'Tenants'" icon="storefront" no-caps />
         <q-tab name="deployments" label="Deployments" icon="devices" no-caps />
         <q-tab name="finance" label="Finance" icon="account_balance_wallet" no-caps />
         <q-tab name="analytics" label="Analytics" icon="analytics" no-caps />
@@ -75,6 +77,24 @@
     <!-- Main Dashboard Panels -->
     <q-tab-panels v-model="activeTab" animated class="bg-transparent col" style="overflow-y: auto;">
       
+      <!-- HMO OPERATIONS TAB -->
+      <q-tab-panel v-if="identity.institutionType === 'HMO'" name="hmo_ops" class="q-pa-none">
+        <HmoInstitutionPortalView
+          :identity="identity"
+          :initial-hmo-dashboard="payload.hmoDashboard || null"
+          :portal-mode="identity.portalMode"
+          :institution-type="identity.institutionType"
+          :approval-status="identity.approvalStatus"
+          :restriction-reason="identity.restrictionReason"
+          @enable-mfa="startMfaSetup"
+        />
+      </q-tab-panel>
+
+      <!-- PRODUCT CATALOGUE & PRICING TAB -->
+      <q-tab-panel v-if="identity.institutionType === 'HMO'" name="catalog" class="q-pa-none">
+        <HmoProductCatalogueView :identity="identity" />
+      </q-tab-panel>
+
       <!-- OVERVIEW TAB -->
       <q-tab-panel name="overview" class="q-pa-none column op-gap-16">
         <!-- ROW 1: Performance KPIs -->
@@ -662,6 +682,7 @@ import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
 import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
 import HmoInstitutionPortalView from './components/HmoInstitutionPortalView.vue'
+import HmoProductCatalogueView from './components/HmoProductCatalogueView.vue'
 import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
@@ -749,11 +770,7 @@ const identity = computed(() => {
   }
 })
 
-const isHmoOrRestricted = computed(() =>
-  identity.value.institutionType === 'HMO' ||
-  identity.value.portalMode === 'HMO' ||
-  identity.value.portalMode === 'RESTRICTED'
-)
+const isRestricted = computed(() => identity.value.portalMode === 'RESTRICTED')
 
 const formatMoney = (num) => {
   const value = Number(num || 0)
@@ -855,6 +872,13 @@ const fetchDashboardData = async () => {
 
     if (dashRes.status === 'fulfilled' && dashRes.value.data?.identity) {
       payload.value = dashRes.value.data
+      const instType = payload.value.identity?.institution_type || payload.value.identity?.institutionType
+      const requestedTab = router.currentRoute.value?.query?.tab
+      if (requestedTab) {
+        activeTab.value = requestedTab
+      } else if (instType === 'HMO' && activeTab.value === 'overview') {
+        activeTab.value = 'hmo_ops'
+      }
     } else if (dashRes.status === 'rejected') {
       const err = dashRes.reason
       $q.notify({
@@ -898,7 +922,16 @@ const fetchDashboardData = async () => {
   }
 }
 
-onMounted(fetchDashboardData)
+onMounted(async () => {
+  const stored = parseStoredAgent()
+  const requestedTab = router.currentRoute.value?.query?.tab
+  if (requestedTab) {
+    activeTab.value = requestedTab
+  } else if (stored?.institution_type === 'HMO' || stored?.institutionType === 'HMO') {
+    activeTab.value = 'hmo_ops'
+  }
+  await fetchDashboardData()
+})
 
 // Chart Series
 const growthSeries = computed(() => [{ name: 'Tenants', data: payload.value.analytics?.merchantGrowth || [] }])

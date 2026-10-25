@@ -10,6 +10,8 @@ import {
   ALLOWED_BATCH_TRANSITIONS,
   BatchStatus,
 } from './hmo-excel-exchange.service';
+import { validateImageBase64 } from '../../../utils/image-validator';
+import { uploadBase64ToContabo } from '../../agent-portal/utils/kyc-storage';
 
 export class HmoPortalService {
   /**
@@ -1252,7 +1254,33 @@ export class HmoPortalService {
 
     const { data, error } = await query;
     if (error) return [];
-    let list = data || [];
+    let list = (data || []).map((f: any) => {
+      let logo_url = f.logo_url || '';
+      let latitude = f.latitude != null ? f.latitude : null;
+      let longitude = f.longitude != null ? f.longitude : null;
+      let restrictionsNote = f.restrictions || '';
+
+      if (f.restrictions && typeof f.restrictions === 'string' && f.restrictions.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(f.restrictions);
+          logo_url = logo_url || parsed.logo_url || '';
+          if (latitude == null && parsed.latitude != null) latitude = parsed.latitude;
+          if (longitude == null && parsed.longitude != null) longitude = parsed.longitude;
+          restrictionsNote = parsed.note || '';
+        } catch {
+          // fallback to raw string
+        }
+      }
+
+      return {
+        ...f,
+        logo_url,
+        latitude,
+        longitude,
+        restrictions: restrictionsNote,
+      };
+    });
+
     if (filters?.search) {
       const q = filters.search.trim().toLowerCase();
       list = list.filter(
@@ -1273,6 +1301,46 @@ export class HmoPortalService {
     const name = String(body.name || '').trim();
     if (!name) throw new Error('Facility name is required.');
 
+    // Process facility logo if provided
+    let logoUrl = String(body.logo_url || body.logoUrl || '').trim();
+    if (body.logoImage && typeof body.logoImage === 'string' && body.logoImage.startsWith('data:image')) {
+      try {
+        validateImageBase64(body.logoImage, { maxSizeBytes: 3 * 1024 * 1024 });
+        logoUrl = await uploadBase64ToContabo(
+          body.logoImage,
+          'facility-logos',
+          `${providerId.slice(0, 8)}_${externalRef.replace(/[^A-Z0-9]/gi, '_')}`
+        );
+      } catch (err: any) {
+        console.warn(`[HmoPortalService] Facility logo upload failed: ${err.message}`);
+        // If upload fails, preserve existing logo or throw if validation failed
+        if (err.name === 'ImageValidationError') throw err;
+      }
+    }
+
+    // Process GPS coordinates
+    const latNum = body.latitude !== undefined && body.latitude !== '' && body.latitude !== null ? Number(body.latitude) : null;
+    const lngNum = body.longitude !== undefined && body.longitude !== '' && body.longitude !== null ? Number(body.longitude) : null;
+
+    // Services parsing
+    let parsedServices: string[] = [];
+    if (Array.isArray(body.services)) {
+      parsedServices = body.services.map((s: any) => String(s).trim()).filter(Boolean);
+    } else if (typeof body.services === 'string') {
+      parsedServices = body.services.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+    if (parsedServices.length === 0) {
+      parsedServices = ['Outpatient', 'Inpatient', 'Pharmacy', 'Emergency'];
+    }
+
+    // Resilient metadata storage inside restrictions column (avoids schema break on staging)
+    const restrictionsPayload = JSON.stringify({
+      note: typeof body.restrictions === 'string' && !body.restrictions.startsWith('{') ? body.restrictions : '',
+      logo_url: logoUrl,
+      latitude: !isNaN(latNum as number) ? latNum : null,
+      longitude: !isNaN(lngNum as number) ? lngNum : null,
+    });
+
     const record = {
       provider_id: providerId,
       external_ref: externalRef,
@@ -1281,13 +1349,8 @@ export class HmoPortalService {
       lga: body.lga || '',
       address: body.address || '',
       phone: body.phone || '',
-      services: Array.isArray(body.services)
-        ? body.services
-        : String(body.services || 'Outpatient,Inpatient,Pharmacy,Emergency')
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-      restrictions: body.restrictions || null,
+      services: parsedServices,
+      restrictions: restrictionsPayload,
       source: 'manual_verified',
       last_verified_at: new Date().toISOString(),
       is_active: body.is_active !== false,
@@ -1300,7 +1363,13 @@ export class HmoPortalService {
       .single();
 
     if (error) throw new Error(error.message);
-    return data;
+
+    return {
+      ...data,
+      logo_url: logoUrl,
+      latitude: !isNaN(latNum as number) ? latNum : null,
+      longitude: !isNaN(lngNum as number) ? lngNum : null,
+    };
   }
 
   /**

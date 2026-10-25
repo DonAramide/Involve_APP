@@ -544,28 +544,117 @@
         <!-- 6. PROVIDER NETWORK (HOSPITALS & CLINICS) TAB -->
         <q-tab-panel name="providers" class="q-pa-none column op-gap-16">
           <div class="row q-col-gutter-md">
-            <div class="col-xs-12 col-md-4">
+            <div class="col-xs-12 col-md-5">
               <div class="bg-panel border-muted rounded-borders q-pa-md column op-gap-12">
-                <div class="text-subtitle2 text-weight-bold text-teal-3">Add Accredited Hospital / Clinic</div>
-                <q-input v-model="newFacility.external_ref" dark filled dense label="Hospital Code (e.g. MHMO-LAG-001)" class="bg-panel-darker" />
-                <q-input v-model="newFacility.name" dark filled dense label="Hospital / Facility Name" class="bg-panel-darker" />
+                <div class="row items-center justify-between">
+                  <div class="text-subtitle2 text-weight-bold text-teal-3">Add Accredited Hospital / Clinic</div>
+                  <q-badge color="teal-9" text-color="teal-2">GEO-TAGGED</q-badge>
+                </div>
+
+                <q-input v-model="newFacility.external_ref" dark filled dense label="Hospital Code (e.g. MHMO-LAG-001) *" class="bg-panel-darker text-caption" />
+                <q-input v-model="newFacility.name" dark filled dense label="Hospital / Facility Name *" class="bg-panel-darker text-caption" />
+
+                <!-- Provider Official Logo Upload -->
+                <div class="bg-panel-darker rounded-borders border-muted q-pa-sm column op-gap-6">
+                  <div class="row items-center justify-between">
+                    <span class="text-caption text-weight-bold text-muted" style="font-size: 10px;">FACILITY LOGO (PNG, JPEG, WebP - MAX 3MB)</span>
+                    <span v-if="facilityLogoFile" class="text-caption text-teal-3" style="font-size: 9px;">{{ (facilityLogoFile.size / 1024).toFixed(0) }} KB</span>
+                  </div>
+                  <div class="row items-center op-gap-12" v-if="facilityLogoPreview">
+                    <q-avatar size="44px" class="bg-panel rounded-borders border-muted">
+                      <img :src="facilityLogoPreview" alt="Provider Logo" style="object-fit: contain;" />
+                    </q-avatar>
+                    <div class="column col">
+                      <span class="text-caption text-weight-bold ellipsis">{{ facilityLogoFile?.name || 'Selected Logo' }}</span>
+                      <span class="text-caption text-muted" style="font-size: 9px;">Recommended: 512 × 512 px square</span>
+                    </div>
+                    <q-btn flat round dense size="sm" icon="close" color="red-4" @click="clearFacilityLogo">
+                      <q-tooltip>Remove logo</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <q-file
+                    v-model="facilityLogoFile"
+                    dark filled dense
+                    label="Upload Facility Logo (512x512 standard)"
+                    accept="image/png,image/jpeg,image/webp"
+                    class="bg-panel text-caption"
+                    @update:model-value="onFacilityLogoSelected"
+                  >
+                    <template v-slot:prepend><q-icon name="add_photo_alternate" color="teal-3" /></template>
+                  </q-file>
+                </div>
+
                 <div class="row q-col-gutter-sm">
                   <div class="col-6">
-                    <q-input v-model="newFacility.state" dark filled dense label="State" class="bg-panel-darker" />
+                    <q-input v-model="newFacility.state" dark filled dense label="State *" class="bg-panel-darker text-caption" />
                   </div>
                   <div class="col-6">
-                    <q-input v-model="newFacility.lga" dark filled dense label="City / LGA" class="bg-panel-darker" />
+                    <q-input v-model="newFacility.lga" dark filled dense label="City / LGA *" class="bg-panel-darker text-caption" />
                   </div>
                 </div>
-                <q-input v-model="newFacility.phone" dark filled dense label="Emergency / Frontdesk Phone" class="bg-panel-darker" />
-                <q-input v-model="newFacility.address" dark filled dense label="Street Address" class="bg-panel-darker" />
-                <q-input v-model="newFacility.services" dark filled dense label="Services (comma-separated)" class="bg-panel-darker" />
+
+                <q-input v-model="newFacility.phone" dark filled dense label="Emergency / Frontdesk Phone" class="bg-panel-darker text-caption" />
+                <q-input v-model="newFacility.address" dark filled dense label="Street Address" class="bg-panel-darker text-caption" />
+
+                <!-- Map Coordinates & Geolocation -->
+                <div class="bg-panel-darker rounded-borders border-muted q-pa-sm column op-gap-6">
+                  <div class="row items-center justify-between">
+                    <span class="text-caption text-weight-bold text-teal-3" style="font-size: 10px;">MAP COORDINATES & NAVIGATION</span>
+                    <q-btn flat dense size="xs" color="teal-3" icon="my_location" label="Detect GPS" @click="detectFacilityLocation" :loading="detectingGps" />
+                  </div>
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-6">
+                      <q-input v-model="newFacility.latitude" dark filled dense label="Latitude (e.g. 6.5244)" class="bg-panel text-caption" />
+                    </div>
+                    <div class="col-6">
+                      <q-input v-model="newFacility.longitude" dark filled dense label="Longitude (e.g. 3.3792)" class="bg-panel text-caption" />
+                    </div>
+                  </div>
+                  <div v-if="newFacility.latitude && newFacility.longitude" class="row items-center justify-between q-mt-xs">
+                    <span class="text-caption text-muted font-mono" style="font-size: 9px;">GPS: {{ newFacility.latitude }}, {{ newFacility.longitude }}</span>
+                    <a :href="`https://www.google.com/maps?q=${newFacility.latitude},${newFacility.longitude}`" target="_blank" class="text-caption text-teal-3" style="font-size: 10px; text-decoration: underline;">
+                      <q-icon name="open_in_new" size="12px" class="q-mr-xs" />Preview on Google Maps
+                    </a>
+                  </div>
+                </div>
+
+                <!-- Services Multi-Select Dropdown with Chips & Custom Input -->
+                <div class="column op-gap-4">
+                  <label class="text-caption text-muted" style="font-size: 10px;">ACCREDITED HEALTHCARE SERVICES *</label>
+                  <q-select
+                    v-model="newFacility.servicesList"
+                    multiple
+                    use-chips
+                    use-input
+                    new-value-mode="add-unique"
+                    :options="standardFacilityServices"
+                    dark filled dense
+                    label="Select or type custom services..."
+                    class="bg-panel-darker text-caption"
+                  >
+                    <template v-slot:selected-item="scope">
+                      <q-chip
+                        removable
+                        dense
+                        @remove="scope.removeAtIndex(scope.index)"
+                        :tabindex="scope.tabindex"
+                        color="teal-9"
+                        text-color="teal-2"
+                        class="q-ma-none q-mr-xs"
+                        style="font-size: 11px;"
+                      >
+                        {{ scope.opt }}
+                      </q-chip>
+                    </template>
+                  </q-select>
+                </div>
+
                 <q-btn
                   color="teal-4"
                   text-color="black"
                   icon="add_business"
                   label="Save Accredited Provider"
-                  class="text-weight-bold"
+                  class="text-weight-bold full-width q-mt-xs"
                   no-caps
                   :loading="savingFacility"
                   @click="handleSaveFacility"
@@ -573,7 +662,7 @@
               </div>
             </div>
 
-            <div class="col-xs-12 col-md-8">
+            <div class="col-xs-12 col-md-7">
               <div class="bg-panel border-muted rounded-borders q-pa-md column op-gap-12 full-height">
                 <div class="row items-center justify-between">
                   <div class="text-subtitle2 text-weight-bold">Accredited Provider Network ({{ facilities.length }})</div>
@@ -582,18 +671,34 @@
                 <div v-if="!facilities.length" class="text-caption text-muted q-pa-md text-center">
                   No accredited hospitals or clinics registered in your HMO directory yet.
                 </div>
-                <div v-else class="column op-gap-8">
-                  <div v-for="fac in facilities" :key="fac.id" class="bg-panel-darker border-muted rounded-borders q-pa-sm row items-center justify-between">
-                    <div>
-                      <div class="row items-center op-gap-8">
-                        <span class="text-weight-bold">{{ fac.name }}</span>
-                        <q-badge color="teal-9" text-color="teal-2">{{ fac.external_ref }}</q-badge>
-                      </div>
-                      <div class="text-caption text-muted">
-                        {{ fac.address }} • {{ fac.lga }}, {{ fac.state }} • {{ fac.phone || 'No phone' }}
-                      </div>
-                      <div class="text-caption text-teal-3" style="font-size: 11px;">
-                        Services: {{ (fac.services || []).join(', ') }}
+                <div v-else class="column op-gap-8" style="max-height: 720px; overflow-y: auto;">
+                  <div v-for="fac in facilities" :key="fac.id" class="bg-panel-darker border-muted rounded-borders q-pa-sm row items-start justify-between op-gap-12">
+                    <div class="row items-start op-gap-12 col">
+                      <q-avatar size="44px" rounded class="bg-panel border-muted shrink-0">
+                        <img v-if="fac.logo_url" :src="fac.logo_url" alt="Logo" style="object-fit: contain;" />
+                        <q-icon v-else name="local_hospital" color="teal-3" size="24px" />
+                      </q-avatar>
+                      <div class="column col">
+                        <div class="row items-center op-gap-8">
+                          <span class="text-weight-bold text-subtitle2">{{ fac.name }}</span>
+                          <q-badge color="teal-9" text-color="teal-2">{{ fac.external_ref }}</q-badge>
+                        </div>
+                        <div class="text-caption text-muted">
+                          {{ fac.address || 'Address unlisted' }} • {{ fac.lga }}, {{ fac.state }} • {{ fac.phone || 'No phone' }}
+                        </div>
+                        <div class="row items-center op-gap-8 q-mt-xs" v-if="fac.latitude && fac.longitude">
+                          <q-badge color="blue-grey-9" text-color="teal-3" class="font-mono" style="font-size: 9px;">
+                            <q-icon name="place" size="10px" class="q-mr-xs" />{{ fac.latitude }}, {{ fac.longitude }}
+                          </q-badge>
+                          <a :href="`https://www.google.com/maps?q=${fac.latitude},${fac.longitude}`" target="_blank" class="text-caption text-teal-3 font-mono" style="font-size: 9px; text-decoration: underline;">
+                            <q-icon name="open_in_new" size="10px" class="q-mr-xs" />Map
+                          </a>
+                        </div>
+                        <div class="row op-gap-4 q-mt-xs wrap">
+                          <q-badge v-for="svc in (fac.services || [])" :key="svc" color="grey-9" text-color="grey-3" style="font-size: 10px;">
+                            {{ svc }}
+                          </q-badge>
+                        </div>
                       </div>
                     </div>
                     <q-badge :color="fac.is_active ? 'green-9' : 'red-9'">
@@ -852,6 +957,28 @@ const newPlan = ref({
   publishImmediately: true,
 })
 
+const standardFacilityServices = [
+  'Outpatient',
+  'Inpatient',
+  'Pharmacy',
+  'Emergency',
+  'Optical',
+  'Dental',
+  'Maternity / Antenatal',
+  'Surgery & Theatre',
+  'Pediatrics',
+  'Laboratory & Diagnostics',
+  'Radiology / Ultrasound',
+  'Physiotherapy',
+  'Intensive Care (ICU)',
+  'Mental Health',
+]
+
+const facilityLogoFile = ref(null)
+const facilityLogoPreview = ref('')
+const facilityLogoBase64 = ref('')
+const detectingGps = ref(false)
+
 const newFacility = ref({
   external_ref: '',
   name: '',
@@ -859,8 +986,59 @@ const newFacility = ref({
   lga: 'Ikeja',
   phone: '',
   address: '',
-  services: 'Outpatient, Inpatient, Pharmacy, Emergency, Optical',
+  servicesList: ['Outpatient', 'Inpatient', 'Pharmacy', 'Emergency', 'Optical'],
+  latitude: '',
+  longitude: '',
+  restrictions: '',
 })
+
+function onFacilityLogoSelected(file) {
+  if (!file) {
+    facilityLogoPreview.value = ''
+    facilityLogoBase64.value = ''
+    return
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 3MB limit (Recommended: 512 × 512 px square).' })
+    facilityLogoFile.value = null
+    facilityLogoPreview.value = ''
+    facilityLogoBase64.value = ''
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    facilityLogoPreview.value = e.target.result
+    facilityLogoBase64.value = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearFacilityLogo() {
+  facilityLogoFile.value = null
+  facilityLogoPreview.value = ''
+  facilityLogoBase64.value = ''
+}
+
+function detectFacilityLocation() {
+  if (!navigator.geolocation) {
+    $q.notify({ type: 'warning', message: 'Geolocation is not supported by your browser.' })
+    return
+  }
+  detectingGps.value = true
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      newFacility.value.latitude = pos.coords.latitude.toFixed(6)
+      newFacility.value.longitude = pos.coords.longitude.toFixed(6)
+      detectingGps.value = false
+      $q.notify({ type: 'positive', message: 'GPS coordinates detected successfully' })
+    },
+    (err) => {
+      detectingGps.value = false
+      $q.notify({ type: 'warning', message: `Could not detect GPS: ${err.message}` })
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  )
+}
 
 function authHeaders() {
   const token = localStorage.getItem('invify_agent_token')
@@ -1140,10 +1318,28 @@ async function handleTogglePlanStatus(planId, status) {
 async function handleSaveFacility() {
   savingFacility.value = true
   try {
-    await axios.post('/api/agent/hmo/facilities', newFacility.value, { headers: authHeaders() })
-    $q.notify({ type: 'positive', message: 'Hospital added to HMO network' })
+    const payload = {
+      external_ref: newFacility.value.external_ref,
+      name: newFacility.value.name,
+      state: newFacility.value.state,
+      lga: newFacility.value.lga,
+      phone: newFacility.value.phone,
+      address: newFacility.value.address,
+      services: newFacility.value.servicesList,
+      latitude: newFacility.value.latitude,
+      longitude: newFacility.value.longitude,
+      restrictions: newFacility.value.restrictions,
+      logoImage: facilityLogoBase64.value || undefined,
+    }
+    await axios.post('/api/agent/hmo/facilities', payload, { headers: authHeaders() })
+    $q.notify({ type: 'positive', message: 'Hospital added to HMO network successfully' })
     newFacility.value.external_ref = ''
     newFacility.value.name = ''
+    newFacility.value.phone = ''
+    newFacility.value.address = ''
+    newFacility.value.latitude = ''
+    newFacility.value.longitude = ''
+    clearFacilityLogo()
     await loadFacilities()
     await loadOverviewAndProfile()
   } catch (err) {

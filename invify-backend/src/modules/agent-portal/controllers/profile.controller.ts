@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { profileService } from '../services/profile.service';
+import { agentService } from '../services/agent.service';
 
 export class ProfileController {
   static userFromReq(req: Request) {
@@ -112,6 +113,56 @@ export class ProfileController {
       res.status(200).json({ success: true, data: qrData });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async uploadLogo(req: Request, res: Response) {
+    try {
+      const { id: authUserId, email } = ProfileController.userFromReq(req);
+      if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const base64Image = req.body?.logoImage || req.body?.image;
+      if (!base64Image) {
+        return res.status(400).json({ success: false, message: 'Base64 image data is required in logoImage' });
+      }
+
+      const agent = await profileService.findAgent(authUserId, email);
+      const result = await agentService.updateLogo(
+        agent.id,
+        base64Image,
+        authUserId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Institution logo updated successfully',
+        logoUrl: result.logoUrl,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async deleteLogo(req: Request, res: Response) {
+    try {
+      const { id: authUserId, email } = ProfileController.userFromReq(req);
+      if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+      const agent = await profileService.findAgent(authUserId, email);
+      await agentService.removeLogo(
+        agent.id,
+        authUserId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Institution logo removed successfully',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 }

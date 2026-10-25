@@ -566,6 +566,15 @@ app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
 app.post('/api/agent/hardware/assign', authenticate, AgentController.assignHardware);
 app.post('/api/agent/hardware/sync', authenticate, AgentController.syncHardware);
 
+import { productCatalogController } from './modules/product-catalog/product-catalog.controller';
+
+app.get('/api/agent/catalog/products', authenticate, (req, res) => productCatalogController.getMasterProducts(req, res));
+app.get('/api/agent/catalog/offers', authenticate, (req, res) => productCatalogController.getHmoOffers(req, res));
+app.post('/api/agent/catalog/offers', authenticate, (req, res) => productCatalogController.configureOfferPrice(req, res));
+app.get('/api/agent/catalog/assignments', authenticate, (req, res) => productCatalogController.listAssignments(req, res));
+app.post('/api/agent/catalog/assignments', authenticate, (req, res) => productCatalogController.assignProduct(req, res));
+app.delete('/api/agent/catalog/assignments/:id', authenticate, (req, res) => productCatalogController.revokeAssignment(req, res));
+
 import activationRoutes from './routes/activation.routes';
 import { authRoutes } from './routes/auth.routes';
 import ecsRoutes from './routes/ecs.routes';

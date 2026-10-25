@@ -51,6 +51,7 @@
           style="width: 100%"
         >
           <q-tab name="personal" icon="person" label="Personal Info" class="justify-start q-pl-md" />
+          <q-tab name="branding" icon="palette" label="Institution Branding" class="justify-start q-pl-md" />
           <q-tab name="kyc" icon="verified_user" label="KYC Documents" class="justify-start q-pl-md" />
           <q-tab name="security" icon="security" label="Security & MFA" class="justify-start q-pl-md" />
           <q-tab name="idcard" icon="badge" label="Identity Card" class="justify-start q-pl-md" />
@@ -78,6 +79,88 @@
               <q-btn type="submit" color="amber-4" text-color="black" label="Save Changes" :loading="saving" />
             </div>
           </q-form>
+        </div>
+
+        <!-- INSTITUTION BRANDING TAB -->
+        <div v-if="activeTab === 'branding'" class="column op-gap-16">
+          <div class="row items-center justify-between border-bottom-light q-pb-sm">
+            <div>
+              <div class="text-h6 text-weight-bold">Institution Branding & Identity</div>
+              <div class="text-caption text-muted">Manage your institution's official brand logo displayed across invoices, student portals, and health certificates.</div>
+            </div>
+            <q-badge color="teal-9" text-color="teal-2" class="text-caption">
+              Classification: {{ profile?.institution_type || 'INSTITUTION' }}
+            </q-badge>
+          </div>
+
+          <div class="bg-panel-darker q-pa-md rounded-borders border-muted column op-gap-16" style="max-width: 600px;">
+            <div class="row items-center justify-between">
+              <div>
+                <div class="text-weight-bold">Official Institution Logo</div>
+                <div class="text-caption text-muted">PNG, JPEG, or WebP. Max 3MB. Standard 512x512 canvas recommended.</div>
+              </div>
+              <q-btn
+                v-if="profile?.logo_url || profile?.logoUrl"
+                flat
+                dense
+                size="sm"
+                color="red-4"
+                label="Remove Logo"
+                icon="delete"
+                :loading="updatingLogo"
+                @click="removeInstitutionLogo"
+              />
+            </div>
+
+            <!-- Current / Preview Logo Avatar -->
+            <div class="row items-center op-gap-16">
+              <q-avatar size="80px" class="bg-panel rounded-borders border-muted shadow-2">
+                <img v-if="logoPreviewUrl || profile?.logo_url || profile?.logoUrl" :src="logoPreviewUrl || profile?.logo_url || profile?.logoUrl" alt="Institution Logo" style="object-fit: contain;" />
+                <q-icon v-else name="account_balance" size="40px" color="grey-6" />
+              </q-avatar>
+              <div class="column col op-gap-4">
+                <div class="text-weight-bold">{{ profile?.institution_name || profile?.name || 'Your Institution' }}</div>
+                <div class="text-caption text-muted">
+                  {{ (logoPreviewUrl || profile?.logo_url || profile?.logoUrl) ? 'Official logo active on public documents and portals' : 'No official logo configured yet' }}
+                </div>
+                <div v-if="logoFile" class="text-caption text-cyan-3">
+                  Selected: {{ logoFile.name }} ({{ (logoFile.size / 1024).toFixed(0) }} KB)
+                </div>
+              </div>
+            </div>
+
+            <!-- Upload File Input -->
+            <div class="row items-center op-gap-12">
+              <div class="col">
+                <q-file
+                  v-model="logoFile"
+                  dark
+                  filled
+                  dense
+                  label="Select Logo File (PNG/JPEG/WebP, Max 3MB, 512x512)"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="bg-panel text-caption"
+                  :loading="updatingLogo"
+                  @update:model-value="onLogoFileSelected"
+                >
+                  <template v-slot:prepend><q-icon name="cloud_upload" color="cyan-3" /></template>
+                  <template v-slot:append v-if="logoFile">
+                    <q-icon name="close" class="cursor-pointer" @click.stop="clearProfileLogoSelection" />
+                  </template>
+                </q-file>
+              </div>
+              <q-btn
+                v-if="logoFile"
+                color="amber-4"
+                text-color="black"
+                label="Upload & Save"
+                icon="save"
+                no-caps
+                :loading="updatingLogo"
+                @click="uploadInstitutionLogo"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- KYC TAB -->
@@ -481,6 +564,93 @@ const verifyMfa = async () => {
     $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Invalid verification code' })
   } finally {
     saving.value = false
+  }
+}
+
+// Institution Official Logo Management
+const logoFile = ref(null)
+const logoPreviewUrl = ref('')
+const updatingLogo = ref(false)
+
+const toBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.readAsDataURL(file)
+  reader.onload = () => resolve(reader.result)
+  reader.onerror = (error) => reject(error)
+})
+
+const onLogoFileSelected = (file) => {
+  if (!file) {
+    logoPreviewUrl.value = ''
+    return
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 3MB limit.', position: 'top-right' })
+    logoFile.value = null
+    logoPreviewUrl.value = ''
+    return
+  }
+  const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+  if (!allowed.includes(file.type)) {
+    $q.notify({ type: 'negative', message: 'Only PNG, JPEG, and WebP logos are supported.', position: 'top-right' })
+    logoFile.value = null
+    logoPreviewUrl.value = ''
+    return
+  }
+  logoPreviewUrl.value = URL.createObjectURL(file)
+}
+
+const clearProfileLogoSelection = () => {
+  logoFile.value = null
+  logoPreviewUrl.value = ''
+}
+
+const uploadInstitutionLogo = async () => {
+  if (!logoFile.value) return
+  updatingLogo.value = true
+  try {
+    const base64Data = await toBase64(logoFile.value)
+    const token = localStorage.getItem('invify_agent_token')
+    const res = await axios.post('/api/agent/profile/logo', {
+      logoImage: base64Data
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const newUrl = res.data?.logoUrl || ''
+    if (profile.value) {
+      profile.value.logo_url = newUrl
+      profile.value.logoUrl = newUrl
+    }
+    clearProfileLogoSelection()
+    $q.notify({ type: 'positive', message: 'Institution logo updated successfully', position: 'top-right' })
+    await fetchProfileData()
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Logo update failed: ${msg}`, position: 'top-right' })
+  } finally {
+    updatingLogo.value = false
+  }
+}
+
+const removeInstitutionLogo = async () => {
+  updatingLogo.value = true
+  try {
+    const token = localStorage.getItem('invify_agent_token')
+    await axios.delete('/api/agent/profile/logo', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (profile.value) {
+      profile.value.logo_url = null
+      profile.value.logoUrl = null
+    }
+    clearProfileLogoSelection()
+    $q.notify({ type: 'positive', message: 'Institution logo removed successfully', position: 'top-right' })
+    await fetchProfileData()
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Logo removal failed: ${msg}`, position: 'top-right' })
+  } finally {
+    updatingLogo.value = false
   }
 }
 </script>

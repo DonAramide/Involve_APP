@@ -25,8 +25,16 @@ export class ImageValidationError extends Error {
   }
 }
 
+export const RECOMMENDED_LOGO_DIMENSIONS = {
+  width: 512,
+  height: 512,
+  aspectRatio: '1:1',
+  maxSizeBytes: 3 * 1024 * 1024, // 3MB
+  allowedFormats: ['png', 'jpeg', 'webp'] as const,
+};
+
 const DEFAULT_OPTIONS: Required<ImageValidationOptions> = {
-  maxSizeBytes: 2 * 1024 * 1024, // 2MB
+  maxSizeBytes: 3 * 1024 * 1024, // 3MB (Standardized)
   minWidth: 32,
   minHeight: 32,
   maxWidth: 4096,
