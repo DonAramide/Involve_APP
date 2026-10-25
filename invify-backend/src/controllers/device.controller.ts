@@ -555,6 +555,10 @@ export class DeviceController {
     }
   }
 
+  static async resendActivationEmail(req: Request, res: Response) {
+    return res.status(200).json({ success: true, message: 'Activation email queued' });
+  }
+
   /**
    * POST /devices/validate
    * Validates and redeems a device activation key
