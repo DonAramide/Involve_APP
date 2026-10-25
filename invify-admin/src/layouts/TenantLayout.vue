@@ -28,12 +28,19 @@
 
           <!-- Dynamic Active Tenant Brand Logo/Title Container -->
           <div class="row items-center op-gap-6 border-indigo-left q-pl-md q-ml-sm v-hide-xs">
-            <q-icon name="storefront" color="amber-4" size="xs" />
+            <q-avatar size="22px" class="bg-panel rounded-borders" v-if="activeTenantLogo">
+              <img :src="activeTenantLogo" alt="Tenant Logo" style="object-fit: contain;" />
+            </q-avatar>
+            <q-icon v-else :name="tenantCategoryIcon" color="amber-4" size="xs" />
             <span class="text-metric-mono text-weight-bold text-amber-4 text-uppercase text-caption" style="font-size: 11px;">
               {{ activeBusinessName }}
             </span>
             <q-badge color="indigo-10" text-color="indigo-3" class="text-metric-sm text-weight-bold letter-spacing-1 q-ml-xs">
-              {{ activeIndustry.toUpperCase() }}
+              {{ (activeIndustry || 'BUSINESS').toUpperCase() }}
+            </q-badge>
+            <!-- Distinct HMO Partner Identity Pill (Separated from School Identity) -->
+            <q-badge v-if="assignedHmoPartner" color="teal-10" text-color="teal-2" class="text-metric-sm q-ml-xs">
+              HMO: {{ assignedHmoPartner }}
             </q-badge>
           </div>
         </div>
@@ -211,9 +218,19 @@ const operatorEmail = ref(localStorage.getItem('operator_email') || 'owner@busin
 const operatorName = ref('')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'OWNER')
 const activeBusinessName = ref('')
+const activeTenantLogo = ref('')
+const assignedHmoPartner = ref('')
 
 // Industry configuration: read from localStorage (tenant_type / school, retail, etc.)
 const activeIndustry = ref(localStorage.getItem('tenant_type') || '')
+
+const tenantCategoryIcon = computed(() => {
+  const mode = String(activeIndustry.value || '').toLowerCase()
+  if (mode.includes('school') || mode.includes('education')) return 'school'
+  if (mode.includes('health') || mode.includes('hmo')) return 'health_and_safety'
+  if (mode.includes('bank') || mode.includes('finance')) return 'account_balance'
+  return 'storefront'
+})
 
 const getTenantIdFromToken = () => {
   // Prefer JWT tenantId for tenant operators so a stale twin in localStorage cannot stick.
@@ -253,6 +270,8 @@ const loadTenantDetails = async () => {
       if (res.data && res.data.tenant) {
         activeBusinessName.value = res.data.tenant.name || ''
         activeIndustry.value = res.data.tenant.business_mode || res.data.tenant.type || ''
+        activeTenantLogo.value = res.data.tenant.logo_url || res.data.tenant.logo || ''
+        assignedHmoPartner.value = res.data.tenant.assigned_hmo_name || res.data.tenant.hmo_partner_name || localStorage.getItem('assigned_hmo_name') || ''
         localStorage.setItem('tenant_type', activeIndustry.value)
         
         // Find operator name

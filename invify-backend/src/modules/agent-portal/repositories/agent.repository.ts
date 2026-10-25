@@ -12,6 +12,17 @@ function isMissingRelationError(error: any): boolean {
   );
 }
 
+function isMissingColumnError(error: any): boolean {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '');
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    /Could not find the ['"]?\w+['"]? column/i.test(message) ||
+    /column ['"]?\w+['"]? does not exist/i.test(message)
+  );
+}
+
 export class AgentSchemaUnavailableError extends Error {
   readonly code = 'AGENT_SCHEMA_UNAVAILABLE';
   constructor(message = 'Agent portal schema is not provisioned in this environment') {
@@ -104,40 +115,80 @@ export class AgentRepository {
   }
 
   /**
-   * Creates an agent and profile inside a transaction-like flow
-   * Note: Supabase JS client doesn't support explicit transactions over REST, 
-   * so we rely on Postgres RPC or sequential inserts.
+   * Creates an agent and profile inside a transaction-like flow.
+   * Gracefully handles optional extended columns (institution_type, logo_url, etc.)
+   * when running against schemas where additive migrations have not yet been applied.
    */
   async createAgent(agentData: any, profileData: any) {
-    // Insert Agent
-    const { data: agent, error: agentError } = await supabase
+    // 1. Insert Agent
+    let agent: any;
+    const agentInsert = await supabase
       .from('agents')
       .insert(agentData)
       .select()
       .single();
 
-    if (agentError) {
-      if (isMissingRelationError(agentError)) {
-        throw new AgentSchemaUnavailableError(agentError.message);
+    if (agentInsert.error && isMissingColumnError(agentInsert.error)) {
+      const { institution_type, trading_name, logo_url, ...baseAgentData } = agentData;
+      const fallbackInsert = await supabase
+        .from('agents')
+        .insert(baseAgentData)
+        .select()
+        .single();
+      if (fallbackInsert.error) {
+        if (isMissingRelationError(fallbackInsert.error)) {
+          throw new AgentSchemaUnavailableError(fallbackInsert.error.message);
+        }
+        throw fallbackInsert.error;
       }
-      throw agentError;
+      agent = fallbackInsert.data;
+    } else if (agentInsert.error) {
+      if (isMissingRelationError(agentInsert.error)) {
+        throw new AgentSchemaUnavailableError(agentInsert.error.message);
+      }
+      throw agentInsert.error;
+    } else {
+      agent = agentInsert.data;
     }
 
-    // Insert Profile
-    const { error: profileError } = await supabase
+    // 2. Insert Profile
+    const profileInsert = await supabase
       .from('agent_profiles')
       .insert({
         agent_id: agent.id,
         ...profileData
       });
 
-    if (profileError) {
-      // Manual rollback
-      await supabase.from('agents').delete().eq('id', agent.id);
-      if (isMissingRelationError(profileError)) {
-        throw new AgentSchemaUnavailableError(profileError.message);
+    if (profileInsert.error && isMissingColumnError(profileInsert.error)) {
+      const {
+        logo_url,
+        cac_registration_number,
+        tax_identification_number,
+        regulator_license_reference,
+        regulatory_metadata,
+        ...baseProfileData
+      } = profileData;
+
+      const fallbackProfile = await supabase
+        .from('agent_profiles')
+        .insert({
+          agent_id: agent.id,
+          ...baseProfileData
+        });
+
+      if (fallbackProfile.error) {
+        await supabase.from('agents').delete().eq('id', agent.id);
+        if (isMissingRelationError(fallbackProfile.error)) {
+          throw new AgentSchemaUnavailableError(fallbackProfile.error.message);
+        }
+        throw fallbackProfile.error;
       }
-      throw profileError;
+    } else if (profileInsert.error) {
+      await supabase.from('agents').delete().eq('id', agent.id);
+      if (isMissingRelationError(profileInsert.error)) {
+        throw new AgentSchemaUnavailableError(profileInsert.error.message);
+      }
+      throw profileInsert.error;
     }
 
     return agent;
@@ -147,30 +198,62 @@ export class AgentRepository {
    * Update Agent core details
    */
   async updateAgent(id: string, updates: any) {
-    const { data, error } = await supabase
+    let res = await supabase
       .from('agents')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (res.error && isMissingColumnError(res.error)) {
+      const { institution_type, trading_name, logo_url, ...baseUpdates } = updates;
+      res = await supabase
+        .from('agents')
+        .update(baseUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+    }
+
+    if (res.error) throw res.error;
+    return res.data;
   }
 
   /**
    * Update Agent profile details
    */
   async updateAgentProfile(agentId: string, updates: any) {
-    const { data, error } = await supabase
+    let res = await supabase
       .from('agent_profiles')
       .update(updates)
       .eq('agent_id', agentId)
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (res.error && isMissingColumnError(res.error)) {
+      const { logo_url, cac_registration_number, regulator_license_reference, ...baseUpdates } = updates;
+      res = await supabase
+        .from('agent_profiles')
+        .update(baseUpdates)
+        .eq('agent_id', agentId)
+        .select()
+        .single();
+    }
+
+    if (res.error) throw res.error;
+    return res.data;
+  }
+
+  /**
+   * Updates Agent logo on both core agent and profile tables
+   */
+  async updateLogo(agentId: string, logoUrl: string | null) {
+    try {
+      await supabase.from('agents').update({ logo_url: logoUrl }).eq('id', agentId);
+    } catch (_) {}
+    try {
+      await supabase.from('agent_profiles').update({ logo_url: logoUrl }).eq('agent_id', agentId);
+    } catch (_) {}
   }
 
   /**
@@ -178,49 +261,44 @@ export class AgentRepository {
    */
   async updateStatus(id: string, newStatus: string, oldStatus: string, changedBy: string, reason: string) {
     // 1. Log History
-    const { error: historyError } = await supabase
-      .from('agent_status_history')
-      .insert({
-        agent_id: id,
-        old_status: oldStatus,
-        new_status: newStatus,
-        changed_by: changedBy,
-        reason: reason
-      });
+    await supabase.from('agent_status_history').insert({
+      agent_id: id,
+      old_status: oldStatus,
+      new_status: newStatus,
+      changed_by: changedBy,
+      reason
+    });
 
-    if (historyError) throw historyError;
-
-    // 2. Update Status
-    const { data, error } = await supabase
-      .from('agents')
-      .update({ status: newStatus })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    // 2. Update status
+    return this.updateAgent(id, { status: newStatus });
   }
 
   /**
-   * Audit Logging Enforcement
+   * Logs an action in the immutable Agent Audit Log
    */
-  async logAudit(actorId: string, entityType: string, entityId: string, action: string, oldValue: any, newValue: any, ipAddress?: string, userAgent?: string) {
-    const { error } = await supabase
-      .from('agent_audit_logs')
-      .insert({
+  async logAudit(
+    actorId: string, 
+    entityType: string, 
+    entityId: string | null, 
+    action: string, 
+    oldValue: any = null, 
+    newValue: any = null, 
+    ipAddress?: string, 
+    userAgent?: string
+  ) {
+    try {
+      await supabase.from('agent_audit_logs').insert({
         actor_id: actorId,
         entity_type: entityType,
         entity_id: entityId,
         action,
         old_value: oldValue,
         new_value: newValue,
-        ip_address: ipAddress || 'unknown',
-        user_agent: userAgent || 'unknown'
+        ip_address: ipAddress || null,
+        user_agent: userAgent || null
       });
-
-    if (error) {
-      console.error('[AgentRepository] Failed to write audit log:', error);
+    } catch (err: any) {
+      console.warn('[AgentRepository] Failed to write audit log:', err?.message || err);
     }
   }
 }

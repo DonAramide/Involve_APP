@@ -419,6 +419,7 @@ registerApiPair('get', '/api/dashboard/analytics', authenticate, checkRole(dashb
 registerCollisionAdmin('post', '/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.onboardAgent);
 registerCollisionAdmin('get', '/agents', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.listAgents);
 registerCollisionAdmin('get', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.getAgent);
+registerCollisionAdmin('patch', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentProfile);
 registerCollisionAdmin('patch', '/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentStatus);
 registerCollisionAdmin('patch', '/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateKycStatus);
 registerCollisionAdmin('get', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.getCommissions);
@@ -426,6 +427,8 @@ registerCollisionAdmin('patch', '/agents/:id/commissions', authenticate, checkRo
 registerCollisionAdmin('post', '/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageAgent);
 registerCollisionAdmin('post', '/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageTenants);
 registerCollisionAdmin('post', '/agents/:id/resend-invite', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.resendInvite);
+registerCollisionAdmin('post', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateLogo);
+registerCollisionAdmin('delete', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.deleteLogo);
 
 registerCollisionAdmin('post', '/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
@@ -560,6 +563,8 @@ app.post('/api/agent/forgot-password', verificationLimiter, AgentController.forg
 app.post('/api/agent/reset-password', authLimiter, AgentController.resetPassword);
 app.post('/api/agent/resolve-suspension', AgentController.resolveSuspension);
 app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
+app.post('/api/agent/hardware/assign', authenticate, AgentController.assignHardware);
+app.post('/api/agent/hardware/sync', authenticate, AgentController.syncHardware);
 
 import activationRoutes from './routes/activation.routes';
 import { authRoutes } from './routes/auth.routes';

@@ -228,10 +228,12 @@ export class AgentController {
 
       const { data: agentProfile } = await supabaseAdmin
         .from('agent_profiles')
-        .select('mfa_enabled')
+        .select('mfa_enabled, logo_url')
         .eq('agent_id', agent.id)
         .maybeSingle();
       const mfaEnabled = Boolean(agentProfile?.mfa_enabled);
+      const logoUrl = agent.logo_url || agentProfile?.logo_url || null;
+      const tradingName = agent.trading_name || null;
 
       const instCtx = await institutionClassificationService
         .resolveForAgentOrUser({
@@ -253,11 +255,15 @@ export class AgentController {
           name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email,
           first_name: agent.first_name,
           last_name: agent.last_name,
+          trading_name: tradingName,
+          tradingName: tradingName,
+          logo_url: logoUrl,
+          logoUrl: logoUrl,
           phone: agent.phone || agent.phone_number || null,
           status: agent.status,
           kycStatus: instCtx?.kycStatus || agent.kyc_status || null,
-          institution_type: instCtx?.institutionType || 'BANK',
-          institutionType: instCtx?.institutionType || 'BANK',
+          institution_type: instCtx?.institutionType || agent.institution_type || 'BANK',
+          institutionType: instCtx?.institutionType || agent.institution_type || 'BANK',
           portal_mode: instCtx?.portalMode || 'BANK',
           portalMode: instCtx?.portalMode || 'BANK',
           institution_id: instCtx?.institutionId || null,

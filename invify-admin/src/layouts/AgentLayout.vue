@@ -2,17 +2,24 @@
   <q-layout view="hHh lpR fFf" class="bg-main text-main font-inter">
     <q-header elevated class="bg-panel-darker border-bottom flex items-center justify-between q-px-md" style="height: 50px;">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon :name="isHmo ? 'health_and_safety' : 'support_agent'" size="sm" :color="isHmo ? 'teal-3' : 'amber-4'" />
-        <span class="text-operator-title text-weight-bold" style="letter-spacing: 1px;">
-          {{ isHmo ? 'HMO INSTITUTION PORTAL' : 'INSTITUTE PORTAL' }}
-        </span>
-        <q-badge v-if="isHmo" color="teal-9" text-color="teal-2" class="q-ml-xs">HMO</q-badge>
+        <q-avatar size="28px" class="bg-panel rounded-borders" v-if="logoUrl">
+          <img :src="logoUrl" alt="Logo" style="object-fit: contain;" />
+        </q-avatar>
+        <q-icon v-else :name="categoryIcon" size="sm" :color="categoryColor" />
+        <div class="column justify-center">
+          <div class="row items-center op-gap-6 no-wrap">
+            <span class="text-operator-title text-weight-bold" style="letter-spacing: 1px;">
+              {{ portalTitle }}
+            </span>
+            <q-badge :color="badgeColor" :text-color="badgeTextColor" class="q-ml-xs">{{ categoryBadge }}</q-badge>
+          </div>
+        </div>
       </div>
       
       <div class="row items-center op-gap-12" v-if="agentInfo">
         <div class="text-metric-mono text-muted text-right" style="font-size: 10px;">
-          <span>{{ agentInfo.name }}</span><br/>
-          <span :class="isHmo ? 'text-teal-3' : 'text-amber-4'">[{{ displayAgentCode }}]</span>
+          <span class="text-weight-bold text-main">{{ displayName }}</span><br/>
+          <span :class="categoryColor">[{{ displayAgentCode }}]</span>
           <span v-if="agentInfo.email"><br/>{{ agentInfo.email }}</span>
         </div>
         <q-btn flat round size="sm" icon="logout" color="grey-5" @click="logout" />
@@ -37,13 +44,89 @@ const displayAgentCode = computed(() =>
   pickInstituteCode(agentInfo.value?.agent_code, agentInfo.value?.agentCode),
 )
 
-const isHmo = computed(() => {
+const institutionType = computed(() => {
   const t = String(
     agentInfo.value?.institution_type ||
     agentInfo.value?.institutionType ||
-    (String(displayAgentCode.value || '').toUpperCase().startsWith('MHMO') ? 'HMO' : '')
+    agentInfo.value?.regulatory_metadata?.institution_type ||
+    (String(displayAgentCode.value || '').toUpperCase().startsWith('MHMO') ? 'HMO' : 'SCHOOL')
   ).toUpperCase()
-  return t === 'HMO'
+  return t
+})
+
+const isHmo = computed(() => institutionType.value === 'HMO')
+
+const logoUrl = computed(() => agentInfo.value?.logo_url || agentInfo.value?.logoUrl || '')
+
+const displayName = computed(() => {
+  return agentInfo.value?.trading_name || agentInfo.value?.tradingName || agentInfo.value?.name || 'Institute'
+})
+
+const portalTitle = computed(() => {
+  switch (institutionType.value) {
+    case 'HMO': return 'HMO INSTITUTION PORTAL'
+    case 'BANK': return 'BANKING PORTAL'
+    case 'PTSP': return 'PTSP TERMINAL PORTAL'
+    case 'MERCHANT': return 'MERCHANT PORTAL'
+    case 'CORPORATE': return 'CORPORATE PORTAL'
+    case 'SCHOOL':
+    default:
+      return 'INSTITUTE PORTAL'
+  }
+})
+
+const categoryBadge = computed(() => institutionType.value)
+
+const categoryIcon = computed(() => {
+  switch (institutionType.value) {
+    case 'HMO': return 'health_and_safety'
+    case 'BANK': return 'account_balance'
+    case 'PTSP': return 'point_of_sale'
+    case 'MERCHANT': return 'storefront'
+    case 'CORPORATE': return 'corporate_fare'
+    case 'SCHOOL':
+    default:
+      return 'school'
+  }
+})
+
+const categoryColor = computed(() => {
+  switch (institutionType.value) {
+    case 'HMO': return 'teal-3'
+    case 'BANK': return 'amber-4'
+    case 'PTSP': return 'purple-3'
+    case 'MERCHANT': return 'orange-4'
+    case 'CORPORATE': return 'indigo-3'
+    case 'SCHOOL':
+    default:
+      return 'cyan-3'
+  }
+})
+
+const badgeColor = computed(() => {
+  switch (institutionType.value) {
+    case 'HMO': return 'teal-9'
+    case 'BANK': return 'amber-9'
+    case 'PTSP': return 'purple-9'
+    case 'MERCHANT': return 'orange-9'
+    case 'CORPORATE': return 'indigo-9'
+    case 'SCHOOL':
+    default:
+      return 'cyan-9'
+  }
+})
+
+const badgeTextColor = computed(() => {
+  switch (institutionType.value) {
+    case 'HMO': return 'teal-2'
+    case 'BANK': return 'amber-2'
+    case 'PTSP': return 'purple-2'
+    case 'MERCHANT': return 'orange-2'
+    case 'CORPORATE': return 'indigo-2'
+    case 'SCHOOL':
+    default:
+      return 'cyan-2'
+  }
 })
 
 const BANK_ONLY_ROUTES = [
