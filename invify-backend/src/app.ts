@@ -692,40 +692,40 @@ registerCollisionAdmin('get', '/quasar/api-key/status', authenticate, checkRole(
 registerCollisionAdmin('post', '/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
 
 // Commission Command Center
-app.get('/admin/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);
-app.post('/admin/commissions/approvals/:id/approve', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.approveCommission);
-app.post('/admin/commissions/approvals/:id/reject', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.rejectCommission);
-app.post('/admin/commissions/clawback', authenticate, checkRole(['super_admin']), CommissionController.executeClawback);
-app.get('/admin/commissions/audit', authenticate, checkRole(['super_admin']), CommissionController.listAuditHistory);
-app.get('/admin/commissions/agents/progress', authenticate, checkRole(['super_admin']), CommissionController.listAgentProgress);
-app.get('/admin/commissions/plans', authenticate, checkRole(['super_admin']), CommissionController.listPlansAndTargets);
-app.get('/admin/commissions/budgets', authenticate, checkRole(['super_admin']), CommissionController.listCampaignsAndBudgets);
-app.post('/admin/commissions/simulate', authenticate, checkRole(['super_admin']), CommissionController.simulateCommission);
+registerCollisionAdmin('get', '/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);
+registerCollisionAdmin('post', '/commissions/approvals/:id/approve', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.approveCommission);
+registerCollisionAdmin('post', '/commissions/approvals/:id/reject', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.rejectCommission);
+registerCollisionAdmin('post', '/commissions/clawback', authenticate, checkRole(['super_admin']), CommissionController.executeClawback);
+registerCollisionAdmin('get', '/commissions/audit', authenticate, checkRole(['super_admin']), CommissionController.listAuditHistory);
+registerCollisionAdmin('get', '/commissions/agents/progress', authenticate, checkRole(['super_admin']), CommissionController.listAgentProgress);
+registerCollisionAdmin('get', '/commissions/plans', authenticate, checkRole(['super_admin']), CommissionController.listPlansAndTargets);
+registerCollisionAdmin('get', '/commissions/budgets', authenticate, checkRole(['super_admin']), CommissionController.listCampaignsAndBudgets);
+registerCollisionAdmin('post', '/commissions/simulate', authenticate, checkRole(['super_admin']), CommissionController.simulateCommission);
 
 // Plans & Targets CRUD Endpoints
-app.post('/admin/commissions/programs', authenticate, checkRole(['super_admin']), CommissionController.createProgram);
-app.put('/admin/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.updateProgram);
-app.delete('/admin/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteProgram);
-app.post('/admin/commissions/programs/:id/versions', authenticate, checkRole(['super_admin']), CommissionController.createVersion);
-app.post('/admin/commissions/versions/:id/clone', authenticate, checkRole(['super_admin']), CommissionController.cloneVersion);
-app.post('/admin/commissions/versions/:id/activate', authenticate, checkRole(['super_admin']), CommissionController.activateVersion);
-app.put('/admin/commissions/versions/:id/rules', authenticate, checkRole(['super_admin']), CommissionController.updateVersionRules);
-app.delete('/admin/commissions/versions/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteVersion);
+registerCollisionAdmin('post', '/commissions/programs', authenticate, checkRole(['super_admin']), CommissionController.createProgram);
+registerCollisionAdmin('put', '/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.updateProgram);
+registerCollisionAdmin('delete', '/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteProgram);
+registerCollisionAdmin('post', '/commissions/programs/:id/versions', authenticate, checkRole(['super_admin']), CommissionController.createVersion);
+registerCollisionAdmin('post', '/commissions/versions/:id/clone', authenticate, checkRole(['super_admin']), CommissionController.cloneVersion);
+registerCollisionAdmin('post', '/commissions/versions/:id/activate', authenticate, checkRole(['super_admin']), CommissionController.activateVersion);
+registerCollisionAdmin('put', '/commissions/versions/:id/rules', authenticate, checkRole(['super_admin']), CommissionController.updateVersionRules);
+registerCollisionAdmin('delete', '/commissions/versions/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteVersion);
 
-app.post('/admin/commissions/category-rules', authenticate, checkRole(['super_admin']), CommissionController.createCategoryRule);
-app.put('/admin/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateCategoryRule);
-app.delete('/admin/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteCategoryRule);
+registerCollisionAdmin('post', '/commissions/category-rules', authenticate, checkRole(['super_admin']), CommissionController.createCategoryRule);
+registerCollisionAdmin('put', '/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateCategoryRule);
+registerCollisionAdmin('delete', '/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteCategoryRule);
 
-app.post('/admin/commissions/performance-rules', authenticate, checkRole(['super_admin']), CommissionController.createPerformanceRule);
-app.put('/admin/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updatePerformanceRule);
-app.delete('/admin/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deletePerformanceRule);
+registerCollisionAdmin('post', '/commissions/performance-rules', authenticate, checkRole(['super_admin']), CommissionController.createPerformanceRule);
+registerCollisionAdmin('put', '/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updatePerformanceRule);
+registerCollisionAdmin('delete', '/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deletePerformanceRule);
 
-app.post('/admin/commissions/terminal-rules', authenticate, checkRole(['super_admin']), CommissionController.createTerminalRule);
-app.put('/admin/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateTerminalRule);
-app.delete('/admin/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteTerminalRule);
+registerCollisionAdmin('post', '/commissions/terminal-rules', authenticate, checkRole(['super_admin']), CommissionController.createTerminalRule);
+registerCollisionAdmin('put', '/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateTerminalRule);
+registerCollisionAdmin('delete', '/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteTerminalRule);
 
 // Subscriptions
-app.post('/admin/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
+registerCollisionAdmin('post', '/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
 app.get('/api/subscription/status', authenticate, AdminController.getSubscriptionStatus);
 
 // API Endpoints for Admin (Invify Pro App / Operator App)
