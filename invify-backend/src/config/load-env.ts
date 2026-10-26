@@ -25,6 +25,8 @@ const CONTABO_KEYS = [
 
 export function resolveEnvFileCandidates(): string[] {
   const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  // Jest sets NODE_ENV=test. Developer and staging files must not change assertions.
+  if (nodeEnv === 'test') return [];
   if (nodeEnv === 'staging') return ['.env.staging', 'env.staging'];
   if (nodeEnv === 'production') return ['.env.production', 'env.production'];
   return ['.env', 'env', '.env.local', '.env.staging', 'env.staging'];
@@ -125,6 +127,11 @@ export function loadEnv(): string {
 
   const cwd = process.cwd();
   const initialNodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  if (initialNodeEnv === 'test') {
+    loadedFile = 'process-environment';
+    console.log('[env] Test run uses the process environment only. Developer env files are not loaded.');
+    return loadedFile;
+  }
   const allowLocalOverlay = initialNodeEnv === '' || initialNodeEnv === 'development' || initialNodeEnv === 'local';
 
   for (const envPath of resolveSystemEnvFileCandidates()) {

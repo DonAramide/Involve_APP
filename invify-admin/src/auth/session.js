@@ -241,6 +241,37 @@ export async function logoutAuthenticatedSession(api, { redirect = true } = {}) 
   }
 }
 
+const ROLE_READONLY_NOTICE =
+  'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.';
+
+/**
+ * A 403 is not automatically a role read-only flag.
+ * Health grant denials carry error.code and error.message; those stay visible.
+ * The generic read-only sentence is only for a 403 body that does not explain itself.
+ */
+export function restrictedAccessNotice(data) {
+  const error = data?.error;
+  const errorCode = typeof error === 'string' && /^[A-Z0-9_]+$/.test(error) ? error : '';
+  const errorText = typeof error === 'string' && !errorCode ? error : '';
+  const code = String(
+    (error && typeof error === 'object' && error.code) ||
+      data?.code ||
+      errorCode ||
+      '',
+  );
+  const message = String(
+    (error && typeof error === 'object' && error.message) ||
+      errorText ||
+      (typeof data?.message === 'string' ? data.message : '') ||
+      '',
+  ).trim();
+  const mfaStepUp = /^(INVALID_MFA|MFA_REQUIRED|MFA_NOT_ENABLED|PROFILE_NOT_PROVISIONED)$/.test(code);
+  if (mfaStepUp) return '';
+  if (message) return message;
+  if (code) return `Access denied (${code}).`;
+  return ROLE_READONLY_NOTICE;
+}
+
 export function attachSessionInterceptors(api, { Notify, loginPathForContext } = {}) {
   api.interceptors.response.use(
     (response) => response,
@@ -249,13 +280,11 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
       const original = error.config || {};
 
       if (status === 403) {
-        const code = String(error.response?.data?.error || error.response?.data?.code || '');
-        const mfaStepUp = /^(INVALID_MFA|MFA_REQUIRED|MFA_NOT_ENABLED|PROFILE_NOT_PROVISIONED)$/.test(code);
-        if (Notify && !mfaStepUp) {
+        const notice = restrictedAccessNotice(error.response?.data);
+        if (Notify && notice) {
           Notify.create({
             type: 'warning',
-            message:
-              'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.',
+            message: notice,
             position: 'top-right',
             timeout: 4000,
             icon: 'lock',

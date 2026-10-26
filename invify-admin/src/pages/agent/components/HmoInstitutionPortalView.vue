@@ -478,7 +478,8 @@
                     <q-input v-model="newPlan.effectiveFrom" dark filled dense type="date" label="Effective From" class="bg-panel-darker" />
                   </div>
                 </div>
-                <q-checkbox v-model="newPlan.publishImmediately" dark label="Publish Plan Version Immediately" color="teal-4" />
+                <q-checkbox v-model="newPlan.publishImmediately" dark label="Publish and activate this version now" color="teal-4" />
+                <div class="text-caption text-grey-5">Leave this off to save a draft. Publishing is a separate choice and does not enrol members.</div>
                 <q-btn
                   color="teal-4"
                   text-color="black"
@@ -954,7 +955,7 @@ const newPlan = ref({
   billingFrequency: 'termly',
   waitingPeriodDays: 14,
   effectiveFrom: new Date().toISOString().slice(0, 10),
-  publishImmediately: true,
+  publishImmediately: false,
 })
 
 const standardFacilityServices = [

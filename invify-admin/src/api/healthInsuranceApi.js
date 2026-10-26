@@ -1,6 +1,12 @@
 // invify-admin/src/api/healthInsuranceApi.js
 import { api } from './index';
 
+function platformReasonHeader(reason) {
+  const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hw_platform_reason') : '';
+  const value = String(reason || stored || '').trim();
+  return { 'x-platform-reason': value };
+}
+
 export const healthInsuranceApi = {
   // Settings & Configuration
   getSettings: () => api.get('/api/v1/health-insurance/settings'),
@@ -50,34 +56,72 @@ export const healthInsuranceApi = {
 
   // Platform Governance (Super Admin Interface C)
   getPlatformOverview: (reason) => api.get('/api/v1/health-insurance/platform/overview', {
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Routine platform health governance audit' }
+    headers: platformReasonHeader(reason)
   }),
   getPlatformTenants: (params, reason) => api.get('/api/v1/health-insurance/platform/tenants', {
     params,
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Tenant health participation review' }
+    headers: platformReasonHeader(reason)
   }),
   getProvidersHealth: (reason) => api.get('/api/v1/health-insurance/platform/providers/health', {
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'HMO provider telemetry check' }
+    headers: platformReasonHeader(reason)
   }),
   getCoverageTrends: (reason) => api.get('/api/v1/health-insurance/platform/coverage-trends', {
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform coverage analytics query' }
+    headers: platformReasonHeader(reason)
   }),
   getPlatformGrants: (params, reason) => api.get('/api/v1/health-insurance/platform/grants', {
     params,
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant audit' }
+    headers: platformReasonHeader(reason)
   }),
+  listGrantOperators: () => api.get('/api/v1/health-insurance/platform/grant-operators'),
   createPlatformGrant: (data, reason) => api.post('/api/v1/health-insurance/platform/grants', data, {
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant creation' }
+    headers: platformReasonHeader(reason)
   }),
   revokePlatformGrant: (grantId, data, reason) => api.post(`/api/v1/health-insurance/platform/grants/${grantId}/revoke`, data, {
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform operator grant revocation' }
+    headers: platformReasonHeader(reason)
   }),
   getPlatformAuditEvents: (params, reason) => api.get('/api/v1/health-insurance/platform/audit-events', {
     params,
-    headers: { 'x-platform-reason': reason || sessionStorage.getItem('hw_platform_reason') || 'Platform health audit review' }
+    headers: platformReasonHeader(reason)
   }),
-  getMyGrantStatus: () => api.get('/api/v1/health-insurance/platform/grant-status'),
-  selfActivateGrant: (data) => api.post('/api/v1/health-insurance/platform/grants/self-activate', data)
+  getMyGrantStatus: () => api.get('/api/v1/health-insurance/platform/my-grant-status'),
+  issuePlatformEntitlement: (data, reason) => api.post('/api/v1/health-insurance/platform/entitlements', data, {
+    headers: platformReasonHeader(reason)
+  }),
+  suspendPlatformEntitlement: (permission, reason) => api.post(`/api/v1/health-insurance/platform/entitlements/${encodeURIComponent(permission)}/suspend`, {}, {
+    headers: platformReasonHeader(reason)
+  }),
+  revokePlatformEntitlement: (permission, reason) => api.post(`/api/v1/health-insurance/platform/entitlements/${encodeURIComponent(permission)}/revoke`, {}, {
+    headers: platformReasonHeader(reason)
+  }),
+  selfActivateGrant: (data) => api.post('/api/v1/health-insurance/platform/grants/self-activate', data),
+  getPlatformRegistry: (reason) => api.get('/api/v1/health-insurance/platform/providers', {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformCatalogue: (reason) => api.get('/api/v1/health-insurance/platform/plans', {
+    headers: platformReasonHeader(reason)
+  }),
+  createPlatformPlanDraft: (data, reason) => api.post('/api/v1/health-insurance/platform/plans', data, {
+    headers: platformReasonHeader(reason)
+  }),
+  publishPlatformPlanVersion: (versionId, data, reason) => api.post(`/api/v1/health-insurance/platform/plans/versions/${versionId}/publish`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  activatePlatformPlan: (planId, data, reason) => api.post(`/api/v1/health-insurance/platform/plans/${planId}/activate`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  retirePlatformPlan: (planId, data, reason) => api.post(`/api/v1/health-insurance/platform/plans/${planId}/retire`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  updatePlatformPlanDraft: (versionId, data, reason) => api.patch(`/api/v1/health-insurance/platform/plans/versions/${versionId}`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinance: (reason) => api.get('/api/v1/health-insurance/platform/finance', {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFacilities: (providerId, reason) => api.get('/api/v1/health-insurance/platform/facilities', {
+    params: providerId ? { providerId } : {},
+    headers: platformReasonHeader(reason)
+  })
 };
 
 export default healthInsuranceApi;

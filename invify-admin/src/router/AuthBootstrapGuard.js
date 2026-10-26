@@ -1,6 +1,7 @@
 // invify-admin/src/router/AuthBootstrapGuard.js
 
 import { loginPathForContext, homePathForRole, hasPlatformStaffRole } from '../utils/authLoginPaths'
+import { isPlatformShellPath } from '../utils/platformShellPaths'
 import { permissionsForOperatorRole } from '../utils/operatorPermissions'
 import { clearMfaChallengeState, hasVerifiedOperatorSession } from '../auth/session'
 
@@ -81,13 +82,8 @@ export function registerAuthBootstrapGuard(router) {
 
       // Gate 2.5: Platform Administration Layout Isolation (Strict Tenant Redirection)
       if (!hasPlatformStaffRole(operatorRole)) {
-        const adminPathPrefixes = [
-          '/fleet', '/governance', '/observability', '/ai', 
-          '/deployments', '/apps', '/incidents', '/admin/', 
-          '/automation', '/communications'
-        ]
         const pathLower = to.path.toLowerCase()
-        if (to.path === '/' || adminPathPrefixes.some(prefix => pathLower.startsWith(prefix)) || pathLower === '/admin') {
+        if (to.path === '/' || isPlatformShellPath(to.path)) {
           console.warn(`[TENANT ISOLATION ENFORCED] Standard tenant operator [${operatorRole}] attempted global administration workspace traversal to [${to.path}]. Redirection to tenant hub initialized.`)
           return next('/tenant/dashboard')
         }

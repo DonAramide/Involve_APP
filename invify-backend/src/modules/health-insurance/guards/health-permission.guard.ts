@@ -14,7 +14,9 @@ declare global {
 /**
  * Enforces explicit Health permissions.
  * CRITICAL RULE: Super Admin does NOT automatically bypass health permissions.
- * Platform staff require explicit, time-boxed entries in hw_platform_grants with an audited reason.
+ * Platform staff require an unexpired hw_platform_grants row or an active
+ * hw_platform_entitlements row, plus an audited x-platform-reason.
+ * A grant lookup failure or an entitlement lookup failure does not authorize.
  */
 export function requireHealthPermission(requiredPermission: HealthPermission | PlatformHealthPermission) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -66,11 +68,49 @@ export function requireHealthPermission(requiredPermission: HealthPermission | P
           .gt('expires_at', new Date().toISOString())
           .maybeSingle();
 
-        if (grantError || !platformGrant) {
+        if (grantError) {
+          return res.status(503).json({
+            error: {
+              code: 'PLATFORM_GRANT_LOOKUP_FAILED',
+              message: 'Platform grant lookup failed. Access was not granted.'
+            }
+          });
+        }
+
+        let platformEntitlement: { id?: string; user_id?: string; granted_by?: string; suspended_at?: string | null; revoked_at?: string | null } | null = null;
+        if (!platformGrant) {
+          const { data: entitlementRow, error: entitlementError } = await supabaseAdmin
+            .from('hw_platform_entitlements')
+            .select('id, user_id, permission, granted_by, suspended_at, revoked_at')
+            .eq('user_id', dbUser.id)
+            .eq('permission', requiredPermission)
+            .is('revoked_at', null)
+            .is('suspended_at', null)
+            .maybeSingle();
+
+          if (entitlementError) {
+            return res.status(503).json({
+              error: {
+                code: 'PLATFORM_GRANT_LOOKUP_FAILED',
+                message: 'Platform entitlement lookup failed. Access was not granted.'
+              }
+            });
+          }
+
+          const rowMatchesCaller = entitlementRow
+            && entitlementRow.user_id === dbUser.id
+            && entitlementRow.granted_by
+            && entitlementRow.granted_by !== dbUser.id
+            && !entitlementRow.suspended_at
+            && !entitlementRow.revoked_at;
+          platformEntitlement = rowMatchesCaller ? entitlementRow : null;
+        }
+
+        if (!platformGrant && !platformEntitlement) {
           return res.status(403).json({
             error: {
               code: 'PLATFORM_PERMISSION_DENIED',
-              message: `Explicit unexpired platform grant required for '${requiredPermission}'`
+              message: `An unexpired platform grant or an active platform entitlement is required for '${requiredPermission}'`
             }
           });
         }

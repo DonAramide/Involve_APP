@@ -2,6 +2,105 @@
 import { supabaseAdmin } from '../../../db/supabase';
 import { HealthAuditService } from './health-audit.service';
 import { HealthContext } from '../types';
+import { premiumOverviewTotals, summarizeStatusAmounts } from './finance-summary';
+import { PlatformEntitlementService } from './platform-entitlement.service';
+
+export interface OperatorGrantDiagnostic {
+  hasActiveGrants: boolean;
+  activeGrants: { permission: string; expires_at: string }[];
+  inactiveGrants: { permission: string; status: 'expired' | 'revoked'; expiresAt: string }[];
+}
+
+/**
+ * Classifies one operator's own grant rows.
+ * Active rows are unrevoked and still in the future. Expired and revoked rows
+ * are diagnostic only and must not be treated as authorization.
+ * A permission with no row is omitted; callers report that as missing.
+ * An unreadable expiry throws so the caller does not describe the row as missing.
+ */
+export function classifyOperatorGrantRows(
+  rows: { permission?: string; expires_at?: string; revoked_at?: string | null }[] | null | undefined,
+  nowMs: number
+): OperatorGrantDiagnostic {
+  const grouped = new Map<string, { expiresAt: string; revokedAt: string | null; expiresMs: number }[]>();
+  for (const row of rows || []) {
+    const permission = String(row?.permission || '');
+    if (!permission) continue;
+    const expiresAt = String(row?.expires_at || '');
+    const expiresMs = new Date(expiresAt).getTime();
+    if (!Number.isFinite(expiresMs)) {
+      throw new Error('Failed to check grants: a grant expiry timestamp was not readable');
+    }
+    const current = grouped.get(permission) || [];
+    current.push({ expiresAt, revokedAt: row?.revoked_at || null, expiresMs });
+    grouped.set(permission, current);
+  }
+
+  const activeGrants: OperatorGrantDiagnostic['activeGrants'] = [];
+  const inactiveGrants: OperatorGrantDiagnostic['inactiveGrants'] = [];
+  for (const [permission, entries] of grouped) {
+    const unrevoked = entries.filter((entry) => !entry.revokedAt);
+    const active = unrevoked.find((entry) => entry.expiresMs > nowMs);
+    if (active) {
+      activeGrants.push({ permission, expires_at: active.expiresAt });
+      continue;
+    }
+    const expired = unrevoked.find((entry) => entry.expiresMs <= nowMs);
+    if (expired) {
+      inactiveGrants.push({ permission, status: 'expired', expiresAt: expired.expiresAt });
+      continue;
+    }
+    const revoked = entries.find((entry) => entry.revokedAt);
+    if (revoked) {
+      inactiveGrants.push({ permission, status: 'revoked', expiresAt: revoked.expiresAt });
+    }
+  }
+
+  return {
+    hasActiveGrants: activeGrants.length > 0,
+    activeGrants,
+    inactiveGrants
+  };
+}
+
+export interface GrantOperatorOption {
+  id: string;
+  email: string;
+  role: string;
+}
+
+/** Active administrator accounts that can be selected as a grant recipient. The caller is omitted. */
+export function grantOperatorOptions(
+  rows: { id?: string; email?: string; role?: string; is_active?: boolean }[] | null | undefined,
+  actorUserId: string
+): GrantOperatorOption[] {
+  const actor = String(actorUserId || '');
+  const options: GrantOperatorOption[] = [];
+  for (const row of rows || []) {
+    const role = String(row?.role || '').trim().toLowerCase().replace(/-/g, '_');
+    const id = String(row?.id || '');
+    const isAdministrator = role === 'super_admin' || role === 'admin' || role.startsWith('admin_');
+    if (!isAdministrator || !id || id === actor || row?.is_active === false) continue;
+    options.push({ id, email: String(row?.email || ''), role });
+  }
+  options.sort((left, right) => left.email.localeCompare(right.email) || left.id.localeCompare(right.id));
+  return options;
+}
+
+/** Eight-hour ceiling for ordinary platform grants. Durable entitlements do not use this cap. */
+export function boundedGrantDurationMinutes(value: unknown): number {
+  return Math.min(Math.max(Number(value) || 60, 10), 480);
+}
+
+/** A failed or missing count is unavailable. Zero is returned only for a successful count of zero. */
+export function metricCount(
+  count: number | null | undefined,
+  error: { message?: string } | null | undefined
+): number | null {
+  if (error) return null;
+  if (typeof count === 'number' && Number.isInteger(count) && count >= 0) return count;
+  return null;
+}
 
 export class HealthPlatformService {
   // ─── 1. Platform Cross-Tenant Overview ─────────────────────────────
@@ -30,21 +129,28 @@ export class HealthPlatformService {
       .from('hw_enrolments')
       .select('status');
 
-    let pendingVerification = 0;
-    let awaitingPayment = 0;
-    let awaitingInsurerActivation = 0;
-    let activeEnrolments = 0;
+    let pendingVerification: number | null = 0;
+    let awaitingPayment: number | null = 0;
+    let awaitingInsurerActivation: number | null = 0;
+    let activeEnrolments: number | null = 0;
 
-    for (const enr of enrolments || []) {
-      if (enr.status === 'awaiting_verification' || enr.status === 'pending_verification') pendingVerification++;
-      else if (enr.status === 'awaiting_premium_payment') awaitingPayment++;
-      else if (enr.status === 'awaiting_insurer_activation') awaitingInsurerActivation++;
-      else if (enr.status === 'active') activeEnrolments++;
+    if (enrErr) {
+      pendingVerification = null;
+      awaitingPayment = null;
+      awaitingInsurerActivation = null;
+      activeEnrolments = null;
+    } else {
+      for (const enr of enrolments || []) {
+        if (enr.status === 'awaiting_verification' || enr.status === 'pending_verification') pendingVerification++;
+        else if (enr.status === 'awaiting_premium_payment') awaitingPayment++;
+        else if (enr.status === 'awaiting_insurer_activation') awaitingInsurerActivation++;
+        else if (enr.status === 'active') activeEnrolments++;
+      }
     }
 
     // 5. Policies approaching expiry (next 30 days)
     const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-    const { count: expiringSoonCount } = await supabaseAdmin
+    const { count: expiringSoonCount, error: expiringErr } = await supabaseAdmin
       .from('hw_policies')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'active')
@@ -56,44 +162,39 @@ export class HealthPlatformService {
       .from('hw_providers')
       .select('id, integration_status');
 
-    const totalProviders = (providers || []).length;
-    const providerErrors = (providers || []).filter(
+    const totalProviders = provErr ? null : (providers || []).length;
+    const providerErrors = provErr ? null : (providers || []).filter(
       p => p.integration_status === 'suspended'
     ).length;
 
-    // 7. Aggregate Premium Billing & Reconciled Payments
-    const { data: invoices } = await supabaseAdmin
+    // 7. Premium totals from the health billing columns. Query failures are errors, not zeros.
+    const { data: invoices, error: invoiceError } = await supabaseAdmin
       .from('hw_premium_invoices')
-      .select('total_amount, status');
+      .select('status, amount_due_minor');
+    if (invoiceError) throw new Error(`Failed to summarise premium invoices: ${invoiceError.message}`);
 
-    const { data: payments } = await supabaseAdmin
+    const { data: payments, error: paymentError } = await supabaseAdmin
       .from('hw_payments')
-      .select('amount, status')
-      .eq('status', 'settled');
+      .select('status, amount_minor');
+    if (paymentError) throw new Error(`Failed to summarise premium payments: ${paymentError.message}`);
 
-    let totalBilledMinor = 0;
-    for (const inv of invoices || []) {
-      totalBilledMinor += Number(inv.total_amount || 0);
-    }
-
-    let totalCollectedMinor = 0;
-    for (const pay of payments || []) {
-      totalCollectedMinor += Number(pay.amount || 0);
-    }
+    const premiumTotals = premiumOverviewTotals(invoices, payments);
+    const totalBilledMinor = premiumTotals.billedMinor;
+    const totalCollectedMinor = premiumTotals.collectedMinor;
 
     return {
-      participatingTenants: enabledTenantsCount || 0,
-      totalEnabledTenants: enabledTenantsCount || 0,
-      totalEnrolledMembers: totalMembersCount || 0,
-      totalDistinctMembers: totalMembersCount || 0,
-      activePolicies: activePoliciesCount || 0,
-      activePoliciesCount: activePoliciesCount || 0,
+      participatingTenants: metricCount(enabledTenantsCount, tenantErr),
+      totalEnabledTenants: metricCount(enabledTenantsCount, tenantErr),
+      totalEnrolledMembers: metricCount(totalMembersCount, memberErr),
+      totalDistinctMembers: metricCount(totalMembersCount, memberErr),
+      activePolicies: metricCount(activePoliciesCount, polErr),
+      activePoliciesCount: metricCount(activePoliciesCount, polErr),
       pendingVerification,
       awaitingPayment,
       awaitingInsurerActivation,
       activeEnrolments,
-      policiesExpiringSoon: expiringSoonCount || 0,
-      expiringSoonCount: expiringSoonCount || 0,
+      policiesExpiringSoon: metricCount(expiringSoonCount, expiringErr),
+      expiringSoonCount: metricCount(expiringSoonCount, expiringErr),
       configuredProviders: totalProviders,
       providersWithErrors: providerErrors,
       totalBilledMinor,
@@ -138,11 +239,11 @@ export class HealthPlatformService {
     // Enrich each tenant with health governance metrics
     const tenantIds = (tenants || []).map(t => t.id);
     if (tenantIds.length === 0) {
-      return { tenants: [], total: 0, limit, offset };
+      return { tenants: [], total: metricCount(count, null), limit, offset };
     }
 
     // Get health settings
-    const { data: settings } = await supabaseAdmin
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from('hw_tenant_settings')
       .select('tenant_id, enabled, school_enabled, retail_enabled, services_enabled')
       .in('tenant_id', tenantIds);
@@ -150,7 +251,7 @@ export class HealthPlatformService {
     const settingsMap = new Map((settings || []).map(s => [s.tenant_id, s]));
 
     // Get member counts per tenant
-    const { data: memberCounts } = await supabaseAdmin
+    const { data: memberCounts, error: memberCountError } = await supabaseAdmin
       .from('hw_members')
       .select('tenant_id');
 
@@ -160,7 +261,7 @@ export class HealthPlatformService {
     }
 
     // Get active policy counts per tenant
-    const { data: policyCounts } = await supabaseAdmin
+    const { data: policyCounts, error: policyCountError } = await supabaseAdmin
       .from('hw_policies')
       .select('tenant_id')
       .eq('status', 'active');
@@ -171,7 +272,7 @@ export class HealthPlatformService {
     }
 
     // Get pending enrolment counts per tenant
-    const { data: pendingEnrolments } = await supabaseAdmin
+    const { data: pendingEnrolments, error: pendingError } = await supabaseAdmin
       .from('hw_enrolments')
       .select('tenant_id, status')
       .in('status', ['awaiting_verification', 'awaiting_premium_payment', 'awaiting_insurer_activation']);
@@ -187,25 +288,25 @@ export class HealthPlatformService {
         id: t.id,
         name: t.name,
         mode: t.type || 'school',
-        isEnabled: s?.enabled || false,
-        is_enabled: s?.enabled || false,
-        schoolEnabled: s?.school_enabled || false,
-        retailEnabled: s?.retail_enabled || false,
-        servicesEnabled: s?.services_enabled || false,
-        enrolledCount: membersCountMap.get(t.id) || 0,
-        enrolled_count: membersCountMap.get(t.id) || 0,
-        enrolledMembersCount: membersCountMap.get(t.id) || 0,
-        activeCount: policiesCountMap.get(t.id) || 0,
-        active_count: policiesCountMap.get(t.id) || 0,
-        activePoliciesCount: policiesCountMap.get(t.id) || 0,
-        pendingEnrolmentsCount: pendingCountMap.get(t.id) || 0,
-        integrationStatus: s?.enabled ? 'active' : 'disabled'
+        isEnabled: settingsError ? null : Boolean(s?.enabled),
+        is_enabled: settingsError ? null : Boolean(s?.enabled),
+        schoolEnabled: settingsError ? null : Boolean(s?.school_enabled),
+        retailEnabled: settingsError ? null : Boolean(s?.retail_enabled),
+        servicesEnabled: settingsError ? null : Boolean(s?.services_enabled),
+        enrolledCount: memberCountError ? null : (membersCountMap.get(t.id) || 0),
+        enrolled_count: memberCountError ? null : (membersCountMap.get(t.id) || 0),
+        enrolledMembersCount: memberCountError ? null : (membersCountMap.get(t.id) || 0),
+        activeCount: policyCountError ? null : (policiesCountMap.get(t.id) || 0),
+        active_count: policyCountError ? null : (policiesCountMap.get(t.id) || 0),
+        activePoliciesCount: policyCountError ? null : (policiesCountMap.get(t.id) || 0),
+        pendingEnrolmentsCount: pendingError ? null : (pendingCountMap.get(t.id) || 0),
+        integrationStatus: settingsError ? 'unavailable' : (s?.enabled ? 'active' : 'disabled')
       };
     });
 
     return {
       tenants: enriched,
-      total: count || 0,
+      total: metricCount(count, null),
       limit,
       offset
     };
@@ -231,25 +332,34 @@ export class HealthPlatformService {
       planCountMap.set(pl.provider_id, (planCountMap.get(pl.provider_id) || 0) + 1);
     }
 
-    const telemetry = (providers || []).map(p => ({
-      id: p.id,
-      code: p.code,
-      displayName: p.display_name,
-      integrationStatus: p.integration_status,
-      adapterKey: p.adapter_key || 'standard',
-      isSandbox: p.integration_status === 'sandbox',
-      licenceReference: p.licence_reference || 'N/A',
-      activePlansCount: planCountMap.get(p.id) || 0,
-      lastVerifiedAt: p.last_verified_at,
-      capabilities: p.capabilities || {},
-      // Telemetry fields report exact observed state (never fabricated)
-      observedLatencyMs: p.adapter_key === 'sandbox' ? 45 : null,
-      telemetryStatus: p.integration_status === 'sandbox' 
-        ? 'Simulated Active (Sandbox)' 
-        : p.integration_status === 'verified' 
-          ? 'Live Operational' 
-          : 'Telemetry Disconnected'
-    }));
+    const telemetry = (providers || []).map(p => {
+      const integrationStatus = p.integration_status;
+      const operational = integrationStatus === 'sandbox' || integrationStatus === 'verified';
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.display_name,
+        displayName: p.display_name,
+        integrationStatus,
+        adapterKey: p.adapter_key || null,
+        isSandbox: integrationStatus === 'sandbox',
+        isActive: operational,
+        licenceReference: p.licence_reference || null,
+        activePlansCount: planCountMap.get(p.id) || 0,
+        lastVerifiedAt: p.last_verified_at,
+        capabilities: p.capabilities || {},
+        observedLatencyMs: null,
+        telemetryStatus: integrationStatus === 'sandbox'
+          ? 'Sandbox adapter'
+          : integrationStatus === 'verified'
+            ? 'Verified integration'
+            : integrationStatus === 'pending_verification'
+              ? 'Pending verification'
+              : integrationStatus === 'suspended'
+                ? 'Suspended'
+                : 'No live telemetry'
+      };
+    });
 
     return { providers: telemetry, timestamp: new Date().toISOString() };
   }
@@ -292,6 +402,33 @@ export class HealthPlatformService {
   }
 
   // ─── 5. Platform Grants Manager ────────────────────────────────────
+  static async listGrantOperators(actorUserId: string) {
+    const { data: actor, error: actorError } = await supabaseAdmin
+      .from('users')
+      .select('id, role, is_active')
+      .eq('id', actorUserId)
+      .maybeSingle();
+    if (actorError) throw new Error(`Failed to list administrators: ${actorError.message}`);
+
+    const actorRole = String(actor?.role || '').trim().toLowerCase().replace(/-/g, '_');
+    const actorIsAdministrator = !!actor?.is_active && (
+      actorRole === 'super_admin' || actorRole === 'admin' || actorRole.startsWith('admin_')
+    );
+    if (!actorIsAdministrator) {
+      const denied = new Error('Only an active administrator can list grant recipients.');
+      (denied as Error & { status?: number; code?: string }).status = 403;
+      (denied as Error & { status?: number; code?: string }).code = 'GRANT_OPERATOR_LIST_FORBIDDEN';
+      throw denied;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email, role, is_active')
+      .eq('is_active', true);
+    if (error) throw new Error(`Failed to list administrators: ${error.message}`);
+    return grantOperatorOptions(data || [], actorUserId);
+  }
+
   static async listPlatformGrants(ctx: HealthContext, statusFilter?: string) {
     const { data: grants, error } = await supabaseAdmin
       .from('hw_platform_grants')
@@ -300,30 +437,61 @@ export class HealthPlatformService {
 
     if (error) throw new Error(`Failed to list platform grants: ${error.message}`);
 
+    const userIds = Array.from(new Set((grants || []).map((g: any) => g.user_id).filter(Boolean)));
+    const userMap: Record<string, { id?: string; email?: string }> = {};
+
+    if (userIds.length > 0) {
+      try {
+        const query = supabaseAdmin.from('users').select('id, email');
+        const res = typeof (query as any)?.in === 'function' ? await (query as any).in('id', userIds) : await query;
+        const usersData = res?.data;
+        if (usersData && Array.isArray(usersData)) {
+          for (const u of usersData) {
+            userMap[u.id] = u;
+          }
+        }
+      } catch {
+        // Graceful fallback if users lookup is not available
+      }
+    }
+
     const now = new Date();
-    const enriched = (grants || []).map(g => {
+    const enriched = (grants || []).map((g: any) => {
       const expiresAt = new Date(g.expires_at);
       const isExpired = expiresAt <= now;
       const isRevoked = g.revoked_at !== null;
       const isActive = !isExpired && !isRevoked;
+      const user = userMap[g.user_id];
+      const email = user?.email || '';
 
       return {
         id: g.id,
         userId: g.user_id,
+        user_id: g.user_id,
+        email,
+        userEmail: email,
+        user_email: email,
         permission: g.permission,
         grantedBy: g.granted_by,
+        granted_by: g.granted_by,
         grantedAt: g.granted_at,
+        granted_at: g.granted_at,
         expiresAt: g.expires_at,
+        expires_at: g.expires_at,
         revokedAt: g.revoked_at,
+        revoked_at: g.revoked_at,
         isActive,
+        is_active: isActive,
         isExpired,
+        is_expired: isExpired,
         isRevoked,
+        is_revoked: isRevoked,
         status: isRevoked ? 'revoked' : isExpired ? 'expired' : 'active'
       };
     });
 
     if (statusFilter) {
-      return enriched.filter(g => g.status === statusFilter);
+      return enriched.filter((g: any) => g.status === statusFilter);
     }
     return enriched;
   }
@@ -335,7 +503,7 @@ export class HealthPlatformService {
     reason: string;
   }) {
     const { userId, permission, reason } = data;
-    const durationMinutes = Math.min(Math.max(Number(data.durationMinutes) || 60, 10), 480);
+    const durationMinutes = boundedGrantDurationMinutes(data.durationMinutes);
 
     if (!userId) throw new Error('Target user ID is required');
     if (actorUserId === userId) {
@@ -406,7 +574,13 @@ export class HealthPlatformService {
       platformReason: reason
     });
 
-    return newGrant;
+    return {
+      ...newGrant,
+      userId: newGrant.user_id,
+      email: targetUser.email,
+      userEmail: targetUser.email,
+      user_email: targetUser.email
+    };
   }
 
   static async revokePlatformGrant(actorUserId: string, grantId: string, reason: string) {
@@ -480,7 +654,7 @@ export class HealthPlatformService {
 
     return {
       events: data || [],
-      total: count || 0,
+      total: metricCount(count, null),
       limit,
       offset
     };
@@ -488,19 +662,57 @@ export class HealthPlatformService {
 
   // ─── 7. Operator Self-Activation / Grant Status Check ───────────────
   static async getOperatorGrantStatus(userId: string) {
-    const nowIso = new Date().toISOString();
     const { data: grants, error } = await supabaseAdmin
       .from('hw_platform_grants')
-      .select('id, permission, expires_at, granted_at')
-      .eq('user_id', userId)
-      .is('revoked_at', null)
-      .gt('expires_at', nowIso);
+      .select('permission, expires_at, revoked_at')
+      .eq('user_id', userId);
 
     if (error) throw new Error(`Failed to check grants: ${error.message}`);
 
+    const classified = classifyOperatorGrantRows(grants || [], Date.now());
+    const durableEntitlements = await PlatformEntitlementService.listForOperator(userId);
+    return { ...classified, durableEntitlements };
+  }
+
+  /** Canonical HMO organisation rows. This read does not load plans. */
+  static async listProviderRegistry() {
+    const { data, error } = await supabaseAdmin
+      .from('hw_providers')
+      .select('id, code, display_name, integration_status, licence_reference')
+      .order('display_name');
+    if (error) throw new Error(`Failed to list HMO registry: ${error.message}`);
+    return data || [];
+  }
+
+  /** Invoice and payment status totals. No payer, member, or enrolment identifiers. */
+  static async getFinanceSnapshot() {
+    const { data: invoices, error: invoiceError } = await supabaseAdmin
+      .from('hw_premium_invoices')
+      .select('status, amount_due_minor, amount_paid_minor');
+    if (invoiceError) throw new Error(`Failed to summarise premium invoices: ${invoiceError.message}`);
+
+    const { data: payments, error: paymentError } = await supabaseAdmin
+      .from('hw_payments')
+      .select('status, amount_minor');
+    if (paymentError) throw new Error(`Failed to summarise premium payments: ${paymentError.message}`);
+
     return {
-      hasActiveGrants: (grants || []).length > 0,
-      activeGrants: grants || []
+      currency: 'NGN',
+      invoices: summarizeStatusAmounts(invoices, 'amount_due_minor'),
+      invoiceCollected: summarizeStatusAmounts(invoices, 'amount_paid_minor'),
+      payments: summarizeStatusAmounts(payments, 'amount_minor')
     };
+  }
+
+  /** Facility network rows for one HMO, or every HMO when no provider filter is set. */
+  static async listFacilities(providerId?: string) {
+    let query = supabaseAdmin
+      .from('hw_facilities')
+      .select('id, provider_id, name, state, lga, services, is_active, last_verified_at, hw_providers(id, code, display_name)')
+      .order('name');
+    if (providerId) query = query.eq('provider_id', providerId);
+    const { data, error } = await query;
+    if (error) throw new Error(`Failed to list facilities: ${error.message}`);
+    return data || [];
   }
 }

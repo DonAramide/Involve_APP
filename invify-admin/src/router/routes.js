@@ -439,6 +439,22 @@ const routes = [
       { path: 'admin/production-env', component: () => import('pages/admin/ProductionEnvGovernancePage.vue'), meta: { workspace: 'admin', title: 'Production Env Governance', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['production env', 'feature flags', 'real money payouts', 'maker checker'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/health-insurance', component: () => import('pages/admin/HealthInsuranceGovernancePage.vue'), meta: { workspace: 'admin', title: 'Health & Wellness Governance', permission: 'admin_deploy', requiresAuth: true, keywords: ['health', 'insurance', 'wellness', 'hmo', 'governance', 'grants'] } },
+      { path: 'hmo', redirect: '/hmo/overview', meta: { workspace: 'hmo', title: 'HMO', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/overview', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Overview', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'health', 'overview'] } },
+      { path: 'hmo/registry', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Registry', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'registry'] } },
+      { path: 'hmo/providers', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Provider Network', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'providers'] } },
+      { path: 'hmo/plans', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Health Plans', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'plans', 'catalogue'] } },
+      { path: 'hmo/coverage', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Benefits and Coverage', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/enrolment', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Member Enrolment', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/members', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Members and Dependants', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/claims', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Claims and Authorisations', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/billing', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Premiums and Billing', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/payments', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Payments and Reconciliation', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/reports', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Reports and Analytics', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/telemetry', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Integrations and Telemetry', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/audit', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Audit Trail', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/settings', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Organisation Settings', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/governance', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Platform Governance', permission: 'hmo.workspace', requiresAuth: true } },
 
       // ==========================================
       // QUASAR FINANCIAL SANDBOX (QFS)

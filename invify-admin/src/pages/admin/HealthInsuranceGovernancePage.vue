@@ -8,12 +8,15 @@
           <h1 class="text-h4 text-weight-bolder text-white q-my-none letter-spacing-1">Health &amp; Wellness Governance</h1>
           <q-badge color="teal-10" text-color="teal-3" class="text-weight-bold letter-spacing-1">
             SUPER ADMIN CONSOLE
+            <q-tooltip>Platform staff shell. It does not bypass health grants.</q-tooltip>
           </q-badge>
           <q-badge v-if="grantStatus.hasActiveGrant" color="green-10" text-color="green-3" class="text-weight-bold">
             SESSION ACTIVE
+            <q-tooltip>An unexpired platform grant was returned by /platform/my-grant-status.</q-tooltip>
           </q-badge>
           <q-badge v-else color="amber-10" text-color="amber-3" class="text-weight-bold">
             GRANT REQUIRED
+            <q-tooltip>Cross-tenant metrics stay hidden until an independent administrator has issued an unexpired hw_platform_grants row. Activate Operational Session only works after that grant exists.</q-tooltip>
           </q-badge>
         </div>
         <div class="text-caption text-grey-5 q-mt-xs">
@@ -31,6 +34,14 @@
           icon="key"
           label="Activate Operational Session"
           @click="showActivateSessionDialog = true"
+          class="text-weight-bold text-caption font-mono"
+        />
+        <q-btn
+          outline
+          color="teal-4"
+          icon="inventory_2"
+          label="Health Plans"
+          to="/hmo/plans"
           class="text-weight-bold text-caption font-mono"
         />
         <q-btn
@@ -57,7 +68,18 @@
 
     <!-- Active Session / Governance Protocol Banner -->
     <q-banner
-      v-if="!grantStatus.hasActiveGrant"
+      v-if="hasActiveDurableEntitlement"
+      dense
+      rounded
+      class="bg-green-10 text-green-2 q-mb-lg"
+      style="border: 1px solid rgba(34, 197, 94, 0.35);"
+    >
+      <div class="text-caption">
+        A durable platform entitlement is active. It is not an eight-hour grant. Suspended and revoked entitlements do not authorize access, and this screen does not issue, suspend, or revoke the entitlement.
+      </div>
+    </q-banner>
+    <q-banner
+      v-if="!grantStatus.hasActiveGrant && !hasActiveDurableEntitlement"
       dense
       rounded
       class="bg-amber-10 text-amber-2 q-mb-lg border-amber"
@@ -69,7 +91,8 @@
       <div class="row items-center justify-between full-width">
         <div class="text-caption">
           <strong>Strict Security Boundary Enforced:</strong> Platform Super Admins do not possess implicit bypass access to student, staff, or tenant health records.
-          You must activate a time-bounded operational session with an explicit audit reason to query cross-tenant health telemetry.
+          Each cross-tenant read requires its own unexpired hw_platform_grants row, issued by an independent administrator. Activating a session records an audit reason. It does not create or renew a grant.
+          <span v-if="inactiveGrantSummary"> {{ inactiveGrantSummary }}</span>
         </div>
         <q-btn
           dense
@@ -79,6 +102,24 @@
           class="text-weight-bold"
           @click="showActivateSessionDialog = true"
         />
+      </div>
+    </q-banner>
+
+    <q-banner
+      v-else-if="String(activePlatformReason || '').trim().length < 5"
+      dense
+      rounded
+      class="bg-amber-10 text-amber-2 q-mb-lg border-amber"
+      style="border: 1px solid rgba(245, 158, 11, 0.4);"
+    >
+      <template v-slot:avatar>
+        <q-icon name="edit_note" color="amber-3" />
+      </template>
+      <div class="row items-center justify-between full-width">
+        <div class="text-caption">
+          An unexpired platform grant is present. Cross-tenant reads stay blocked until you record an operational audit reason of at least 5 characters. Recording the reason does not create or renew a grant.
+        </div>
+        <q-btn dense flat color="amber-2" label="Set audit reason" class="text-weight-bold" @click="promptChangeReason" />
       </div>
     </q-banner>
 
@@ -137,8 +178,13 @@
 
     <!-- TAB 1: OVERVIEW -->
     <div v-if="activeTab === 'overview'">
-      <!-- Platform KPI Cards -->
-      <div class="row q-col-gutter-md q-mb-lg">
+      <q-banner v-if="overviewState === 'withheld'" dense rounded class="bg-amber-10 text-amber-2 q-mb-md">
+        Metrics are withheld. An active platform.integration.health grant was not confirmed, so these totals are not displayed as zero.
+      </q-banner>
+      <q-banner v-else-if="overviewState === 'error'" dense rounded class="bg-red-10 text-red-2 q-mb-md">
+        The overview API failed{{ overviewError ? `: ${overviewError}` : '' }}. Totals are not shown.
+      </q-banner>
+      <div v-else-if="overviewState === 'loaded'" class="row q-col-gutter-md q-mb-lg">
         <div class="col-12 col-sm-6 col-md-3">
           <q-card class="bg-card-dark border-grey-9 q-pa-md">
             <div class="row items-center justify-between">
@@ -238,7 +284,7 @@
       </div>
 
       <!-- Coverage Distribution Analytics -->
-      <div class="row q-col-gutter-md q-mb-lg">
+      <div v-if="overviewState === 'loaded'" class="row q-col-gutter-md q-mb-lg">
         <!-- Distribution by Mode -->
         <div class="col-12 col-md-4">
           <q-card class="bg-card-dark border-grey-9 q-pa-md full-height">
@@ -357,7 +403,7 @@
           bordered
           :loading="loading"
           :pagination="{ rowsPerPage: 15 }"
-          no-data-label="No participating tenants found."
+          no-data-label="No participating tenants were returned. If the request failed, the banner above the overview explains the denial or API error."
           class="bg-dark text-white border-grey-9 font-mono"
         >
           <template v-slot:body-cell-mode="props">
@@ -425,11 +471,11 @@
                 </div>
               </div>
               <div class="column items-end">
-                <q-badge :color="prov.isSandbox ? 'amber-10' : 'green-10'" :text-color="prov.isSandbox ? 'amber-2' : 'green-2'" class="text-weight-bold">
-                  {{ prov.isSandbox ? 'SANDBOX ADAPTER' : 'LIVE HMO API' }}
+                <q-badge :color="prov.isSandbox ? 'amber-10' : 'grey-9'" :text-color="prov.isSandbox ? 'amber-2' : 'grey-3'" class="text-weight-bold">
+                  {{ prov.telemetryStatus || prov.integrationStatus || 'Unknown' }}
                 </q-badge>
-                <q-badge :color="prov.isActive ? 'teal-10' : 'red-10'" :text-color="prov.isActive ? 'teal-3' : 'red-3'" class="q-mt-xs">
-                  {{ prov.isActive ? 'ACTIVE' : 'SUSPENDED' }}
+                <q-badge :color="prov.isActive ? 'teal-10' : 'grey-9'" :text-color="prov.isActive ? 'teal-3' : 'grey-4'" class="q-mt-xs">
+                  {{ prov.isActive ? 'ADAPTER REACHABLE' : 'NOT VERIFIED' }}
                 </q-badge>
               </div>
             </div>
@@ -451,7 +497,7 @@
               <div class="col-4">
                 <div class="text-grey-5">TELEMETRY</div>
                 <div class="text-subtitle1 text-grey-4">
-                  {{ prov.lastVerifiedAt ? formatDate(prov.lastVerifiedAt) : 'Live / Active' }}
+                  {{ prov.lastVerifiedAt ? formatDate(prov.lastVerifiedAt) : 'Not verified' }}
                 </div>
               </div>
             </div>
@@ -461,7 +507,7 @@
               <div class="text-caption text-grey-5 text-weight-bold q-mb-xs">SUPPORTED CAPABILITIES</div>
               <div class="row q-gutter-xs">
                 <q-badge
-                  v-for="cap in (prov.capabilities || ['auto_verification', 'claims_lookup', 'digital_id_card'])"
+                  v-for="cap in (prov.capabilities || [])"
                   :key="cap"
                   color="grey-9"
                   text-color="teal-2"
@@ -469,16 +515,17 @@
                 >
                   {{ cap }}
                 </q-badge>
+                <span v-if="!(prov.capabilities || []).length" class="text-caption text-grey-6">No capabilities recorded</span>
               </div>
             </div>
           </q-card>
         </div>
 
-        <div v-if="!providersHealth.length" class="col-12">
+        <div v-if="telemetryOutcome !== 'ok'" class="col-12">
           <q-card class="bg-card-dark border-grey-9 q-pa-lg text-center">
             <q-icon name="hub" color="grey-6" size="xl" />
-            <div class="text-subtitle1 text-grey-4 q-mt-sm">No HMO Provider Registry Records Found</div>
-            <div class="text-caption text-grey-6">Providers configured in `hw_providers` will appear here with live health telemetry.</div>
+            <div class="text-subtitle1 text-grey-4 q-mt-sm">{{ telemetryMessage.title }}</div>
+            <div class="text-caption text-grey-6">{{ telemetryMessage.detail }}</div>
           </q-card>
         </div>
       </div>
@@ -514,9 +561,21 @@
           bordered
           :loading="loading"
           :pagination="{ rowsPerPage: 10 }"
-          no-data-label="No platform operator grants recorded."
+          :no-data-label="grantsEmptyLabel"
           class="bg-dark text-white border-grey-9 font-mono"
         >
+          <template v-slot:body-cell-user_id="props">
+            <q-td :props="props">
+              <span class="text-white font-mono text-caption">{{ props.value || props.row.user_id || props.row.userId || '—' }}</span>
+            </q-td>
+          </template>
+
+          <template v-slot:body-cell-email="props">
+            <q-td :props="props">
+              <span class="text-teal-2 font-mono text-caption">{{ props.value || props.row.email || props.row.userEmail || props.row.user_email || '—' }}</span>
+            </q-td>
+          </template>
+
           <template v-slot:body-cell-permission="props">
             <q-td :props="props">
               <q-badge color="teal-10" text-color="teal-2" class="font-mono text-weight-bold">
@@ -528,31 +587,31 @@
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
               <q-badge
-                :color="props.row.revoked_at ? 'red-10' : isExpired(props.row.expires_at) ? 'grey-8' : 'green-10'"
-                :text-color="props.row.revoked_at ? 'red-2' : isExpired(props.row.expires_at) ? 'grey-4' : 'green-2'"
+                :color="(props.row.revoked_at || props.row.revokedAt) ? 'red-10' : isExpired(props.row.expires_at || props.row.expiresAt) ? 'grey-8' : 'green-10'"
+                :text-color="(props.row.revoked_at || props.row.revokedAt) ? 'red-2' : isExpired(props.row.expires_at || props.row.expiresAt) ? 'grey-4' : 'green-2'"
                 class="font-mono"
               >
-                {{ props.row.revoked_at ? 'REVOKED' : isExpired(props.row.expires_at) ? 'EXPIRED' : 'ACTIVE' }}
+                {{ (props.row.revoked_at || props.row.revokedAt) ? 'REVOKED' : isExpired(props.row.expires_at || props.row.expiresAt) ? 'EXPIRED' : 'ACTIVE' }}
               </q-badge>
             </q-td>
           </template>
 
           <template v-slot:body-cell-granted_at="props">
             <q-td :props="props">
-              {{ formatDate(props.value) }}
+              {{ formatDate(props.value || props.row.granted_at || props.row.grantedAt) }}
             </q-td>
           </template>
 
           <template v-slot:body-cell-expires_at="props">
             <q-td :props="props">
-              {{ formatDate(props.value) }}
+              {{ formatDate(props.value || props.row.expires_at || props.row.expiresAt) }}
             </q-td>
           </template>
 
           <template v-slot:body-cell-actions="props">
             <q-td :props="props" class="text-right">
               <q-btn
-                v-if="!props.row.revoked_at && !isExpired(props.row.expires_at)"
+                v-if="!(props.row.revoked_at || props.row.revokedAt) && !isExpired(props.row.expires_at || props.row.expiresAt)"
                 dense
                 flat
                 size="sm"
@@ -600,7 +659,7 @@
           bordered
           :loading="loading"
           :pagination="{ rowsPerPage: 15 }"
-          no-data-label="No platform health audit events recorded."
+          :no-data-label="auditEmptyLabel"
           class="bg-dark text-white border-grey-9 font-mono text-caption"
         >
           <template v-slot:body-cell-occurred_at="props">
@@ -645,21 +704,25 @@
 
         <q-card-section class="q-pt-none">
           <div class="text-caption text-grey-4 q-mb-md">
-            As a verified Super Admin, you can self-activate an operational grant session to query platform health governance data.
-            This action creates an immutable record in <code class="text-amber-3">hw_audit_events</code>.
+            Session activation records <code class="text-amber-3">platform.session.activated</code> in hw_audit_events.
+            It works only when an independent administrator has already issued the selected permission. It does not create a grant, and it does not extend that grant's expiry.
           </div>
 
           <div class="q-gutter-y-md">
             <div>
-              <div class="text-caption text-grey-5 q-mb-xs font-mono">DURATION (MINUTES)</div>
+              <div class="text-caption text-grey-5 q-mb-xs font-mono">PERMISSION ALREADY ISSUED TO THIS ACCOUNT</div>
               <q-select
-                v-model="sessionForm.durationMinutes"
-                :options="[15, 30, 60, 120, 240, 480]"
+                v-model="sessionForm.permission"
+                :options="heldGrantOptions"
                 dense
                 outlined
                 dark
-                class="bg-dark"
+                class="bg-dark font-mono"
+                :disable="!heldGrantOptions.length"
               />
+              <div v-if="!heldGrantOptions.length" class="text-caption text-amber-3 q-mt-xs">
+                No unexpired platform grant is on this account. Ask an administrator who holds platform.tenant_access to issue one for this user. Self-activation cannot do that.
+              </div>
             </div>
 
             <div>
@@ -675,7 +738,7 @@
                 placeholder="Describe why platform-level health data access is required (e.g. 'Investigating HMO claims webhook discrepancy for St. Jude Academy')"
               />
               <div class="text-caption text-grey-6 q-mt-xs">
-                Minimum 6 characters required. Will be logged in `hw_audit_events`.
+                At least 5 characters. The text is stored on the platform.session.activated audit event.
               </div>
             </div>
           </div>
@@ -689,7 +752,7 @@
             text-color="dark"
             label="Activate Session"
             :loading="activatingSession"
-            :disable="!sessionForm.reason || sessionForm.reason.trim().length < 6"
+            :disable="!heldGrantOptions.length || !sessionForm.permission || !sessionForm.reason || sessionForm.reason.trim().length < 5"
             @click="submitSelfActivate"
             class="text-weight-bold font-mono"
           />
@@ -710,20 +773,48 @@
 
         <q-card-section class="q-pt-none">
           <div class="text-caption text-grey-4 q-mb-md">
-            Assign explicit, time-bounded health governance permission to an operator in <code class="text-teal-3">hw_platform_grants</code>.
+            <template v-if="grantTargetIsDesignated">
+              This issues a durable entitlement for the designated platform administrator. A different active super administrator can do this without platform.tenant_access. It does not expire, and it does not include payout authority. An administrator cannot approve their own entitlement.
+            </template>
+            <template v-else>
+              Assign an explicit, time-bounded permission in <code class="text-teal-3">hw_platform_grants</code>.
+              This call requires your own unexpired platform.tenant_access grant, an audit reason, and a different user. An administrator cannot approve a grant for themselves.
+            </template>
           </div>
 
           <div class="q-gutter-y-md">
             <div>
               <div class="text-caption text-grey-5 q-mb-xs font-mono">OPERATOR USER ID (UUID)</div>
-              <q-input
+              <q-select
                 v-model="createGrantForm.userId"
+                :options="filteredGrantOperators"
+                use-input
+                fill-input
+                hide-selected
+                input-debounce="0"
+                emit-value
+                map-options
+                option-value="id"
+                option-label="label"
                 dense
                 outlined
                 dark
                 class="bg-dark font-mono"
-                placeholder="e.g. 00000000-0000-0000-0000-000000000000"
-              />
+                :loading="loadingGrantOperators"
+                :disable="loadingGrantOperators || !grantOperatorOptions.length"
+                label="Search by email, role, or id"
+                @filter="filterGrantOperators"
+              >
+                <template v-slot:no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No administrator matches that search.</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <div v-if="grantOperatorError" class="text-caption text-negative q-mt-xs">{{ grantOperatorError }}</div>
+              <div v-else-if="!loadingGrantOperators && !grantOperatorOptions.length" class="text-caption text-amber-3 q-mt-xs">
+                No other active administrator account was returned. Your own account is not listed.
+              </div>
             </div>
 
             <div>
@@ -744,11 +835,11 @@
               />
             </div>
 
-            <div>
+            <div v-if="!grantTargetIsDesignated">
               <div class="text-caption text-grey-5 q-mb-xs font-mono">DURATION (MINUTES)</div>
               <q-select
                 v-model="createGrantForm.durationMinutes"
-                :options="[30, 60, 120, 240, 480, 1440]"
+                :options="[30, 60, 120, 240, 480]"
                 dense
                 outlined
                 dark
@@ -780,7 +871,7 @@
             text-color="dark"
             label="Grant Privileges"
             :loading="creatingGrant"
-            :disable="!createGrantForm.userId || !createGrantForm.reason || createGrantForm.reason.trim().length < 6"
+            :disable="!createGrantForm.userId || !createGrantForm.reason || createGrantForm.reason.trim().length < 5"
             @click="submitCreateGrant"
             class="text-weight-bold font-mono"
           />
@@ -837,9 +928,11 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi';
+import { classifyTelemetryOutcome, normalizeProviderHealthPayload, unwrapPlatformBody } from 'src/hmo/telemetryState';
+import { DESIGNATED_PLATFORM_ADMIN_USER_ID, INTEGRATION_GRANT, TENANT_ACCESS_GRANT, grantOperatorLabel, hasActiveDurable, hasGrant } from 'src/hmo/overviewState';
 
 export default {
   name: 'HealthInsuranceGovernancePage',
@@ -854,13 +947,13 @@ export default {
     const errorMessage = ref('');
     const activeTab = ref('overview');
 
-    const activePlatformReason = ref(
-      sessionStorage.getItem('hw_platform_reason') || 'Routine platform health governance audit'
-    );
+    const activePlatformReason = ref(sessionStorage.getItem('hw_platform_reason') || '');
 
     const grantStatus = ref({
       hasActiveGrant: false,
-      activeGrants: []
+      durableEntitlements: [],
+      activeGrants: [],
+      inactiveGrants: []
     });
 
     const overview = ref({
@@ -884,6 +977,12 @@ export default {
     const tenantModeFilter = ref('all');
 
     const providersHealth = ref([]);
+    const telemetryOutcome = ref('loading');
+    const telemetryDetail = ref('');
+    const overviewState = ref('loading');
+    const overviewError = ref('');
+    const grantsState = ref('loading');
+    const auditState = ref('loading');
     const grantsList = ref([]);
     const auditEvents = ref([]);
     const auditActionFilter = ref('all');
@@ -891,16 +990,77 @@ export default {
     // Dialog state
     const showActivateSessionDialog = ref(false);
     const sessionForm = ref({
-      durationMinutes: 60,
-      reason: 'Routine platform health governance audit'
+      permission: 'platform.integration.health',
+      reason: ''
     });
+    const heldGrantOptions = computed(() => {
+      const grants = (grantStatus.value.activeGrants || []).map((grant) => grant && grant.permission).filter(Boolean);
+      const durable = (grantStatus.value.durableEntitlements || [])
+        .filter((row) => row && row.status === 'active')
+        .map((row) => row.permission);
+      return [...new Set([...grants, ...durable])];
+    });
+    const hasActiveDurableEntitlement = computed(() =>
+      (grantStatus.value.durableEntitlements || []).some((row) => row && row.status === 'active')
+    );
 
     const showCreateGrantDialog = ref(false);
     const createGrantForm = ref({
       userId: '',
-      permission: 'platform.read',
+      permission: 'platform.integration.health',
       durationMinutes: 60,
       reason: ''
+    });
+    const grantOperators = ref([]);
+    const filteredGrantOperators = ref([]);
+    const loadingGrantOperators = ref(false);
+    const grantOperatorError = ref('');
+    const grantOperatorOptions = computed(() => grantOperators.value);
+    const grantTargetIsDesignated = computed(() => createGrantForm.value.userId === DESIGNATED_PLATFORM_ADMIN_USER_ID);
+
+    const filterGrantOperators = (value, update) => {
+      update(() => {
+        const needle = String(value || '').trim().toLowerCase();
+        filteredGrantOperators.value = !needle
+          ? grantOperators.value
+          : grantOperators.value.filter((row) => {
+            const label = String(row.label || '').toLowerCase();
+            const id = String(row.id || '').toLowerCase();
+            return label.includes(needle) || id.includes(needle);
+          });
+      });
+    };
+
+    const loadGrantOperators = async () => {
+      loadingGrantOperators.value = true;
+      grantOperatorError.value = '';
+      try {
+        const res = await healthInsuranceApi.listGrantOperators();
+        const payload = unwrapPlatformBody(res.data) || {};
+        const rows = Array.isArray(payload.operators) ? payload.operators : [];
+        const selfId = localStorage.getItem('operator_userId') || '';
+        grantOperators.value = rows
+          .filter((row) => row && row.id && row.id !== selfId)
+          .map((row) => ({
+            id: row.id,
+            label: grantOperatorLabel(row)
+          }));
+        filteredGrantOperators.value = grantOperators.value;
+        if (!grantOperators.value.some((row) => row.id === createGrantForm.value.userId)) {
+          createGrantForm.value.userId = '';
+        }
+      } catch (err) {
+        grantOperators.value = [];
+        filteredGrantOperators.value = [];
+        createGrantForm.value.userId = '';
+        grantOperatorError.value = err?.response?.data?.error?.message || 'Administrator accounts could not be loaded.';
+      } finally {
+        loadingGrantOperators.value = false;
+      }
+    };
+
+    watch(showCreateGrantDialog, (open) => {
+      if (open) loadGrantOperators();
     });
 
     const showRevokeGrantDialog = ref(false);
@@ -921,11 +1081,12 @@ export default {
     ];
 
     const grantColumns = [
-      { name: 'user_id', label: 'OPERATOR USER ID', field: 'user_id', align: 'left' },
+      { name: 'user_id', label: 'OPERATOR USER ID', field: (row) => row.user_id || row.userId || '—', align: 'left', sortable: true },
+      { name: 'email', label: 'OPERATOR EMAIL', field: (row) => row.email || row.user_email || row.userEmail || '—', align: 'left', sortable: true },
       { name: 'permission', label: 'PERMISSION', field: 'permission', align: 'left', sortable: true },
-      { name: 'status', label: 'STATUS', field: 'id', align: 'center' },
-      { name: 'granted_at', label: 'GRANTED AT', field: 'granted_at', align: 'left', sortable: true },
-      { name: 'expires_at', label: 'EXPIRES AT', field: 'expires_at', align: 'left', sortable: true },
+      { name: 'status', label: 'STATUS', field: (row) => row.status || (row.revoked_at || row.revokedAt ? 'revoked' : 'active'), align: 'center' },
+      { name: 'granted_at', label: 'GRANTED AT', field: (row) => row.granted_at || row.grantedAt, align: 'left', sortable: true },
+      { name: 'expires_at', label: 'EXPIRES AT', field: (row) => row.expires_at || row.expiresAt, align: 'left', sortable: true },
       { name: 'actions', label: 'ACTION', field: 'id', align: 'right' }
     ];
 
@@ -960,6 +1121,12 @@ export default {
         res = res.filter(a => a.action === auditActionFilter.value);
       }
       return res;
+    });
+
+    const inactiveGrantSummary = computed(() => {
+      const rows = grantStatus.value.inactiveGrants || [];
+      if (!rows.length) return '';
+      return rows.map((row) => `${row.permission} is ${row.status} and does not authorize access.`).join(' ');
     });
 
     const grantRemainingMinutes = computed(() => {
@@ -1041,69 +1208,233 @@ export default {
         cancel: true,
         persistent: true
       }).onOk(data => {
-        if (data && data.trim().length >= 6) {
+        if (data && data.trim().length >= 5) {
           activePlatformReason.value = data.trim();
           sessionStorage.setItem('hw_platform_reason', data.trim());
           $q.notify({ type: 'positive', message: 'Operational reason updated.' });
           loadAll();
         } else {
-          $q.notify({ type: 'warning', message: 'Reason must be at least 6 characters.' });
+          $q.notify({ type: 'warning', message: 'Reason must be at least 5 characters.' });
         }
       });
     };
 
     // API actions
+    const grantsEmptyLabel = computed(() => {
+      if (grantsState.value === 'withheld' || grantsState.value === 'denied') {
+        return 'Grant list withheld. platform.tenant_access was not confirmed, so this is not an empty registry.';
+      }
+      if (grantsState.value === 'error') return 'The grants API failed. No empty-registry result is shown.';
+      return 'No platform operator grants are recorded.';
+    });
+
+    const auditEmptyLabel = computed(() => {
+      if (auditState.value === 'withheld' || auditState.value === 'denied') {
+        return 'Audit events are withheld until platform.integration.health is active.';
+      }
+      if (auditState.value === 'error') return 'The audit API failed.';
+      return 'No platform health audit events are recorded.';
+    });
+
+    const telemetryMessage = computed(() => {
+      const messages = {
+        loading: {
+          title: 'Loading provider telemetry',
+          detail: 'Waiting for the grant check and provider registry response.'
+        },
+        access_denied: {
+          title: 'Access denied',
+          detail: 'Provider telemetry requires an unexpired platform.integration.health grant and an audit reason. No registry rows are shown.'
+        },
+        unavailable: {
+          title: 'Telemetry API unavailable',
+          detail: telemetryDetail.value || 'The provider health request failed.'
+        },
+        malformed: {
+          title: 'Telemetry response was malformed',
+          detail: 'The response did not include a provider list.'
+        },
+        empty: {
+          title: 'No HMO provider registry records exist',
+          detail: 'The request succeeded and hw_providers returned no rows.'
+        }
+      };
+      return messages[telemetryOutcome.value] || messages.unavailable;
+    });
+
     const checkGrantStatus = async () => {
       try {
         const res = await healthInsuranceApi.getMyGrantStatus();
-        if (res.data?.success) {
-          grantStatus.value = res.data.data;
-        }
+        const payload = unwrapPlatformBody(res.data) || {};
+        const active = Boolean(payload.hasActiveGrant || payload.hasActiveGrants);
+        const inactive = Array.isArray(payload.inactiveGrants) ? payload.inactiveGrants : [];
+        const durableEntitlements = Array.isArray(payload.durableEntitlements) ? payload.durableEntitlements : [];
+        const durableActive = durableEntitlements.some((row) => row && row.status === 'active');
+        grantStatus.value = {
+          hasActiveGrant: active,
+          activeGrants: payload.activeGrants || [],
+          inactiveGrants: inactive,
+          durableEntitlements
+        };
+        return active || durableActive;
       } catch (err) {
-        console.warn('Could not verify platform grant status:', err);
+        grantStatus.value = { hasActiveGrant: false, activeGrants: [], inactiveGrants: [], durableEntitlements: [] };
+        const status = err?.response?.status;
+        if (status && status !== 401 && status !== 403 && status !== 404) {
+          overviewError.value = err?.response?.data?.error?.message || err.message || 'Grant status request failed.';
+          return 'error';
+        }
+        return false;
       }
+    };
+
+    const applySettled = (result) => {
+      if (result.status !== 'fulfilled') {
+        const status = result.reason?.response?.status;
+        const message = result.reason?.response?.data?.error?.message || result.reason?.message || 'Request failed';
+        return { rejected: true, httpStatus: status, message, payload: null };
+      }
+      return {
+        rejected: false,
+        httpStatus: result.value.status,
+        message: '',
+        payload: unwrapPlatformBody(result.value.data)
+      };
     };
 
     const loadAll = async () => {
       loading.value = true;
       errorMessage.value = '';
+      overviewError.value = '';
+      telemetryDetail.value = '';
       try {
-        await checkGrantStatus();
+        const grantResult = await checkGrantStatus();
+        if (grantResult !== true) {
+          overviewState.value = grantResult === 'error' ? 'error' : 'withheld';
+          telemetryOutcome.value = grantResult === 'error' ? 'unavailable' : 'access_denied';
+          grantsState.value = 'withheld';
+          auditState.value = grantResult === 'error' ? 'error' : 'withheld';
+          providersHealth.value = [];
+          tenantsList.value = [];
+          grantsList.value = [];
+          auditEvents.value = [];
+          return;
+        }
 
-        // If grant active, load platform telemetry
-        if (grantStatus.value.hasActiveGrant) {
-          const reason = activePlatformReason.value;
+        const grants = grantStatus.value.activeGrants || [];
+        const durable = grantStatus.value.durableEntitlements || [];
+        const reason = String(activePlatformReason.value || '').trim();
+        const integrationGranted = hasGrant(grants, INTEGRATION_GRANT) || hasActiveDurable(durable, INTEGRATION_GRANT);
+        const tenantAccessGranted = hasGrant(grants, TENANT_ACCESS_GRANT) || hasActiveDurable(durable, TENANT_ACCESS_GRANT);
+        if (reason.length < 5) {
+          overviewState.value = 'withheld';
+          overviewError.value = 'Set an operational audit reason of at least 5 characters before querying cross-tenant health data. This does not create a grant.';
+          telemetryOutcome.value = 'access_denied';
+          telemetryDetail.value = overviewError.value;
+          grantsState.value = 'withheld';
+          auditState.value = 'withheld';
+          providersHealth.value = [];
+          tenantsList.value = [];
+          grantsList.value = [];
+          auditEvents.value = [];
+          return;
+        }
+        if (!integrationGranted) {
+          overviewState.value = 'withheld';
+          overviewError.value = `No unexpired ${INTEGRATION_GRANT} grant or active durable entitlement is present. Cross-tenant telemetry stays withheld.`;
+          telemetryOutcome.value = 'access_denied';
+          telemetryDetail.value = overviewError.value;
+          auditState.value = 'withheld';
+          providersHealth.value = [];
+          tenantsList.value = [];
+          auditEvents.value = [];
+        }
+        if (!tenantAccessGranted) {
+          grantsState.value = 'withheld';
+          grantsList.value = [];
+        }
 
-          const [ovRes, tenRes, provRes, trRes, grRes, audRes] = await Promise.allSettled([
-            healthInsuranceApi.getPlatformOverview(reason),
-            healthInsuranceApi.getPlatformTenants({}, reason),
-            healthInsuranceApi.getProvidersHealth(reason),
-            healthInsuranceApi.getCoverageTrends(reason),
-            healthInsuranceApi.getPlatformGrants({}, reason),
-            healthInsuranceApi.getPlatformAuditEvents({ limit: 50 }, reason)
-          ]);
+        const requests = [];
+        if (integrationGranted) {
+          requests.push(['overview', healthInsuranceApi.getPlatformOverview(reason)]);
+          requests.push(['tenants', healthInsuranceApi.getPlatformTenants({}, reason)]);
+          requests.push(['providers', healthInsuranceApi.getProvidersHealth(reason)]);
+          requests.push(['trends', healthInsuranceApi.getCoverageTrends(reason)]);
+          requests.push(['audit', healthInsuranceApi.getPlatformAuditEvents({ limit: 50 }, reason)]);
+        }
+        if (tenantAccessGranted) {
+          requests.push(['grants', healthInsuranceApi.getPlatformGrants({}, reason)]);
+        }
+        const settled = await Promise.all(requests.map(async ([key, promise]) => {
+          try {
+            return [key, { status: 'fulfilled', value: await promise }];
+          } catch (reason) {
+            return [key, { status: 'rejected', reason }];
+          }
+        }));
+        const byKey = Object.fromEntries(settled);
 
-          if (ovRes.status === 'fulfilled' && ovRes.value.data?.success) {
-            overview.value = ovRes.value.data.data;
+        if (byKey.overview) {
+          const overviewResult = applySettled(byKey.overview);
+          if (overviewResult.rejected) {
+            overviewState.value = 'error';
+            overviewError.value = overviewResult.message;
+          } else {
+            overview.value = overviewResult.payload || overview.value;
+            overviewState.value = 'loaded';
           }
-          if (tenRes.status === 'fulfilled' && tenRes.value.data?.success) {
-            tenantsList.value = tenRes.value.data.data?.tenants || [];
+        }
+
+        if (byKey.tenants) {
+          const tenantResult = applySettled(byKey.tenants);
+          tenantsList.value = tenantResult.rejected ? [] : (tenantResult.payload?.tenants || []);
+        }
+
+        if (byKey.providers) {
+          const providerResult = applySettled(byKey.providers);
+          telemetryOutcome.value = classifyTelemetryOutcome({
+            grantActive: true,
+            rejected: providerResult.rejected,
+            httpStatus: providerResult.httpStatus,
+            payload: providerResult.payload
+          });
+          telemetryDetail.value = providerResult.message;
+          const normalized = normalizeProviderHealthPayload(providerResult.payload);
+          providersHealth.value = telemetryOutcome.value === 'ok' ? normalized.providers : [];
+        }
+
+        if (byKey.trends) {
+          const trendResult = applySettled(byKey.trends);
+          if (!trendResult.rejected && trendResult.payload) {
+            coverageTrends.value = trendResult.payload;
           }
-          if (provRes.status === 'fulfilled' && provRes.value.data?.success) {
-            providersHealth.value = provRes.value.data.data || [];
+        }
+
+        if (byKey.grants) {
+          const grantListResult = applySettled(byKey.grants);
+          if (grantListResult.rejected) {
+            grantsState.value = grantListResult.httpStatus === 401 || grantListResult.httpStatus === 403 ? 'denied' : 'error';
+            grantsList.value = [];
+          } else {
+            grantsList.value = grantListResult.payload?.grants || [];
+            grantsState.value = 'loaded';
           }
-          if (trRes.status === 'fulfilled' && trRes.value.data?.success) {
-            coverageTrends.value = trRes.value.data.data || { byMode: [], byCategory: [], byStatus: [] };
-          }
-          if (grRes.status === 'fulfilled' && grRes.value.data?.success) {
-            grantsList.value = grRes.value.data.data?.grants || [];
-          }
-          if (audRes.status === 'fulfilled' && audRes.value.data?.success) {
-            auditEvents.value = audRes.value.data.data?.events || [];
+        }
+
+        if (byKey.audit) {
+          const auditResult = applySettled(byKey.audit);
+          if (auditResult.rejected) {
+            auditState.value = auditResult.httpStatus === 401 || auditResult.httpStatus === 403 ? 'denied' : 'error';
+            auditEvents.value = [];
+          } else {
+            auditEvents.value = auditResult.payload?.events || [];
+            auditState.value = 'loaded';
           }
         }
       } catch (err) {
         errorMessage.value = err?.response?.data?.message || err.message || 'Error loading platform governance data.';
+        overviewState.value = 'error';
+        telemetryOutcome.value = 'unavailable';
       } finally {
         loading.value = false;
       }
@@ -1112,15 +1443,23 @@ export default {
     const submitSelfActivate = async () => {
       activatingSession.value = true;
       try {
+        const sessionDurable = hasActiveDurable(grantStatus.value.durableEntitlements, sessionForm.value.permission);
+        if (!hasGrant(grantStatus.value.activeGrants, sessionForm.value.permission) && !sessionDurable) {
+          $q.notify({
+            type: 'warning',
+            message: `No unexpired ${sessionForm.value.permission} grant or active durable entitlement is on this account. Self-activation cannot create one.`
+          });
+          return;
+        }
         const res = await healthInsuranceApi.selfActivateGrant({
-          durationMinutes: sessionForm.value.durationMinutes,
+          permission: sessionForm.value.permission,
           reason: sessionForm.value.reason
         });
 
         if (res.data?.success) {
           $q.notify({
             type: 'positive',
-            message: 'Operational session activated successfully.'
+            message: 'Operational session recorded under the existing grant. The grant expiry is unchanged.'
           });
           sessionStorage.setItem('hw_platform_reason', sessionForm.value.reason);
           activePlatformReason.value = sessionForm.value.reason;
@@ -1135,7 +1474,7 @@ export default {
       } catch (err) {
         $q.notify({
           type: 'negative',
-          message: err?.response?.data?.message || 'Error activating operational grant session.'
+          message: err?.response?.data?.error?.message || err?.response?.data?.message || 'The operational session was not activated.'
         });
       } finally {
         activatingSession.value = false;
@@ -1145,22 +1484,48 @@ export default {
     const submitCreateGrant = async () => {
       creatingGrant.value = true;
       try {
-        const res = await healthInsuranceApi.createPlatformGrant({
-          userId: createGrantForm.value.userId,
-          permission: createGrantForm.value.permission,
-          durationMinutes: createGrantForm.value.durationMinutes,
-          reason: createGrantForm.value.reason
-        }, activePlatformReason.value);
+        const reason = String(createGrantForm.value.reason || '').trim();
+        if (reason.length < 5) {
+          $q.notify({
+            type: 'warning',
+            message: 'A justification reason of at least 5 characters is required.'
+          });
+          return;
+        }
+        const designated = createGrantForm.value.userId === DESIGNATED_PLATFORM_ADMIN_USER_ID;
+        let res;
+        if (designated) {
+          res = await healthInsuranceApi.issuePlatformEntitlement({
+            userId: createGrantForm.value.userId,
+            permission: createGrantForm.value.permission
+          }, reason);
+        } else {
+          if (!hasGrant(grantStatus.value.activeGrants, TENANT_ACCESS_GRANT) && !hasActiveDurable(grantStatus.value.durableEntitlements, TENANT_ACCESS_GRANT)) {
+            $q.notify({
+              type: 'warning',
+              message: 'An eight-hour grant for another administrator requires your own unexpired platform.tenant_access grant. The designated platform administrator is the account that can receive a durable entitlement without that grant.'
+            });
+            return;
+          }
+          res = await healthInsuranceApi.createPlatformGrant({
+            userId: createGrantForm.value.userId,
+            permission: createGrantForm.value.permission,
+            durationMinutes: createGrantForm.value.durationMinutes,
+            reason
+          }, reason);
+        }
 
         if (res.data?.success) {
           $q.notify({
             type: 'positive',
-            message: 'Platform operator grant created successfully.'
+            message: designated
+              ? 'Durable platform entitlement issued. It does not expire and does not include payout authority.'
+              : 'Platform operator grant created successfully.'
           });
           showCreateGrantDialog.value = false;
           createGrantForm.value = {
             userId: '',
-            permission: 'platform.read',
+            permission: 'platform.integration.health',
             durationMinutes: 60,
             reason: ''
           };
@@ -1174,7 +1539,7 @@ export default {
       } catch (err) {
         $q.notify({
           type: 'negative',
-          message: err?.response?.data?.message || 'Error creating platform grant.'
+          message: err?.response?.data?.error?.message || err?.response?.data?.message || 'The platform grant was not created.'
         });
       } finally {
         creatingGrant.value = false;
@@ -1214,7 +1579,7 @@ export default {
       } catch (err) {
         $q.notify({
           type: 'negative',
-          message: err?.response?.data?.message || 'Error revoking grant.'
+          message: err?.response?.data?.error?.message || err?.response?.data?.message || 'The platform grant was not revoked.'
         });
       } finally {
         revokingGrant.value = false;
@@ -1234,19 +1599,33 @@ export default {
       activeTab,
       activePlatformReason,
       grantStatus,
+      hasActiveDurableEntitlement,
       overview,
       coverageTrends,
       tenantsList,
       tenantSearch,
       tenantModeFilter,
       providersHealth,
+      telemetryOutcome,
+      telemetryMessage,
+      overviewState,
+      overviewError,
+      grantsEmptyLabel,
+      auditEmptyLabel,
       grantsList,
       auditEvents,
       auditActionFilter,
       showActivateSessionDialog,
       sessionForm,
+      heldGrantOptions,
       showCreateGrantDialog,
       createGrantForm,
+      grantTargetIsDesignated,
+      grantOperatorOptions,
+      filteredGrantOperators,
+      filterGrantOperators,
+      loadingGrantOperators,
+      grantOperatorError,
       showRevokeGrantDialog,
       activeRevokeGrant,
       revokeReason,
@@ -1256,6 +1635,7 @@ export default {
       filteredTenants,
       filteredAuditEvents,
       grantRemainingMinutes,
+      inactiveGrantSummary,
       formatNgn,
       formatDate,
       isExpired,

@@ -144,6 +144,7 @@ const currentUserPermissions = ref([
   'read_metrics',
   'soc_quarantine',
   'admin_deploy',
+  'hmo.workspace',
   'write_fleet',
   'tenant.settings.manage',
   'tenant.transaction.view',

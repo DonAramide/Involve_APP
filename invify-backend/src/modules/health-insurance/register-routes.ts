@@ -74,17 +74,36 @@ export function createHealthInsuranceRouter(): Router {
   // ─── Platform Super-Admin Governance (Interface C) ───────────────
   // Operator grant check and self-activation for SUPER_ADMIN
   router.get('/platform/my-grant-status', HealthPlatformController.getMyGrantStatus);
+  router.get('/platform/grant-status', HealthPlatformController.getMyGrantStatus);
   router.post('/platform/grants/self-activate', HealthPlatformController.selfActivateGrant);
+
+  // Durable entitlement. Not gated by platform.tenant_access: that grant does not
+  // exist for any operator, so using it here would make first issuance impossible.
+  // The controller requires a different active super_admin, the pinned holder,
+  // and x-platform-reason. The holder cannot call these for their own row.
+  router.post('/platform/entitlements', HealthPlatformController.issueEntitlement);
+  router.post('/platform/entitlements/:permission/suspend', HealthPlatformController.suspendEntitlement);
+  router.post('/platform/entitlements/:permission/revoke', HealthPlatformController.revokeEntitlement);
+  router.get('/platform/grant-operators', HealthPlatformController.listGrantOperators);
 
   // Protected Platform Endpoints (Strictly require explicit platform.* grants & justification)
   router.get('/platform/overview', requireHealthPermission('platform.integration.health'), HealthPlatformController.getOverview);
   router.get('/platform/tenants', requireHealthPermission('platform.integration.health'), HealthPlatformController.listTenants);
+  router.get('/platform/providers', requireHealthPermission('platform.providers.manage'), HealthPlatformController.listProviderRegistry);
   router.get('/platform/providers/health', requireHealthPermission('platform.integration.health'), HealthPlatformController.getProvidersHealth);
   router.get('/platform/coverage-trends', requireHealthPermission('platform.integration.health'), HealthPlatformController.getCoverageTrends);
   router.get('/platform/grants', requireHealthPermission('platform.tenant_access'), HealthPlatformController.listGrants);
   router.post('/platform/grants', requireHealthPermission('platform.tenant_access'), HealthPlatformController.createGrant);
   router.post('/platform/grants/:id/revoke', requireHealthPermission('platform.tenant_access'), HealthPlatformController.revokeGrant);
   router.get('/platform/audit-events', requireHealthPermission('platform.integration.health'), HealthPlatformController.listAuditEvents);
+  router.get('/platform/plans', requireHealthPermission('platform.plans.manage'), HealthPlatformController.listPlanCatalogue);
+  router.post('/platform/plans', requireHealthPermission('platform.plans.manage'), HealthPlatformController.createPlanDraft);
+  router.post('/platform/plans/versions/:versionId/publish', requireHealthPermission('platform.plans.manage'), HealthPlatformController.publishPlanVersion);
+  router.post('/platform/plans/:planId/activate', requireHealthPermission('platform.plans.manage'), HealthPlatformController.activatePlan);
+  router.post('/platform/plans/:planId/retire', requireHealthPermission('platform.plans.manage'), HealthPlatformController.retirePlan);
+  router.patch('/platform/plans/versions/:versionId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.updatePlanDraft);
+  router.get('/platform/finance', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceSnapshot);
+  router.get('/platform/facilities', requireHealthPermission('platform.integration.health'), HealthPlatformController.listFacilities);
 
   // ─── Tenant Endpoints (Interface B) ──────────────────────────────
   // 1. Dashboard Overview
