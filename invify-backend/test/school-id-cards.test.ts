@@ -310,16 +310,22 @@ describe('school ID cards', () => {
     expect(REPLACEMENT_SQL.map((sql) => sql.toLowerCase()).join('\n')).toContain('pending');
     expect(replacementSqlTouchesAttendanceOrSessions(REPLACEMENT_SQL)).toBe(false);
     const directory = path.join(__dirname, '../src/modules/school-gate');
-    const source = fs.readdirSync(directory)
-      .filter((file) => file !== 'school-card.transaction.ts')
+    // Card issue and replacement must not open gate sessions. Session writes belong only in the scan module.
+    const issuanceSource = fs.readdirSync(directory)
+      .filter((file) => file !== 'school-card.transaction.ts' && file !== 'school-gate.scan.ts')
       .map((file) => fs.readFileSync(path.join(directory, file), 'utf8'))
       .join('\n');
-    expect(source).not.toContain('attendance_records');
-    expect(source).not.toContain('student_attendance');
-    expect(source).not.toContain('AttendanceService');
-    expect(source).not.toContain('school_entry_exit_sessions');
-    expect(source).not.toContain('checkTenantPermission');
-    expect(source).not.toContain('resolveTenantScope');
+    expect(issuanceSource).not.toContain('attendance_records');
+    expect(issuanceSource).not.toContain('student_attendance');
+    expect(issuanceSource).not.toContain('AttendanceService');
+    expect(issuanceSource).not.toContain('school_entry_exit_sessions');
+    expect(issuanceSource).not.toContain('checkTenantPermission');
+    expect(issuanceSource).not.toContain('resolveTenantScope');
+    const scanSource = fs.readFileSync(path.join(directory, 'school-gate.scan.ts'), 'utf8');
+    expect(scanSource).toContain('school_entry_exit_sessions');
+    expect(scanSource).not.toContain('attendance_records');
+    expect(scanSource).not.toContain('student_attendance');
+    expect(scanSource).not.toContain('AttendanceService');
   });
 
   test('the live route service reports that the schema is unapplied and still refuses scan-only roles', async () => {

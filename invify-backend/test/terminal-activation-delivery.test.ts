@@ -26,8 +26,10 @@ describe('terminal activation delivery', () => {
     expect(pdf.length).toBeGreaterThan(1500);
     const raw = pdf.toString('latin1');
     expect(raw).toContain('/Subtype /Image');
+    // QRCode.toBuffer is called with width 320. The certificate logo is assets/iips-logo.png (607px), not the 454px Invify wordmark.
     expect(raw).toContain('/Width 320');
-    expect(raw).toContain('/Width 454');
+    expect(raw).toContain('/Width 607');
+    expect(raw).toContain('ABCD-EFGH-IJKL');
   }, 30000);
 
   it('names the attachment as a pdf', () => {
