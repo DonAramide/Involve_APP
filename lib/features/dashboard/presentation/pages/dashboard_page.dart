@@ -755,6 +755,13 @@ class _DashboardPageState extends State<DashboardPage> {
             ? () => _showFeaturePlanLock(context, 'Multi Device')
             : () => Navigator.pushNamed(context, '/device_sync'),
       ),
+      _DashboardMenuItem(
+        id: 'health_wellness',
+        title: 'HEALTH & WELLNESS',
+        icon: Icons.health_and_safety,
+        color: Colors.teal,
+        onTap: () => Navigator.pushNamed(context, '/health_wellness'),
+      ),
     ];
 
     if (isServices) {
@@ -800,6 +807,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'finance_analytics',
           'reconciliation',
           'multi_device',
+          'health_wellness',
         ].contains(i.id)),
       ], settings);
     }
