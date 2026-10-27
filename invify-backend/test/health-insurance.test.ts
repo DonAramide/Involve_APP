@@ -1269,3 +1269,44 @@ describe('Invify Health & Wellness — Unit & Security Verification', () => {
   });
 });
 
+describe('finance command authorization', () => {
+  test('keeps the aggregate read behind platform.integration.health and omits payer fields', () => {
+    const routes = fs.readFileSync(
+      path.join(__dirname, '../src/modules/health-insurance/register-routes.ts'),
+      'utf8'
+    );
+    expect(routes).toContain(
+      "router.get('/platform/finance-command', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceCommand)"
+    );
+    const service = fs.readFileSync(
+      path.join(__dirname, '../src/modules/health-insurance/services/health-platform.service.ts'),
+      'utf8'
+    );
+    const method = service.slice(service.indexOf('static async getFinanceCommand'));
+    expect(method).toContain('invoice_number, status, amount_due_minor, amount_paid_minor, due_date, issued_at, currency');
+    expect(method).not.toContain('payer');
+    expect(method).not.toContain('payment_metadata');
+    expect(method).not.toContain('enrolment_id');
+    expect(method).not.toContain('member');
+  });
+
+  test('tenant activate and suspend stays behind platform.tenants.onboard and does not enrol', () => {
+    const routes = fs.readFileSync(
+      path.join(__dirname, '../src/modules/health-insurance/register-routes.ts'),
+      'utf8'
+    );
+    expect(routes).toContain(
+      "router.post('/platform/tenants/:tenantId/participation', requireHealthPermission('platform.tenants.onboard'), HealthPlatformController.setTenantParticipation)"
+    );
+    const service = fs.readFileSync(
+      path.join(__dirname, '../src/modules/health-insurance/services/health-platform.service.ts'),
+      'utf8'
+    );
+    const method = service.slice(service.indexOf('static async setTenantParticipation'), service.indexOf('static async getProvidersHealth'));
+    expect(method).toContain('tenant.health.activated');
+    expect(method).toContain('tenant.health.suspended');
+    expect(method).not.toContain('hw_enrolments');
+    expect(method).not.toContain('hw_payments');
+  });
+});
+

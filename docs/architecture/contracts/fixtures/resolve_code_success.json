@@ -1,0 +1,30 @@
+{
+  "valid": true,
+  "institution": {
+    "id": "11111111-2222-3333-4444-555555555555",
+    "code": "PROV01",
+    "name": "Providus Bank Institution Portal",
+    "type": "BANK",
+    "logoUrl": "https://cdn.invify.com/institutions/providus.png",
+    "isDefault": false,
+    "supportedServices": ["PAYMENTS", "TRANSFERS", "VIRTUAL_ACCOUNTS", "CARD_ACQUIRING"],
+    "allowedBusinessModes": ["school", "retail", "services"],
+    "policySummary": {
+      "PAYMENTS": {
+        "defaultProvider": "paystack",
+        "allowedProviders": ["paystack", "flutterwave"],
+        "overridePolicy": "PERMITTED_FROM_LIST"
+      },
+      "TRANSFERS": {
+        "defaultProvider": "nomba",
+        "allowedProviders": ["nomba", "paystack"],
+        "overridePolicy": "LOCKED"
+      },
+      "VIRTUAL_ACCOUNTS": {
+        "defaultProvider": "connectpoint",
+        "allowedProviders": ["connectpoint", "paystack"],
+        "overridePolicy": "LOCKED"
+      }
+    }
+  }
+}

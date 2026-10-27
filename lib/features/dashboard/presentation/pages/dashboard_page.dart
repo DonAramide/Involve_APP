@@ -868,6 +868,20 @@ class _DashboardPageState extends State<DashboardPage> {
               ? () => _showFeaturePlanLock(context, 'Lesson Notes')
               : () => Navigator.pushNamed(context, '/lesson_notes_list'),
         ),
+        _DashboardMenuItem(
+          id: 'my_id_card',
+          title: 'MY ID CARD',
+          icon: Icons.badge_outlined,
+          color: Colors.indigo,
+          onTap: () => Navigator.pushNamed(context, '/my_id_card'),
+        ),
+        _DashboardMenuItem(
+          id: 'gate_clock',
+          title: 'GATE CLOCK',
+          icon: Icons.sensor_door_outlined,
+          color: Colors.blue,
+          onTap: () => Navigator.pushNamed(context, '/gate_clock'),
+        ),
       ]);
     }
 

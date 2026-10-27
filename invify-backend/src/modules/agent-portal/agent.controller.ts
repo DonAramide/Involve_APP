@@ -741,12 +741,12 @@ export class AgentController {
           rank: rank || '-'
         },
         quickActions: [
-          { label: 'Create Lead', route: '/agent/coming-soon/create-lead', icon: 'person_add' },
-          { label: 'Upload KYC', route: '/agent/coming-soon/upload-kyc', icon: 'file_upload' },
-          { label: 'Assign Device', route: '/agent/coming-soon/assign-device', icon: 'devices' },
-          { label: 'Assign Terminal', route: '/agent/coming-soon/assign-terminal', icon: 'point_of_sale' },
-          { label: 'Request Withdrawal', route: '/agent/coming-soon/request-withdrawal', icon: 'payments' },
-          { label: 'Support Ticket', route: '/agent/coming-soon/support-ticket', icon: 'support_agent' }
+          { label: 'Create Lead', route: '/institute/leads', icon: 'person_add' },
+          { label: 'Upload KYC', route: '/institute/profile?tab=kyc', icon: 'file_upload' },
+          { label: 'Assign Device', route: '/institute/assign-device', icon: 'devices' },
+          { label: 'Assign Terminal', route: '/institute/assign-terminal', icon: 'point_of_sale' },
+          { label: 'Request Withdrawal', route: '/institute/wallet', icon: 'payments' },
+          { label: 'Support Ticket', route: '/institute/support', icon: 'support_agent' }
         ]
       };
 

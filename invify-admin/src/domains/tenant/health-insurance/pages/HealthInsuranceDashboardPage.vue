@@ -436,8 +436,12 @@
             emit-value
             map-options
             :options="planVersionOptions"
-            label="Plan Version"
+            label="Plan version"
+            hint="Reference price is read-only. Only an active bank offering is listed when this tenant belongs to a bank."
           />
+          <div v-if="selectedPlanDetail" class="text-caption text-grey-4">
+            {{ selectedPlanDetail }}
+          </div>
           <q-input
             v-model="newEnrolment.startDate"
             outlined
@@ -621,7 +625,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi';
 
@@ -750,9 +754,41 @@ const activationData = reactive({
   expiryDate: new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)
 });
 
-const planVersionOptions = ref([
-  { label: 'Reliance Basic Student Care v1 (Standard)', value: 'plan-ver-default-01' }
-]);
+const planRows = computed(() => {
+  const raw = tenantOffers.value
+  if (Array.isArray(raw)) return raw
+  if (Array.isArray(raw?.data)) return raw.data
+  return []
+})
+
+const planVersionOptions = computed(() => planRows.value.map((row) => {
+  const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions
+  if (!version?.id) return null
+  const plan = Array.isArray(version.hw_plans) ? version.hw_plans[0] : version.hw_plans
+  const provider = Array.isArray(plan?.hw_providers) ? plan.hw_providers[0] : plan?.hw_providers
+  const minor = Number(version.premium_minor)
+  const price = Number.isFinite(minor)
+    ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: version.currency || 'NGN' }).format(minor / 100)
+    : 'Price unavailable'
+  return {
+    label: `${provider?.display_name || 'HMO'} · ${plan?.name || 'Plan'} v${version.version} · ${price}`,
+    value: version.id,
+  }
+}).filter(Boolean))
+
+const selectedPlanDetail = computed(() => {
+  const row = planRows.value.find((item) => {
+    const version = Array.isArray(item.hw_plan_versions) ? item.hw_plan_versions[0] : item.hw_plan_versions
+    return version?.id === newEnrolment.planVersionId
+  })
+  const version = Array.isArray(row?.hw_plan_versions) ? row.hw_plan_versions[0] : row?.hw_plan_versions
+  if (!version) return ''
+  const categories = (version.member_categories || []).join(', ')
+  const benefits = Array.isArray(version.benefits)
+    ? version.benefits.map((benefit) => benefit?.category || benefit?.name).filter(Boolean).join(', ')
+    : ''
+  return [categories && `Categories: ${categories}`, benefits && `Benefits: ${benefits}`].filter(Boolean).join(' · ')
+})
 
 // Helpers
 function formatNgn(amount) {
@@ -823,7 +859,7 @@ async function loadInvoices() {
 async function loadPlansAndOffers() {
   try {
     const res = await healthInsuranceApi.getTenantOffers();
-    tenantOffers.value = res.data || [];
+    tenantOffers.value = res.data?.data || res.data || [];
   } catch (err) {
     console.warn('Plans load:', err?.message);
   }

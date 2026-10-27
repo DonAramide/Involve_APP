@@ -78,6 +78,9 @@ const routes = [
       { path: 'success', component: () => import('pages/agent/AgentSuccessPage.vue') },
       { path: 'dashboard', component: () => import('pages/agent/AgentDashboardPage.vue') },
       { path: 'coming-soon/:module', component: () => import('pages/agent/ComingSoonPage.vue') },
+      { path: 'assign-device', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
+      { path: 'assign-terminal', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
+      { path: 'hmo/:section', component: () => import('pages/agent/InstituteHmoWorkspace.vue') },
       { path: 'notifications', component: () => import('pages/agent-portal/AgentNotificationsPage.vue') },
       { path: 'profile', component: () => import('pages/agent-portal/AgentProfilePage.vue') },
       { path: 'leads', component: () => import('pages/agent-portal/leads/LeadKanbanPage.vue') },
@@ -549,6 +552,8 @@ const routes = [
 
       // School roster synced from Flutter Web Sync
       { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
+      { path: 'id-cards', component: () => import('pages/school/IdCardManagementPage.vue'), meta: { title: 'ID Card Management', requiresAuth: true } },
+      { path: 'entry-exit', component: () => import('pages/school/EntryExitPage.vue'), meta: { title: 'Entry and Exit', requiresAuth: true } },
       { path: 'school-payments', component: () => import('pages/school/SchoolPaymentsPage.vue'), meta: { title: 'School Payments', requiresAuth: true } },
       { path: 'health-insurance', component: () => import('src/domains/tenant/health-insurance/pages/HealthInsuranceDashboardPage.vue'), meta: { title: 'Health & Wellness', requiresAuth: true } },
       

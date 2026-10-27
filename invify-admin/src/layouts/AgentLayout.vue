@@ -1,7 +1,14 @@
 <template>
   <q-layout view="hHh lpR fFf" class="bg-main text-main font-inter">
     <q-header elevated class="bg-panel-darker border-bottom flex items-center justify-between q-px-md" style="height: 50px;">
-      <div class="row items-center op-gap-8 no-wrap">
+      <div
+        class="row items-center op-gap-8 no-wrap portal-home"
+        role="button"
+        tabindex="0"
+        aria-label="Back to dashboard"
+        @click="goDashboard"
+        @keyup.enter="goDashboard"
+      >
         <q-avatar size="28px" class="bg-panel rounded-borders" v-if="logoUrl">
           <img :src="logoUrl" alt="Logo" style="object-fit: contain;" />
         </q-avatar>
@@ -136,6 +143,9 @@ const BANK_ONLY_ROUTES = [
   '/institute/reputation',
   '/institute/certifications',
   '/institute/training',
+  '/institute/assign-device',
+  '/institute/assign-terminal',
+  '/institute/hmo',
 ]
 
 function enforceInstitutionRouteIsolation(path) {
@@ -172,6 +182,14 @@ onUnmounted(() => {
   window.removeEventListener('invify-agent-info-updated', syncAgentInfo)
 })
 
+function goDashboard() {
+  if (route.path === '/institute/dashboard') {
+    window.location.assign('/institute/dashboard')
+    return
+  }
+  router.push('/institute/dashboard')
+}
+
 const logout = () => {
   localStorage.removeItem('invify_agent_token')
   localStorage.removeItem('invify_agent_info')
@@ -187,4 +205,5 @@ const logout = () => {
 .text-muted { color: #868e96; }
 .border-bottom { border-bottom: 1px solid #1a2024; }
 .font-inter { font-family: 'Inter', Roboto, sans-serif; }
+.portal-home { cursor: pointer; }
 </style>

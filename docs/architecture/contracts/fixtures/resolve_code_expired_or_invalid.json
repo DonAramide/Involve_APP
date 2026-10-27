@@ -1,0 +1,6 @@
+{
+  "valid": false,
+  "error": "Institutional code 'INVALID999' is not registered, has expired, or is inactive.",
+  "fallbackDecision": "RETAIN_LEGACY_CONFIG",
+  "instruction": "Do not assign fabricated platform institution; retain existing tenant configuration."
+}

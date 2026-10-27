@@ -2,7 +2,7 @@
 import { supabaseAdmin } from '../../../db/supabase';
 import { HealthAuditService } from './health-audit.service';
 import { HealthContext } from '../types';
-import { premiumOverviewTotals, summarizeStatusAmounts } from './finance-summary';
+import { premiumOverviewTotals, summarizeStatusAmounts, commandPremiumTotals, premiumMonthSeries, integerMinor } from './finance-summary';
 import { PlatformEntitlementService } from './platform-entitlement.service';
 
 export interface OperatorGrantDiagnostic {
@@ -100,6 +100,12 @@ export function metricCount(
   if (error) return null;
   if (typeof count === 'number' && Number.isInteger(count) && count >= 0) return count;
   return null;
+}
+
+function normalDay(value: unknown): string | null {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
 export class HealthPlatformService {
@@ -213,10 +219,17 @@ export class HealthPlatformService {
 
   // ─── 2. Tenant Participation Directory ─────────────────────────────
   static async listPlatformTenants(ctx: HealthContext, query: any) {
-    const limit = Math.min(Number(query.limit) || 20, 100);
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
     const offset = Math.max(Number(query.offset) || 0, 0);
-    const search = (query.search || '').trim().toLowerCase();
-    const modeFilter = (query.mode || '').trim().toLowerCase();
+    const search = String(query.search || '').trim().replace(/[%_\\]/g, '').slice(0, 64);
+    const modeFilter = String(query.mode || '').trim().toLowerCase();
+    const healthFilter = String(query.health || '').trim().toLowerCase();
+    if (modeFilter && !['school', 'retail', 'services'].includes(modeFilter)) {
+      throw new Error('mode must be school, retail, or services');
+    }
+    if (healthFilter && !['enabled', 'disabled'].includes(healthFilter)) {
+      throw new Error('health must be enabled or disabled');
+    }
 
     // Query tenants
     let tenantQuery = supabaseAdmin
@@ -228,6 +241,20 @@ export class HealthPlatformService {
     }
     if (modeFilter) {
       tenantQuery = tenantQuery.eq('type', modeFilter);
+    }
+    if (healthFilter) {
+      const { data: enabledRows, error: enabledError } = await supabaseAdmin
+        .from('hw_tenant_settings')
+        .select('tenant_id')
+        .eq('enabled', true);
+      if (enabledError) throw new Error(`Failed to read health access: ${enabledError.message}`);
+      const enabledIds = (enabledRows || []).map((row) => row.tenant_id).filter(Boolean);
+      if (healthFilter === 'enabled') {
+        if (!enabledIds.length) return { tenants: [], total: 0, limit, offset };
+        tenantQuery = tenantQuery.in('id', enabledIds);
+      } else if (enabledIds.length) {
+        tenantQuery = tenantQuery.not('id', 'in', `(${enabledIds.join(',')})`);
+      }
     }
 
     const { data: tenants, count, error } = await tenantQuery
@@ -310,6 +337,56 @@ export class HealthPlatformService {
       limit,
       offset
     };
+  }
+
+  /**
+   * Turns hw_tenant_settings.enabled on or off for one tenant.
+   * This does not enrol members, issue an invoice, or move money.
+   */
+  static async setTenantParticipation(ctx: HealthContext, tenantId: string, enabled: boolean) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(tenantId || ''))) {
+      const invalid: any = new Error('tenantId must be a UUID');
+      invalid.status = 400;
+      throw invalid;
+    }
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('id, name')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to read tenant: ${error.message}`);
+    if (!tenant) {
+      const missing: any = new Error('Tenant was not found.');
+      missing.status = 404;
+      throw missing;
+    }
+
+    const now = new Date().toISOString();
+    const payload: Record<string, unknown> = { tenant_id: tenantId, enabled, updated_at: now };
+    if (enabled) {
+      payload.enabled_by = ctx.userId;
+      payload.enabled_at = now;
+    }
+    const { data, error: saveError } = await supabaseAdmin
+      .from('hw_tenant_settings')
+      .upsert(payload, { onConflict: 'tenant_id' })
+      .select('tenant_id, enabled')
+      .single();
+    if (saveError || !data) throw new Error(`Failed to update health access: ${saveError?.message || 'no row returned'}`);
+
+    await HealthAuditService.recordEvent({
+      tenantId: '00000000-0000-0000-0000-000000000000',
+      actorUserId: ctx.userId,
+      actorRole: 'platform_admin',
+      action: enabled ? 'tenant.health.activated' : 'tenant.health.suspended',
+      resourceType: 'hw_tenant_settings',
+      resourceId: tenantId,
+      changes: { tenantName: tenant.name, enabled, reason: ctx.platformReason },
+      viaPlatformAccess: true,
+      platformReason: ctx.platformReason
+    });
+
+    return { tenantId, name: tenant.name, enabled: data.enabled === true };
   }
 
   // ─── 3. Provider Integration & Telemetry Health ───────────────────
@@ -701,6 +778,88 @@ export class HealthPlatformService {
       invoices: summarizeStatusAmounts(invoices, 'amount_due_minor'),
       invoiceCollected: summarizeStatusAmounts(invoices, 'amount_paid_minor'),
       payments: summarizeStatusAmounts(payments, 'amount_minor')
+    };
+  }
+
+  /**
+   * Period premium command data. Amounts stay in integer kobo.
+   * Operating expenses, profit, and claim disbursements are not derived here.
+   */
+  static async getFinanceCommand(query: any) {
+    const from = normalDay(query?.from);
+    const to = normalDay(query?.to);
+    if (query?.from && !from) throw new Error('from must be YYYY-MM-DD');
+    if (query?.to && !to) throw new Error('to must be YYYY-MM-DD');
+    if (from && to && from > to) throw new Error('from is after to');
+
+    const limit = Math.min(Math.max(Number(query?.limit) || 20, 1), 50);
+    const offset = Math.max(Number(query?.offset) || 0, 0);
+    const status = String(query?.status || '').trim();
+    const allowedStatuses = new Set(['', 'draft', 'issued', 'partially_paid', 'paid', 'void', 'refunded', 'overdue']);
+    if (!allowedStatuses.has(status)) throw new Error('status is not a recognised invoice filter');
+    const search = String(query?.search || '').trim().replace(/[%_\\]/g, '').slice(0, 64);
+
+    const { data: invoices, error: invoiceError } = await supabaseAdmin
+      .from('hw_premium_invoices')
+      .select('status, amount_due_minor, amount_paid_minor, issued_at, due_date');
+    if (invoiceError) throw new Error(`Failed to summarise premium invoices: ${invoiceError.message}`);
+
+    const { data: payments, error: paymentError } = await supabaseAdmin
+      .from('hw_payments')
+      .select('status, amount_minor, created_at, reconciled_at');
+    if (paymentError) throw new Error(`Failed to summarise premium payments: ${paymentError.message}`);
+
+    const totals = commandPremiumTotals(invoices, payments, from, to);
+    const series = premiumMonthSeries(invoices, payments, from, to);
+
+    let recordQuery = supabaseAdmin
+      .from('hw_premium_invoices')
+      .select('invoice_number, status, amount_due_minor, amount_paid_minor, due_date, issued_at, currency', { count: 'exact' });
+    if (search) recordQuery = recordQuery.ilike('invoice_number', `%${search}%`);
+    if (status && status !== 'overdue') recordQuery = recordQuery.eq('status', status);
+    if (status === 'overdue') {
+      const today = new Date().toISOString().slice(0, 10);
+      recordQuery = recordQuery.in('status', ['issued', 'partially_paid']).lt('due_date', today);
+    }
+    if (from) recordQuery = recordQuery.gte('issued_at', `${from}T00:00:00.000Z`);
+    if (to) recordQuery = recordQuery.lte('issued_at', `${to}T23:59:59.999Z`);
+    const { data: records, count, error: recordError } = await recordQuery
+      .order('issued_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (recordError) throw new Error(`Failed to list premium invoices: ${recordError.message}`);
+
+    return {
+      currency: 'NGN',
+      period: { from, to },
+      generatedAt: new Date().toISOString(),
+      totals,
+      series,
+      records: {
+        rows: (records || []).map((row) => {
+          const grossMinor = integerMinor(row.amount_due_minor);
+          const paidMinor = integerMinor(row.amount_paid_minor);
+          return {
+            reference: row.invoice_number,
+            recordType: 'premium_invoice',
+            grossMinor,
+            paidMinor,
+            outstandingMinor: grossMinor === null || paidMinor === null ? null : grossMinor - paidMinor,
+            status: row.status,
+            occurredOn: row.issued_at || row.due_date || null,
+            currency: row.currency || 'NGN'
+          };
+        }),
+        total: metricCount(count, null),
+        limit,
+        offset
+      },
+      unavailable: {
+        operatingExpenses: 'No HMO operating-expense source is defined. This is not zero.',
+        netOperatingProfit: 'Recognised revenue and recorded operating expenses are not both available. Premium collections are not profit.',
+        claimsPaid: 'Claim status records do not store a disbursement. A settled or approved claim is not a paid claim.',
+        claimsOutstanding: 'Authorised claim amounts are not unpaid disbursements.',
+        collectionByHmo: 'Premium invoices are tenant-scoped and are not attributed to an HMO provider.'
+      }
     };
   }
 

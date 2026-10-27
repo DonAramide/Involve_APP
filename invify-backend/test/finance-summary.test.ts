@@ -56,4 +56,67 @@ describe('premium finance summary', () => {
     expect(totals.billedMinor).toBeNull();
     expect(totals.collectedMinor).toBe(100);
   });
+
+  test('keeps outstanding, collections, and the collection rate on the existing minor-unit basis', () => {
+    const {
+      collectionRateBps,
+      collectedPremiumMinor,
+      outstandingPremiumMinor,
+      reconciledCollectionMinor,
+      premiumMonthSeries,
+      commandPremiumTotals
+    } = require('../src/modules/health-insurance/services/finance-summary');
+
+    expect(collectionRateBps(0, 0)).toBeNull();
+    expect(collectionRateBps(null, 100)).toBeNull();
+    expect(collectedPremiumMinor([
+      { status: 'successful', amount_minor: 500 },
+      { status: 'refunded', amount_minor: 500 },
+      { status: 'reversed', amount_minor: 500 },
+      { status: 'failed', amount_minor: 500 }
+    ])).toBe(500);
+    expect(reconciledCollectionMinor([
+      { status: 'successful', amount_minor: 500, reconciled_at: '2026-03-16' },
+      { status: 'successful', amount_minor: 200, reconciled_at: null }
+    ])).toBe(500);
+    expect(outstandingPremiumMinor([
+      { status: 'issued', amount_due_minor: 1000, amount_paid_minor: 400 },
+      { status: 'paid', amount_due_minor: 1000, amount_paid_minor: 1000 },
+      { status: 'draft', amount_due_minor: 900, amount_paid_minor: 0 }
+    ])).toBe(600);
+    expect(outstandingPremiumMinor([
+      { status: 'issued', amount_due_minor: null, amount_paid_minor: 0 }
+    ])).toBeNull();
+    expect(outstandingPremiumMinor([])).toBe(0);
+
+    const series = premiumMonthSeries(
+      [
+        { status: 'issued', amount_due_minor: 1000, issued_at: '2026-03-02T00:00:00.000Z' },
+        { status: 'issued', amount_due_minor: 1000, issued_at: null },
+        { status: 'draft', amount_due_minor: 900, issued_at: '2026-03-03T00:00:00.000Z' }
+      ],
+      [
+        { status: 'successful', amount_minor: 250, created_at: '2026-03-15T00:00:00.000Z' },
+        { status: 'refunded', amount_minor: 250, created_at: '2026-03-16T00:00:00.000Z' }
+      ],
+      '2026-03-01',
+      '2026-03-31'
+    );
+    expect(series.points).toEqual([{ month: '2026-03', invoicedMinor: 1000, collectedMinor: 250 }]);
+    expect(series.undatedInvoices).toBe(1);
+
+    const totals = commandPremiumTotals(
+      [{ status: 'issued', amount_due_minor: 1000, amount_paid_minor: 250, issued_at: '2026-03-02' }],
+      [{ status: 'successful', amount_minor: 250, created_at: '2026-03-15', reconciled_at: '2026-03-16' }],
+      '2026-03-01',
+      '2026-03-31'
+    );
+    expect(totals).toEqual({
+      billedMinor: 1000,
+      collectedMinor: 250,
+      reconciledMinor: 250,
+      outstandingMinor: 750,
+      collectionRateBps: 2500
+    });
+  });
 });

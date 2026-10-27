@@ -62,6 +62,7 @@ import { CurriculumController } from './controllers/curriculum.controller';
 import { BillingController } from './controllers/billing.controller';
 import { ReferralController } from './controllers/referral.controller';
 import { AttendanceController } from './controllers/attendance.controller';
+import { createUnappliedSchoolCardService, registerSchoolCardRoutes } from './modules/school-gate/school-card.routes';
 import { InsightsController } from './controllers/insights.controller';
 import { RetentionController } from './controllers/retention.controller';
 import { WebhookController } from './controllers/webhook.controller';
@@ -562,7 +563,16 @@ app.post('/api/agent/change-password', AgentController.changePassword);
 app.post('/api/agent/forgot-password', verificationLimiter, AgentController.forgotPassword);
 app.post('/api/agent/reset-password', authLimiter, AgentController.resetPassword);
 app.post('/api/agent/resolve-suspension', AgentController.resolveSuspension);
+import { BankHmoDistributionController } from './modules/health-insurance/controllers/bank-hmo-distribution.controller';
 app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
+app.get('/api/agent/hmo-distribution/catalogue', authenticate, BankHmoDistributionController.catalogue);
+app.get('/api/agent/hmo-distribution/catalogue/:providerId', authenticate, BankHmoDistributionController.provider);
+app.get('/api/agent/hmo-distribution/facilities', authenticate, BankHmoDistributionController.facilities);
+app.get('/api/agent/hmo-distribution/offerings', authenticate, BankHmoDistributionController.offerings);
+app.post('/api/agent/hmo-distribution/offerings', authenticate, BankHmoDistributionController.changeOffering);
+app.post('/api/agent/hmo-distribution/selections', authenticate, BankHmoDistributionController.validateSelection);
+app.get('/api/agent/hmo-distribution/overview', authenticate, BankHmoDistributionController.overview);
+app.get('/api/agent/hmo-distribution/tenants', authenticate, BankHmoDistributionController.tenants);
 app.post('/api/agent/hardware/assign', authenticate, AgentController.assignHardware);
 app.post('/api/agent/hardware/sync', authenticate, AgentController.syncHardware);
 
@@ -898,6 +908,7 @@ app.post('/attendance/enroll', authenticate, AttendanceController.enroll);
 app.post('/attendance/save', authenticate, AttendanceController.autoSave);
 app.post('/attendance/bulk-present', authenticate, AttendanceController.bulkPresent);
 app.get('/attendance/history', authenticate, AttendanceController.getHistory);
+registerSchoolCardRoutes(app, authenticate, createUnappliedSchoolCardService());
 
 // Class Insights
 app.get('/insights/class', authenticate, InsightsController.getClassInsights);

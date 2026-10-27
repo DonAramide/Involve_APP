@@ -74,7 +74,27 @@ export class HealthPlatformController {
       const data = await HealthPlatformService.listPlatformTenants(req.healthContext!, req.query);
       return sendPlatformData(res, data);
     } catch (err: any) {
-      return res.status(500).json({ error: { message: err?.message || 'Failed to list participating tenants' } });
+      const message = err?.message || 'Failed to list participating tenants';
+      const status = /mode must be|health must be/.test(message) ? 400 : 500;
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async setTenantParticipation(req: Request, res: Response) {
+    try {
+      if (typeof req.body?.enabled !== 'boolean') {
+        return res.status(400).json({ error: { message: 'enabled must be true or false' } });
+      }
+      const data = await HealthPlatformService.setTenantParticipation(
+        req.healthContext!,
+        req.params.tenantId,
+        req.body.enabled
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to update health access';
+      const status = err?.status || (/UUID/.test(message) ? 400 : 500);
+      return res.status(status).json({ error: { message } });
     }
   }
 
@@ -425,6 +445,17 @@ export class HealthPlatformController {
       return sendPlatformData(res, data);
     } catch (err: any) {
       return res.status(500).json({ success: false, error: { message: err?.message || 'Failed to summarise premiums' } });
+    }
+  }
+
+  static async getFinanceCommand(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getFinanceCommand(req.query);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load the finance command';
+      const status = /YYYY-MM-DD|from is after to|status is not/.test(message) ? 400 : 500;
+      return res.status(status).json({ error: { message } });
     }
   }
 

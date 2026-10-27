@@ -1,9 +1,9 @@
 <template>
-  <q-page class="q-pa-lg text-white" style="background: #05070d; min-height: 100vh;">
+  <q-page class="q-pa-lg hmo-workspace">
     <div class="q-mb-md">
       <div class="text-caption text-grey-5">HMO / {{ current.section }}</div>
       <div class="row items-center q-gutter-sm no-wrap">
-        <q-icon name="health_and_safety" color="teal-4" size="md" />
+        <q-icon name="health_and_safety" :color="isDark ? 'teal-4' : 'teal-8'" size="md" />
         <h1 class="text-h4 text-weight-bolder q-my-none">{{ current.label }}</h1>
       </div>
       <div class="text-caption text-grey-5 q-mt-xs">
@@ -41,6 +41,80 @@
           <div v-if="metric.detail" class="kpi-detail">{{ metric.detail }}</div>
         </article>
       </div>
+      <section class="panel" aria-label="Financial command center">
+        <div class="row items-center justify-between q-col-gutter-sm">
+          <div>
+            <div class="panel-title">Financial command</div>
+            <div class="kpi-detail">Refreshed {{ commandRefreshed }}. Currency NGN. Amounts are kobo converted only for display.</div>
+          </div>
+            <div class="row q-gutter-xs wrap">
+            <q-btn v-for="option in periodOptions" :key="option.id" dense no-caps :outline="commandPeriod !== option.id" :color="commandPeriod === option.id ? 'teal-7' : 'grey-6'" :label="option.label" @click="selectPeriod(option.id)" />
+            <q-btn dense flat no-caps color="teal-3" label="Retry" @click="loadFinanceCommand" />
+          </div>
+        </div>
+        <div v-if="commandPeriod === 'custom'" class="row q-gutter-sm q-mt-sm">
+          <q-input v-model="commandFrom" type="date" :dark="isDark" outlined dense label="From" />
+          <q-input v-model="commandTo" type="date" :dark="isDark" outlined dense label="To" />
+          <q-btn dense no-caps color="teal-8" label="Apply range" @click="loadFinanceCommand" />
+        </div>
+        <div v-if="commandError" class="kpi-detail text-red-3 q-mt-sm">{{ commandError }}</div>
+        <div v-if="commandLoad === 'loading'" class="kpi-grid q-mt-sm" aria-hidden="true">
+          <q-skeleton v-for="index in 4" :key="index" type="rect" height="84px" />
+        </div>
+        <div v-else class="kpi-grid q-mt-sm" aria-label="Financial metrics">
+          <article v-for="metric in financialCards" :key="metric.label" class="kpi-card" :data-tone="metric.tone">
+            <div class="kpi-label">{{ metric.label }}</div>
+            <div class="kpi-value">{{ metric.value }}</div>
+            <div class="kpi-detail">{{ metric.period }}</div>
+            <div v-if="metric.detail" class="kpi-detail">{{ metric.detail }}</div>
+          </article>
+        </div>
+        <div class="chart-grid q-mt-sm">
+          <section class="panel" aria-label="Premium invoicing versus collection">
+            <div class="panel-title">Premium invoicing versus collection</div>
+            <div v-if="!premiumSeries.categories.length" class="kpi-detail">No dated invoice or successful payment rows are in this period. Undated rows are omitted rather than assigned to a month.</div>
+            <apexchart v-else type="bar" height="240" :options="premiumChartOptions" :series="premiumSeriesData" />
+            <div v-if="premiumSeries.undatedInvoices || premiumSeries.undatedPayments" class="kpi-detail">{{ premiumSeries.undatedInvoices }} invoices and {{ premiumSeries.undatedPayments }} payments have no usable timestamp and are excluded from this chart.</div>
+          </section>
+          <section class="panel" aria-label="Enrolment status">
+            <div class="panel-title">Enrolment status</div>
+            <div class="kpi-detail">Current status counts. This is not an enrolment trend over time.</div>
+            <apexchart v-if="enrolmentSeries" type="bar" height="220" :options="enrolmentChartOptions" :series="enrolmentSeriesData" />
+            <div v-else class="kpi-detail">Enrolment status counts were not returned.</div>
+          </section>
+          <section class="panel" aria-label="Unavailable financial charts">
+            <div class="panel-title">Not calculated</div>
+            <div class="kpi-detail">Revenue, expenses, and profit are unavailable. Premium cash is not profit.</div>
+            <div class="kpi-detail">Claims paid versus outstanding claims are unavailable. Approval is not a disbursement.</div>
+            <div class="kpi-detail">Premium collection by HMO is unavailable. Invoices are not attributed to a provider.</div>
+          </section>
+        </div>
+        <div class="q-mt-sm">
+          <div class="panel-title">Premium invoices</div>
+          <div class="kpi-detail q-mb-sm">Invoice references only. Payer, member, and payment credentials are not loaded. Failed and reconciled are payment states and are not invoice rows.</div>
+          <div class="row q-gutter-sm q-mb-sm">
+            <q-input v-model="recordSearch" :dark="isDark" outlined dense label="Invoice reference" @keyup.enter="reloadRecords" />
+            <q-select v-model="recordStatus" :options="invoiceStatusFilters" :dark="isDark" outlined dense emit-value map-options label="Status" style="min-width: 180px" @update:model-value="reloadRecords" />
+          </div>
+          <q-table
+            :rows="financeCommand?.records?.rows || []"
+            :columns="invoiceColumns"
+            row-key="reference"
+            :dark="isDark"
+            flat
+            bordered
+            :loading="commandLoad === 'loading'"
+            hide-pagination
+            :rows-per-page-options="[20]"
+            no-data-label="No premium invoices were returned for this filter."
+          />
+          <div class="row items-center q-gutter-sm q-mt-sm">
+            <q-btn dense flat no-caps color="grey-4" label="Previous" :disable="recordOffset === 0" @click="changeRecordPage(-1)" />
+            <div class="kpi-detail">{{ recordOffset + 1 }}–{{ recordOffset + (financeCommand?.records?.rows?.length || 0) }} of {{ financeCommand?.records?.total ?? 'unavailable' }}</div>
+            <q-btn dense flat no-caps color="grey-4" label="Next" :disable="!canNextRecords" @click="changeRecordPage(1)" />
+          </div>
+        </div>
+      </section>
       <div class="action-grid" aria-label="HMO quick actions">
         <component
           :is="action.allowed ? 'router-link' : 'button'"
@@ -79,7 +153,7 @@
       </div>
       <q-expansion-item
         dense
-        dark
+        :dark="isDark"
         expand-separator
         icon="info"
         label="Role access guide"
@@ -114,7 +188,7 @@
         :rows="plans"
         :columns="planColumns"
         row-key="id"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="loadingCatalogue"
@@ -133,7 +207,7 @@
     </div>
 
     <div v-else-if="current.id === 'registry'">
-      <q-input v-model="registryQuery" dark outlined dense label="Search HMO code or name" class="q-mb-md" />
+      <q-input v-model="registryQuery" :dark="isDark" outlined dense label="Search HMO code or name" class="q-mb-md" />
       <q-banner v-if="registryState === 'access_denied' || registryState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2 q-mb-md">
         <div>{{ registryDenial || 'The HMO registry read requires platform.providers.manage. It loads hw_providers only. No rows are shown until that grant is active.' }}</div>
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
@@ -149,7 +223,7 @@
         :rows="visibleProviders"
         :columns="providerColumns"
         row-key="id"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="loadingRegistry"
@@ -168,7 +242,7 @@
 
     <div v-else-if="current.id === 'providers'">
       <div class="text-caption text-grey-5 q-mb-sm">Facilities come from hw_facilities and stay tied to hw_providers. Requires platform.integration.health.</div>
-      <q-select v-model="facilityProviderId" :options="registryProviderOptions" emit-value map-options clearable label="Owning HMO" dark outlined dense class="q-mb-md" @update:model-value="loadFacilities" />
+      <q-select v-model="facilityProviderId" :options="registryProviderOptions" emit-value map-options clearable label="Owning HMO" :dark="isDark" outlined dense class="q-mb-md" @update:model-value="loadFacilities" />
       <q-banner v-if="facilityState === 'access_denied' || facilityState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
         <div>{{ facilityDenial || 'Facility rows require an unexpired platform.integration.health grant. They are withheld.' }}</div>
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
@@ -180,7 +254,7 @@
         :rows="facilities"
         :columns="facilityColumns"
         row-key="id"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="loadingFacilities"
@@ -190,7 +264,7 @@
 
     <div v-else-if="current.id === 'telemetry'">
       <q-btn outline color="teal-4" label="Refresh telemetry" no-caps class="q-mb-md" :loading="loadingTelemetry" @click="loadTelemetry" />
-      <q-banner v-if="telemetryOutcome === 'loading'" dense rounded class="bg-grey-9 text-grey-3 q-mb-md">
+      <q-banner v-if="telemetryOutcome === 'loading'" dense rounded class="hmo-note q-mb-md">
         Checking the operational grant and provider registry.
       </q-banner>
       <q-banner v-else-if="telemetryOutcome === 'access_denied' || telemetryOutcome === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2 q-mb-md">
@@ -203,7 +277,7 @@
       <q-banner v-else-if="telemetryOutcome === 'malformed'" dense rounded class="bg-red-10 text-red-2 q-mb-md">
         The telemetry response did not contain a provider list.
       </q-banner>
-      <q-banner v-else-if="telemetryOutcome === 'empty'" dense rounded class="bg-grey-9 text-grey-3 q-mb-md">
+      <q-banner v-else-if="telemetryOutcome === 'empty'" dense rounded class="hmo-note q-mb-md">
         No HMO provider registry records exist in hw_providers. The request succeeded.
       </q-banner>
       <div v-else class="row q-col-gutter-md">
@@ -225,20 +299,21 @@
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
       </q-banner>
       <template v-else>
-        <q-select v-model="selectedPlanId" :options="planOptions" emit-value map-options label="Plan" dark outlined dense class="q-mb-md" />
+        <q-select v-model="selectedPlanId" :options="planOptions" emit-value map-options label="Plan" :dark="isDark" outlined dense class="q-mb-md" />
         <q-card v-if="selectedVersion" class="bg-card-dark q-pa-md">
           <div class="text-subtitle1 text-weight-bold">Version {{ selectedVersion.version }} · {{ selectedVersion.status }}</div>
           <div class="text-caption text-grey-4">Premium {{ formatKobo(selectedVersion.premium_minor) }} · {{ selectedVersion.billing_frequency }} · {{ selectedVersion.currency || 'NGN' }}</div>
           <div class="text-caption text-grey-4">Eligible: {{ (selectedVersion.member_categories || []).join(', ') || 'None recorded' }}</div>
           <div class="text-caption text-grey-4">Eligibility rules: {{ formatRules(selectedVersion.eligibility_rules) }}</div>
-          <div class="text-caption text-grey-4 q-mt-sm">Benefits</div>
-          <div v-if="!(selectedVersion.benefits || []).length" class="text-caption text-grey-5">No benefits are stored on this version.</div>
-          <div v-for="(benefit, index) in selectedVersion.benefits || []" :key="index" class="text-caption">
-            {{ benefit.category }} · limit {{ formatKobo(benefit.limitMinor) }} · co-pay {{ benefit.copayBps || 0 }} bps
+          <div class="text-caption text-grey-4 q-mt-sm">
+            {{ selectedVersion.status === 'draft'
+              ? 'Add benefits and coverage on this draft. Saving does not publish the plan or enrol members.'
+              : 'This version is immutable. Saving creates the next draft version with these benefits. It does not publish or activate the plan.' }}
           </div>
-          <div class="text-caption text-grey-4 q-mt-sm">Exclusions</div>
-          <div v-if="!(selectedVersion.exclusions || []).length" class="text-caption text-grey-5">No exclusions are stored on this version.</div>
-          <div v-for="(item, index) in selectedVersion.exclusions || []" :key="'ex-' + index" class="text-caption">{{ item }}</div>
+          <BenefitRows v-model="coverageBenefits" class="q-mt-sm" />
+          <q-input v-model="coverageExclusions" type="textarea" class="q-mt-sm" label="Exclusions, one per line" :dark="isDark" outlined dense />
+          <div v-if="coverageError" class="text-caption text-red-4 q-mt-sm">{{ coverageError }}</div>
+          <q-btn class="q-mt-sm" color="teal-8" no-caps :loading="coverageSaving" :label="selectedVersion.status === 'draft' ? 'Save benefits' : 'Save as new draft'" @click="saveCoverage" />
           <div class="text-caption text-grey-5 q-mt-sm">School or member contribution splits live on hw_tenant_plan_offers and are configured by the tenant after publication. This page does not enrol members.</div>
         </q-card>
         <div v-else class="text-caption text-grey-5">Select a plan to read its latest version. An empty catalogue means hw_plans has no rows.</div>
@@ -265,17 +340,52 @@
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
       </q-banner>
       <q-banner v-else-if="tenantLoad === 'error'" dense rounded class="bg-red-10 text-red-2">The tenant participation request failed. Counts are not shown as zero.</q-banner>
-      <q-table
-        v-else
-        :rows="tenants"
-        :columns="tenantColumns"
-        row-key="id"
-        dark
-        flat
-        bordered
-        :loading="integrationState === 'loading'"
-        no-data-label="No participating tenants were returned."
-      />
+      <template v-else>
+        <div class="row q-gutter-sm q-mb-sm items-end">
+          <q-input v-model="tenantSearch" :dark="isDark" outlined dense label="Search tenant" style="min-width: 200px" @keyup.enter="reloadTenants" />
+          <q-select v-model="tenantMode" :options="tenantModeFilters" :dark="isDark" outlined dense emit-value map-options label="Mode" style="min-width: 140px" @update:model-value="reloadTenants" />
+          <q-select v-model="tenantHealth" :options="tenantHealthFilters" :dark="isDark" outlined dense emit-value map-options label="Health access" style="min-width: 160px" @update:model-value="reloadTenants" />
+          <q-btn dense no-caps color="teal-8" label="Search" @click="reloadTenants" />
+        </div>
+        <div v-if="current.id === 'enrolment'" class="text-caption text-grey-5 q-mb-sm">Activate and Suspend change only hw_tenant_settings.enabled. They do not enrol members, create an invoice, or move money. The action requires platform.tenants.onboard.</div>
+        <q-table
+          :rows="tenants"
+          :columns="participationColumns"
+          row-key="id"
+          :dark="isDark"
+          flat
+          bordered
+          :loading="tenantLoad === 'loading' || integrationState === 'loading'"
+          hide-pagination
+          :rows-per-page-options="[20]"
+          no-data-label="No tenants matched this search."
+        >
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                v-if="props.row.is_enabled === false"
+                dense no-caps color="teal-8"
+                label="Activate"
+                :disable="!canOnboardTenants"
+                @click="askParticipation(props.row, true)"
+              />
+              <q-btn
+                v-else-if="props.row.is_enabled === true"
+                dense no-caps color="orange-9"
+                label="Suspend"
+                :disable="!canOnboardTenants"
+                @click="askParticipation(props.row, false)"
+              />
+              <span v-else class="text-caption text-grey-5">Unavailable</span>
+            </q-td>
+          </template>
+        </q-table>
+        <div class="row items-center q-gutter-sm q-mt-sm">
+          <q-btn dense flat no-caps color="grey-4" label="Previous" :disable="tenantOffset === 0" @click="changeTenantPage(-1)" />
+          <div class="text-caption text-grey-5">{{ tenantOffset + 1 }}–{{ tenantOffset + tenants.length }} of {{ tenantTotal ?? 'unavailable' }}</div>
+          <q-btn dense flat no-caps color="grey-4" label="Next" :disable="!canNextTenants" @click="changeTenantPage(1)" />
+        </div>
+      </template>
       <div v-if="current.id === 'members' && trends" class="q-mt-md text-caption text-grey-4">
         Category counts from coverage trends:
         <span v-for="item in trends.byCategory || []" :key="item.category"> {{ item.category }} {{ item.count }}.</span>
@@ -283,11 +393,62 @@
       </div>
     </div>
 
-    <div v-else-if="current.id === 'billing' || current.id === 'payments'">
-      <div class="text-caption text-grey-5 q-mb-sm">
-        {{ current.id === 'billing' ? 'Invoice status totals from hw_premium_invoices.' : 'Payment status totals from hw_payments. Nothing on this page initiates a transfer.' }}
-        Real-money payouts stay disabled.
-      </div>
+    <div v-else-if="current.id === 'billing'">
+      <div class="text-caption text-grey-5 q-mb-sm">Recorded premium invoices from hw_premium_invoices. This page does not create an invoice, collect a payment, or start a payout. Real-money payouts stay disabled.</div>
+      <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
+        <div>{{ integrationDenial || 'Premium invoices require an unexpired platform.integration.health grant. They are withheld.' }}</div>
+        <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
+      </q-banner>
+      <template v-else>
+        <div class="text-subtitle2 q-mb-xs">Status totals</div>
+        <q-banner v-if="financeLoad === 'error'" dense rounded class="bg-red-10 text-red-2 q-mb-sm">The finance summary failed. Amounts are not replaced with zeros. {{ financeError }}</q-banner>
+        <q-table
+          v-else
+          :rows="finance?.invoices || []"
+          :columns="financeColumns"
+          row-key="status"
+          :dark="isDark"
+          flat
+          bordered
+          :loading="integrationState === 'loading'"
+          no-data-label="The request succeeded and returned no invoice status rows."
+        />
+        <div class="row q-gutter-xs wrap q-mt-md q-mb-sm">
+          <q-btn v-for="option in periodOptions" :key="option.id" dense no-caps :outline="commandPeriod !== option.id" :color="commandPeriod === option.id ? 'teal-7' : 'grey-6'" :label="option.label" @click="selectPeriod(option.id)" />
+          <q-btn dense flat no-caps color="teal-3" label="Retry" @click="loadFinanceCommand" />
+        </div>
+        <div v-if="commandPeriod === 'custom'" class="row q-gutter-sm q-mb-sm">
+          <q-input v-model="commandFrom" type="date" :dark="isDark" outlined dense label="From" />
+          <q-input v-model="commandTo" type="date" :dark="isDark" outlined dense label="To" />
+          <q-btn dense no-caps color="teal-8" label="Apply range" @click="loadFinanceCommand" />
+        </div>
+        <div v-if="commandError" class="text-caption text-red-4 q-mb-sm">{{ commandError }}</div>
+        <div class="row q-gutter-sm q-mb-sm">
+          <q-input v-model="recordSearch" :dark="isDark" outlined dense label="Invoice reference" @keyup.enter="reloadRecords" />
+          <q-select v-model="recordStatus" :options="invoiceStatusFilters" :dark="isDark" outlined dense emit-value map-options label="Status" style="min-width: 180px" @update:model-value="reloadRecords" />
+        </div>
+        <q-table
+          :rows="financeCommand?.records?.rows || []"
+          :columns="invoiceColumns"
+          row-key="reference"
+          :dark="isDark"
+          flat
+          bordered
+          :loading="commandLoad === 'loading'"
+          hide-pagination
+          :rows-per-page-options="[20]"
+          no-data-label="No premium invoices were returned for this filter."
+        />
+        <div class="row items-center q-gutter-sm q-mt-sm">
+          <q-btn dense flat no-caps color="grey-4" label="Previous" :disable="recordOffset === 0" @click="changeRecordPage(-1)" />
+          <div class="text-caption text-grey-5">{{ recordOffset + 1 }}–{{ recordOffset + (financeCommand?.records?.rows?.length || 0) }} of {{ financeCommand?.records?.total ?? 'unavailable' }}</div>
+          <q-btn dense flat no-caps color="grey-4" label="Next" :disable="!canNextRecords" @click="changeRecordPage(1)" />
+        </div>
+      </template>
+    </div>
+
+    <div v-else-if="current.id === 'payments'">
+      <div class="text-caption text-grey-5 q-mb-sm">Payment status totals from hw_payments. Nothing on this page initiates a transfer. Real-money payouts stay disabled.</div>
       <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
         <div>{{ integrationDenial || 'Financial totals require an unexpired platform.integration.health grant. They are withheld.' }}</div>
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
@@ -295,10 +456,10 @@
       <q-banner v-else-if="financeLoad === 'error'" dense rounded class="bg-red-10 text-red-2">The finance summary failed. Amounts are not replaced with zeros. {{ financeError }}</q-banner>
       <q-table
         v-else
-        :rows="current.id === 'billing' ? (finance?.invoices || []) : (finance?.payments || [])"
+        :rows="finance?.payments || []"
         :columns="financeColumns"
         row-key="status"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="integrationState === 'loading'"
@@ -325,7 +486,7 @@
 
     <div v-else-if="current.id === 'audit'">
       <div class="row q-gutter-sm q-mb-md">
-        <q-input v-model="auditAction" dark outlined dense label="Filter action" class="col" />
+        <q-input v-model="auditAction" :dark="isDark" outlined dense label="Filter action" class="col" />
         <q-btn outline color="teal-4" label="Apply" no-caps @click="loadAudit" />
       </div>
       <q-banner v-if="auditState === 'access_denied' || auditState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
@@ -338,7 +499,7 @@
         :rows="auditEvents"
         :columns="auditColumns"
         row-key="id"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="loadingAudit"
@@ -358,7 +519,7 @@
         :rows="registryProviders"
         :columns="providerColumns"
         row-key="id"
-        dark
+        :dark="isDark"
         flat
         bordered
         :loading="loadingRegistry"
@@ -373,25 +534,25 @@
     </q-card>
 
     <q-dialog v-model="showCreate" persistent>
-      <q-card class="bg-dark text-white" style="min-width: 360px; max-width: 720px; width: 100%;">
+      <q-card class="hmo-dialog">
         <q-card-section class="text-h6">{{ editingVersionId ? 'Edit draft version' : 'Create health plan draft' }}</q-card-section>
         <q-card-section class="q-gutter-sm">
-          <q-select v-model="form.providerId" :options="providerOptions" emit-value map-options label="Owning HMO" dark outlined dense :disable="!!editingVersionId" />
-          <q-input v-model="form.name" label="Plan name" dark outlined dense />
-          <q-input v-model="form.code" label="Plan code" dark outlined dense hint="Unique for the owning HMO. Letters, numbers, _ or -." :disable="!!editingVersionId" />
-          <q-input v-model="form.premiumNaira" label="Premium (NGN)" dark outlined dense />
-          <q-select v-model="form.billingFrequency" :options="billingOptions" label="Billing frequency" dark outlined dense />
-          <q-select v-model="form.memberCategories" :options="categoryOptions" label="Eligible categories" multiple use-chips dark outlined dense />
+          <q-select v-model="form.providerId" :options="providerOptions" emit-value map-options label="Owning HMO" :dark="isDark" outlined dense :disable="!!editingVersionId" />
+          <q-input v-model="form.name" label="Plan name" :dark="isDark" outlined dense />
+          <q-input v-model="form.code" label="Plan code" :dark="isDark" outlined dense hint="Unique for the owning HMO. Letters, numbers, _ or -." :disable="!!editingVersionId" />
+          <q-input v-model="form.premiumNaira" label="Premium (NGN)" :dark="isDark" outlined dense />
+          <q-select v-model="form.billingFrequency" :options="billingOptions" label="Billing frequency" :dark="isDark" outlined dense />
+          <q-select v-model="form.memberCategories" :options="categoryOptions" label="Eligible categories" multiple use-chips :dark="isDark" outlined dense />
           <div class="row q-col-gutter-sm">
-            <q-input v-model.number="form.minAge" type="number" class="col" label="Min age" dark outlined dense />
-            <q-input v-model.number="form.maxAge" type="number" class="col" label="Max age" dark outlined dense />
-            <q-input v-model.number="form.waitingPeriodDays" type="number" class="col" label="Waiting days" dark outlined dense />
+            <q-input v-model.number="form.minAge" type="number" class="col" label="Min age" :dark="isDark" outlined dense />
+            <q-input v-model.number="form.maxAge" type="number" class="col" label="Max age" :dark="isDark" outlined dense />
+            <q-input v-model.number="form.waitingPeriodDays" type="number" class="col" label="Waiting days" :dark="isDark" outlined dense />
           </div>
-          <q-input v-model="form.effectiveFrom" type="date" label="Effective date" dark outlined dense />
-          <q-input v-model="form.effectiveTo" type="date" label="Expiry date (optional)" dark outlined dense />
-          <q-input v-model="form.benefitCategory" label="Benefit category" dark outlined dense hint="On edit, leave blank to keep saved benefits." />
-          <q-input v-model="form.benefitLimitNaira" label="Benefit limit (NGN)" dark outlined dense />
-          <q-input v-model="form.exclusionsText" type="textarea" label="Exclusions, one per line" dark outlined dense />
+          <q-input v-model="form.effectiveFrom" type="date" label="Effective date" :dark="isDark" outlined dense />
+          <q-input v-model="form.effectiveTo" type="date" label="Expiry date (optional)" :dark="isDark" outlined dense />
+          <div class="text-caption text-grey-4">Benefits and coverage. A blank row is ignored. Saving a list replaces the benefits on this draft.</div>
+          <BenefitRows v-model="form.benefits" />
+          <q-input v-model="form.exclusionsText" type="textarea" label="Exclusions, one per line" :dark="isDark" outlined dense />
           <div v-if="formError" class="text-caption text-red-4">{{ formError }}</div>
         </q-card-section>
         <q-card-actions align="right">
@@ -408,6 +569,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi'
+import BenefitRows from 'src/hmo/BenefitRows.vue'
+import { benefitsFromVersion, benefitsPayload, emptyBenefit } from 'src/hmo/benefitDraft'
 import { hmoItemForPath } from 'src/hmo/hmoWorkspace'
 import { classifyTelemetryOutcome, normalizeProviderHealthPayload, unwrapPlatformBody } from 'src/hmo/telemetryState'
 import {
@@ -422,9 +585,16 @@ import {
   quickActions,
   readActiveGrants
 } from 'src/hmo/overviewState'
+import {
+  commandCards,
+  enrolmentChartSeries,
+  periodRange,
+  premiumChartSeries
+} from 'src/hmo/commandCenter'
 
 const route = useRoute()
 const $q = useQuasar()
+const isDark = computed(() => $q.dark.isActive)
 
 const current = computed(() => hmoItemForPath(route.path))
 const loadingCatalogue = ref(false)
@@ -455,12 +625,63 @@ const facilityDenial = ref('')
 const overview = ref(null)
 const overviewLoad = ref('idle')
 const tenants = ref([])
+const tenantTotal = ref(null)
+const tenantSearch = ref('')
+const tenantMode = ref('')
+const tenantHealth = ref('')
+const tenantOffset = ref(0)
+const tenantModeFilters = [
+  { label: 'All modes', value: '' },
+  { label: 'School', value: 'school' },
+  { label: 'Retail', value: 'retail' },
+  { label: 'Services', value: 'services' }
+]
+const tenantHealthFilters = [
+  { label: 'All access', value: '' },
+  { label: 'Enabled', value: 'enabled' },
+  { label: 'Not enabled', value: 'disabled' }
+]
 const tenantLoad = ref('idle')
 const trends = ref(null)
 const trendLoad = ref('idle')
 const finance = ref(null)
 const financeLoad = ref('idle')
 const financeError = ref('')
+const financeCommand = ref(null)
+const commandLoad = ref('idle')
+const commandError = ref('')
+const commandPeriod = ref('all')
+const commandFrom = ref('')
+const commandTo = ref('')
+const recordSearch = ref('')
+const recordStatus = ref('')
+const recordOffset = ref(0)
+const periodOptions = [
+  { id: '7d', label: '7 days' },
+  { id: '30d', label: '30 days' },
+  { id: '90d', label: '90 days' },
+  { id: 'ytd', label: 'Year to date' },
+  { id: 'all', label: 'All rows' },
+  { id: 'custom', label: 'Custom' }
+]
+const invoiceStatusFilters = [
+  { label: 'All statuses', value: '' },
+  { label: 'Issued', value: 'issued' },
+  { label: 'Partially paid', value: 'partially_paid' },
+  { label: 'Paid', value: 'paid' },
+  { label: 'Overdue', value: 'overdue' },
+  { label: 'Refunded', value: 'refunded' },
+  { label: 'Void', value: 'void' }
+]
+const invoiceColumns = [
+  { name: 'reference', label: 'Invoice', field: 'reference', align: 'left' },
+  { name: 'recordType', label: 'Type', field: 'recordType', align: 'left' },
+  { name: 'grossMinor', label: 'Gross', field: (row) => formatKobo(row.grossMinor), align: 'right' },
+  { name: 'paidMinor', label: 'Paid', field: (row) => formatKobo(row.paidMinor), align: 'right' },
+  { name: 'outstandingMinor', label: 'Outstanding', field: (row) => formatKobo(row.outstandingMinor), align: 'right' },
+  { name: 'status', label: 'Status', field: 'status', align: 'left' },
+  { name: 'occurredOn', label: 'Issued', field: (row) => row.occurredOn || 'Not recorded', align: 'left' }
+]
 const facilities = ref([])
 const facilityProviderId = ref('')
 const facilityState = ref('idle')
@@ -477,6 +698,10 @@ const activeGrants = ref([])
 const inactiveGrants = ref([])
 const durableEntitlements = ref([])
 const selectedPlanId = ref('')
+const coverageBenefits = ref([emptyBenefit()])
+const coverageExclusions = ref('')
+const coverageError = ref('')
+const coverageSaving = ref(false)
 const editingVersionId = ref('')
 
 const billingOptions = ['monthly', 'quarterly', 'termly', 'annual', 'one_off']
@@ -494,8 +719,7 @@ const form = reactive({
   waitingPeriodDays: 0,
   effectiveFrom: '',
   effectiveTo: '',
-  benefitCategory: '',
-  benefitLimitNaira: '',
+  benefits: [emptyBenefit()],
   exclusionsText: ''
 })
 
@@ -567,6 +791,12 @@ const selectedVersion = computed(() => {
   return versions[0] || null
 })
 
+watch(selectedVersion, (version) => {
+  coverageBenefits.value = benefitsFromVersion(version?.benefits)
+  coverageExclusions.value = Array.isArray(version?.exclusions) ? version.exclusions.join('\n') : ''
+  coverageError.value = ''
+})
+
 function formatCount(value) {
   if (value === null || value === undefined || value === '') return 'Unavailable'
   return value
@@ -583,6 +813,48 @@ const overviewKpis = computed(() => buildOverviewKpis({
   finance: finance.value,
   financeLoad: financeLoad.value
 }))
+
+const periodLabel = computed(() => {
+  const range = periodRange(commandPeriod.value, new Date().toISOString().slice(0, 10), commandFrom.value, commandTo.value)
+  if (!range.from && !range.to) return 'All persisted rows'
+  return `${range.from || 'start'} to ${range.to || 'latest'}`
+})
+const financialCards = computed(() => commandCards(financeCommand.value, commandLoad.value, periodLabel.value))
+const premiumSeries = computed(() => premiumChartSeries(financeCommand.value))
+const premiumSeriesData = computed(() => [
+  { name: 'Invoiced', data: premiumSeries.value.invoiced },
+  { name: 'Collected', data: premiumSeries.value.collected }
+])
+const enrolmentSeries = computed(() => enrolmentChartSeries(overview.value))
+const enrolmentSeriesData = computed(() => enrolmentSeries.value ? [{ name: 'Enrolments', data: enrolmentSeries.value.counts }] : [])
+const chartTheme = computed(() => {
+  const label = isDark.value ? '#94a3b8' : '#334155'
+  return {
+    chart: { background: 'transparent', toolbar: { show: false }, fontFamily: 'inherit' },
+    theme: { mode: isDark.value ? 'dark' : 'light' },
+    dataLabels: { enabled: false },
+    grid: { borderColor: isDark.value ? '#243044' : '#e2e8f0' },
+    legend: { labels: { colors: label } },
+    label
+  }
+})
+const premiumChartOptions = computed(() => ({
+  ...chartTheme.value,
+  xaxis: { categories: premiumSeries.value.categories, labels: { style: { colors: chartTheme.value.label } } },
+  yaxis: { labels: { style: { colors: chartTheme.value.label } }, title: { text: 'NGN', style: { color: chartTheme.value.label } } },
+  tooltip: { y: { formatter: (value) => `₦${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` } }
+}))
+const enrolmentChartOptions = computed(() => ({
+  ...chartTheme.value,
+  xaxis: { categories: enrolmentSeries.value?.categories || [], labels: { style: { colors: chartTheme.value.label } } },
+  yaxis: { labels: { style: { colors: chartTheme.value.label } } }
+}))
+const commandRefreshed = computed(() => financeCommand.value?.generatedAt || 'not yet')
+const canNextRecords = computed(() => {
+  const total = financeCommand.value?.records?.total
+  if (typeof total !== 'number') return false
+  return recordOffset.value + (financeCommand.value?.records?.rows?.length || 0) < total
+})
 
 const overviewActions = computed(() => quickActions(activeGrants.value, inactiveGrants.value, durableEntitlements.value))
 
@@ -610,6 +882,17 @@ const tenantColumns = [
   { name: 'pendingEnrolmentsCount', label: 'Pending enrolments', field: (row) => formatCount(row.pendingEnrolmentsCount), align: 'right' },
   { name: 'is_enabled', label: 'Health enabled', field: (row) => row.is_enabled === null || row.is_enabled === undefined ? 'Unavailable' : (row.is_enabled ? 'Yes' : 'No'), align: 'left' }
 ]
+const participationColumns = computed(() => (
+  current.value.id === 'enrolment'
+    ? [...tenantColumns, { name: 'actions', label: 'Health access', field: 'id', align: 'right' }]
+    : tenantColumns
+))
+const canOnboardTenants = computed(() => {
+  const granted = (activeGrants.value || []).some((grant) => grant && grant.permission === 'platform.tenants.onboard')
+  const entitled = (durableEntitlements.value || []).some((row) => row && row.permission === 'platform.tenants.onboard' && row.status === 'active')
+  return granted || entitled
+})
+const canNextTenants = computed(() => typeof tenantTotal.value === 'number' && tenantOffset.value + tenants.value.length < tenantTotal.value)
 
 const facilityColumns = [
   { name: 'name', label: 'Facility', field: 'name', align: 'left' },
@@ -671,6 +954,82 @@ const providerColumns = [
 
 function reason() {
   return sessionStorage.getItem('hw_platform_reason') || ''
+}
+
+function tenantQueryParams() {
+  return {
+    limit: 20,
+    offset: tenantOffset.value,
+    search: tenantSearch.value || undefined,
+    mode: tenantMode.value || undefined,
+    health: tenantHealth.value || undefined
+  }
+}
+
+async function loadTenants() {
+  tenantLoad.value = 'loading'
+  try {
+    const decision = await guardPlatformRead(INTEGRATION_GRANT)
+    if (!decision.proceed) {
+      tenants.value = []
+      tenantTotal.value = null
+      tenantLoad.value = decision.state === 'unavailable' ? 'error' : 'withheld'
+      return
+    }
+    const res = await healthInsuranceApi.getPlatformTenants(tenantQueryParams(), reason())
+    const body = unwrapPlatformBody(res.data)
+    if (!body || !Array.isArray(body.tenants)) {
+      tenants.value = []
+      tenantTotal.value = null
+      tenantLoad.value = 'error'
+      return
+    }
+    tenants.value = body.tenants
+    tenantTotal.value = typeof body.total === 'number' ? body.total : null
+    tenantLoad.value = 'ok'
+  } catch {
+    tenants.value = []
+    tenantTotal.value = null
+    tenantLoad.value = 'error'
+  }
+}
+
+function reloadTenants() {
+  tenantOffset.value = 0
+  loadTenants()
+}
+
+function changeTenantPage(direction) {
+  tenantOffset.value = Math.max(0, tenantOffset.value + (direction * 20))
+  loadTenants()
+}
+
+function askParticipation(row, enabled) {
+  if (!canOnboardTenants.value) {
+    $q.notify({ type: 'warning', message: 'platform.tenants.onboard is required to activate or suspend health access.' })
+    return
+  }
+  $q.dialog({
+    title: enabled ? `Activate health access for ${row.name}` : `Suspend health access for ${row.name}`,
+    message: enabled
+      ? 'This sets hw_tenant_settings.enabled for this tenant. It does not enrol members or create an invoice.'
+      : 'This turns health access off for this tenant. Member records stay in place, and no payment is made.',
+    prompt: { model: '', type: 'text', label: 'Audit reason' },
+    cancel: true,
+    persistent: true
+  }).onOk(async (text) => {
+    if (!text || String(text).trim().length < 5) {
+      $q.notify({ type: 'warning', message: 'Reason must be at least 5 characters.' })
+      return
+    }
+    try {
+      await healthInsuranceApi.setTenantParticipation(row.id, { enabled }, String(text).trim())
+      $q.notify({ type: 'positive', message: enabled ? 'Health access activated.' : 'Health access suspended.' })
+      await loadTenants()
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err?.response?.data?.error?.message || 'Health access was not changed.' })
+    }
+  })
 }
 
 let grantFlight = null
@@ -865,6 +1224,7 @@ async function loadIntegration(includeBoard = false) {
       integrationDenial.value = decision.message
       overview.value = null
       tenants.value = []
+      tenantTotal.value = null
       trends.value = null
       finance.value = null
       facilities.value = []
@@ -878,12 +1238,15 @@ async function loadIntegration(includeBoard = false) {
       auditState.value = decision.state === 'unavailable' ? 'unavailable' : decision.state
       auditDenial.value = decision.message
       auditEvents.value = []
+      financeCommand.value = null
+      commandLoad.value = decision.state === 'unavailable' ? 'unavailable' : 'withheld'
+      commandError.value = decision.message
       if (decision.state === 'unavailable') integrationError.value = decision.message
       return
     }
     const [overviewResult, tenantResult, trendResult, financeResult] = await Promise.allSettled([
       healthInsuranceApi.getPlatformOverview(reason()),
-      healthInsuranceApi.getPlatformTenants({ limit: 100 }, reason()),
+      healthInsuranceApi.getPlatformTenants(tenantQueryParams(), reason()),
       healthInsuranceApi.getCoverageTrends(reason()),
       healthInsuranceApi.getPlatformFinance(reason())
     ])
@@ -904,10 +1267,13 @@ async function loadIntegration(includeBoard = false) {
       if (denial.state === 'reason_required') integrationState.value = 'reason_required'
     }
     if (tenantResult.status === 'fulfilled') {
-      tenants.value = unwrapPlatformBody(tenantResult.value.data)?.tenants || []
+      const body = unwrapPlatformBody(tenantResult.value.data)
+      tenants.value = Array.isArray(body?.tenants) ? body.tenants : []
+      tenantTotal.value = typeof body?.total === 'number' ? body.total : null
       tenantLoad.value = 'ok'
     } else {
       tenants.value = []
+      tenantTotal.value = null
       tenantLoad.value = 'error'
     }
     if (trendResult.status === 'fulfilled') {
@@ -937,6 +1303,7 @@ async function loadIntegration(includeBoard = false) {
       loadFacilities()
       loadTelemetry()
       loadAudit(5)
+      loadFinanceCommand()
     }
   } catch (err) {
     const denial = platformHttpDenial(err?.response?.status, err?.response?.data)
@@ -944,6 +1311,59 @@ async function loadIntegration(includeBoard = false) {
     integrationDenial.value = denial.message
     integrationError.value = denial.message
   }
+}
+
+async function loadFinanceCommand() {
+  commandLoad.value = 'loading'
+  commandError.value = ''
+  try {
+    const decision = await guardPlatformRead(INTEGRATION_GRANT)
+    if (!decision.proceed) {
+      financeCommand.value = null
+      commandLoad.value = decision.state === 'unavailable' ? 'unavailable' : 'withheld'
+      commandError.value = decision.message
+      return
+    }
+    const range = periodRange(commandPeriod.value, new Date().toISOString().slice(0, 10), commandFrom.value, commandTo.value)
+    const res = await healthInsuranceApi.getPlatformFinanceCommand({
+      from: range.from || undefined,
+      to: range.to || undefined,
+      search: recordSearch.value || undefined,
+      status: recordStatus.value || undefined,
+      limit: 20,
+      offset: recordOffset.value
+    }, reason())
+    const body = unwrapPlatformBody(res.data)
+    if (!body || typeof body !== 'object' || !body.totals || !body.series || !body.records || !Array.isArray(body.records.rows)) {
+      financeCommand.value = null
+      commandLoad.value = 'malformed'
+      commandError.value = 'The finance command response did not include totals, a series, and invoice rows.'
+      return
+    }
+    financeCommand.value = body
+    commandLoad.value = 'ok'
+  } catch (err) {
+    financeCommand.value = null
+    const denial = platformHttpDenial(err?.response?.status, err?.response?.data)
+    commandLoad.value = denial.state === 'access_denied' || denial.state === 'reason_required' ? 'withheld' : 'unavailable'
+    commandError.value = denial.message
+  }
+}
+
+function selectPeriod(id) {
+  commandPeriod.value = id
+  recordOffset.value = 0
+  if (id !== 'custom') loadFinanceCommand()
+}
+
+function reloadRecords() {
+  recordOffset.value = 0
+  loadFinanceCommand()
+}
+
+function changeRecordPage(direction) {
+  recordOffset.value = Math.max(0, recordOffset.value + (direction * 20))
+  loadFinanceCommand()
 }
 
 async function loadFacilities() {
@@ -1035,8 +1455,7 @@ function openCreate() {
   form.name = ''
   form.code = ''
   form.premiumNaira = ''
-  form.benefitCategory = ''
-  form.benefitLimitNaira = ''
+  form.benefits = [emptyBenefit()]
   form.exclusionsText = ''
   form.effectiveFrom = new Date().toISOString().slice(0, 10)
   showCreate.value = true
@@ -1058,8 +1477,7 @@ function openEdit(plan) {
   form.waitingPeriodDays = draft.eligibility_rules?.waitingPeriodDays ?? 0
   form.effectiveFrom = String(draft.effective_from || '').slice(0, 10)
   form.effectiveTo = draft.effective_to ? String(draft.effective_to).slice(0, 10) : ''
-  form.benefitCategory = ''
-  form.benefitLimitNaira = ''
+  form.benefits = benefitsFromVersion(draft.benefits)
   form.exclusionsText = (draft.exclusions || []).join('\n')
   showCreate.value = true
 }
@@ -1081,17 +1499,75 @@ function draftPayload() {
       maxAge: form.maxAge,
       waitingPeriodDays: form.waitingPeriodDays
     },
-    exclusions: String(form.exclusionsText || '').split('\n').map((line) => line.trim()).filter(Boolean),
+    exclusions: exclusionLines(form.exclusionsText),
     effectiveFrom: form.effectiveFrom,
     effectiveTo: form.effectiveTo || null
   }
-  if (String(form.benefitCategory || '').trim()) {
-    payload.benefits = [{
-      category: form.benefitCategory.trim(),
-      limitNaira: form.benefitLimitNaira || '0'
-    }]
+  const parsed = benefitsPayload(form.benefits)
+  if (parsed.error) {
+    formError.value = parsed.error
+    return null
   }
+  payload.benefits = parsed.benefits
   return payload
+}
+
+function exclusionLines(text) {
+  return String(text || '').split('\n').map((line) => line.trim()).filter(Boolean)
+}
+
+async function saveCoverage() {
+  coverageError.value = ''
+  const version = selectedVersion.value
+  const plan = selectedPlan.value
+  if (!version || !plan) return
+  if (plan.status === 'retired') {
+    coverageError.value = 'A retired plan cannot receive a new benefit draft.'
+    return
+  }
+  if (!reason() || reason().trim().length < 5) {
+    coverageError.value = 'Set an operational reason of at least 5 characters on Platform Governance before saving benefits.'
+    return
+  }
+  const parsed = benefitsPayload(coverageBenefits.value)
+  if (parsed.error) {
+    coverageError.value = parsed.error
+    return
+  }
+  const exclusions = exclusionLines(coverageExclusions.value)
+  if (exclusions.some((item) => item.length > 200)) {
+    coverageError.value = 'Each exclusion must be 200 characters or fewer.'
+    return
+  }
+  coverageSaving.value = true
+  try {
+    if (version.status === 'draft') {
+      await healthInsuranceApi.updatePlatformPlanDraft(version.id, {
+        benefits: parsed.benefits,
+        exclusions
+      }, reason())
+    } else {
+      await healthInsuranceApi.createPlatformPlanDraft({
+        providerId: plan.provider_id,
+        code: plan.code,
+        name: plan.name,
+        premiumMinor: version.premium_minor,
+        billingFrequency: version.billing_frequency,
+        memberCategories: version.member_categories,
+        eligibilityRules: version.eligibility_rules || {},
+        benefits: parsed.benefits,
+        exclusions,
+        effectiveFrom: String(version.effective_from || '').slice(0, 10),
+        effectiveTo: version.effective_to ? String(version.effective_to).slice(0, 10) : null
+      }, reason())
+    }
+    $q.notify({ type: 'positive', message: version.status === 'draft' ? 'Benefits saved on this draft.' : 'Benefits saved as a new draft version. It is not published.' })
+    await loadCatalogue()
+  } catch (err) {
+    coverageError.value = err?.response?.data?.error?.message || err?.response?.data?.message || 'Benefits were not saved.'
+  } finally {
+    coverageSaving.value = false
+  }
 }
 
 async function saveDraft() {
@@ -1103,6 +1579,7 @@ async function saveDraft() {
   saving.value = true
   try {
     const payload = draftPayload()
+    if (!payload) return
     if (editingVersionId.value) {
       await healthInsuranceApi.updatePlatformPlanDraft(editingVersionId.value, payload, reason())
     } else {
@@ -1179,6 +1656,7 @@ function refreshSection() {
   if (['plans', 'coverage'].includes(id)) loadCatalogue()
   if (['registry', 'settings', 'providers'].includes(id)) loadRegistry()
   if (['enrolment', 'members', 'billing', 'payments', 'reports'].includes(id)) loadIntegration()
+  if (id === 'billing') loadFinanceCommand()
   if (id === 'telemetry') loadTelemetry()
   if (id === 'providers') loadFacilities()
   if (id === 'audit') loadAudit()
@@ -1206,7 +1684,12 @@ onBeforeRouteLeave((to, from, next) => {
 
 <style scoped>
 .overview-board {
-  max-width: 1120px;
+  max-width: 1280px;
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
 }
 .kpi-grid,
 .action-grid {
@@ -1214,11 +1697,21 @@ onBeforeRouteLeave((to, from, next) => {
   grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 8px;
 }
+.hmo-workspace {
+  color: var(--enterprise-text-main);
+  min-height: 100%;
+}
+.hmo-note {
+  background: var(--enterprise-subpanel-bg);
+  color: var(--enterprise-text-secondary);
+  border: 1px solid var(--enterprise-border);
+}
 .kpi-card,
 .action-card,
 .panel {
-  background: #101826;
-  border: 1px solid #2a3b52;
+  background: var(--enterprise-panel-bg);
+  border: 1px solid var(--enterprise-border);
+  color: var(--enterprise-text-main);
   border-radius: 8px;
   padding: 8px 10px;
   min-height: 76px;
@@ -1238,18 +1731,18 @@ onBeforeRouteLeave((to, from, next) => {
 .kpi-label,
 .panel-title,
 .action-label {
-  color: #d6dee8;
+  color: var(--enterprise-text-secondary);
   font-size: 12px;
   font-weight: 650;
 }
 .kpi-value {
-  color: #f8fafc;
+  color: var(--enterprise-text-main);
   font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
 }
 .kpi-detail {
-  color: #c5d0dc;
+  color: var(--enterprise-text-secondary);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -1261,6 +1754,16 @@ onBeforeRouteLeave((to, from, next) => {
   .kpi-value {
     font-size: 18px;
   }
+}
+</style>
+
+<style>
+.hmo-dialog {
+  background: var(--enterprise-panel-bg, #ffffff);
+  color: var(--enterprise-text-main, #0f172a);
+  min-width: 360px;
+  max-width: 720px;
+  width: 100%;
 }
 </style>
 

@@ -1,0 +1,18 @@
+{
+  "decision": "RESOLVED",
+  "serviceType": "PAYMENTS",
+  "operationType": "CHECKOUT",
+  "quasarTenantId": "not-a-valid-uuid-tenant",
+  "provider": "paystack",
+  "allowedProviders": [
+    "paystack",
+    "flutterwave"
+  ],
+  "precedenceTier": "INSTITUTION_DEFAULT",
+  "institutionId": "11111111-2222-3333-4444-555555555555",
+  "institutionCode": "PROV01",
+  "decisionTraceId": "trc_invalid_tenant_123",
+  "policyVersion": 1,
+  "evaluatedAt": "2026-10-20T00:15:00.000Z",
+  "expiresAt": "2026-10-20T00:16:00.000Z"
+}

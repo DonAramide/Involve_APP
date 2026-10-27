@@ -287,3 +287,118 @@ describe('HMO overview metrics', () => {
     expect(malformed.ok).toBe(false)
   })
 })
+
+describe('HMO finance command presentation', () => {
+  test('keeps unsupported profit, expenses, and claim payments unavailable', () => {
+    const { commandCards, premiumChartSeries, periodRange } = require('../src/hmo/commandCenter')
+    const withheld = commandCards(null, 'withheld', '7 days')
+    expect(withheld.every((card) => card.value === 'Unavailable')).toBe(true)
+    expect(withheld[0].detail).toContain('platform.integration.health')
+
+    const failed = commandCards(null, 'unavailable', '30 days')
+    expect(failed.find((card) => card.label === 'Premiums invoiced').value).toBe('Unavailable')
+
+    const cards = commandCards({
+      totals: {
+        billedMinor: 0,
+        collectedMinor: 0,
+        reconciledMinor: 0,
+        outstandingMinor: 0,
+        collectionRateBps: null
+      },
+      unavailable: {
+        operatingExpenses: 'No HMO operating-expense source is defined. This is not zero.',
+        netOperatingProfit: 'Premium collections are not profit.',
+        claimsPaid: 'A settled or approved claim is not a paid claim.',
+        claimsOutstanding: 'Authorised claim amounts are not unpaid disbursements.'
+      },
+      series: { points: [], undatedInvoices: 0, undatedPayments: 0 }
+    }, 'ok', 'All persisted rows')
+    expect(cards.find((card) => card.label === 'Premiums invoiced').value).toContain('0.00')
+    expect(cards.find((card) => card.label === 'Collection rate').value).toBe('Unavailable')
+    expect(cards.find((card) => card.label === 'Collection rate').detail).toContain('not 0%')
+    expect(cards.find((card) => card.label === 'Operating expenses').value).toBe('Unavailable')
+    expect(cards.find((card) => card.label === 'Net operating result').value).toBe('Unavailable')
+    expect(cards.find((card) => card.label === 'Claims paid').value).toBe('Unavailable')
+
+    const paid = commandCards({
+      totals: { billedMinor: 100000, collectedMinor: 25000, reconciledMinor: 0, outstandingMinor: 75000, collectionRateBps: 2500 },
+      series: { points: [{ month: '2026-03', invoicedMinor: 100000, collectedMinor: 25000 }] }
+    }, 'ok', '2026-03-01 to 2026-03-31')
+    expect(paid.find((card) => card.label === 'Premiums collected').value).toBe('₦250.00')
+    expect(paid.find((card) => card.label === 'Collection rate').value).toBe('25.00%')
+    const chart = premiumChartSeries({
+      series: { points: [{ month: '2026-03', invoicedMinor: 100000, collectedMinor: 25000 }], undatedInvoices: 2, undatedPayments: 0 }
+    })
+    expect(chart.invoiced).toEqual([1000])
+    expect(chart.undatedInvoices).toBe(2)
+    expect(periodRange('ytd', '2026-10-26', '', '')).toEqual({ from: '2026-01-01', to: '2026-10-26' })
+    expect(periodRange('7d', '2026-10-26', '', '')).toEqual({ from: '2026-10-20', to: '2026-10-26' })
+    expect(periodRange('all', '2026-10-26', '', '')).toEqual({ from: null, to: null })
+  })
+
+  test('the overview reads the finance command and does not invent profit', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    const api = fs.readFileSync(path.join(__dirname, '../src/api/healthInsuranceApi.js'), 'utf8')
+    expect(api).toContain('/api/v1/health-insurance/platform/finance-command')
+    expect(page).toContain('getPlatformFinanceCommand')
+    expect(page).toContain('Premium cash is not profit.')
+    expect(page).not.toContain('₦25,084')
+    expect(page).toContain('commandCards')
+    expect(page).toContain('apexchart')
+  })
+})
+
+describe('benefit and coverage drafts', () => {
+  test('turns saved kobo benefits into editable rows and rejects a limit without a name', () => {
+    const { benefitsFromVersion, benefitsPayload } = require('../src/hmo/benefitDraft')
+    expect(benefitsFromVersion([
+      { category: 'Outpatient', limitMinor: 10000000, copayBps: 250 }
+    ])).toEqual([
+      { category: 'Outpatient', limitNaira: '100000.00', copayPercent: '2.50' }
+    ])
+    expect(benefitsPayload([
+      { category: 'Inpatient', limitNaira: '50000.50', copayPercent: '0' },
+      { category: '', limitNaira: '', copayPercent: '0' }
+    ]).benefits).toEqual([
+      { category: 'Inpatient', limitNaira: '50000.50', copayBps: 0 }
+    ])
+    expect(benefitsPayload([{ category: '', limitNaira: '10', copayPercent: '0' }]).error).toContain('Benefit 1')
+    expect(benefitsPayload([{ category: 'Dental', limitNaira: '10', copayPercent: '101' }]).error).toContain('100')
+  })
+
+  test('coverage can add benefits onto a draft and does not publish from this page', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    const rows = fs.readFileSync(path.join(__dirname, '../src/hmo/BenefitRows.vue'), 'utf8')
+    expect(rows).toContain('Add benefit')
+    expect(page).toContain('Save benefits')
+    expect(page).toContain('updatePlatformPlanDraft')
+    expect(page).toContain('Saving does not publish the plan or enrol members.')
+    expect(page).not.toContain('benefitCategory')
+  })
+
+  test('enrolment can search, filter, activate, and suspend without enrolling a member', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    const api = fs.readFileSync(path.join(__dirname, '../src/api/healthInsuranceApi.js'), 'utf8')
+    expect(page).toContain('Search tenant')
+    expect(page).toContain('label="Activate"')
+    expect(page).toContain('label="Suspend"')
+    expect(page).toContain('platform.tenants.onboard')
+    expect(page).toContain('does not enrol members')
+    expect(api).toContain('/participation')
+  })
+
+  test('premiums and billing lists recorded invoices and does not collect payment', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    expect(page).toContain('This page does not create an invoice, collect a payment, or start a payout.')
+    expect(page).toContain("if (id === 'billing') loadFinanceCommand()")
+  })
+
+  test('HMO tabs follow the app theme instead of a forced dark page', () => {
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    expect(page).toContain('class="q-pa-lg hmo-workspace"')
+    expect(page).not.toContain('#05070d')
+    expect(page).toContain(':dark="isDark"')
+    expect(page).toContain('var(--enterprise-panel-bg)')
+  })
+})

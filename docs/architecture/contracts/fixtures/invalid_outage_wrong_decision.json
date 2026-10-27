@@ -1,0 +1,13 @@
+{
+  "code": "ROUTING_ALL_PROVIDERS_UNAVAILABLE",
+  "message": "Outage code paired with a decision that is not OUTAGE_FAIL_FAST.",
+  "traceId": "trc_err_outage_wrong_decision",
+  "details": {
+    "decision": "RESOLVED",
+    "serviceType": "PAYMENTS",
+    "operationType": "CHECKOUT",
+    "institutionCode": "PROV01",
+    "allowedProviders": ["paystack", "flutterwave"],
+    "safeHalt": true
+  }
+}

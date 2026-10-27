@@ -316,6 +316,8 @@ const industryNavigationTree = computed(() => {
       { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
       { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
+      { label: 'ID Cards', path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: 'SCHOOL' },
+      { label: 'Entry and Exit', path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
       { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },

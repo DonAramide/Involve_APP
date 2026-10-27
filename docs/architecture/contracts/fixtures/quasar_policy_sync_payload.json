@@ -1,0 +1,14 @@
+{
+  "event": "ROUTING_TRACE_FEEDBACK",
+  "timestamp": "2026-10-20T00:17:00.000Z",
+  "payload": {
+    "decisionTraceId": "trc_9a8f7b6c5d4e3f21",
+    "quasarTenantId": "c3d11b8b-e85d-4f2b-8a8f-2872bc900382",
+    "serviceType": "PAYMENTS",
+    "operationType": "CHECKOUT",
+    "providerDispatched": "paystack",
+    "executionResult": "SUCCESS",
+    "latencyMs": 420,
+    "providerReference": "pstk_chk_88392019"
+  }
+}

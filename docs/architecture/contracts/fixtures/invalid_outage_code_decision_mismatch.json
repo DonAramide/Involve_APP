@@ -1,0 +1,11 @@
+{
+  "code": "ROUTING_REQUEST_INVALID",
+  "message": "A non-outage code must not carry OUTAGE_FAIL_FAST.",
+  "traceId": "trc_err_outage_code_mismatch",
+  "details": {
+    "decision": "OUTAGE_FAIL_FAST",
+    "serviceType": "PAYMENTS",
+    "operationType": "CHECKOUT",
+    "safeHalt": true
+  }
+}

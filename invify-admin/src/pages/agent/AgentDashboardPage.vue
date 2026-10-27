@@ -4,6 +4,16 @@
     <!-- Header -->
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
+        <q-btn
+          v-if="identity.institutionType === 'BANK'"
+          flat
+          dense
+          no-caps
+          color="amber-4"
+          icon="health_and_safety"
+          label="HMO Management"
+          @click="router.push('/institute/hmo/overview')"
+        />
         <q-icon :name="identity.institutionType === 'HMO' ? 'health_and_safety' : 'dashboard'" size="sm" :color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'" />
         <div>
           <div class="row items-center op-gap-8">
@@ -141,7 +151,7 @@
               v-for="(action, index) in visibleQuickActions" 
               :key="index" 
               class="col panel-card bg-panel border-muted rounded-borders q-pa-md row items-center justify-center op-gap-8 cursor-pointer hover-card"
-              @click="$router.push(action.route)"
+              @click="openQuickAction(action)"
             >
               <q-icon :name="action.icon" color="amber-4" size="sm" />
               <div class="text-weight-bold text-caption text-center" style="line-height: 1.2;">{{ action.label }}</div>
@@ -356,8 +366,8 @@
           <div class="col-xs-12 col-md-4 bg-panel border-muted rounded-borders q-pa-md column justify-between">
             <div class="text-weight-bold q-mb-sm text-caption">DEPLOYMENT ACTIONS</div>
             <div class="column op-gap-8">
-              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="hardwareModal.open('DEVICE')" />
-              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="hardwareModal.open('TERMINAL')" />
+              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="router.push('/institute/assign-device')" />
+              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="router.push('/institute/assign-terminal')" />
               <q-btn outline color="grey-4" icon="sync" label="Sync Device" class="full-width" no-caps @click="syncDevice()" />
             </div>
           </div>
@@ -641,7 +651,6 @@
     </template>
     
     <AgentKYCUploadModal ref="kycModal" />
-    <AgentHardwareAssignmentModal ref="hardwareModal" />
 
     <q-dialog v-model="showMfaModal" persistent>
       <q-card class="bg-panel text-main" style="min-width: 400px">
@@ -680,16 +689,15 @@ import { useRouter } from 'vue-router'
 import VueApexCharts from 'vue3-apexcharts'
 import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
-import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
 import HmoInstitutionPortalView from './components/HmoInstitutionPortalView.vue'
 import HmoProductCatalogueView from './components/HmoProductCatalogueView.vue'
+import { resolveInstituteQuickAction } from './instituteQuickActions'
 import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
 const router = useRouter()
 const apexchart = VueApexCharts
 const kycModal = ref(null)
-const hardwareModal = ref(null)
 const loading = ref(true)
 const mfaBusy = ref(false)
 const showMfaModal = ref(false)
@@ -698,6 +706,10 @@ const mfaVerifyCode = ref('')
 const agentInfo = ref(null)
 const payload = ref({})
 const activeTab = ref('overview')
+function openQuickAction(action) {
+  router.push(resolveInstituteQuickAction(action))
+}
+
 const visibleQuickActions = computed(() =>
   (payload.value.quickActions || []).filter((action) => {
     const label = String(action.label || '').toLowerCase()

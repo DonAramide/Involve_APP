@@ -2,6 +2,7 @@
 import { supabaseAdmin } from '../../../db/supabase';
 import { HealthContext } from '../types';
 import { HealthAuditService } from './health-audit.service';
+import { activeBankOfferingVersionIds, assertBankOfferingForNewEnrolment } from './bank-hmo-distribution.service';
 
 export class HealthPlanService {
   /**
@@ -70,6 +71,7 @@ export class HealthPlanService {
         hw_plan_versions (
           id,
           version,
+          status,
           premium_minor,
           currency,
           billing_frequency,
@@ -88,7 +90,16 @@ export class HealthPlanService {
       .eq('is_active', true);
 
     if (error) throw new Error(`Failed to list tenant offers: ${error.message}`);
-    return data || [];
+    const allowed = await activeBankOfferingVersionIds(ctx.tenantId);
+    if (allowed === 'unavailable') {
+      throw new Error('Bank offerings could not be confirmed. The plan list was not returned.');
+    }
+    const rows = data || [];
+    if (allowed === null) return rows;
+    return rows.filter((row: any) => {
+      const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions;
+      return Boolean(version?.id) && version.status === 'published' && allowed.has(String(version.id));
+    });
   }
 
   /**
@@ -109,12 +120,16 @@ export class HealthPlanService {
       }
     }
 
+    const body = params as any;
+    const planVersionId = String(body.planVersionId || body.plan_version_id || '');
+    await assertBankOfferingForNewEnrolment(ctx.tenantId, planVersionId);
+
     const { data, error } = await supabaseAdmin
       .from('hw_tenant_plan_offers')
       .upsert(
         {
           tenant_id: ctx.tenantId,
-          plan_version_id: params.planVersionId,
+          plan_version_id: planVersionId,
           default_funding: params.defaultFunding,
           shared_split: params.sharedSplit || null,
           is_active: true,

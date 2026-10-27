@@ -89,6 +89,7 @@ export function createHealthInsuranceRouter(): Router {
   // Protected Platform Endpoints (Strictly require explicit platform.* grants & justification)
   router.get('/platform/overview', requireHealthPermission('platform.integration.health'), HealthPlatformController.getOverview);
   router.get('/platform/tenants', requireHealthPermission('platform.integration.health'), HealthPlatformController.listTenants);
+  router.post('/platform/tenants/:tenantId/participation', requireHealthPermission('platform.tenants.onboard'), HealthPlatformController.setTenantParticipation);
   router.get('/platform/providers', requireHealthPermission('platform.providers.manage'), HealthPlatformController.listProviderRegistry);
   router.get('/platform/providers/health', requireHealthPermission('platform.integration.health'), HealthPlatformController.getProvidersHealth);
   router.get('/platform/coverage-trends', requireHealthPermission('platform.integration.health'), HealthPlatformController.getCoverageTrends);
@@ -103,6 +104,7 @@ export function createHealthInsuranceRouter(): Router {
   router.post('/platform/plans/:planId/retire', requireHealthPermission('platform.plans.manage'), HealthPlatformController.retirePlan);
   router.patch('/platform/plans/versions/:versionId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.updatePlanDraft);
   router.get('/platform/finance', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceSnapshot);
+  router.get('/platform/finance-command', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceCommand);
   router.get('/platform/facilities', requireHealthPermission('platform.integration.health'), HealthPlatformController.listFacilities);
 
   // ─── Tenant Endpoints (Interface B) ──────────────────────────────

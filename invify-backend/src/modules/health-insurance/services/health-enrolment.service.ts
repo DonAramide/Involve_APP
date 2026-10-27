@@ -90,11 +90,17 @@ export class HealthEnrolmentService {
       periodEnd: string;
     }
   ) {
+    const raw = params as any;
+    const memberId = String(raw.memberId || raw.member_id || '');
+    const planVersionId = String(raw.planVersionId || raw.plan_version_id || '');
+    const periodStart = String(raw.periodStart || raw.period_start || raw.start_date || '');
+    const periodEnd = String(raw.periodEnd || raw.period_end || raw.end_date || '');
+
     // 1. Verify member exists in this tenant
     const { data: member, error: memErr } = await supabaseAdmin
       .from('hw_members')
       .select('id, tenant_id, member_category')
-      .eq('id', params.memberId)
+      .eq('id', memberId)
       .eq('tenant_id', ctx.tenantId)
       .maybeSingle();
 
@@ -105,7 +111,7 @@ export class HealthEnrolmentService {
       .from('hw_tenant_plan_offers')
       .select('id, default_funding, hw_plan_versions(*)')
       .eq('tenant_id', ctx.tenantId)
-      .eq('plan_version_id', params.planVersionId)
+      .eq('plan_version_id', planVersionId)
       .eq('is_active', true)
       .maybeSingle();
 
@@ -113,15 +119,18 @@ export class HealthEnrolmentService {
       throw new Error('Plan version is not currently offered by this organisation');
     }
 
+    const { assertBankOfferingForNewEnrolment } = await import('./bank-hmo-distribution.service');
+    await assertBankOfferingForNewEnrolment(ctx.tenantId, planVersionId);
+
     // 3. Create enrolment record (starts in enrolment_pending or draft)
     const { data: enrolment, error: enrErr } = await supabaseAdmin
       .from('hw_enrolments')
       .insert({
         tenant_id: ctx.tenantId,
-        member_id: params.memberId,
-        plan_version_id: params.planVersionId,
-        period_start: params.periodStart,
-        period_end: params.periodEnd,
+        member_id: memberId,
+        plan_version_id: planVersionId,
+        period_start: periodStart,
+        period_end: periodEnd,
         status: 'enrolment_pending',
         submitted_by: ctx.userId,
         submitted_at: new Date().toISOString()

@@ -331,7 +331,7 @@ const showMfaModal = ref(false)
 const mfaSetupData = ref({})
 const mfaVerifyCode = ref('')
 
-const activeTab = ref('personal')
+const activeTab = ref(['personal', 'kyc', 'security'].includes(String(route.query.tab || '')) ? String(route.query.tab) : 'personal')
 const profileCode = computed(() =>
   pickInstituteCode(profile.value?.agent_code, profile.value?.agentCode),
 )

@@ -1,0 +1,15 @@
+{
+  "decision": "NO_RELATIONSHIP",
+  "serviceType": "PAYMENTS",
+  "operationType": "CHECKOUT",
+  "quasarTenantId": "c3d11b8b-e85d-4f2b-8a8f-2872bc900382",
+  "provider": "paystack",
+  "allowedProviders": [],
+  "precedenceTier": "NONE",
+  "institutionId": null,
+  "institutionCode": null,
+  "decisionTraceId": "trc_invalid_unrouted_active_123",
+  "policyVersion": 0,
+  "evaluatedAt": "2026-10-20T00:15:00.000Z",
+  "expiresAt": "2026-10-20T00:16:00.000Z"
+}

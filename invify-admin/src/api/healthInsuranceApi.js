@@ -62,6 +62,9 @@ export const healthInsuranceApi = {
     params,
     headers: platformReasonHeader(reason)
   }),
+  setTenantParticipation: (tenantId, data, reason) => api.post(`/api/v1/health-insurance/platform/tenants/${tenantId}/participation`, data, {
+    headers: platformReasonHeader(reason)
+  }),
   getProvidersHealth: (reason) => api.get('/api/v1/health-insurance/platform/providers/health', {
     headers: platformReasonHeader(reason)
   }),
@@ -116,6 +119,10 @@ export const healthInsuranceApi = {
     headers: platformReasonHeader(reason)
   }),
   getPlatformFinance: (reason) => api.get('/api/v1/health-insurance/platform/finance', {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceCommand: (params, reason) => api.get('/api/v1/health-insurance/platform/finance-command', {
+    params,
     headers: platformReasonHeader(reason)
   }),
   getPlatformFacilities: (providerId, reason) => api.get('/api/v1/health-insurance/platform/facilities', {
