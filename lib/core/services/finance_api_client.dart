@@ -138,6 +138,24 @@ class PlanGatingInterceptor extends Interceptor {
       return super.onRequest(options, handler);
     }
 
+    if (isPermittedMobileHealthPath(options.path)) {
+      final hasEntitlement = await checkHasHealthInsuranceEntitlement(options);
+      if (!hasEntitlement) {
+        handler.reject(
+          DioException(
+            requestOptions: options,
+            error: const FinanceApiException(
+              message: 'Health insurance requires valid authentication and institution scope.',
+              statusCode: 403,
+            ),
+            type: DioExceptionType.badResponse,
+          ),
+        );
+        return;
+      }
+      return super.onRequest(options, handler);
+    }
+
     final isOnline = await checkIsOnlinePlan();
     if (!isOnline) {
       handler.reject(
@@ -204,6 +222,35 @@ class PlanGatingInterceptor extends Interceptor {
       // Fallback
     }
     return false;
+  }
+
+  static bool isPermittedMobileHealthPath(String path) {
+    final p = path.toLowerCase().trim();
+    if (!p.startsWith('/api/v1/health-insurance')) return false;
+    if (p.contains('/platform') ||
+        p.contains('/hmo-portal') ||
+        p.contains('/provider-webhooks')) {
+      return false;
+    }
+    return p.contains('/settings') ||
+        p.contains('/overview') ||
+        p.contains('/tenant-offers') ||
+        p.contains('/guardian/children') ||
+        p.contains('/enrolments');
+  }
+
+  static Future<bool> checkHasHealthInsuranceEntitlement(RequestOptions options) async {
+    final auth = options.headers['Authorization'] as String? ?? '';
+    final hasAuth = auth.startsWith('Bearer ') && auth.length > 7;
+    if (!hasAuth) return false;
+
+    if (options.path.contains('/guardian/children')) {
+      return true;
+    }
+
+    final tenantId = options.headers['X-Tenant-ID'] as String? ??
+        options.headers['x-tenant-id'] as String?;
+    return tenantId != null && tenantId.trim().isNotEmpty;
   }
 }
 

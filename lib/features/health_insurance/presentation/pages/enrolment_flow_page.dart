@@ -94,9 +94,9 @@ class _EnrolmentFlowPageState extends State<EnrolmentFlowPage> {
 
         for (final s in students) {
           final className = classMap[s.classId] ?? (s.classId > 0 ? 'Class ${s.classId}' : 'Unassigned Class');
-          final identifier = (s.syncId != null && s.syncId!.trim().isNotEmpty)
-              ? s.syncId!.trim()
-              : (s.admissionNumber.trim().isNotEmpty ? s.admissionNumber.trim() : (s.id?.toString() ?? ''));
+          final identifier = s.admissionNumber.trim().isNotEmpty
+              ? s.admissionNumber.trim()
+              : (s.id?.toString() ?? '');
           if (identifier.isNotEmpty) {
             items.add(EnrolmentStudentItem(
               id: identifier,
