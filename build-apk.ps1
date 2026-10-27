@@ -12,6 +12,20 @@ param (
     [switch]$Unsigned = $false
 )
 
+$javaCandidates = @(
+    'C:\dev\jdk-17',
+    'C:\Program Files\Android\Android Studio\jbr',
+    (Get-ChildItem "C:\Program Files\Microsoft\jdk-*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName),
+    $env:JAVA_HOME
+) | Where-Object { $_ }
+$resolvedJava = $javaCandidates | Where-Object {
+    try { Test-Path (Join-Path $_ 'bin\java.exe') } catch { $false }
+} | Select-Object -First 1
+if ($resolvedJava) {
+    $env:JAVA_HOME = $resolvedJava
+    $env:PATH = "$resolvedJava\bin;" + $env:PATH
+}
+
 function Repair-FlutterAssetManifest {
     param(
         [Parameter(Mandatory = $true)][string]$ApkPath,

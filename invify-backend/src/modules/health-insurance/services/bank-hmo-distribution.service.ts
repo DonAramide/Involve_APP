@@ -106,7 +106,7 @@ export class BankHmoDistributionService {
     }
     const activeIds = new Set(owned.rows.filter((row) => row.is_active).map((row) => String(row.plan_version_id)));
     const plans = await loadPublishedPlans();
-    const rows = offeringViews(plans, owned.rows).filter((row) => activeIds.has(row.versionId) && row.activeForBank);
+    const rows = offeringViews(plans, owned.rows).filter((row) => activeIds.has(String(row.versionId)) && row.activeForBank);
     return { data: rows, unavailable: null as string | null };
   }
 

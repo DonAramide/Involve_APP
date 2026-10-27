@@ -146,6 +146,7 @@ import 'package:involve_app/features/school/presentation/pages/manage_subjects_p
 import 'package:involve_app/features/school/presentation/pages/result_entry_page.dart';
 import 'package:involve_app/features/school/presentation/pages/lesson_notes_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/my_id_card_page.dart';
+import 'package:involve_app/features/school/presentation/pages/id_card_admin_page.dart';
 import 'package:involve_app/features/school/presentation/pages/gate_clock_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/about_page.dart';
 import 'package:involve_app/features/help/presentation/pages/help_page.dart';
@@ -965,6 +966,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/attendance': (_) => const AttendanceDashboardPage(),
               '/lesson_notes_list': (_) => const LessonNotesListPage(),
               MyIdCardPage.routeName: (_) => const MyIdCardPage(),
+              IdCardAdminPage.routeName: (_) => const IdCardAdminPage(),
               GateClockPage.routeName: (_) => const GateClockPage(),
               '/about': (_) => const AboutPage(),
               '/help': (_) => const HelpPage(),
