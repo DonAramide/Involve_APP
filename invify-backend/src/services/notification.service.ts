@@ -64,7 +64,105 @@ if (!admin.apps.length) {
   }
 }
 
+const FCM_MULTICAST_LIMIT = 500;
+
 export class NotificationService {
+  static isConfigured(): boolean {
+    return admin.apps.length > 0;
+  }
+
+  /**
+   * Sends an FCM multicast to registered device tokens.
+   * Optional tenantId scopes tokens via users.tenant_id.
+   */
+  static async sendToFleet(options: {
+    title: string;
+    body: string;
+    tenantId?: string | null;
+    data?: Record<string, string>;
+    priority?: 'high' | 'normal';
+  }) {
+    const title = options.title || 'Invify Broadcast';
+    const body = options.body || '';
+    if (!this.isConfigured()) {
+      console.warn('[NotificationService] sendToFleet skipped: FCM is not configured.');
+      return { configured: false, tokenCount: 0, successCount: 0, failureCount: 0 };
+    }
+
+    let tokens: string[] = [];
+    try {
+      if (options.tenantId) {
+        const { data: users, error: userErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('tenant_id', options.tenantId);
+        if (userErr) throw userErr;
+        const userIds = (users || []).map((u: { id: string }) => u.id).filter(Boolean);
+        if (userIds.length === 0) {
+          return { configured: true, tokenCount: 0, successCount: 0, failureCount: 0 };
+        }
+        const { data: rows, error } = await supabase
+          .from('device_tokens')
+          .select('token')
+          .in('user_id', userIds);
+        if (error) throw error;
+        tokens = (rows || []).map((r: { token: string }) => r.token).filter(Boolean);
+      } else {
+        const { data: rows, error } = await supabase.from('device_tokens').select('token');
+        if (error) throw error;
+        tokens = (rows || []).map((r: { token: string }) => r.token).filter(Boolean);
+      }
+    } catch (error: any) {
+      console.error('[NotificationService] sendToFleet token lookup failed:', error?.message || error);
+      return { configured: true, tokenCount: 0, successCount: 0, failureCount: 0, error: error?.message };
+    }
+
+    if (tokens.length === 0) {
+      console.log('[NotificationService] sendToFleet: no device tokens registered.');
+      return { configured: true, tokenCount: 0, successCount: 0, failureCount: 0 };
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+    const data = options.data || {};
+    const priority = options.priority || 'high';
+
+    try {
+      for (let i = 0; i < tokens.length; i += FCM_MULTICAST_LIMIT) {
+        const chunk = tokens.slice(i, i + FCM_MULTICAST_LIMIT);
+        const message: admin.messaging.MulticastMessage = {
+          tokens: chunk,
+          notification: { title, body },
+          data,
+          android: {
+            priority,
+            notification: { channelId: 'broadcasts' },
+          },
+        };
+        const response = await admin.messaging().sendEachForMulticast(message);
+        successCount += response.successCount;
+        failureCount += response.failureCount;
+        if (response.failureCount > 0) {
+          await this._cleanupFailedTokens(chunk, response.responses);
+        }
+      }
+    } catch (error: any) {
+      console.error('[NotificationService] sendToFleet FCM error:', error?.message || error);
+      return {
+        configured: true,
+        tokenCount: tokens.length,
+        successCount,
+        failureCount,
+        error: error?.message,
+      };
+    }
+
+    console.log(
+      `[NotificationService] sendToFleet done: ${successCount} sent, ${failureCount} failed, ${tokens.length} tokens.`,
+    );
+    return { configured: true, tokenCount: tokens.length, successCount, failureCount };
+  }
+
   /**
    * Sends a push notification to a specific user and persists it in DB.
    */

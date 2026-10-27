@@ -1,5 +1,43 @@
 import 'package:flutter/material.dart';
 
+class WestAfricanCountry {
+  final String name;
+  final String code;
+  final String dialCode;
+  final String flag;
+  final int minLength;
+  final int maxLength;
+
+  const WestAfricanCountry({
+    required this.name,
+    required this.code,
+    required this.dialCode,
+    required this.flag,
+    this.minLength = 7,
+    this.maxLength = 14,
+  });
+}
+
+const List<WestAfricanCountry> westAfricanCountries = [
+  WestAfricanCountry(name: 'Nigeria', code: 'NG', dialCode: '+234', flag: '🇳🇬', minLength: 10, maxLength: 11),
+  WestAfricanCountry(name: 'Ghana', code: 'GH', dialCode: '+233', flag: '🇬🇭', minLength: 9, maxLength: 10),
+  WestAfricanCountry(name: 'Benin', code: 'BJ', dialCode: '+229', flag: '🇧🇯', minLength: 8, maxLength: 10),
+  WestAfricanCountry(name: 'Togo', code: 'TG', dialCode: '+228', flag: '🇹🇬', minLength: 8, maxLength: 10),
+  WestAfricanCountry(name: 'Ivory Coast (Côte d\'Ivoire)', code: 'CI', dialCode: '+225', flag: '🇨🇮', minLength: 10, maxLength: 10),
+  WestAfricanCountry(name: 'Senegal', code: 'SN', dialCode: '+221', flag: '🇸🇳', minLength: 9, maxLength: 9),
+  WestAfricanCountry(name: 'Liberia', code: 'LR', dialCode: '+231', flag: '🇱🇷', minLength: 7, maxLength: 9),
+  WestAfricanCountry(name: 'Sierra Leone', code: 'SL', dialCode: '+232', flag: '🇸🇱', minLength: 8, maxLength: 9),
+  WestAfricanCountry(name: 'Gambia', code: 'GM', dialCode: '+220', flag: '🇬🇲', minLength: 7, maxLength: 8),
+  WestAfricanCountry(name: 'Guinea', code: 'GN', dialCode: '+224', flag: '🇬🇳', minLength: 9, maxLength: 9),
+  WestAfricanCountry(name: 'Guinea-Bissau', code: 'GW', dialCode: '+245', flag: '🇬🇼', minLength: 7, maxLength: 9),
+  WestAfricanCountry(name: 'Burkina Faso', code: 'BF', dialCode: '+226', flag: '🇧🇫', minLength: 8, maxLength: 8),
+  WestAfricanCountry(name: 'Mali', code: 'ML', dialCode: '+223', flag: '🇲🇱', minLength: 8, maxLength: 8),
+  WestAfricanCountry(name: 'Niger', code: 'NE', dialCode: '+227', flag: '🇳🇪', minLength: 8, maxLength: 8),
+  WestAfricanCountry(name: 'Cape Verde (Cabo Verde)', code: 'CV', dialCode: '+238', flag: '🇨🇻', minLength: 7, maxLength: 7),
+  WestAfricanCountry(name: 'Mauritania', code: 'MR', dialCode: '+222', flag: '🇲🇷', minLength: 8, maxLength: 8),
+  WestAfricanCountry(name: 'Cameroon', code: 'CM', dialCode: '+237', flag: '🇨🇲', minLength: 9, maxLength: 9),
+];
+
 const List<String> africaCountries = [
   'Nigeria',
   'Algeria',

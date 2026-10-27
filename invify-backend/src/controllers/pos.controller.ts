@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
 import { PosService } from '../services/pos.service';
 import { supabase } from '../db/supabase';
+import { holdForSupportApproval } from '../services/maker-checker.service';
 
 export class PosController {
   static async processTransaction(req: Request, res: Response) {
     try {
-      const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse, tenantProfile, deviceInfo } = req.body;
+      const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse, tenantProfile, deviceInfo, latitude, longitude, field120, geofencing } = req.body;
       const { resolveTenantScope } = require('../utils/resolve-tenant-scope');
       const tenantId =
         resolveTenantScope(req) ||
@@ -29,7 +30,11 @@ export class PosController {
           deviceStatus,
           transactionResponse,
           tenantProfile,
-          deviceInfo
+          deviceInfo,
+          latitude,
+          longitude,
+          field120,
+          geofencing,
         });
         return res.status(200).json(response);
       }
@@ -40,7 +45,11 @@ export class PosController {
         amount,
         emvData,
         staffName,
-        items
+        items,
+        latitude,
+        longitude,
+        field120,
+        geofencing,
       });
 
       res.status(200).json(response);
@@ -79,7 +88,8 @@ export class PosController {
   static async getRoutingConfig(req: Request, res: Response) {
     try {
       const config = await PosService.getRoutingConfig();
-      res.status(200).json(config);
+      // Server-side mandatory redaction — never return decrypted POS secrets to clients
+      res.status(200).json(PosService.sanitizeRoutingConfigForClient(config));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -87,12 +97,20 @@ export class PosController {
 
   static async updateRoutingConfig(req: Request, res: Response) {
     try {
+      const reasonText = String(req.body?.reason || req.headers['x-audit-reason'] || 'Updated POS routing configuration');
+      const held = await holdForSupportApproval(req, res, {
+        domain: 'pos_switchboard',
+        action: 'routing_config',
+        summary: reasonText,
+        body: req.body || {},
+      });
+      if (held) return;
       const { config, adminId, reason } = req.body;
       const actualConfig = config || req.body;
       const actualAdminId = adminId || req.headers['x-admin-id'] as string || 'Admin';
       const actualReason = reason || req.headers['x-audit-reason'] as string || 'Updated POS routing configuration';
       const updatedConfig = await PosService.updateRoutingConfig(actualConfig, actualAdminId, actualReason);
-      res.status(200).json(updatedConfig);
+      res.status(200).json(PosService.sanitizeRoutingConfigForClient(updatedConfig));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

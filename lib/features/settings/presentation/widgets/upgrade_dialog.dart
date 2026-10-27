@@ -1,31 +1,36 @@
 import 'package:flutter/material.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
+import '../../domain/entities/user_plan.dart';
 
 class UpgradeDialog extends StatelessWidget {
-  const UpgradeDialog({super.key});
+  final String? title;
+  final String? message;
+  const UpgradeDialog({super.key, this.title, this.message});
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.star, color: Colors.amber),
-          SizedBox(width: 8),
-          Text('Upgrade to Pro'),
+          const Icon(Icons.star, color: Colors.amber),
+          const SizedBox(width: 8),
+          Text(title ?? 'Upgrade Plan'),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text('Service Billing is a premium feature.'),
-          SizedBox(height: 16),
-          Text('Unlock these benefits:', style: TextStyle(fontWeight: FontWeight.bold)),
-          SizedBox(height: 8),
-          _BenefitItem('Daily & Hourly Billing'),
-          _BenefitItem('Hospitality & Event Support'),
-          _BenefitItem('Advanced Receipt Formats'),
-          _BenefitItem('Priority Support'),
+        children: [
+          Text(
+            message ??
+                'Choose a plan to unlock online features and multi-device sync.',
+          ),
+          const SizedBox(height: 16),
+          const Text('Plans:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const _BenefitItem(UserPlan.basicSummary),
+          const _BenefitItem(UserPlan.standardSummary),
+          const _BenefitItem(UserPlan.premiumSummary),
         ],
       ),
       actions: [
@@ -39,7 +44,7 @@ class UpgradeDialog extends StatelessWidget {
             foregroundColor: Colors.black,
           ),
           onPressed: () {
-            Navigator.pop(context); // Close dialog
+            Navigator.pop(context);
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ActivationPage()),
@@ -61,10 +66,11 @@ class _BenefitItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.check_circle, color: Colors.green, size: 20),
           const SizedBox(width: 8),
-          Text(text),
+          Expanded(child: Text(text)),
         ],
       ),
     );

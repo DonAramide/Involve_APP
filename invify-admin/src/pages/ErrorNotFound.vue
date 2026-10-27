@@ -29,8 +29,8 @@ const router = useRouter()
 const route = useRoute()
 
 const goHome = () => {
-  if (route.path.startsWith('/agent')) {
-    router.push('/agent/login')
+  if (route.path.startsWith('/agent') || route.path.startsWith('/institute')) {
+    router.push('/institute/login')
   } else if (route.path.startsWith('/tenant')) {
     router.push('/tenant/dashboard')
   } else {

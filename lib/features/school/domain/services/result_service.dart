@@ -4,6 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../entities/school_entities.dart';
+import '../entities/attendance_models.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 
@@ -19,6 +20,7 @@ class ResultService {
     double? classAverage,
     int? studentPosition,
     int? classSize,
+    StudentAttendanceSummary? attendanceSummary,
   }) async {
     final font = await PdfGoogleFonts.robotoRegular();
     final boldFont = await PdfGoogleFonts.robotoBold();
@@ -117,6 +119,7 @@ class ResultService {
                       children: [
                         if (academicYear != null) _infoRow('Academic Year:', academicYear.name),
                         if (term != null) _infoRow('Term:', term.name),
+                        if (term != null) _infoRow('Term Dates:', term.dateRangeLabel),
                         _infoRow('Date:', DateFormat('dd MMM, yyyy').format(DateTime.now())),
                       ],
                     ),
@@ -202,6 +205,58 @@ class ResultService {
                 ),
               ],
 
+              pw.SizedBox(height: 12),
+
+              // Attendance Record
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey400, width: 0.8),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  color: PdfColors.grey100,
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'ATTENDANCE RECORD',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.blueGrey800),
+                        ),
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          'Total Attendance: ${attendanceSummary?.totalDays ?? 0} days',
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                      ],
+                    ),
+                    pw.Row(
+                      children: [
+                        _pdfAttendanceItem('Present', '${attendanceSummary?.present ?? 0}', PdfColors.green800),
+                        pw.SizedBox(width: 12),
+                        _pdfAttendanceItem('Absent', '${attendanceSummary?.absent ?? 0}', PdfColors.red800),
+                        pw.SizedBox(width: 12),
+                        _pdfAttendanceItem('Late', '${attendanceSummary?.lateCount ?? 0}', PdfColors.amber800),
+                        pw.SizedBox(width: 14),
+                        pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.end,
+                          children: [
+                            pw.Text('Attendance Rate', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              attendanceSummary?.formattedRate ?? 'N/A',
+                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11, color: PdfColors.blue900),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
               pw.Spacer(),
 
               // Footer / Signatures
@@ -239,7 +294,7 @@ class ResultService {
               ),
               pw.SizedBox(height: 20),
               pw.Center(
-                child: pw.Text('Powered by Invify.iips.app', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+                child: pw.Text('Powered by Invify.org', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
               ),
             ],
           );
@@ -284,6 +339,20 @@ class ResultService {
     );
   }
 
+  pw.Widget _pdfAttendanceItem(String label, String value, PdfColor textColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+        pw.SizedBox(height: 1),
+        pw.Text(
+          value,
+          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: textColor),
+        ),
+      ],
+    );
+  }
+
   String _getOrdinalSuffix(int value) {
     if (value >= 11 && value <= 13) {
       return 'th';
@@ -311,6 +380,7 @@ class ResultService {
     double? classAverage,
     int? studentPosition,
     int? classSize,
+    StudentAttendanceSummary? attendanceSummary,
   }) {
     final List<PrintCommand> commands = [];
 
@@ -339,6 +409,7 @@ class ResultService {
     }
     if (term != null) {
       commands.add(TextCommand('Term: ${term.name}'));
+      commands.add(TextCommand('Dates: ${term.dateRangeLabel}'));
     }
     commands.add(DividerCommand());
 
@@ -385,7 +456,21 @@ class ResultService {
       commands.add(DividerCommand());
     }
 
-    commands.add(TextCommand('Powered by Invify.iips.app', align: 'center'));
+    // Attendance Statistics
+    if (attendanceSummary != null) {
+      commands.add(TextCommand('ATTENDANCE RECORD', isBold: true, align: 'center'));
+      commands.add(TextCommand('Total Attendance: ${attendanceSummary.totalDays} days'));
+      commands.add(TextCommand(
+        'Present: ${attendanceSummary.present} | Absent: ${attendanceSummary.absent} | Late: ${attendanceSummary.lateCount}',
+      ));
+      commands.add(TextCommand(
+        'Attendance Rate: ${attendanceSummary.formattedRate}',
+        isBold: true,
+      ));
+      commands.add(DividerCommand());
+    }
+
+    commands.add(TextCommand('Powered by Invify.org', align: 'center'));
     commands.add(SizedBoxCommand(height: 3)); // feed paper
 
     return commands;

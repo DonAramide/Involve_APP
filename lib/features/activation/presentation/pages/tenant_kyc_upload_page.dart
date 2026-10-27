@@ -17,15 +17,23 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
   
   Map<String, File?> _selectedFiles = {
     'GOVT_ID': null,
-    'UTILITY_BILL': null,
     'CAC_CERT': null,
+    'UTILITY_BILL': null,
   };
 
   Map<String, bool> _uploadStatus = {
     'GOVT_ID': false,
-    'UTILITY_BILL': false,
     'CAC_CERT': false,
+    'UTILITY_BILL': false,
   };
+
+  final Map<String, bool> _rejected = {
+    'GOVT_ID': false,
+    'CAC_CERT': false,
+    'UTILITY_BILL': false,
+  };
+
+  final Map<String, String> _rejectReason = {};
 
   bool _isLoading = true;
 
@@ -41,9 +49,13 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
       if (mounted) {
         setState(() {
           for (var doc in docs) {
-            final type = doc['document_type'];
+            final type = _normalizeType(doc['document_type']?.toString());
             if (_uploadStatus.containsKey(type)) {
-              _uploadStatus[type] = true;
+              final status = (doc['status'] ?? '').toString().toUpperCase();
+              final rejected = status == 'REJECTED';
+              _rejected[type] = rejected;
+              _rejectReason[type] = (doc['rejection_reason'] ?? doc['rejectionReason'] ?? '').toString();
+              _uploadStatus[type] = !rejected;
             }
           }
           _isLoading = false;
@@ -133,6 +145,8 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
       if (success) {
         setState(() {
           _uploadStatus[documentType] = true;
+          _rejected[documentType] = false;
+          _rejectReason[documentType] = '';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$documentType uploaded successfully!'), backgroundColor: Colors.green),
@@ -145,9 +159,20 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
     }
   }
 
+  String _normalizeType(String? raw) {
+    final key = (raw ?? '').trim().toUpperCase().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (key.contains('CAC')) return 'CAC_CERT';
+    if (key.contains('ID') || key == 'NIN' || key == 'PASSPORT' || key.contains('LICENSE')) {
+      return 'GOVT_ID';
+    }
+    return key;
+  }
+
   bool _isAllRequiredUploaded() {
-    // Make ID and Utility Bill mandatory, CAC optional depending on business type (for simplicity all 3 or just 2)
-    return _uploadStatus['GOVT_ID'] == true && _uploadStatus['UTILITY_BILL'] == true;
+    return _uploadStatus['GOVT_ID'] == true &&
+        _uploadStatus['CAC_CERT'] == true &&
+        _rejected['GOVT_ID'] != true &&
+        _rejected['CAC_CERT'] != true;
   }
 
   @override
@@ -182,12 +207,12 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Mandatory for Pro Tier',
+                            'Upload CAC and a valid ID card',
                             style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary, fontSize: 16),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Please upload the following documents to verify your business identity and activate your cloud linkage.',
+                            'We need your CAC certificate and a valid government ID (NIN slip, National ID, driver’s licence, or passport) before this workspace can be verified.',
                             style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
                           ),
                         ],
@@ -199,26 +224,26 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
               const SizedBox(height: 32),
               
               _buildDocumentCard(
-                title: 'Government Issued ID',
-                subtitle: "Passport, Driver's License, or National ID",
+                title: 'Valid ID card',
+                subtitle: 'NIN slip, National ID, driver’s licence, or international passport',
                 documentType: 'GOVT_ID',
                 icon: Icons.badge,
                 isRequired: true,
               ),
-              
+
               _buildDocumentCard(
-                title: 'Utility Bill',
-                subtitle: 'Recent electricity, water, or internet bill containing your address',
-                documentType: 'UTILITY_BILL',
-                icon: Icons.receipt_long,
+                title: 'CAC certificate',
+                subtitle: 'Certificate of Incorporation or Business Name registration',
+                documentType: 'CAC_CERT',
+                icon: Icons.business,
                 isRequired: true,
               ),
 
               _buildDocumentCard(
-                title: 'CAC Certificate (Optional)',
-                subtitle: 'Certificate of Incorporation for registered businesses',
-                documentType: 'CAC_CERT',
-                icon: Icons.business,
+                title: 'Utility bill (optional)',
+                subtitle: 'Recent electricity, water, or internet bill with your address',
+                documentType: 'UTILITY_BILL',
+                icon: Icons.receipt_long,
                 isRequired: false,
               ),
 
@@ -252,12 +277,20 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
   }) {
     final theme = Theme.of(context);
     final isUploaded = _uploadStatus[documentType] ?? false;
+    final isRejected = _rejected[documentType] ?? false;
+    final reason = _rejectReason[documentType] ?? '';
     
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: isUploaded ? Colors.green.withOpacity(0.5) : theme.colorScheme.onSurface.withOpacity(0.1)),
+        side: BorderSide(
+          color: isRejected
+              ? Colors.red.withOpacity(0.5)
+              : isUploaded
+                  ? Colors.green.withOpacity(0.5)
+                  : theme.colorScheme.onSurface.withOpacity(0.1),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -266,10 +299,17 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isUploaded ? Colors.green.withOpacity(0.1) : theme.colorScheme.primary.withOpacity(0.1),
+                color: isRejected
+                    ? Colors.red.withOpacity(0.1)
+                    : isUploaded
+                        ? Colors.green.withOpacity(0.1)
+                        : theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(isUploaded ? Icons.check_circle : icon, color: isUploaded ? Colors.green : theme.colorScheme.primary),
+              child: Icon(
+                isRejected ? Icons.error : (isUploaded ? Icons.check_circle : icon),
+                color: isRejected ? Colors.red : (isUploaded ? Colors.green : theme.colorScheme.primary),
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -290,12 +330,20 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.6))),
+                  Text(
+                    isRejected
+                        ? (reason.isNotEmpty ? 'Rejected. $reason' : 'Rejected. Please re-upload this file.')
+                        : subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isRejected ? Colors.red : theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            if (isUploaded)
+            if (isUploaded && !isRejected)
               OutlinedButton.icon(
                 onPressed: () => _pickFile(documentType),
                 icon: const Icon(Icons.refresh, size: 14),
@@ -309,7 +357,7 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
               ElevatedButton.icon(
                 onPressed: () => _pickFile(documentType),
                 icon: const Icon(Icons.upload_file, size: 14),
-                label: const Text('Upload', style: TextStyle(fontSize: 12)),
+                label: Text(isRejected ? 'Re-upload' : 'Upload', style: const TextStyle(fontSize: 12)),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

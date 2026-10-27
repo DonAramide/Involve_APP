@@ -58,7 +58,7 @@ export class ReferralController {
         .single();
 
       // 3. Send Notification
-      const appUrl = process.env.APP_URL || 'https://IIPS.app';
+      const appUrl = process.env.APP_URL || 'https://invify.org';
       const referralLink = `${appUrl}/#/onboarding?ref=${tenant?.referral_code}`;
 
       await ReferralNotificationService.sendInvite(tenant?.name || 'A School', email, referralLink);

@@ -7,6 +7,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_material.dart';
 import '../../domain/entities/service_job.dart';
 import '../../data/services/services_backup_service.dart';
+import '../utils/job_staff_store.dart';
 
 class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   final GetJobs getJobs;
@@ -114,6 +115,23 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           successMessage: 'Customer registered successfully!',
         ));
       } catch (e) {
+        final cleanMsg = e.toString().replaceAll('Exception: ', '').trim();
+        emit(state.copyWith(errorMessage: cleanMsg));
+      }
+    });
+
+    on<EnsureWalkInCustomer>((event, emit) async {
+      try {
+        final customer = await getJobs.repository.ensureWalkInCustomer();
+        final customers = List<ServiceCustomer>.from(state.customers);
+        if (!customers.any((c) => c.id == customer.id)) {
+          customers.insert(0, customer);
+        }
+        emit(state.copyWith(
+          customers: customers,
+          successMessage: 'Walk-in customer selected',
+        ));
+      } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
     });
@@ -130,8 +148,12 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<PrintServiceReceiptEvent>((event, emit) async {
       try {
         final payments = await getJobPayments(event.job.id);
+        final assignment = await JobStaffStore.getAssignment(event.job.id) ??
+            await JobStaffStore.getAssignment(event.job.jobId);
         await printJobReceipt(
-          job: event.job,
+          job: event.job.copyWith(
+            staffName: assignment?.staffName ?? event.job.staffName,
+          ),
           settings: event.settings,
           payments: payments,
         );
@@ -163,7 +185,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<AddServicePreset>((event, emit) async {
       try {
         await getJobs.repository.addJobPreset(event.name);
-        add(const LoadServicePresets());
+        final presets = await getJobs.repository.getJobPresets();
+        emit(state.copyWith(presets: presets, successMessage: 'Service offering added!'));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -172,7 +195,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<DeleteServicePreset>((event, emit) async {
       try {
         await getJobs.repository.deleteJobPreset(event.name);
-        add(const LoadServicePresets());
+        final presets = await getJobs.repository.getJobPresets();
+        emit(state.copyWith(presets: presets, successMessage: 'Service offering removed.'));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -181,9 +205,16 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<LoadServiceMaterials>((event, emit) async {
       try {
         final materials = await getJobs.repository.getMaterials(category: event.category);
-        final categories = materials.map((m) => m.category).toSet().toList();
-        final finalMaterials = materials.isNotEmpty ? materials : const <ServiceMaterial>[];
-        emit(state.copyWith(materials: finalMaterials, categories: categories));
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -191,8 +222,24 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
 
     on<AddServiceMaterial>((event, emit) async {
       try {
-        await getJobs.repository.addMaterial(name: event.name, category: event.category, price: event.price);
-        add(LoadServiceMaterials(category: event.category));
+        await getJobs.repository.addMaterial(
+          name: event.name,
+          category: event.category,
+          price: event.price,
+          image: event.image,
+        );
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material added successfully!',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -201,7 +248,18 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     on<DeleteServiceMaterial>((event, emit) async {
       try {
         await getJobs.repository.deleteMaterial(event.id);
-        add(const LoadServiceMaterials());
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material deleted.',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }
@@ -214,8 +272,20 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           name: event.name,
           category: event.category,
           price: event.price,
+          image: event.image,
         );
-        add(LoadServiceMaterials(category: event.category));
+        final materials = await getJobs.repository.getMaterials();
+        final catObjects = await getJobs.repository.getFullMaterialCategories();
+        final catNames = catObjects.map((c) => c.name).toList();
+        final materialCats = materials.map((m) => m.category).toList();
+        final allCategories = {...catNames, ...materialCats}.where((c) => c.trim().isNotEmpty).toList();
+
+        emit(state.copyWith(
+          materials: materials,
+          categories: allCategories,
+          materialCategories: catObjects,
+          successMessage: 'Material updated successfully!',
+        ));
       } catch (e) {
         emit(state.copyWith(errorMessage: e.toString()));
       }

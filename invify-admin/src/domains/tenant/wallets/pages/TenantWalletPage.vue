@@ -641,6 +641,7 @@ import { useCurrency } from '../../../../composables/useCurrency';
 import { useTenantWalletStore } from '../stores/tenantWalletStore';
 import { usePlatformPayoutSettingsStore } from '../../../../stores/platformPayoutSettings.store';
 import { adminApi } from '../../../../api';
+import { promptCheckerMfa } from '../../../../utils/promptCheckerMfa';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
@@ -817,20 +818,18 @@ const maskedAccountNumber = computed(() => {
 async function loadTenantBankDetails() {
   try {
     const res = await adminApi.getTenantPayoutSettings()
-    if (res && res.data && res.data.account_number) {
+    const row = res?.data?.settings || res?.data || {}
+    const accountNumber = String(row.account_number || row.accountNumber || '').trim()
+    if (accountNumber) {
       bankDetails.value = {
-        bank_name: res.data.bank_name || '',
-        bank_code: res.data.bank_code || '',
-        account_number: res.data.account_number || '',
-        account_name: res.data.account_name || ''
+        bank_name: row.bank_name || row.bankName || '',
+        bank_code: row.bank_code || row.bankCode || '',
+        account_number: accountNumber,
+        account_name: row.account_name || row.accountName || ''
       }
-      // Populate form backup
       bankForm.value = { ...bankDetails.value }
-      
-      // Load bank list to match dropdown option
       loadBanksList()
     } else {
-      // Load bank list immediately if they don't have settings so options are ready
       loadBanksList()
     }
   } catch (err) {
@@ -860,6 +859,11 @@ async function loadBanksList() {
     }
   } catch (err) {
     console.error('Failed to load banks from Quasar:', err)
+    const msg =
+      err?.response?.data?.error ||
+      err?.message ||
+      'Failed to load payout banks from Quasar'
+    $q.notify({ type: 'negative', message: msg, timeout: 6000 })
   } finally {
     loadingBanks.value = false
   }
@@ -937,9 +941,18 @@ async function resolveAccountName(accountNumber, bankCode) {
 }
 
 async function saveBankDetails() {
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: '2FA required',
+    message: 'Enter the 6-digit code from your authenticator app to save the corporate bank account used for dispatches.',
+    okLabel: 'Verify & save',
+  })
+  if (!otp) {
+    $q.notify({ type: 'warning', message: 'Bank details were not saved. A 2FA code is required.' })
+    return
+  }
   savingBank.value = true
   try {
-    const res = await adminApi.saveTenantPayoutSettings(bankForm.value)
+    const res = await adminApi.saveTenantPayoutSettings({ ...bankForm.value, otp })
     if (res && res.data) {
       bankDetails.value = { ...bankForm.value }
       showBankSetupDialog.value = false
@@ -951,7 +964,7 @@ async function saveBankDetails() {
   } catch (err) {
     $q.notify({
       type: 'negative',
-      message: 'Failed to save bank details: ' + (err.response?.data?.error || err.message)
+      message: 'Failed to save bank details: ' + (err.response?.data?.message || err.response?.data?.error || err.message)
     })
   } finally {
     savingBank.value = false
@@ -1038,20 +1051,30 @@ const computedManualTotal = computed(() => {
 
 function dispatchPayout() {
   if (activeSchedule.value === 'manual') {
-    // Show the fee warning dialog first
     showManualFeeDialog.value = true
     return
   }
-  executePayout()
+  executePayout(false)
 }
 
-function confirmManualDispatch() {
+async function confirmManualDispatch() {
   showManualFeeDialog.value = false
-  executePayout()
+  await executePayout(true)
 }
 
-function executePayout() {
-  store.dispatchPayout()
+async function executePayout(manual) {
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: '2FA required',
+    message: manual
+      ? 'Enter the 6-digit code from your authenticator app to send this manual dispatch payout.'
+      : 'Enter the 6-digit code from your authenticator app to send this payout.',
+    okLabel: 'Verify & pay',
+  })
+  if (!otp) {
+    $q.notify({ type: 'warning', message: 'Payout cancelled. A 2FA code is required.' })
+    return
+  }
+  store.dispatchPayout({ otp, manual })
     .then((msg) => {
       $q.notify({ type: 'positive', message: msg })
     })
@@ -1081,7 +1104,10 @@ onMounted(() => {
   }
 
   // 2. Polling Fallback — check every 2 seconds in case storage events are throttled/blocked
-  syncInterval = setInterval(loadAdminPayoutSettings, 2000)
+  syncInterval = setInterval(() => {
+    loadAdminPayoutSettings()
+    store.loadTreasuryData()
+  }, 12000)
 
   // Restore saved weekly preference
   const saved = localStorage.getItem('tenant_weekly_schedule')

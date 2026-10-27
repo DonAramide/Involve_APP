@@ -5,11 +5,27 @@
 
 import { CanonicalBroadcastTypes, DotroidLauncherModes, DeliveryPriorityLanes } from '../contracts/broadcast';
 
+/** UUID that works on LAN HTTP (crypto.randomUUID needs a secure context). */
+export function newBroadcastId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return `bcast-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
 export class BroadcastEnvelopeModel {
   constructor({
-    broadcastId = crypto.randomUUID(),
+    broadcastId = null,
     tenantId = "global",
-    regionId = "us-east",
+    regionId = "global",
     type = CanonicalBroadcastTypes.NOTIFICATION,
     severity = "INFO",
     title = "",
@@ -25,7 +41,7 @@ export class BroadcastEnvelopeModel {
     priorityLane = DeliveryPriorityLanes.INFO,
     lineageHash = null
   }) {
-    this.broadcastId = broadcastId;
+    this.broadcastId = broadcastId || newBroadcastId();
     this.tenantId = tenantId;
     this.regionId = regionId;
     this.type = type;

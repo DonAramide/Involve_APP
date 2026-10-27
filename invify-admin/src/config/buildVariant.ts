@@ -6,49 +6,38 @@ export enum BuildVariant {
 
 /**
  * Explicit admin build variant.
- * Production Vite builds (MODE=production / PROD) require VITE_BUILD_VARIANT=PROD.
- * Staging builds require VITE_BUILD_VARIANT=STAGING (or MODE=staging).
+ * `vite build` sets PROD=true even for `--mode staging`. Prefer MODE / VITE_APP_ENV
+ * over that flag so a staging build never throws in the browser.
  */
 export function getBuildVariant(): BuildVariant {
-  const raw = (
-    import.meta.env.VITE_BUILD_VARIANT ||
-    import.meta.env.VITE_DASHBOARD_DATA_MODE ||
-    ''
-  )
-    .toString()
-    .trim()
-    .toUpperCase()
+  try {
+    const raw = (
+      import.meta.env.VITE_BUILD_VARIANT ||
+      import.meta.env.VITE_DASHBOARD_DATA_MODE ||
+      ''
+    )
+      .toString()
+      .trim()
+      .toUpperCase()
 
-  const mode = (import.meta.env.MODE || '').toLowerCase()
-  const appEnv = (import.meta.env.VITE_APP_ENV || '').toLowerCase()
-  const claimsProduction =
-    import.meta.env.PROD === true || mode === 'production' || appEnv === 'production'
-  const claimsStaging = mode === 'staging' || appEnv === 'staging'
+    const mode = (import.meta.env.MODE || '').toLowerCase()
+    const appEnv = (import.meta.env.VITE_APP_ENV || '').toLowerCase()
+    const claimsStaging = mode === 'staging' || appEnv === 'staging'
+    const claimsProduction = mode === 'production' || appEnv === 'production'
 
-  if (raw === 'PROD' || raw === 'PRODUCTION') {
-    return BuildVariant.PROD
-  }
-  if (raw === 'STAGING') {
-    return BuildVariant.STAGING
-  }
-  if (raw === 'LOCAL' || raw === 'DEVELOPMENT' || raw === 'DEV') {
-    if (claimsProduction) {
-      throw new Error(
-        '[AdminBuildVariant] Refusing LOCAL while production MODE is set. Set VITE_BUILD_VARIANT=PROD.',
-      )
+    if (raw === 'STAGING' || (claimsStaging && raw !== 'PROD' && raw !== 'PRODUCTION')) {
+      return BuildVariant.STAGING
+    }
+    if (raw === 'PROD' || raw === 'PRODUCTION' || claimsProduction) {
+      return BuildVariant.PROD
+    }
+    if (raw === 'LOCAL' || raw === 'DEVELOPMENT' || raw === 'DEV') {
+      return BuildVariant.LOCAL
     }
     return BuildVariant.LOCAL
-  }
-
-  if (claimsProduction) {
-    throw new Error(
-      '[AdminBuildVariant] VITE_BUILD_VARIANT=PROD is required for production builds.',
-    )
-  }
-  if (claimsStaging) {
+  } catch {
     return BuildVariant.STAGING
   }
-  return BuildVariant.LOCAL
 }
 
 export function isLocal(): boolean {

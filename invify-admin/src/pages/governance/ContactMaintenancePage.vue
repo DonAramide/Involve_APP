@@ -35,8 +35,11 @@
               <q-input
                 outlined
                 v-model="supportPhone"
+                type="tel"
                 label="Support Phone Number"
                 hint="e.g. +234 800 INVIFY or +1 (800) 123-4567"
+                maxlength="13"
+                counter
               >
                 <template v-slot:prepend><q-icon name="phone" color="primary" /></template>
               </q-input>

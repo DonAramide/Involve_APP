@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -125,6 +126,8 @@ internal class KeyExchangeHandler(
             terminalParameters?.tmk = masterKey
             sessionManager.saveTerminalParameters(terminalParameters!!)
 
+            keyExchangeResult.update { KeyExchangeResult.Progress("TMK updated") }
+            delay(600)
             doTSKTransaction()
         } catch (e: ISOException) {
             LogUtil.e(e.message ?: "An error occurred")
@@ -151,6 +154,7 @@ internal class KeyExchangeHandler(
 
     private suspend fun doTSKTransaction() {
         try {
+            keyExchangeResult.update { KeyExchangeResult.Progress("Downloading TSK...") }
             val channel = socketChannel.setup()
             channel.connect()
             val tskRequest =
@@ -183,6 +187,8 @@ internal class KeyExchangeHandler(
             terminalParameters?.tsk = sessionKey
             sessionManager.saveTerminalParameters(terminalParameters!!)
 
+            keyExchangeResult.update { KeyExchangeResult.Progress("TSK updated") }
+            delay(600)
             doTPKTransaction()
         } catch (e: ISOException) {
             LogUtil.e(e.message ?: "An error occurred")
@@ -209,6 +215,7 @@ internal class KeyExchangeHandler(
 
     private suspend fun doTPKTransaction() {
         try {
+            keyExchangeResult.update { KeyExchangeResult.Progress("Downloading TPK...") }
             val channel = socketChannel.setup()
             channel.connect()
             val tpkRequest =
@@ -240,6 +247,8 @@ internal class KeyExchangeHandler(
             terminalParameters?.tpk = pinKey
             sessionManager.saveTerminalParameters(terminalParameters!!)
 
+            keyExchangeResult.update { KeyExchangeResult.Progress("TPK updated") }
+            delay(600)
             doParameterDownloadTransaction()
         } catch (e: ISOException) {
             LogUtil.e(e.message ?: "An error occurred")
@@ -266,6 +275,7 @@ internal class KeyExchangeHandler(
 
     private suspend fun doParameterDownloadTransaction() {
         try {
+            keyExchangeResult.update { KeyExchangeResult.Progress("Downloading terminal parameters...") }
             val channel = socketChannel.setup()
             channel.connect()
 
@@ -287,22 +297,19 @@ internal class KeyExchangeHandler(
             }
 
 
-            val field62 = response.getString(62)
-
-            val merchantId = ISOUtils.parseTLV(field62, "03").toString()
-            val merchantCategoryCode = ISOUtils.parseTLV(field62, "08").toString()
-            val merchantLocation = ISOUtils.parseTLV(field62, "52").toString()
-            val currencyCode = ISOUtils.parseTLV(field62, "05").toString()
-            val countryCode = ISOUtils.parseTLV(field62, "06").toString()
-            val ctmsTimeDate = ISOUtils.parseTLV(field62, "02").toString()
-
-            terminalParameters?.merchantNo = merchantId
-            terminalParameters?.merchantName = merchantLocation
-            terminalParameters?.currencyCode = currencyCode
-            terminalParameters?.mcc = merchantCategoryCode
-            terminalParameters?.cardAcceptorLocation = merchantLocation
-            terminalParameters?.cardAcceptorId = merchantId
-
+            val field62 = if (response.hasField(62)) response.getString(62) else null
+            if (!field62.isNullOrBlank()) {
+                val merchantId = ISOUtils.parseTLV(field62, "03").toString()
+                val merchantCategoryCode = ISOUtils.parseTLV(field62, "08").toString()
+                val merchantLocation = ISOUtils.parseTLV(field62, "52").toString()
+                val currencyCode = ISOUtils.parseTLV(field62, "05").toString()
+                terminalParameters?.merchantNo = merchantId
+                terminalParameters?.merchantName = merchantLocation
+                terminalParameters?.currencyCode = currencyCode
+                terminalParameters?.mcc = merchantCategoryCode
+                terminalParameters?.cardAcceptorLocation = merchantLocation
+                terminalParameters?.cardAcceptorId = merchantId
+            }
 
             if (terminalParameters != null && !terminalParameters?.tmk.isNullOrEmpty() && !terminalParameters?.tpk.isNullOrEmpty()) {
                 keyExchangeResult.update {

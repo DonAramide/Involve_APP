@@ -12,8 +12,12 @@ import 'package:involve_app/features/invoicing/presentation/history/bloc/history
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'reconciliation_page.dart';
@@ -81,6 +85,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   Future<Map<String, dynamic>> _localFinanceSnapshot() async {
     double collected = 0;
     double invoiceOutstanding = 0;
+    double cardOnBills = 0;
+    double parentWalletOnBills = 0;
+    double staffVaOnBills = 0;
     final monthCollected = List<double>.filled(6, 0);
     final now = DateTime.now();
     List<Invoice> invoices = const [];
@@ -93,14 +100,31 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             inv.dateCreated.isAfter(_endDate!.add(const Duration(days: 1)))) {
           continue;
         }
-        collected += inv.amountPaid;
-        final owing = inv.totalAmount - inv.amountPaid;
-        if (owing > 0.01) invoiceOutstanding += owing;
+        if (!inv.countsTowardSales || inv.isRolledForward) continue;
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final got = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        collected += got;
+        invoiceOutstanding += billed - got;
+        switch (classifyInvoicePaymentRail(inv.paymentMethod)) {
+          case InvoicePaymentRail.card:
+            cardOnBills += got;
+            break;
+          case InvoicePaymentRail.wallet:
+            parentWalletOnBills += got;
+            break;
+          case InvoicePaymentRail.vaTransfer:
+            staffVaOnBills += got;
+            break;
+          case InvoicePaymentRail.cash:
+          case InvoicePaymentRail.bankTransfer:
+          case InvoicePaymentRail.other:
+            break;
+        }
 
         final monthsAgo =
             (now.year - inv.dateCreated.year) * 12 + now.month - inv.dateCreated.month;
         if (monthsAgo >= 0 && monthsAgo < 6) {
-          monthCollected[5 - monthsAgo] += inv.amountPaid;
+          monthCollected[5 - monthsAgo] += got;
         }
       }
     } catch (e) {
@@ -117,17 +141,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         final students =
             await context.read<SchoolRepository>().getStudentSummaries();
         total = students.length;
-        for (final s in students) {
-          if (s.balance > 0.01) {
-            owingCount++;
-            outstanding += s.balance;
-          } else {
-            paidCount++;
-          }
-        }
-        if (outstanding < 0.01 && invoiceOutstanding > 0.01) {
-          outstanding = invoiceOutstanding;
-        }
+        final ids = students.map((s) => s.id).whereType<int>();
+        final payStatus = countStudentPayStatus(studentIds: ids, invoices: invoices);
+        owingCount = payStatus.owing;
+        paidCount = payStatus.paid;
+        outstanding = payStatus.owingValue > 0.01 ? payStatus.owingValue : invoiceOutstanding;
       } catch (e) {
         debugPrint('[ExecutiveDashboard] school ledger failed: $e');
         outstanding = invoiceOutstanding;
@@ -154,6 +172,23 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       }
     }
 
+    var parentVaGross = 0.0;
+    try {
+      final school = context.read<SchoolRepository>();
+      final parents = await school.getParents();
+      final payments = <ParentPaymentRecord>[];
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) continue;
+        payments.addAll(await school.getParentPayments(id));
+      }
+      parentVaGross = ParentCreditParts.grossVirtualAccount(payments);
+    } catch (e) {
+      debugPrint('[ExecutiveDashboard] parent VA total skipped: $e');
+    }
+    final schoolWallet = cardOnBills + parentWalletOnBills + staffVaOnBills;
+    final pendingAtQuasar = cardOnBills + parentVaGross + staffVaOnBills;
+
     final recent = invoices.take(8).map((inv) {
       return {
         'created_at': inv.dateCreated.toIso8601String(),
@@ -174,6 +209,8 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       'owing': owingCount,
       'monthCollected': monthCollected,
       'recent': recent,
+      'schoolWallet': schoolWallet,
+      'pendingAtQuasar': pendingAtQuasar,
     };
   }
 
@@ -192,14 +229,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       );
       final history = await _repository.getPayoutHistory(limit: 5);
 
-      final apiCollected = (summary['totalCollected'] is num)
-          ? (summary['totalCollected'] as num).toDouble()
-          : double.tryParse('${summary['totalCollected']}') ?? 0.0;
       final localCollected = (local['collected'] as num?)?.toDouble() ?? 0.0;
 
       // Local sales land here immediately; cloud catch-up can lag behind device invoices.
-      summary['totalCollected'] = math.max(apiCollected, localCollected);
+      summary['totalCollected'] = localCollected;
       summary['outstanding'] = local['outstanding'];
+      summary['walletBalance'] = local['schoolWallet'];
+      summary['pendingQuasarRemittance'] = local['schoolWallet'];
+      summary['pendingVirtualAccountFunds'] = local['pendingAtQuasar'];
       summary['studentMetrics'] = {
         'total': local['total'],
         'paid': local['paid'],
@@ -221,13 +258,13 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     } catch (e) {
       setState(() {
         _summary = {
-          'walletBalance': 0.0,
+          'walletBalance': local['schoolWallet'],
           'totalCollected': local['collected'],
           'revenueInRange': local['collected'],
           'totalQuasarCollected': 0.0,
           'totalQuasarRemitted': 0.0,
-          'pendingQuasarRemittance': 0.0,
-          'pendingVirtualAccountFunds': 0.0,
+          'pendingQuasarRemittance': local['schoolWallet'],
+          'pendingVirtualAccountFunds': local['pendingAtQuasar'],
           'outstanding': local['outstanding'],
           'alerts': {
             'unmatchedCount': 0,
@@ -260,18 +297,20 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       },
       child: BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, state) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
         final settings = state.settings;
         final isRetail = settings?.businessMode == 'retail';
         final customerLabelPlural = settings?.customersLabel ?? 'Customers';
         final collectedLabel = settings?.collectedLabel ?? 'Total Collected';
         
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
           appBar: AppBar(
             title: const Text('Executive Dashboard', style: TextStyle(fontWeight: FontWeight.w900)),
             elevation: 0,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+            foregroundColor: isDark ? Colors.white : Colors.black,
             actions: [
               IconButton(
                 icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -339,7 +378,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            decoration: BoxDecoration(
+                              color: isDark ? theme.cardColor : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -351,9 +393,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: isDark ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.5) : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.grey.shade100),
+                                      border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade100),
                                     ),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.end,
@@ -455,14 +497,16 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildAlertPanel() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final alerts = _summary?['alerts'];
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: isDark ? Colors.red.withOpacity(0.15) : Colors.red.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade100),
+        border: Border.all(color: isDark ? Colors.red.withOpacity(0.3) : Colors.red.shade100),
       ),
       child: Column(
         children: [
@@ -476,6 +520,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _alertItem(String title, String sub, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -488,14 +533,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.red.shade700),
+            Icon(icon, size: 20, color: isDark ? Colors.red.shade300 : Colors.red.shade700),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900, fontSize: 13)),
-                  Text(sub, style: TextStyle(color: Colors.red.shade700, fontSize: 11)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.red.shade200 : Colors.red.shade900, fontSize: 13)),
+                  Text(sub, style: TextStyle(color: isDark ? Colors.red.shade300 : Colors.red.shade700, fontSize: 11)),
                 ],
               ),
             ),
@@ -507,13 +552,21 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildKpiCard(String label, dynamic value, IconData icon, Color color) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final amount = (value is num) ? value.toDouble() : double.tryParse('$value') ?? 0.0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,10 +576,22 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               Text(
                 CurrencyFormatter.formatWithSymbol(amount),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
               ),
             ],
           ),
@@ -567,6 +632,8 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildActivityTile(Map<String, dynamic> item, bool isRetail) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final date = DateTime.parse(item['created_at']);
     final typeLabel = item['type'] == 'payout' 
         ? 'Fund Sweep' 
@@ -575,12 +642,18 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: isDark ? theme.cardColor : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.grey.shade50, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey.shade50,
+              shape: BoxShape.circle,
+            ),
             child: const Icon(Icons.swap_horiz_rounded, color: Colors.blue),
           ),
           const SizedBox(width: 16),
@@ -589,7 +662,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(DateFormat('MMM dd, hh:mm a').format(date), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(DateFormat('MMM dd, hh:mm a').format(date), style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey)),
               ],
             ),
           ),
@@ -599,7 +672,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                   ? (item['amount'] as num).toDouble()
                   : double.tryParse('${item['amount']}') ?? 0.0,
             ),
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
         ],
       ),
@@ -634,8 +710,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   void _showFilterOptions(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),

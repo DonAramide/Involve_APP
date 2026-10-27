@@ -26,7 +26,54 @@ export const SESSION_STORAGE_KEYS = [
   'supabase_token',
 ];
 
-export const SESSION_STORAGE_TRANSIENT_KEYS = ['mfa_setup_token', 'mfa_setup_userId'];
+export const SESSION_STORAGE_TRANSIENT_KEYS = [
+  'mfa_setup_token',
+  'mfa_setup_userId',
+  'mfa_challenge_token',
+  'mfa_challenge_userId',
+];
+
+export function isMfaChallengePending() {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    return !!(
+      sessionStorage.getItem('mfa_setup_token') ||
+      sessionStorage.getItem('mfa_challenge_token')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Live access token that already cleared MFA. Stale challenge leftovers must not hijack it. */
+export function hasVerifiedOperatorSession() {
+  if (!readAccessToken()) return false;
+  try {
+    return localStorage.getItem('mfa_status_verified') !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+const SOFT_SESSION_FAILURE_MARKERS = [
+  '/api/notifications',
+  '/notifications',
+  '/api/dashboard/',
+  '/dashboard/',
+  '/api/v1/runtime/config',
+  '/v1/runtime/config',
+  '/api/v1/finance',
+  '/api/finance',
+  '/api/v1/wallet',
+  '/api/inventory',
+  '/api/v1/inventory',
+];
+
+/** Background/overview GETs that should degrade instead of wiping the operator session. */
+export function isSoftSessionFailureUrl(url) {
+  const value = String(url || '').toLowerCase();
+  return SOFT_SESSION_FAILURE_MARKERS.some((marker) => value.includes(marker));
+}
 
 const AUTH_PATH_MARKERS = [
   '/api/auth/login',
@@ -68,9 +115,15 @@ export function readRefreshToken() {
 
 export function persistAuthenticatedSession(tokenData = {}) {
   logoutGeneration = 0;
-  if (tokenData.token) localStorage.setItem('invify_token', tokenData.token);
-  if (tokenData.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenData.refreshToken);
+  const accessToken = tokenData.token || tokenData.access_token;
+  const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
+  if (accessToken) {
+    localStorage.setItem('invify_token', accessToken);
+    localStorage.setItem('invify_access_token', accessToken);
+    localStorage.setItem('supabase_token', accessToken);
+  }
+  if (refreshToken) {
+    localStorage.setItem('invify_refresh_token', refreshToken);
   }
   const user = tokenData.user || {};
   if (user.id) localStorage.setItem('operator_userId', user.id);
@@ -78,6 +131,23 @@ export function persistAuthenticatedSession(tokenData = {}) {
   if (user.role) localStorage.setItem('operator_role', String(user.role).toUpperCase());
   if (user.tenantId) localStorage.setItem('tenant_id', user.tenantId);
   localStorage.setItem('mfa_status_verified', 'true');
+  clearMfaChallengeState();
+  try {
+    localStorage.setItem('invify_last_activity_at', String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearMfaChallengeState() {
+  if (typeof sessionStorage === 'undefined') return;
+  for (const key of SESSION_STORAGE_TRANSIENT_KEYS) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function clearAuthenticatedSession() {
@@ -151,18 +221,17 @@ export async function logoutAuthenticatedSession(api, { redirect = true } = {}) 
   refreshInFlight = null;
 
   if (api && (refreshToken || accessToken)) {
-    try {
-      await api.post(
+    void api
+      .post(
         '/api/auth/logout',
         refreshToken ? { refreshToken } : {},
         {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           _invifySkipRefresh: true,
+          timeout: 2000,
         },
-      );
-    } catch {
-      /* local clear still proceeds */
-    }
+      )
+      .catch(() => {});
   }
 
   clearAuthenticatedSession();
@@ -170,6 +239,37 @@ export async function logoutAuthenticatedSession(api, { redirect = true } = {}) 
   if (redirect && typeof window !== 'undefined' && window.location) {
     window.location.href = resolveLoginPath();
   }
+}
+
+const ROLE_READONLY_NOTICE =
+  'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.';
+
+/**
+ * A 403 is not automatically a role read-only flag.
+ * Health grant denials carry error.code and error.message; those stay visible.
+ * The generic read-only sentence is only for a 403 body that does not explain itself.
+ */
+export function restrictedAccessNotice(data) {
+  const error = data?.error;
+  const errorCode = typeof error === 'string' && /^[A-Z0-9_]+$/.test(error) ? error : '';
+  const errorText = typeof error === 'string' && !errorCode ? error : '';
+  const code = String(
+    (error && typeof error === 'object' && error.code) ||
+      data?.code ||
+      errorCode ||
+      '',
+  );
+  const message = String(
+    (error && typeof error === 'object' && error.message) ||
+      errorText ||
+      (typeof data?.message === 'string' ? data.message : '') ||
+      '',
+  ).trim();
+  const mfaStepUp = /^(INVALID_MFA|MFA_REQUIRED|MFA_NOT_ENABLED|PROFILE_NOT_PROVISIONED)$/.test(code);
+  if (mfaStepUp) return '';
+  if (message) return message;
+  if (code) return `Access denied (${code}).`;
+  return ROLE_READONLY_NOTICE;
 }
 
 export function attachSessionInterceptors(api, { Notify, loginPathForContext } = {}) {
@@ -180,11 +280,11 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
       const original = error.config || {};
 
       if (status === 403) {
-        if (Notify) {
+        const notice = restrictedAccessNotice(error.response?.data);
+        if (Notify && notice) {
           Notify.create({
             type: 'warning',
-            message:
-              'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.',
+            message: notice,
             position: 'top-right',
             timeout: 4000,
             icon: 'lock',
@@ -197,17 +297,25 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
         return Promise.reject(error);
       }
 
+      // Login succeeded but MFA is still pending — no access token yet.
+      // A 401 from runtime/config must not wipe the MFA challenge.
+      if (isMfaChallengePending() && !readAccessToken()) {
+        return Promise.reject(error);
+      }
+
       if (original._invifySkipRefresh || isAuthSessionUrl(original.url)) {
         return Promise.reject(error);
       }
 
+      const keepSession = isSoftSessionFailureUrl(original.url);
+
       if (original._invifyRetry) {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
 
       if (!usableRefreshToken(readRefreshToken())) {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
 
@@ -218,7 +326,7 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
         original.headers.Authorization = `Bearer ${readAccessToken()}`;
         return api.request(original);
       } catch {
-        failClosedLogout({ Notify, loginPathForContext });
+        if (!keepSession) failClosedLogout({ Notify, loginPathForContext });
         return Promise.reject(error);
       }
     },

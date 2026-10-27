@@ -36,6 +36,10 @@ part 'app_database.g.dart';
   AcademicYears,
   Terms,
   Classes,
+  Parents,
+  ParentVirtualAccounts,
+  ParentPayments,
+  ParentPaymentAllocations,
   Students,
   BusinessSettings,
   Subjects,
@@ -53,6 +57,8 @@ part 'app_database.g.dart';
   ServiceMaterialCategories,
   ServiceLaborPresets,
   ServiceExpenseCategories,
+  ServiceDescriptionFormatCategories,
+  ServiceDescriptionFormatFields,
   CurriculumMap,
   LessonNotes,
   OutboxTable
@@ -62,7 +68,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 86;
+  int get schemaVersion => 100;
 
   @override
   MigrationStrategy get migration {
@@ -440,6 +446,61 @@ class AppDatabase extends _$AppDatabase {
         if (from < 86) {
           // Schema V86: Staff personal bank code for salary payouts
           await _safeAddColumn(m, staff, staff.bankCode);
+        }
+        if (from < 87) {
+          await _safeAddColumn(m, stockIncrements, stockIncrements.supplierName);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.receiptNumber);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.trackingNumber);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.receiptImage);
+        }
+        if (from < 88) {
+          await _safeAddColumn(m, serviceMaterials, serviceMaterials.image);
+        }
+        if (from < 89) {
+          await _safeAddColumn(m, settings, settings.servicesMaterialsEnabled);
+          await _safeAddColumn(m, settings, settings.servicesLaborEnabled);
+        }
+        if (from < 90) {
+          await _safeCreateTable(m, serviceDescriptionFormatCategories);
+          await _safeCreateTable(m, serviceDescriptionFormatFields);
+        }
+        if (from < 91) {
+          await _safeAddColumn(m, settings, settings.servicesDescriptionFormatEnabled);
+        }
+        if (from < 92) {
+          await _safeAddColumn(m, students, students.middleName);
+        }
+        if (from < 93) {
+          await _safeAddColumn(m, subjects, subjects.classIds);
+        }
+        if (from < 94) {
+          await _safeAddColumn(m, subjects, subjects.teacherIds);
+          await customStatement(
+            "UPDATE subjects SET teacher_ids = CAST(teacher_id AS TEXT) "
+            "WHERE teacher_id IS NOT NULL AND (teacher_ids IS NULL OR teacher_ids = '')",
+          );
+        }
+        if (from < 95) {
+          await _safeCreateTable(m, parents);
+          await _safeCreateTable(m, parentVirtualAccounts);
+          await _safeCreateTable(m, parentPayments);
+          await _safeCreateTable(m, parentPaymentAllocations);
+          await _safeAddColumn(m, students, students.parentId);
+        }
+        if (from < 96) {
+          await _safeAddColumn(m, settings, settings.parentPaymentShareMode);
+        }
+        if (from < 97) {
+          await _safeAddColumn(m, parents, parents.address);
+        }
+        if (from < 98) {
+          await _safeAddColumn(m, students, students.enrollmentStatus);
+        }
+        if (from < 99) {
+          await _safeAddColumn(m, settings, settings.hiddenDashboardIcons);
+        }
+        if (from < 100) {
+          await _safeAddColumn(m, students, students.notes);
         }
       },
       beforeOpen: (details) async {

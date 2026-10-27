@@ -8,10 +8,18 @@ import '../../domain/entities/stock_return.dart';
 import '../../../stock/domain/entities/item.dart';
 import '../../domain/repositories/invoice_repository.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/invoice_payment_legs.dart';
+import 'package:involve_app/core/sync/domain/services/finance_command_lifecycle.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_ack.dart';
+import 'package:involve_app/features/invoicing/domain/services/local_payment_apply.dart';
+import 'package:involve_app/features/invoicing/domain/services/parent_wallet_payment.dart';
+import 'package:involve_app/features/invoicing/domain/services/payment_balance_effect.dart';
 
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 import 'package:involve_app/core/sync/domain/services/outbox_publisher.dart';
+import 'package:involve_app/core/sync/domain/services/finance_command_id.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
@@ -50,25 +58,91 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     await db.transaction(() async {
       String? finalCustomerId = invoice.customerId;
 
-      // Wallet/credit payments require sufficient customer credit before save.
-      // Convention: balance < 0 means credit available (= -balance).
+      // Wallet/credit payments require sufficient credit before save.
+      // School roster invoices debit parent (or student) creditBalance.
+      // Retail/services: customers.balance < 0 means credit available (= -balance).
       if (invoice.paymentMethod == 'Wallet') {
-        if (finalCustomerId == null || finalCustomerId.isEmpty) {
-          throw Exception(
-              'Customer Wallet payment requires a selected customer.');
-        }
-        final customer = await (db.select(db.customers)
-              ..where((t) => t.id.equals(finalCustomerId!)))
-            .getSingleOrNull();
-        if (customer == null) {
-          throw Exception('Selected customer was not found.');
-        }
-        final availableCredit =
-            customer.balance < 0 ? -customer.balance : 0.0;
-        if (availableCredit + 1e-9 < invoice.totalAmount) {
-          throw Exception(
-              'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
-              'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+        if (invoice.studentId != null) {
+          final student = await (db.select(db.students)
+                ..where((t) => t.id.equals(invoice.studentId!)))
+              .getSingleOrNull();
+          if (student == null) {
+            throw Exception('Selected student was not found.');
+          }
+          String phoneKey(String? raw) {
+            final d = (raw ?? '').replaceAll(RegExp(r'\D'), '');
+            if (d.length >= 10) return d.substring(d.length - 10);
+            return d;
+          }
+          var parentRow;
+          if (student.parentId != null) {
+            parentRow = await (db.select(db.parents)
+                  ..where((t) => t.id.equals(student.parentId!)))
+                .getSingleOrNull();
+          }
+          if (parentRow == null) {
+            final key = phoneKey(student.parentPhone);
+            if (key.length >= 10) {
+              final parents = await db.select(db.parents).get();
+              for (final p in parents) {
+                if (!p.isDeleted && phoneKey(p.phone) == key) {
+                  parentRow = p;
+                  break;
+                }
+              }
+            }
+          }
+          if (parentRow != null) {
+            if (invoice.invoiceNumber.startsWith('PMT-')) {
+              // Payment slips must not take parent credit; funding already credited the wallet.
+            } else {
+            final available = parentRow.creditBalance;
+            if (available + 1e-9 < invoice.totalAmount) {
+              throw Exception(
+                  'Insufficient parent wallet credit. Available: ₦${available.toStringAsFixed(2)}, '
+                  'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+            }
+            await (db.update(db.parents)..where((t) => t.id.equals(parentRow!.id)))
+                .write(ParentsCompanion(
+              creditBalance: Value(
+                CurrencyFormatter.roundMoney(available - invoice.totalAmount),
+              ),
+              updatedAt: Value(now),
+            ));
+            }
+          } else if (!invoice.invoiceNumber.startsWith('PMT-')) {
+            final available = student.creditBalance;
+            if (available + 1e-9 < invoice.totalAmount) {
+              throw Exception(
+                  'Insufficient student credit. Available: ₦${available.toStringAsFixed(2)}, '
+                  'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+            }
+            await (db.update(db.students)..where((t) => t.id.equals(student.id)))
+                .write(StudentsCompanion(
+              creditBalance: Value(
+                CurrencyFormatter.roundMoney(available - invoice.totalAmount),
+              ),
+              updatedAt: Value(now),
+            ));
+          }
+        } else {
+          if (finalCustomerId == null || finalCustomerId.isEmpty) {
+            throw Exception(
+                'Customer Wallet payment requires a selected customer.');
+          }
+          final customer = await (db.select(db.customers)
+                ..where((t) => t.id.equals(finalCustomerId!)))
+              .getSingleOrNull();
+          if (customer == null) {
+            throw Exception('Selected customer was not found.');
+          }
+          final availableCredit =
+              customer.balance < 0 ? -customer.balance : 0.0;
+          if (availableCredit + 1e-9 < invoice.totalAmount) {
+            throw Exception(
+                'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
+                'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+          }
         }
       }
 
@@ -89,6 +163,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       var amountPaid = invoice.amountPaid;
       var balanceAmount = invoice.balanceAmount;
       var paymentMethod = invoice.paymentMethod;
+      String? parentWalletCommandId;
       final unpaidBeforeWalletApply = balanceAmount;
 
       // Pay Later / partial cash: auto-apply existing wallet credit onto the invoice
@@ -117,6 +192,34 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             paymentMethod = '$method + Wallet';
           }
         }
+      }
+
+      if (isSchoolParentWalletPayment(
+            paymentMethod,
+            businessMode: invoice.businessMode,
+            studentId: invoice.studentId,
+          ) &&
+          !invoice.invoiceNumber.startsWith('PMT-') &&
+          (amountPaid > 1e-9 || invoice.totalAmount > 1e-9)) {
+        parentWalletCommandId = financeCommandId(
+          action: 'invoice_pay',
+          entityId: invoiceSyncId,
+          part: 'create',
+        );
+        paymentStatus = 'Pending';
+        amountPaid = 0;
+        balanceAmount = invoice.totalAmount;
+        paymentMethod = encodePaymentLegs([
+          InvoicePaymentLeg(
+            amount: invoice.totalAmount,
+            method: (invoice.paymentMethod ?? 'Wallet').trim().isEmpty
+                ? 'Wallet'
+                : invoice.paymentMethod!,
+            confirmed: false,
+            receivedAt: now,
+            commandId: parentWalletCommandId,
+          ),
+        ]);
       }
 
       final invoiceId = await db.into(db.invoices).insert(
@@ -219,16 +322,14 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       if (invoice.studentId != null && !invoice.invoiceNumber.startsWith('PMT-')) {
         final carryForwardAmount = _carryForwardAmountFromItems(invoice.items);
         if (carryForwardAmount > 0.001) {
-          final settleMethod = amountPaid > 0.001
-              ? (paymentMethod ?? invoice.paymentMethod ?? 'Cash')
-              : 'Rolled Forward';
           await _applyAmountToOpenStudentBills(
             studentId: invoice.studentId!,
             amount: carryForwardAmount,
             excludeInvoiceNumber: invoice.invoiceNumber,
             onlyBefore: invoice.dateCreated,
-            paymentMethod: settleMethod,
+            paymentMethod: 'Rolled Forward',
             now: now,
+            countAsCollection: false,
           );
         }
       }
@@ -238,16 +339,16 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         final double balanceChange;
         
         if (invoice.invoiceNumber.startsWith('PMT-')) {
-          // It's a payment receipt - REDUCE the debt
-          balanceChange = -invoice.amountPaid;
-          print('DEBUG: Payment Receipt detected (${invoice.invoiceNumber}). Reducing balance by: ${invoice.amountPaid}');
+          // Confirmed receipts reduce debt. Pending transfers do not.
+          balanceChange = -invoice.collectedAmount;
+          print('DEBUG: Payment Receipt detected (${invoice.invoiceNumber}). Reducing balance by: ${invoice.collectedAmount}');
         } else {
-          // It's a bill (charge) - INCREASE the debt
-          // Calculate the increment: Balance Amount - Carry Forward amounts
-          // We do this because the UI adds the old balance as a line item ("Previous Term Balance").
-          // If we simply add invoice.balanceAmount to student.balance, we double the debt.
+          // Pending/unconfirmed checkouts still increase open debt.
           final carryForwardAmount = _carryForwardAmountFromItems(invoice.items);
-          balanceChange = balanceAmount - carryForwardAmount;
+          final owing = parentWalletCommandId != null
+              ? CurrencyFormatter.roundMoney(invoice.totalAmount)
+              : invoice.outstandingAmount;
+          balanceChange = owing - carryForwardAmount;
           print('DEBUG: Bill detected (${invoice.invoiceNumber}). Found Carry Forward: $carryForwardAmount. Final increment: $balanceChange');
         }
         
@@ -263,7 +364,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       }
 
       // 4. Update Customer Balance if customer is associated with invoice
-      if (finalCustomerId != null) {
+      // School Wallet already debited parents/students.credit_balance above.
+      if (finalCustomerId != null &&
+          !(invoice.paymentMethod == 'Wallet' && invoice.studentId != null)) {
         final double balanceChange;
         
         if (invoice.invoiceNumber.startsWith('PMT-')) {
@@ -290,33 +393,28 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         );
       }
 
-      final isOnlineInvoiceEnabled = await StorageService.isOnlineInvoiceUpdateEnabled();
-      if (outboxPublisher != null && isOnlineInvoiceEnabled) {
-        await outboxPublisher!.publish<Invoice>(
-          db: db, // This passes the transaction context through
-          eventName: 'invoice.created',
-          aggregateType: 'invoice',
-          aggregateId: invoice.syncId ?? invoiceSyncId,
-          payload: invoice,
-          serializer: (inv) => {
-            'invoiceNumber': inv.invoiceNumber,
-            'dateCreated': inv.dateCreated.toIso8601String(),
-            'subtotal': inv.subtotal,
-            'taxAmount': inv.taxAmount,
-            'totalAmount': inv.totalAmount,
-            'paymentStatus': inv.paymentStatus,
-            'amountPaid': inv.amountPaid,
-            'balanceAmount': inv.balanceAmount,
-            'customerName': inv.customerName,
-            'customerId': finalCustomerId, // use final evaluated id
-            'syncId': inv.syncId ?? invoiceSyncId,
-            'items': inv.items.map((i) => {
-              'productSyncId': i.item.syncId,
-              'quantity': i.quantity,
-              'unitPrice': i.unitPrice,
-              'type': i.type,
-              'invoiceItemSyncId': i.syncId,
-            }).toList(),
+      await _publishInvoiceToOutbox(
+        eventName: 'invoice.created',
+        invoice: invoice,
+        syncId: invoice.syncId ?? invoiceSyncId,
+        customerId: finalCustomerId,
+        paymentStatus: paymentStatus,
+        amountPaid: amountPaid,
+        balanceAmount: balanceAmount,
+        paymentMethod: paymentMethod,
+      );
+
+      if (parentWalletCommandId != null) {
+        await enqueueFinanceCommand(
+          eventName: 'finance.invoice_pay',
+          commandId: parentWalletCommandId,
+          payload: {
+            'invoiceId': invoice.syncId ?? invoiceSyncId,
+            'amount': invoice.totalAmount,
+            'paymentMethod': invoice.paymentMethod ?? 'Wallet',
+            'businessMode': invoice.businessMode ?? 'school',
+            'studentId': invoice.studentId,
+            'confirmed': false,
           },
         );
       }
@@ -339,21 +437,36 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         paymentMethod: Value(invoice.paymentMethod),
         updatedAt: Value(now),
       ));
+
+      await _publishInvoiceToOutbox(
+        eventName: 'invoice.updated',
+        invoice: invoice,
+        syncId: invoice.syncId,
+      );
     });
   }
 
   @override
   Future<List<Invoice>> getAllInvoices() async {
-    return _getInvoicesWithItems(db.select(db.invoices)
+    final regularInvoices = await _getInvoicesWithItems(db.select(db.invoices)
       ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
+    final serviceInvoices = await _getServiceJobsAsInvoices();
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
   }
 
   @override
   Future<Invoice?> getInvoiceById(int id) async {
     final query = db.select(db.invoices)..where((t) => t.id.equals(id));
     final results = await _getInvoicesWithItems(query);
-    if (results.isEmpty) return null;
-    return results.first;
+    if (results.isNotEmpty) return results.first;
+
+    final serviceInvoices = await _getServiceJobsAsInvoices();
+    final match = serviceInvoices.where((inv) => inv.id == id);
+    if (match.isNotEmpty) return match.first;
+
+    return null;
   }
 
   @override
@@ -366,10 +479,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end) async {
-    final query = db.select(db.invoices)
+    final regularInvoices = await _getInvoicesWithItems(db.select(db.invoices)
       ..where((t) => t.dateCreated.isBetweenValues(start, end))
-      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
-    return _getInvoicesWithItems(query);
+      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
+    final serviceInvoices = await _getServiceJobsAsInvoices(start: start, end: end);
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
   }
 
   @override
@@ -380,11 +496,19 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       ..where(db.invoices.isDeleted.equals(false));
     
     final rows = await query.get();
-    return rows
+    final names = rows
         .map((r) => r.read(db.invoices.customerName)!)
         .where((name) => name.trim().isNotEmpty)
-        .toList()
-      ..sort();
+        .toSet();
+
+    try {
+      final customers = await db.select(db.customers).get();
+      for (final c in customers) {
+        if (c.name.trim().isNotEmpty) names.add(c.name.trim());
+      }
+    } catch (_) {}
+
+    return names.toList()..sort();
   }
 
   @override
@@ -398,7 +522,123 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     
     query.orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
     
-    return _getInvoicesWithItems(query);
+    final regularInvoices = await _getInvoicesWithItems(query);
+    final serviceInvoices = await _getServiceJobsAsInvoices(start: start, end: end, customerName: customerName);
+    final combined = [...regularInvoices, ...serviceInvoices]
+      ..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    return combined;
+  }
+
+  Future<List<Invoice>> _getServiceJobsAsInvoices({
+    DateTime? start,
+    DateTime? end,
+    String? customerName,
+  }) async {
+    try {
+      final query = db.select(db.serviceJobs);
+      if (start != null && end != null) {
+        query.where((t) => t.createdAt.isBetweenValues(start, end));
+      }
+      final jobs = await (query..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)])).get();
+
+      if (jobs.isEmpty) return [];
+
+      final customers = await db.select(db.customers).get();
+      final customerMap = {for (var c in customers) c.id: c.name};
+
+      final List<Invoice> result = [];
+
+      for (final job in jobs) {
+        final cName = customerMap[job.customerId] ?? 'Client';
+        if (customerName != null &&
+            customerName.trim().isNotEmpty &&
+            !cName.toLowerCase().contains(customerName.trim().toLowerCase())) {
+          continue;
+        }
+
+        final jobItems = await (db.select(db.serviceJobItems)..where((t) => t.jobId.equals(job.id))).get();
+        final payments = await (db.select(db.servicePayments)
+              ..where((t) => t.jobId.equals(job.id))
+              ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
+            .get();
+        final latestMethod = payments.isNotEmpty ? payments.first.method : (job.amountPaid > 0 ? 'Cash' : null);
+
+        final items = <InvoiceItem>[];
+        if (job.laborAmount > 0) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: 0,
+              name: 'Workmanship / Labor',
+              category: ItemCategory.service,
+              price: job.laborAmount,
+              stockQty: 1,
+              type: 'service',
+            ),
+            quantity: 1,
+            unitPrice: job.laborAmount,
+            type: 'service',
+          ));
+        }
+        for (final it in jobItems) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: it.id,
+              name: it.name,
+              category: ItemCategory.service,
+              price: it.price,
+              stockQty: it.quantity.toInt() > 0 ? it.quantity.toInt() : 1,
+              type: 'service',
+              serviceCategory: it.category,
+            ),
+            quantity: it.quantity.toInt() > 0 ? it.quantity.toInt() : 1,
+            unitPrice: it.price,
+            type: 'service',
+          ));
+        }
+        if (items.isEmpty) {
+          items.add(InvoiceItem(
+            item: Item(
+              id: 0,
+              name: job.title.isNotEmpty ? job.title : 'Service Job',
+              category: ItemCategory.service,
+              price: job.totalAmount,
+              stockQty: 1,
+              type: 'service',
+            ),
+            quantity: 1,
+            unitPrice: job.totalAmount,
+            type: 'service',
+          ));
+        }
+
+        final isPaid = job.balance <= 0;
+        final paymentStatus = isPaid ? 'Paid' : (job.amountPaid > 0 ? 'Partial' : 'Unpaid');
+
+        result.add(Invoice(
+          id: job.id.hashCode.abs(),
+          invoiceNumber: job.jobId,
+          dateCreated: job.createdAt,
+          items: items,
+          subtotal: job.totalAmount,
+          taxAmount: 0.0,
+          discountAmount: 0.0,
+          discountType: DiscountType.amount,
+          totalAmount: job.totalAmount,
+          paymentStatus: paymentStatus,
+          amountPaid: job.amountPaid,
+          balanceAmount: job.balance,
+          customerName: cName,
+          customerId: job.customerId,
+          paymentMethod: latestMethod,
+          businessMode: 'services',
+          warrantyDuration: job.warrantyDuration,
+        ));
+      }
+
+      return result;
+    } catch (_) {
+      return [];
+    }
   }
 
   @override
@@ -460,6 +700,15 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           paymentMethod: Value(newMethod),
           updatedAt: Value(now),
         ),
+      );
+      await _publishInvoiceRowToOutbox(
+        inv.copyWith(
+          amountPaid: newPaid,
+          balanceAmount: newBal,
+          paymentStatus: newStatus,
+          paymentMethod: Value(newMethod),
+        ),
+        eventName: 'invoice.updated',
       );
       hiddenCredit -= apply;
     }
@@ -586,6 +835,11 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         updatedAt: Value(now),
       ),
     );
+    final row = await (db.select(db.invoices)..where((t) => t.id.equals(invoiceId)))
+        .getSingleOrNull();
+    if (row != null) {
+      await _publishInvoiceRowToOutbox(row, eventName: 'invoice.updated');
+    }
   }
 
   /// Line items that represent debt rolled from prior open bills.
@@ -615,6 +869,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     DateTime? onlyBefore,
     required String paymentMethod,
     required DateTime now,
+    bool countAsCollection = true,
   }) async {
     if (amount <= 0.001) return 0.0;
 
@@ -651,27 +906,73 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       final pay = remaining < owing ? remaining : owing;
       if (pay <= 0.001) continue;
 
-      final newPaid = row.amountPaid + pay;
-      final newBalance =
-          (row.totalAmount - newPaid).clamp(0.0, double.infinity);
-      final newStatus = newBalance <= 0.001
-          ? 'Paid'
-          : (newPaid > 0 ? 'Partial' : 'Unpaid');
+      final newPaid = countAsCollection ? row.amountPaid + pay : row.amountPaid;
+      final newBalance = countAsCollection
+          ? (row.totalAmount - newPaid).clamp(0.0, double.infinity)
+          : (owing - pay).clamp(0.0, double.infinity);
+      final newStatus = !countAsCollection && newBalance <= 0.001
+          ? 'Rolled Forward'
+          : (newBalance <= 0.001
+              ? 'Paid'
+              : (newPaid > 0 ? 'Partial' : 'Unpaid'));
 
       await (db.update(db.invoices)..where((t) => t.id.equals(row.id))).write(
         InvoicesCompanion(
           amountPaid: Value(newPaid),
           balanceAmount: Value(newBalance),
           paymentStatus: Value(newStatus),
-          paymentMethod: Value(paymentMethod),
+          paymentMethod: countAsCollection
+              ? Value(paymentMethod)
+              : const Value.absent(),
           updatedAt: Value(now),
         ),
+      );
+      await _publishInvoiceRowToOutbox(
+        row.copyWith(
+          amountPaid: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newStatus,
+          paymentMethod: Value(
+            countAsCollection ? paymentMethod : row.paymentMethod,
+          ),
+        ),
+        eventName: 'invoice.updated',
       );
       remaining -= pay;
       applied += pay;
     }
 
     return applied;
+  }
+
+  @override
+  /// Settle invoices that still say Partial after paid covers the billed total
+  /// at 2 decimal places (tax float leftover of ~₦0.00).
+  Future<bool> healSettledPartialInvoices() async {
+    final rows = await (db.select(db.invoices)
+          ..where((t) => t.paymentStatus.equals('Partial')))
+        .get();
+    var changed = false;
+    final now = DateTime.now();
+    for (final row in rows) {
+      final paid = CurrencyFormatter.roundMoney(row.amountPaid);
+      final total = CurrencyFormatter.roundMoney(row.totalAmount);
+      final balance = CurrencyFormatter.roundMoney(row.balanceAmount);
+      if (paid < total && balance > 0) continue;
+      await (db.update(db.invoices)..where((t) => t.id.equals(row.id))).write(
+        InvoicesCompanion(
+          paymentStatus: const Value('Paid'),
+          balanceAmount: const Value(0.0),
+          updatedAt: Value(now),
+        ),
+      );
+      await _publishInvoiceRowToOutbox(
+        row.copyWith(paymentStatus: 'Paid', balanceAmount: 0.0),
+        eventName: 'invoice.updated',
+      );
+      changed = true;
+    }
+    return changed;
   }
 
   @override
@@ -694,16 +995,14 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       final now = DateTime.now();
       for (final inv in withCarry) {
         final cf = _carryForwardAmountFromItems(inv.items);
-        final settleMethod = inv.amountPaid > 0.001
-            ? (inv.paymentMethod ?? 'Cash')
-            : 'Rolled Forward';
         final applied = await _applyAmountToOpenStudentBills(
           studentId: studentId,
           amount: cf,
           excludeInvoiceNumber: inv.invoiceNumber,
           onlyBefore: inv.dateCreated,
-          paymentMethod: settleMethod,
+          paymentMethod: 'Rolled Forward',
           now: now,
+          countAsCollection: false,
         );
         if (applied > 0.001) changed = true;
       }
@@ -714,38 +1013,69 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   // New method for partial payments
   @override
-  Future<void> recordPayment(int invoiceId, double additionalAmount, String method) async {
+  Future<void> recordPayment(
+    int invoiceId,
+    double additionalAmount,
+    String method, {
+    String? commandId,
+    bool enqueueFinance = true,
+  }) async {
     final now = DateTime.now();
     final invoice = await getInvoiceById(invoiceId);
     if (invoice == null) return;
 
-    final newAmountPaid = invoice.amountPaid + additionalAmount;
-    final newBalance = (invoice.totalAmount - newAmountPaid).clamp(0.0, double.infinity);
-    final String newStatus;
-    
-    if (method == 'Transfer') {
-      newStatus = 'Pending';
-    } else if (newBalance <= 0) {
-      newStatus = 'Paid';
-    } else if (newAmountPaid > 0) {
-      newStatus = 'Partial';
-    } else {
-      newStatus = 'Unpaid';
-    }
+    final invoiceKey = (invoice.syncId ?? '').trim();
+    final paymentCommandId = (commandId != null && commandId.trim().length >= 16)
+        ? commandId.trim()
+        : _uuid.v4();
+
+    final plan = planRecordedPayment(
+      invoice: invoice,
+      additionalAmount: additionalAmount,
+      method: method,
+      commandId: paymentCommandId,
+      now: now,
+    );
+    if (plan.alreadyApplied) return;
 
     await db.transaction(() async {
       await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
         InvoicesCompanion(
-          amountPaid: Value(newAmountPaid),
-          balanceAmount: Value(newBalance),
-          paymentStatus: Value(newStatus),
-          paymentMethod: Value(method),
+          amountPaid: Value(plan.amountPaid),
+          balanceAmount: Value(plan.balance),
+          paymentStatus: Value(plan.status),
+          paymentMethod: Value(plan.storedMethod),
           updatedAt: Value(now),
         ),
       );
 
-      // Propagate balance update to student master balance
-      if (invoice.studentId != null) {
+      await _publishInvoiceToOutbox(
+        eventName: 'invoice.updated',
+        invoice: invoice.copyWith(
+          amountPaid: plan.amountPaid,
+          balanceAmount: plan.balance,
+          paymentStatus: plan.status,
+          paymentMethod: plan.storedMethod,
+        ),
+        syncId: invoice.syncId,
+      );
+
+      if (enqueueFinance && invoiceKey.isNotEmpty && paymentCommandId != null) {
+        await enqueueFinanceCommand(
+          eventName: 'finance.invoice_pay',
+          commandId: paymentCommandId,
+          payload: {
+            'invoiceId': invoiceKey,
+            'amount': additionalAmount,
+            'paymentMethod': method,
+            'businessMode': invoice.businessMode,
+            'studentId': invoice.studentId,
+            'confirmed': plan.reduceOpenBalances,
+          },
+        );
+      }
+
+      if (plan.reduceOpenBalances && invoice.studentId != null) {
         await db.customUpdate(
           'UPDATE students SET balance = balance - ?, updated_at = ? WHERE id = ?',
           variables: [
@@ -757,8 +1087,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         );
       }
 
-      // Propagate balance update to customer master balance
-      if (invoice.customerId != null) {
+      if (plan.reduceOpenBalances && invoice.customerId != null) {
         await db.customUpdate(
           'UPDATE customers SET balance = balance - ? WHERE id = ?',
           variables: [
@@ -769,6 +1098,104 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         );
       }
     });
+  }
+
+  @override
+  Future<void> confirmFinanceCommand(String commandId) async {
+    final id = commandId.trim();
+    if (id.length < 16) return;
+    final now = DateTime.now();
+    final rows = await db.select(db.invoices).get();
+    for (final row in rows) {
+      final rawMethod = row.paymentMethod ?? '';
+      if (!rawMethod.contains(id)) continue;
+      final invoice = Invoice(
+        id: row.id,
+        invoiceNumber: row.invoiceNumber,
+        dateCreated: row.dateCreated,
+        items: const [],
+        subtotal: row.subtotal,
+        taxAmount: row.taxAmount,
+        discountAmount: row.discountAmount,
+        totalAmount: row.totalAmount,
+        paymentStatus: row.paymentStatus,
+        amountPaid: row.amountPaid,
+        balanceAmount: row.balanceAmount,
+        paymentMethod: rawMethod,
+        studentId: row.studentId,
+        customerId: row.customerId,
+        businessMode: row.businessMode,
+        syncId: row.syncId,
+      );
+      final legs = displayPaymentLegs(invoice);
+      if (legs.isEmpty) continue;
+      var newlyConfirmed = 0.0;
+      final next = <InvoicePaymentLeg>[];
+      for (final leg in legs) {
+        if (!leg.confirmed && leg.commandId == id) {
+          newlyConfirmed += leg.amount;
+          next.add(InvoicePaymentLeg(
+            amount: leg.amount,
+            method: leg.method,
+            confirmed: true,
+            receivedAt: leg.receivedAt,
+            commandId: leg.commandId,
+          ));
+        } else {
+          next.add(leg);
+        }
+      }
+      if (newlyConfirmed <= 0) continue;
+      final confirmedPaid = next
+          .where((leg) => leg.confirmed)
+          .fold<double>(0, (sum, leg) => sum + leg.amount);
+      final paid = CurrencyFormatter.roundMoney(confirmedPaid);
+      final balance = CurrencyFormatter.roundMoney(
+        (row.totalAmount - paid).clamp(0.0, double.infinity),
+      );
+      final status = balance <= 0
+          ? 'Paid'
+          : (paid > 0 ? 'Partial' : 'Unpaid');
+      await (db.update(db.invoices)..where((t) => t.id.equals(row.id))).write(
+        InvoicesCompanion(
+          amountPaid: Value(paid),
+          balanceAmount: Value(balance),
+          paymentStatus: Value(status),
+          paymentMethod: Value(encodePaymentLegs(next)),
+          updatedAt: Value(now),
+        ),
+      );
+      if (row.studentId != null) {
+        await db.customUpdate(
+          'UPDATE students SET balance = balance - ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(newlyConfirmed),
+            Variable.withDateTime(now),
+            Variable.withInt(row.studentId!),
+          ],
+          updates: {db.students},
+        );
+      }
+    }
+  }
+
+  @override
+  Future<void> markFinanceCommandUnconfirmed(String commandId) async {
+    // Keep pending legs and confirmed totals unchanged. Unrelated invoices
+    // are not reversed; recovery waits for authoritative server state.
+  }
+
+  Future<void> applyFinanceAck({
+    required String commandId,
+    required String? ack,
+  }) async {
+    final lifecycle = financeCommandLifecycleForAck(ack);
+    if (financeAckConfirmsLocally(lifecycle) ||
+        outboxStatusForAck(ack) == 'COMPLETED') {
+      await confirmFinanceCommand(commandId);
+      return;
+    }
+    await markFinanceCommandUnconfirmed(commandId);
   }
 
   @override
@@ -897,6 +1324,15 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           updatedAt: Value(now),
         ),
       );
+      await _publishInvoiceRowToOutbox(
+        invoiceRow.copyWith(
+          totalAmount: newTotal,
+          amountPaid: newAmountPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newStatus,
+        ),
+        eventName: 'invoice.updated',
+      );
 
       // Propagate balance update to student master balance
       if (invoiceRow.studentId != null) {
@@ -963,5 +1399,149 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       dateReturned: row.dateReturned,
       syncId: row.syncId,
     )).toList();
+  }
+
+  Future<void> _publishInvoiceToOutbox({
+    required String eventName,
+    required Invoice invoice,
+    String? syncId,
+    String? customerId,
+    String? paymentStatus,
+    double? amountPaid,
+    double? balanceAmount,
+    String? paymentMethod,
+  }) async {
+    final id = (syncId ?? invoice.syncId)?.trim();
+    if (id == null || id.isEmpty) return;
+    if (outboxPublisher == null) return;
+    try {
+      final enabled = await StorageService.isOnlineInvoiceUpdateEnabled();
+      if (!enabled) return;
+    } catch (_) {
+      // Unit tests have no path_provider plugin; still keep finance outbox writes.
+    }
+
+    await outboxPublisher!.publish<Invoice>(
+      db: db,
+      eventName: eventName,
+      aggregateType: 'invoice',
+      aggregateId: id,
+      payload: invoice,
+      serializer: (inv) => _serializeInvoiceForCloud(
+        inv,
+        syncId: id,
+        customerId: customerId ?? inv.customerId,
+        paymentStatus: paymentStatus ?? inv.paymentStatus,
+        amountPaid: amountPaid ?? inv.amountPaid,
+        balanceAmount: balanceAmount ?? inv.balanceAmount,
+        paymentMethod: paymentMethod ?? inv.paymentMethod,
+      ),
+    );
+  }
+
+  @override
+  Future<void> enqueueFinanceCommand({
+    required String eventName,
+    required String commandId,
+    required Map<String, dynamic> payload,
+  }) async {
+    if (outboxPublisher == null) return;
+    if (commandId.trim().length < 16 || RegExp(r'^\d+$').hasMatch(commandId.trim())) {
+      return;
+    }
+    await outboxPublisher!.publish<Map<String, dynamic>>(
+      db: db,
+      eventName: eventName,
+      aggregateType: 'finance_command',
+      aggregateId: commandId,
+      payload: {...payload, 'commandId': commandId},
+      serializer: (row) => row,
+      idempotencyKey: commandId,
+      commandId: commandId,
+    );
+  }
+
+  Future<void> _publishInvoiceRowToOutbox(
+    InvoiceTable row, {
+    required String eventName,
+  }) async {
+    final id = row.syncId?.trim();
+    if (id == null || id.isEmpty) return;
+    final enabled = await StorageService.isOnlineInvoiceUpdateEnabled();
+    if (outboxPublisher == null || !enabled) return;
+
+    await outboxPublisher!.publish<InvoiceTable>(
+      db: db,
+      eventName: eventName,
+      aggregateType: 'invoice',
+      aggregateId: id,
+      payload: row,
+      serializer: (inv) => {
+        'invoiceNumber': inv.invoiceNumber,
+        'dateCreated': inv.dateCreated.toIso8601String(),
+        'subtotal': inv.subtotal,
+        'taxAmount': inv.taxAmount,
+        'discountAmount': inv.discountAmount,
+        'totalAmount': inv.totalAmount,
+        'paymentStatus': inv.paymentStatus,
+        'amountPaid': inv.amountPaid,
+        'balanceAmount': inv.balanceAmount,
+        'paymentMethod': inv.paymentMethod,
+        'customerName': inv.customerName,
+        'customerId': inv.customerId,
+        'customerAddress': inv.customerAddress,
+        'staffName': inv.staffName,
+        'syncId': id,
+        'admissionNumber': inv.admissionNumber,
+        'className': inv.className,
+        'termName': inv.termName,
+        'academicYearName': inv.academicYearName,
+        'businessMode': inv.businessMode,
+      },
+    );
+  }
+
+  Map<String, dynamic> _serializeInvoiceForCloud(
+    Invoice inv, {
+    required String syncId,
+    String? customerId,
+    required String paymentStatus,
+    required double amountPaid,
+    required double balanceAmount,
+    String? paymentMethod,
+  }) {
+    return {
+      'invoiceNumber': inv.invoiceNumber,
+      'dateCreated': inv.dateCreated.toIso8601String(),
+      'subtotal': inv.subtotal,
+      'taxAmount': inv.taxAmount,
+      'discountAmount': inv.discountAmount,
+      'totalAmount': inv.totalAmount,
+      'paymentStatus': paymentStatus,
+      'amountPaid': amountPaid,
+      'balanceAmount': balanceAmount,
+      'paymentMethod': paymentMethod,
+      'customerName': inv.customerName,
+      'customerId': customerId,
+      'customerAddress': inv.customerAddress,
+      'staffName': inv.staffName,
+      'syncId': syncId,
+      'studentId': inv.studentId,
+      'classId': inv.classId,
+      'admissionNumber': inv.admissionNumber,
+      'className': inv.className,
+      'termName': inv.termName,
+      'academicYearName': inv.academicYearName,
+      'businessMode': inv.businessMode,
+      'items': inv.items
+          .map((i) => {
+                'productSyncId': i.item.syncId,
+                'quantity': i.quantity,
+                'unitPrice': i.unitPrice,
+                'type': i.type,
+                'invoiceItemSyncId': i.syncId,
+              })
+          .toList(),
+    };
   }
 }

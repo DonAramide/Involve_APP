@@ -1,5 +1,6 @@
 // src/middleware/rbac.middleware.ts
 import { Request, Response, NextFunction } from 'express';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 const parseRoles = (roleData: any): string[] => {
   if (typeof roleData === 'string') {
@@ -65,21 +66,21 @@ export const checkRole = (allowedRoles: string[]) => {
       
       if (userRoles.includes('admin_executive')) {
         // admin_executive has privilege "Board View, Export Reports"
-        if (path.startsWith('/admin/dashboard-stats') || path.startsWith('/admin/analytics') || path.startsWith('/api/finance/executive-summary')) {
+        if (path.startsWith('/admin/dashboard-stats') || path.startsWith('/admin/analytics') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard')) {
           return next();
         }
       }
       
       if (userRoles.includes('admin_finance')) {
         // admin_finance has privilege "Read/Write Ledgers"
-        if (path.startsWith('/admin/ledger') || path.startsWith('/admin/payments') || path.startsWith('/api/reconciliation') || path.startsWith('/api/finance/executive-summary')) {
+        if (path.startsWith('/admin/ledger') || path.startsWith('/admin/payments') || path.includes('tenant-payables') || path.includes('virtual-accounts') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit')) {
           return next();
         }
       }
 
       if (userRoles.includes('admin_treasury')) {
         // admin_treasury has privilege "Batch Payouts, Wallet Adjustments"
-        if (path.startsWith('/wallet') || path.startsWith('/api/payout') || path.startsWith('/api/finance/executive-summary')) {
+        if (path.startsWith('/wallet') || path.startsWith('/api/payout') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/school') || path.startsWith('/school') || path.includes('card-settlement') || path.startsWith('/api/dashboard') || path.startsWith('/dashboard') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit') || isAdminSurface('/admin/inventory')) {
           return next();
         }
       }
@@ -100,33 +101,12 @@ export const checkRole = (allowedRoles: string[]) => {
  * Tenant Admin/Staff can only access their specific tenant.
  */
 export const checkTenantAccess = (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as any).user;
-  
-  if (!user) return res.status(401).json({ error: 'Unauthenticated' });
-
-  const userRoles = parseRoles(user.role);
-
-  // 1. Super Admin Bypass
-  if (userRoles.includes('super_admin')) {
+  try {
+    (req as any).effectiveTenantId = resolveAuthoritativeTenantId(req);
     return next();
+  } catch (err: any) {
+    return res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
   }
-
-  // 2. Extract TenantId from Request (Check Params first, then Query, then Body)
-  const targetTenantId = req.params.tenantId || req.query.tenantId || req.body.tenantId;
-
-  if (!targetTenantId) {
-    // If no specific tenant is targetted, default to the user's tenant context
-    (req as any).effectiveTenantId = user.tenantId;
-    return next();
-  }
-
-  // 3. Strict Comparison
-  if (user.tenantId !== targetTenantId) {
-    return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
-  }
-
-  (req as any).effectiveTenantId = user.tenantId;
-  next();
 };
 
 /**
@@ -170,5 +150,40 @@ export const checkTenantPermission = (requiredPermission: string) => {
     }
 
     next();
+  };
+};
+
+const BILLING_PERMISSION_ROLES: Record<string, string[]> = {
+  'billing.view': ['super_admin', 'admin_finance', 'admin_treasury', 'admin_executive'],
+  'billing.create_obligation': ['super_admin', 'admin_finance'],
+  'billing.post_payment': ['super_admin', 'admin_finance'],
+  'billing.reverse_payment': ['super_admin'],
+  'billing.manage_plan': ['super_admin', 'admin_finance'],
+  'billing.manage_subscription': ['super_admin', 'admin_finance'],
+  'billing.export': ['super_admin', 'admin_finance', 'admin_executive'],
+};
+
+/** Platform Tenant Billing & Collections. Tenant operators never pass. */
+export const checkBillingPermission = (requiredPermission: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json({ error: 'Unauthenticated' });
+    const userRoles = parseRoles(user.role);
+    if (
+      userRoles.includes('owner') ||
+      userRoles.includes('tenant_admin') ||
+      userRoles.includes('tenant_operator') ||
+      userRoles.includes('cashier') ||
+      userRoles.includes('finance_staff') ||
+      userRoles.includes('teacher')
+    ) {
+      return res.status(403).json({ error: 'Forbidden: tenant isolation — billing collections is platform-only' });
+    }
+    if (userRoles.includes('super_admin')) return next();
+    const allowed = BILLING_PERMISSION_ROLES[requiredPermission] || [];
+    if (userRoles.some((r) => allowed.includes(r))) return next();
+    const explicit: string[] = user.permissions || [];
+    if (explicit.includes(requiredPermission)) return next();
+    return res.status(403).json({ error: `Forbidden: Missing required permission: ${requiredPermission}` });
   };
 };

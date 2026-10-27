@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
+import '../widgets/parent_payment_share_mode_picker.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import 'manage_grading_rules_page.dart';
@@ -17,7 +20,7 @@ class SchoolSetupPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Academic Setup'),
@@ -34,10 +37,12 @@ class SchoolSetupPage extends StatelessWidget {
             ),
           ],
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Years', icon: Icon(Icons.calendar_today)),
               Tab(text: 'Terms', icon: Icon(Icons.segment)),
               Tab(text: 'Classes', icon: Icon(Icons.class_)),
+              Tab(text: 'Payment Plan', icon: Icon(Icons.payments_outlined)),
             ],
           ),
         ),
@@ -56,6 +61,7 @@ class SchoolSetupPage extends StatelessWidget {
                   _YearsTab(state: state),
                   _TermsTab(state: state),
                   _ClassesTab(state: state),
+                  const _ParentPaymentShareTab(),
                 ],
               );
             },
@@ -66,21 +72,73 @@ class SchoolSetupPage extends StatelessWidget {
   }
 }
 
+int _compareByName(String a, String b) =>
+    a.toLowerCase().compareTo(b.toLowerCase());
+
+final _academicSessionPattern = RegExp(r'^(\d{4})/(\d{4})$');
+
+String? _validateAcademicSession(String? value) {
+  final text = (value ?? '').trim();
+  if (text.isEmpty) return 'Enter a session like 2026/2027';
+  final match = _academicSessionPattern.firstMatch(text);
+  if (match == null) return 'Use session format YYYY/YYYY, e.g. 2026/2027';
+  final start = int.parse(match.group(1)!);
+  final end = int.parse(match.group(2)!);
+  if (end != start + 1) return 'Second year must be ${start + 1}';
+  if (start < 1990 || start > 2100) return 'Enter a valid session year';
+  return null;
+}
+
+({int start, int end})? _parseAcademicSession(String value) {
+  final match = _academicSessionPattern.firstMatch(value.trim());
+  if (match == null) return null;
+  final start = int.parse(match.group(1)!);
+  final end = int.parse(match.group(2)!);
+  if (end != start + 1) return null;
+  return (start: start, end: end);
+}
+
+class _AcademicSessionFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 8) digits = digits.substring(0, 8);
+
+    final oldDigits = oldValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    String formatted;
+    if (digits.length == 4 && oldDigits.length < 4) {
+      final year = int.tryParse(digits);
+      formatted = year == null ? digits : '$digits/${year + 1}';
+    } else if (digits.length <= 4) {
+      formatted = digits;
+    } else {
+      formatted = '${digits.substring(0, 4)}/${digits.substring(4)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class _YearsTab extends StatelessWidget {
   final SchoolState state;
   const _YearsTab({required this.state});
 
   @override
   Widget build(BuildContext context) {
+    final years = [...state.academicYears]
+      ..sort((a, b) => _compareByName(a.name, b.name));
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddYearDialog(context),
         child: const Icon(Icons.add),
       ),
       body: ListView.builder(
-        itemCount: state.academicYears.length,
+        itemCount: years.length,
         itemBuilder: (context, index) {
-          final year = state.academicYears[index];
+          final year = years[index];
           return ListTile(
             title: Text(year.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             trailing: Row(
@@ -116,6 +174,7 @@ class _YearsTab extends StatelessWidget {
   void _showYearDialog(BuildContext context, {AcademicYear? year}) {
     final isEdit = year != null;
     final controller = TextEditingController(text: year?.name);
+    final formKey = GlobalKey<FormState>();
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -129,26 +188,42 @@ class _YearsTab extends StatelessWidget {
         },
         child: AlertDialog(
           title: Text(isEdit ? 'Edit Academic Year' : 'Add Academic Year'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'e.g. 2023/2024'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+                _AcademicSessionFormatter(),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Academic session',
+                hintText: '2026/2027',
+                helperText: 'Use standard session format YYYY/YYYY',
+              ),
+              validator: _validateAcademicSession,
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  if (isEdit) {
-                    context.read<SchoolBloc>().add(UpdateAcademicYearEvent(
-                      year!.copyWith(name: controller.text),
-                    ));
-                  } else {
-                    context.read<SchoolBloc>().add(AddAcademicYearEvent(
-                      name: controller.text,
-                      startDate: DateTime.now(),
-                      endDate: DateTime.now().add(const Duration(days: 365)),
-                    ));
-                  }
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                final session = controller.text.trim();
+                final years = _parseAcademicSession(session);
+                if (years == null) return;
+                if (isEdit) {
+                  context.read<SchoolBloc>().add(UpdateAcademicYearEvent(
+                    year!.copyWith(name: session),
+                  ));
+                } else {
+                  context.read<SchoolBloc>().add(AddAcademicYearEvent(
+                    name: session,
+                    startDate: DateTime(years.start, 9, 1),
+                    endDate: DateTime(years.end, 8, 31),
+                  ));
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(
@@ -178,6 +253,9 @@ class _TermsTab extends StatelessWidget {
       return const Center(child: Text('Please add an Academic Year first.'));
     }
 
+    final terms = [...state.terms]
+      ..sort((a, b) => _compareByName(a.name, b.name));
+
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTermDialog(context, activeYear.id!),
@@ -191,11 +269,12 @@ class _TermsTab extends StatelessWidget {
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: state.terms.length,
+              itemCount: terms.length,
               itemBuilder: (context, index) {
-                final term = state.terms[index];
+                final term = terms[index];
                 return ListTile(
                   title: Text(term.name),
+                  subtitle: Text(term.dateRangeLabel),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -232,6 +311,8 @@ class _TermsTab extends StatelessWidget {
   void _showTermDialog(BuildContext context, {required int yearId, Term? term}) {
     final isEdit = term != null;
     final controller = TextEditingController(text: term?.name);
+    DateTime startDate = term?.startDate ?? DateTime.now();
+    DateTime endDate = term?.endDate ?? DateTime.now().add(const Duration(days: 90));
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -243,41 +324,92 @@ class _TermsTab extends StatelessWidget {
             Navigator.of(ctx).pop();
           }
         },
-        child: AlertDialog(
-          title: Text(isEdit ? 'Edit Term' : 'Add Term'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'e.g. First Term'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  if (isEdit) {
-                    context.read<SchoolBloc>().add(UpdateTermEvent(
-                      term!.copyWith(name: controller.text),
-                    ));
-                  } else {
-                    context.read<SchoolBloc>().add(AddTermEvent(
-                      academicYearId: yearId, 
-                      name: controller.text,
-                      startDate: DateTime.now(),
-                      endDate: DateTime.now().add(const Duration(days: 90)),
-                    ));
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> pickDate({required bool isStart}) async {
+              final initial = isStart ? startDate : endDate;
+              final date = await showDatePicker(
+                context: context,
+                initialDate: initial,
+                firstDate: DateTime(1990),
+                lastDate: DateTime(2100),
+              );
+              if (date == null) return;
+              setDialogState(() {
+                if (isStart) {
+                  startDate = date;
+                  if (endDate.isBefore(startDate)) {
+                    endDate = startDate.add(const Duration(days: 90));
                   }
+                } else {
+                  endDate = date.isBefore(startDate) ? startDate : date;
                 }
-              },
-              child: BlocBuilder<SchoolBloc, SchoolState>(
-                builder: (context, state) {
-                  if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
-                  }
-                  return Text(isEdit ? 'Update' : 'Add');
-                },
+              });
+            }
+
+            return AlertDialog(
+              title: Text(isEdit ? 'Edit Term' : 'Add Term'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Term name',
+                      hintText: 'e.g. First Term',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Start date'),
+                    subtitle: Text(DateFormat('dd MMM yyyy').format(startDate)),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () => pickDate(isStart: true),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('End date'),
+                    subtitle: Text(DateFormat('dd MMM yyyy').format(endDate)),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () => pickDate(isStart: false),
+                  ),
+                ],
               ),
-            ),
-          ],
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) return;
+                    if (isEdit) {
+                      context.read<SchoolBloc>().add(UpdateTermEvent(
+                        term!.copyWith(
+                          name: controller.text.trim(),
+                          startDate: startDate,
+                          endDate: endDate,
+                        ),
+                      ));
+                    } else {
+                      context.read<SchoolBloc>().add(AddTermEvent(
+                        academicYearId: yearId,
+                        name: controller.text.trim(),
+                        startDate: startDate,
+                        endDate: endDate,
+                      ));
+                    }
+                  },
+                  child: BlocBuilder<SchoolBloc, SchoolState>(
+                    builder: (context, state) {
+                      if (state.isLoading && state.status == SchoolStatus.loading) {
+                        return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
+                      }
+                      return Text(isEdit ? 'Update' : 'Add');
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -290,18 +422,29 @@ class _ClassesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final classes = [...state.classes]
+      ..sort((a, b) => _compareByName(a.name, b.name));
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddClassDialog(context),
+        onPressed: () => _showClassDialog(context),
         child: const Icon(Icons.add),
       ),
       body: ListView.builder(
-        itemCount: state.classes.length,
+        itemCount: classes.length,
         itemBuilder: (context, index) {
-          final sClass = state.classes[index];
+          final sClass = classes[index];
+          final desc = sClass.description?.trim();
           return ListTile(
             title: Text(sClass.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: sClass.description != null ? Text(sClass.description!) : null,
+            subtitle: Text(
+              (desc == null || desc.isEmpty) ? 'No description' : desc,
+              style: TextStyle(
+                color: (desc == null || desc.isEmpty)
+                    ? Colors.grey.shade500
+                    : Colors.blueGrey.shade700,
+              ),
+            ),
+            onTap: () => _showClassDialog(context, existing: sClass),
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () => _confirmDelete(context, sClass),
@@ -355,9 +498,10 @@ class _ClassesTab extends StatelessWidget {
     });
   }
 
-  void _showAddClassDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
+  void _showClassDialog(BuildContext context, {SchoolClass? existing}) {
+    final isEdit = existing != null;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final descController = TextEditingController(text: existing?.description ?? '');
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -370,7 +514,7 @@ class _ClassesTab extends StatelessWidget {
           }
         },
         child: AlertDialog(
-          title: const Text('Add Class'),
+          title: Text(isEdit ? 'Edit Class' : 'Add Class'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -382,8 +526,14 @@ class _ClassesTab extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  context.read<SchoolBloc>().add(AddClassEvent(nameController.text, description: descController.text));
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                if (isEdit) {
+                  context.read<SchoolBloc>().add(UpdateClassEvent(
+                    existing.copyWith(name: name, description: descController.text),
+                  ));
+                } else {
+                  context.read<SchoolBloc>().add(AddClassEvent(name, description: descController.text));
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(
@@ -391,13 +541,44 @@ class _ClassesTab extends StatelessWidget {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
                     return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
-                  return const Text('Add');
+                  return Text(isEdit ? 'Update' : 'Add');
                 },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ParentPaymentShareTab extends StatelessWidget {
+  const _ParentPaymentShareTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, state) {
+        final settings = state.settings;
+        if (settings == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ParentPaymentShareModePicker(
+              value: settings.parentPaymentShareMode,
+              onChanged: (value) {
+                context.read<SettingsBloc>().add(
+                      UpdateAppSettings(
+                        settings.copyWith(parentPaymentShareMode: value),
+                      ),
+                    );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -65,21 +65,46 @@ export class InvoiceController {
 
       let synced = 0;
       const errors: string[] = [];
+      const concurrency = Math.min(6, invoices.length);
+      let nextIndex = 0;
 
-      for (const invoice of invoices) {
+      const worker = async () => {
+        while (true) {
+          const i = nextIndex++;
+          if (i >= invoices.length) return;
+          const invoice = invoices[i];
+          try {
+            const idempotencyKey = invoice.idempotencyKey || invoice.syncId || randomUUID();
+            const correlationId = invoice.correlationId || randomUUID();
+            await InvoiceFacade.createInvoice(
+              invoice,
+              { tenantId, deviceId, skipTenantEmail: true, skipNotify: true },
+              idempotencyKey,
+              correlationId
+            );
+            synced++;
+          } catch (err: any) {
+            console.error(`[InvoiceController.bulkSyncInvoices] Failed for invoice ${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
+            errors.push(`${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+      if (synced > 0) {
+        const { TenantAlertService } = require('../services/tenant-alert.service');
+        const total = invoices.reduce((sum: number, inv: any) => sum + Number(inv.totalAmount || inv.total_amount || 0), 0);
+        TenantAlertService.notifyTransaction(tenantId, { count: synced, amount: total });
         try {
-          const idempotencyKey = invoice.idempotencyKey || invoice.syncId || randomUUID();
-          const correlationId = invoice.correlationId || randomUUID();
-          await InvoiceFacade.createInvoice(
-            invoice,
-            { tenantId, deviceId },
-            idempotencyKey,
-            correlationId
-          );
-          synced++;
-        } catch (err: any) {
-          console.error(`[InvoiceController.bulkSyncInvoices] Failed for invoice ${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
-          errors.push(`${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
+          const { io } = require('../app');
+          io.to(`tenant:${tenantId}`).emit('finance.sync.completed', {
+            synced,
+            errors: errors.length,
+            at: new Date().toISOString(),
+          });
+        } catch (emitErr: any) {
+          console.warn('[InvoiceController.bulkSyncInvoices] realtime emit skipped:', emitErr?.message || emitErr);
         }
       }
 
@@ -132,8 +157,12 @@ export class InvoiceController {
       
       const { id } = req.params;
       const user = (req as any).user || {};
+      const idempotencyKey = String(
+        req.headers['x-idempotency-key'] || req.body?.idempotencyKey || req.body?.commandId || '',
+      ).trim();
       const payload = {
         ...req.body,
+        idempotencyKey,
         userEmail: user.email,
         userName: user.name,
         ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress
@@ -143,7 +172,8 @@ export class InvoiceController {
       
       return res.status(200).json(data);
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
+      const status = err.status || 500;
+      return res.status(status).json({ success: false, ack: 'rejected', message: err.message });
     }
   }
 

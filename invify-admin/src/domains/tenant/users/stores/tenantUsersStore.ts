@@ -62,6 +62,33 @@ export const useTenantUsersStore = defineStore('tenantUsers', {
       const op = this.operators.find((o) => o.id === id);
       if (op) op.role = role;
     },
+    async persistOperator(id: string | number, payload: Record<string, any>) {
+      const res = await adminApi.patchTenantStaff(id, payload);
+      const updated = res.data?.data || res.data;
+      if (updated?.id) {
+        const idx = this.operators.findIndex((o) => o.id === updated.id);
+        if (idx >= 0) {
+          this.operators[idx] = { ...this.operators[idx], ...updated };
+        }
+      } else if (payload.role) {
+        this.updateOperatorRole(id, payload.role);
+      } else if (payload.status) {
+        this.updateOperatorStatus(id, payload.status);
+      }
+      return updated;
+    },
+    async provisionOperator(payload: {
+      name: string;
+      staffId?: string;
+      phone?: string;
+      role?: string;
+      authCode: string;
+    }) {
+      const res = await adminApi.createTenantStaff(payload);
+      const created = res.data?.data || res.data;
+      if (created) this.operators.push(created);
+      return created;
+    },
     logAudit(message: string, operator = 'SYSTEM') {
       this.auditLogs.unshift({
         id: Date.now(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/license/license_validator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/device_onboarding_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
@@ -17,6 +18,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 class ActivationPage extends StatefulWidget {
   static const routeName = '/activation';
@@ -54,6 +56,9 @@ class _ActivationPageState extends State<ActivationPage> {
       }
     }
     _loadGlobalConfig();
+    for (var i = 0; i < _focusNodes.length; i++) {
+      _focusNodes[i].onKeyEvent = (node, event) => _onSegmentKey(i, event);
+    }
   }
 
   /// First-time users (no trial started yet) can start a 3-day trial from this page.
@@ -135,11 +140,17 @@ class _ActivationPageState extends State<ActivationPage> {
 
   Future<void> _pingServer() async {
     try {
-      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/settings/onboarding'))
-        .timeout(const Duration(seconds: 3));
-      if (mounted) setState(() => _isServerReachable = true);
+      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/livez'))
+        .timeout(const Duration(seconds: 4));
+      if (mounted) setState(() => _isServerReachable = response.statusCode < 500);
     } catch (_) {
-      if (mounted) setState(() => _isServerReachable = false);
+      try {
+        final response = await http.get(Uri.parse('${AppConfig.baseUrl}/settings/onboarding'))
+          .timeout(const Duration(seconds: 4));
+        if (mounted) setState(() => _isServerReachable = response.statusCode < 500);
+      } catch (_) {
+        if (mounted) setState(() => _isServerReachable = false);
+      }
     }
   }
 
@@ -187,26 +198,36 @@ class _ActivationPageState extends State<ActivationPage> {
             ? tenant['name'] 
             : businessName;
 
-        final license = await LicenseService.activate(actualBusinessName, code);
+        final planIndex = data['plan_index'] is int
+            ? data['plan_index'] as int
+            : int.tryParse('${data['plan_index'] ?? ''}');
+        final durationRaw = data['duration_days'] ?? tenant?['duration_days'] ?? 365;
+        final durationDays = durationRaw is int ? durationRaw : int.tryParse('$durationRaw') ?? 365;
+        final planName = LicenseService.normalizePlanName(
+          (data['plan'] ?? tenant?['plan'])?.toString(),
+          planIndex: planIndex,
+        );
+        final expiry = DateTime.now().add(Duration(days: durationDays < 1 ? 365 : durationDays));
 
-        if (license != null) {
-          if (mounted) {
-            final settingsBloc = context.read<SettingsBloc>();
-            final currentSettings = settingsBloc.state.settings;
-            if (currentSettings != null) {
-               settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(
-                 organizationName: actualBusinessName,
-                 phone: tenant != null ? tenant['phone'] ?? currentSettings.phone : currentSettings.phone,
-               )));
-            }
-            settingsBloc.add(LoadSettings());
-            _showSuccessDialog(license);
+        final hmacLicense = LicenseValidator.validate(code, actualBusinessName);
+        final license = await LicenseService.applyServerActivation(
+          businessName: actualBusinessName,
+          activationCode: code,
+          planType: hmacLicense?.planType.name ?? planName,
+          expiryDate: hmacLicense?.expiryDate ?? expiry,
+        );
+
+        if (mounted) {
+          final settingsBloc = context.read<SettingsBloc>();
+          final currentSettings = settingsBloc.state.settings;
+          if (currentSettings != null) {
+             settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(
+               organizationName: actualBusinessName,
+               phone: tenant != null ? tenant['phone'] ?? currentSettings.phone : currentSettings.phone,
+             )));
           }
-        } else {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Invalid activation code or business name mismatch.';
-          });
+          settingsBloc.add(LoadSettings());
+          _showSuccessDialog(license);
         }
       } else {
         setState(() {
@@ -342,12 +363,7 @@ class _ActivationPageState extends State<ActivationPage> {
               child: Center(
                 child: Opacity(
                   opacity: 0.15,
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 500,
-                    height: 500,
-                    fit: BoxFit.contain,
-                  ),
+                  child: InvifyBrandLogo(size: 500, fit: BoxFit.contain),
                 ),
               ),
             ),
@@ -444,10 +460,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Image.asset(
-                                        'assets/images/logo_transparent.png',
-                                        height: 70,
-                                      ),
+                                      InvifyBrandLogo(size: 70, fit: BoxFit.contain),
                                       const SizedBox(width: 16),
                                       Icon(Icons.lock_person, size: 70, color: const Color(0xFF818CF8)),
                                     ],
@@ -596,7 +609,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                         context,
                                         icon: Icons.email,
                                         label: 'Email Support',
-                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'support@iips.app'}'),
+                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'support@invify.org'}'),
                                       ),
                                     ],
                                   ),
@@ -673,8 +686,20 @@ class _ActivationPageState extends State<ActivationPage> {
                   focusNode: _focusNodes[index],
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.characters,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: index < 5 ? TextInputAction.next : TextInputAction.done,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  smartDashesType: SmartDashesType.disabled,
+                  smartQuotesType: SmartQuotesType.disabled,
                   inputFormatters: [
-                    LengthLimitingTextInputFormatter(30), // Allow paste
+                    _ActivationSegmentFormatter(
+                      onOverflow: (full) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _handlePaste(index, full);
+                        });
+                      },
+                    ),
                   ],
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
@@ -692,15 +717,7 @@ class _ActivationPageState extends State<ActivationPage> {
                     filled: true,
                     fillColor: Colors.black.withOpacity(0.3),
                   ),
-                  onChanged: (value) {
-                    if (value.length > 4) {
-                      _handlePaste(index, value);
-                    } else if (value.length == 4 && index < 5) {
-                      _focusNodes[index + 1].requestFocus();
-                    } else if (value.isEmpty && index > 0) {
-                      _focusNodes[index - 1].requestFocus();
-                    }
-                  },
+                  onChanged: (value) => _onSegmentChanged(index, value),
                 ),
               ),
             );
@@ -713,6 +730,38 @@ class _ActivationPageState extends State<ActivationPage> {
         ),
       ],
     );
+  }
+
+  void _onSegmentChanged(int index, String value) {
+    final clean = value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (clean != value) {
+      _segmentControllers[index].value = TextEditingValue(
+        text: clean,
+        selection: TextSelection.collapsed(offset: clean.length),
+      );
+    }
+    if (clean.length >= 4 && index < 5) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNodes[index + 1].requestFocus();
+      });
+    }
+  }
+
+  KeyEventResult _onSegmentKey(int index, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey != LogicalKeyboardKey.backspace) {
+      return KeyEventResult.ignored;
+    }
+    if (_segmentControllers[index].text.isNotEmpty || index == 0) {
+      return KeyEventResult.ignored;
+    }
+    _focusNodes[index - 1].requestFocus();
+    final prev = _segmentControllers[index - 1];
+    if (prev.text.isNotEmpty) {
+      prev.text = prev.text.substring(0, prev.text.length - 1);
+      prev.selection = TextSelection.collapsed(offset: prev.text.length);
+    }
+    return KeyEventResult.handled;
   }
 
   void _handlePaste(int startIndex, String value) {
@@ -865,6 +914,9 @@ class _ActivationPageState extends State<ActivationPage> {
                               Navigator.of(dialogContext).pop();
                               _fillActivationCode(code);
                               _showScannerSuccess(code);
+                              if (_businessNameController.text.trim().isNotEmpty) {
+                                _activate();
+                              }
                               return;
                             }
                           }
@@ -1063,5 +1115,27 @@ class _ScannerLaserAnimationState extends State<ScannerLaserAnimation> with Sing
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+}
+
+class _ActivationSegmentFormatter extends TextInputFormatter {
+  final void Function(String overflow) onOverflow;
+
+  _ActivationSegmentFormatter({required this.onOverflow});
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final clean = newValue.text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (clean.length > 4) {
+      onOverflow(clean);
+      return TextEditingValue(
+        text: clean.substring(0, 4),
+        selection: const TextSelection.collapsed(offset: 4),
+      );
+    }
+    return TextEditingValue(
+      text: clean,
+      selection: TextSelection.collapsed(offset: clean.length),
+    );
   }
 }

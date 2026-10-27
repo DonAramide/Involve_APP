@@ -6,6 +6,79 @@ import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
 import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
+import { NotificationService } from '../services/notification.service';
+import { hydrateTenantOwnerContact } from '../utils/owner-contact';
+import {
+  normalizeTenantType,
+  sanitizeTenantUpdates,
+  withoutOptionalTenantColumns,
+} from '../utils/sanitize-tenant-updates';
+import { isMakerCheckerApply, submitSupportChange } from '../services/maker-checker.service';
+import { collectedInvoiceAmount } from '../utils/invoice-collection';
+import { displayableDeviceId } from '../utils/device-identity';
+import { planNameFromIndex } from '../utils/paid-license';
+import { canApproveTerminalActivation } from '../utils/terminal-activation-approval';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
+import {
+  sanitizeVerificationSearch,
+  toVerificationLogRow,
+  uniqueLatestByRecipient,
+  verificationLogSelect,
+} from '../utils/verification-log';
+import { VerificationService } from '../services/verification.service';
+import {
+  formatVaTransaction,
+  pendingFundsByTenant,
+  pendingFundsByVa,
+  unsettledCardByTenant,
+  virtualAccountMatches,
+} from '../utils/virtual-account-funds';
+import { tenantInstitutePortService } from '../services/tenant-institute-port.service';
+import { loadActivationGate, virtualAccountGenerationBlockReason } from '../modules/financial-platform/activation/activation-gate';
+
+function isPlatformFinanceOperator(user: any): boolean {
+  const role = String(user?.role || '').toLowerCase()
+  return role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_') || role === 'admin'
+}
+
+function walletBalanceFromLedger(rows: any[], tenantId: string): number | null {
+  const mine = (rows || []).filter((row) => String(row.tenant_id) === String(tenantId))
+  if (!mine.length) return null
+  const hasUserWallet = mine.some((row) => String(row.account || '') === 'USER_WALLET')
+  const usable = hasUserWallet ? mine.filter((row) => String(row.account || '') === 'USER_WALLET') : mine
+  const balance = usable.reduce((current, entry) => {
+    const amt = Number(entry.amount)
+    if (!Number.isFinite(amt)) return current
+    const raw = String(entry.entry_type || entry.type || '').toUpperCase()
+    if (['CREDIT', 'VIRTUAL_ACCOUNT_CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'CARD_PAYMENT'].includes(raw)) {
+      return current + amt
+    }
+    if (['DEBIT', 'WITHDRAWAL', 'SWEEP', 'PAYOUT'].includes(raw)) {
+      return current - amt
+    }
+    return current
+  }, 0)
+  return Number(balance.toFixed(2))
+}
+
+/** Keys stored in global_settings.json. DB upserts must not override or block these. */
+const FILE_BACKED_CONFIG_KEYS = [
+  'daily_payout_time',
+  'manual_dispatch_fee',
+  'manual_dispatch_fee_type',
+  'quasar_base_url',
+  'quasar_pos_encryption_key_base64',
+];
+
+function isFileBackedConfigKey(key: string): boolean {
+  return FILE_BACKED_CONFIG_KEYS.includes(key);
+}
+
+function isBrokenConfigAuditError(message: string | undefined): boolean {
+  const msg = String(message || '').toLowerCase();
+  return msg.includes('commission_events') || msg.includes('event_type');
+}
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -25,6 +98,14 @@ async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   }
 
   return 'demo-key';
+}
+
+async function rejectUnlessMakerCheckerApproved(res: Response, tenantId: string): Promise<boolean> {
+  const { gate } = await loadActivationGate(tenantId);
+  const blocked = virtualAccountGenerationBlockReason(gate);
+  if (!blocked) return false;
+  res.status(403).json({ error: blocked, code: 'MAKER_CHECKER_REQUIRED' });
+  return true;
 }
 
 export class AdminController {
@@ -80,7 +161,7 @@ export class AdminController {
   private static getGlobalSettingsData() {
     return { 
       support_phone: '+234 800 INVIFY',
-      support_email: 'support@iips.app',
+      support_email: 'support@invify.org',
       support_whatsapp: '+2348023552282',
       broadcast_message: '',
       audit_retention_hours: 72,
@@ -130,17 +211,11 @@ export class AdminController {
         return res.status(200).json(settingsObj);
       }
       
-      const { data, error } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
+      const { data } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
       
       if (data && data.length > 0) {
         for (const row of data) {
-           // Skip payout settings keys to let the local file cache (global_settings.json) be the source of truth
-           if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(row.config_key)) {
-             continue;
-           }
-           // Never send plaintext POS encryption key to the browser
-           if (row.config_key === 'quasar_pos_encryption_key_base64') {
-             settingsObj.quasar_pos_encryption_key_configured = Boolean(row.config_value);
+           if (isFileBackedConfigKey(row.config_key)) {
              continue;
            }
            settingsObj[row.config_key] = row.config_value;
@@ -251,10 +326,21 @@ export class AdminController {
     try {
       const { QuasarIntegrationStore } = require('../integrations/quasar/quasar-integration.store');
       const rows = await QuasarIntegrationStore.listAll();
+      const ids = [...new Set((rows || []).map((r: any) => r.invify_tenant_id).filter(Boolean))];
+      const names = new Map<string, string>();
+      if (ids.length) {
+        const { data, error } = await supabaseAdmin.from('tenants').select('id, name').in('id', ids);
+        if (error) console.warn('[AdminController] tenant names:', error.message);
+        for (const tenant of (data || []) as Array<{ id: string; name?: string }>) {
+          const label = String(tenant.name || '').trim();
+          if (label) names.set(tenant.id, label);
+        }
+      }
       return res.status(200).json({
         data: (rows || []).map((r: any) => ({
           invifyTenantId: r.invify_tenant_id,
           quasarTenantId: r.quasar_tenant_id,
+          tenantName: names.get(r.invify_tenant_id) || '',
           vertical: r.quasar_vertical,
           environment: r.quasar_environment,
           status: r.status,
@@ -268,6 +354,26 @@ export class AdminController {
   static async updateGlobalSettings(req: Request, res: Response) {
     try {
       const updates = req.body;
+      if (
+        updates &&
+        Object.prototype.hasOwnProperty.call(updates, 'quasar_base_url') &&
+        !isMakerCheckerApply(req)
+      ) {
+        const row = submitSupportChange(req, {
+          domain: 'pos_switchboard',
+          action: 'quasar_base_url',
+          summary: `Quasar switch URL → ${String(updates.quasar_base_url || '(cleared)')}`,
+          body: { quasar_base_url: updates.quasar_base_url },
+        });
+        delete updates.quasar_base_url;
+        if (!Object.keys(updates).length) {
+          return res.status(202).json({
+            pending: true,
+            id: row.id,
+            message: 'Submitted. Only support@iips.app can approve this change.',
+          });
+        }
+      }
       const operatorId = (req as any).user?.id || null;
       
       // Update the local global_settings.json file cache
@@ -281,25 +387,22 @@ export class AdminController {
         }
         const updated = { ...currentSettings, ...updates };
         if (Object.prototype.hasOwnProperty.call(updates, 'quasar_base_url')) {
-          try {
-            const {
-              normalizeQuasarBaseUrl,
-              setQuasarBaseUrlOverride,
-            } = require('../integrations/quasar/quasar-base-url');
-            const normalized = normalizeQuasarBaseUrl(updates.quasar_base_url as string);
-            updated.quasar_base_url = normalized;
-            (updates as any).quasar_base_url = normalized;
-            setQuasarBaseUrlOverride(normalized || null);
-            console.log(
-              `[AdminController] Quasar base URL → ${normalized || '(env/default fallback)'}`,
-            );
-          } catch (e: any) {
-            console.warn('[AdminController] Failed to apply Quasar base URL override:', e.message);
-          }
+          const {
+            normalizeQuasarBaseUrl,
+            setQuasarBaseUrlOverride,
+          } = require('../integrations/quasar/quasar-base-url');
+          const normalized = normalizeQuasarBaseUrl(updates.quasar_base_url as string);
+          updated.quasar_base_url = normalized;
+          (updates as any).quasar_base_url = normalized;
+          setQuasarBaseUrlOverride(normalized || null);
+          console.log(
+            `[AdminController] Quasar base URL → ${normalized || '(env/default fallback)'}`,
+          );
         }
         fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf8');
-      } catch (fileErr) {
+      } catch (fileErr: any) {
         console.error('[AdminController] Failed to write to global_settings.json:', fileErr);
+        throw new Error(`Failed to write platform settings file: ${fileErr.message}`);
       }
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
@@ -308,12 +411,7 @@ export class AdminController {
       
       // Update each key-value pair in system_configurations database table
       for (const [key, value] of Object.entries(updates)) {
-        // Skip payout settings keys that are not supported by the DB schema/triggers
-        if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(key)) {
-          continue;
-        }
-        // POS encryption key is managed only via /admin/quasar/pos-encryption-key/*
-        if (key === 'quasar_pos_encryption_key_base64') {
+        if (isFileBackedConfigKey(key)) {
           continue;
         }
 
@@ -321,6 +419,12 @@ export class AdminController {
           .upsert({ config_key: key, config_value: value, updated_by: operatorId });
           
         if (error) {
+          if (isBrokenConfigAuditError(error.message)) {
+            console.warn(
+              `[AdminController] DB persist skipped for ${key} (config audit trigger): ${error.message}`,
+            );
+            continue;
+          }
           throw new Error(`Failed to update ${key}: ${error.message}`);
         }
       }
@@ -494,9 +598,9 @@ export class AdminController {
         }
 
         if (matchingTenantIds.length > 0) {
-          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,id.in.(${matchingTenantIds.join(',')})`);
+          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,owner_email.ilike.%${name}%,id.in.(${matchingTenantIds.join(',')})`);
         } else {
-          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%`);
+          query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%,owner_email.ilike.%${name}%`);
         }
       }
 
@@ -504,18 +608,62 @@ export class AdminController {
 
       if (error) throw error;
 
+      // Fallback: tenants may have fleet rows in `devices` without a device_registrations row
+      // (e.g. DON MARS / Akwaja Daniel). Use those so the matrix does not show UNASSIGNED.
+      const tenantsNeedingDevice = (data || []).filter(
+        (t: any) => !Array.isArray(t.device_registrations) || t.device_registrations.length === 0,
+      );
+      const fallbackByTenant = new Map<string, any>();
+      if (tenantsNeedingDevice.length > 0) {
+        const ids = tenantsNeedingDevice.map((t: any) => t.id);
+        const { data: deviceRows } = await supabaseAdmin
+          .from('devices')
+          .select('device_id, tenant_id, device_name, status, last_seen, device_info')
+          .in('tenant_id', ids)
+          .order('last_seen', { ascending: false });
+        for (const row of deviceRows || []) {
+          const tid = String(row.tenant_id || '');
+          if (!tid || fallbackByTenant.has(tid)) continue;
+          fallbackByTenant.set(tid, row);
+        }
+      }
+
       // Flatten: pull the primary device (device_number=1) fields up to the tenant row
+      const instituteByTenant = await tenantInstitutePortService
+        .ownershipMap((data || []).map((t: any) => String(t.id)))
+        .catch(() => new Map());
+
       const enriched = (data || []).map((tenant: any) => {
         const devices: any[] = tenant.device_registrations || [];
         // Sort by device_number so device #1 is primary
         devices.sort((a: any, b: any) => (a.device_number || 1) - (b.device_number || 1));
-        const primary = devices[0];
+        let primary = devices[0];
+        const fallback = fallbackByTenant.get(String(tenant.id));
+        if (!primary && fallback) {
+          primary = {
+            device_id: fallback.device_id,
+            agent_code: fallback.device_info?.agent_code ?? null,
+            location: fallback.device_info?.location ?? tenant.location ?? null,
+            device_number: 1,
+            status: fallback.status,
+            device_name: fallback.device_name,
+          };
+          devices.push(primary);
+        }
+        const institute = instituteByTenant.get(String(tenant.id));
+        const pendingPort = tenant?.settings?.institute_port?.proposal?.status === 'pending';
         return {
           ...tenant,
-          device_id: primary?.device_id ?? null,
-          agent_code: primary?.agent_code ?? null,
-          location: primary?.location ?? null,
-          device_count: tenant.device_count || devices.length || 1,
+          device_id: displayableDeviceId(primary?.device_id),
+          device_agent_code: primary?.agent_code ?? null,
+          agent_code: institute?.agent_code || tenant.agent_code || primary?.agent_code || null,
+          institute_id: institute?.id || null,
+          institute_code: institute?.agent_code || tenant.agent_code || null,
+          institute_name: institute?.name || null,
+          institute_is_default: institute ? institute.isDefault : !tenant.agent_code,
+          institute_port_pending: pendingPort,
+          location: primary?.location || tenant.location || null,
+          device_count: tenant.device_count || devices.length || (primary ? 1 : 0),
           // Keep raw array for potential future use
           device_registrations: devices,
         };
@@ -534,6 +682,145 @@ export class AdminController {
       if (isConnectionTimeout) {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/:id/ping-identity
+   * Ask the live tablet on this tenant socket room for serial + GPS.
+   */
+  static async pingTenantIdentity(req: Request, res: Response) {
+    try {
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Tenant id is required' });
+
+      const { data: tenant, error } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      const { io } = require('../app');
+      const { emitIdentityPing } = require('../utils/device-identity-ping');
+      const result = await emitIdentityPing(io, id);
+      return res.status(200).json({
+        success: true,
+        tenantId: id,
+        name: tenant.name,
+        ...result,
+        message: result.onlineSockets > 0
+          ? `Ping sent to ${result.onlineSockets} online tablet(s). Device ID and location will appear when they reply.`
+          : 'No tablet is connected for this tenant right now. Keep the app open on the device, then ping again.',
+      });
+    } catch (error: any) {
+      console.error('[AdminController] pingTenantIdentity Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/ping-missing-identity
+   * Ping every tenant that is missing a hardware serial or GPS location.
+   */
+  static async pingMissingTenantIdentities(_req: Request, res: Response) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, location, device_registrations(device_id, location, device_number)')
+        .eq('status', 'active');
+      if (error) throw error;
+
+      const { displayableDeviceId } = require('../utils/device-identity');
+      const missing = (data || []).filter((tenant: any) => {
+        const devices: any[] = tenant.device_registrations || [];
+        devices.sort((a: any, b: any) => (a.device_number || 1) - (b.device_number || 1));
+        const primary = devices[0];
+        const deviceId = displayableDeviceId(primary?.device_id);
+        const location = primary?.location || tenant.location;
+        return !deviceId || !location;
+      });
+
+      const { io } = require('../app');
+      const { emitIdentityPing } = require('../utils/device-identity-ping');
+      const results = [];
+      for (const tenant of missing) {
+        const ping = await emitIdentityPing(io, tenant.id);
+        results.push({ tenantId: tenant.id, name: tenant.name, ...ping });
+      }
+
+      const online = results.filter((r: any) => r.onlineSockets > 0).length;
+      return res.status(200).json({
+        success: true,
+        pinged: results.length,
+        onlineTenants: online,
+        results,
+        message: results.length === 0
+          ? 'Every active tenant already has a device ID and location.'
+          : `Pinged ${results.length} tenant(s); ${online} currently have a tablet online.`,
+      });
+    } catch (error: any) {
+      console.error('[AdminController] pingMissingTenantIdentities Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /admin/verification-log
+   * Super-admin support view of recent OTP sends, including the 6-digit code.
+   */
+  static async listVerificationLog(req: Request, res: Response) {
+    try {
+      const q = sanitizeVerificationSearch(req.query.q);
+      const channel = String(req.query.channel || '').trim().toUpperCase();
+      const status = String(req.query.status || '').trim().toUpperCase();
+      const purpose = String(req.query.purpose || '').trim().toUpperCase();
+      const latestOnly = String(req.query.latest || '1') !== '0';
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 200);
+
+      let query = supabaseAdmin
+        .from('verification_codes')
+        .select(verificationLogSelect())
+        .order('created_at', { ascending: false })
+        .limit(latestOnly ? 1500 : limit);
+
+      if (q) {
+        query = query.or(`email.ilike.%${q}%,phone.ilike.%${q}%`);
+      }
+      if (['EMAIL', 'WHATSAPP'].includes(channel)) {
+        query = query.eq('channel', channel);
+      }
+      if (status === 'EXPIRED') {
+        query = query.in('status', ['EXPIRED', 'PENDING']);
+      } else if (['PENDING', 'VERIFIED', 'CANCELLED'].includes(status)) {
+        query = query.eq('status', status);
+      }
+      if (['SIGNUP', 'PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(purpose)) {
+        query = query.eq('purpose', purpose);
+      }
+
+      let { data, error } = await query;
+      if (error) throw error;
+
+      let rows = (data || []).map((row: any) => toVerificationLogRow(row));
+      if (status === 'EXPIRED') {
+        rows = rows.filter((row: { displayStatus: string }) => row.displayStatus === 'EXPIRED');
+      } else if (status === 'PENDING') {
+        rows = rows.filter((row: { displayStatus: string }) => row.displayStatus === 'PENDING');
+      }
+      if (latestOnly) {
+        rows = uniqueLatestByRecipient(rows).slice(0, limit);
+      }
+
+      return res.status(200).json({
+        latestOnly,
+        count: rows.length,
+        rows,
+      });
+    } catch (error: any) {
+      console.error('[AdminController] listVerificationLog Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -576,9 +863,23 @@ export class AdminController {
         attempt++;
       }
 
+      const insertRow: Record<string, unknown> = {
+        id: finalTenantId,
+        name,
+        type: normalizeTenantType(type) || type,
+        plan: plan || 'free',
+        status: 'active',
+      };
+      if (req.body.plan_expires_at !== undefined) {
+        insertRow.plan_expires_at = req.body.plan_expires_at || null;
+      }
+      if (req.body.support_phone !== undefined) insertRow.support_phone = req.body.support_phone || null;
+      if (req.body.support_email !== undefined) insertRow.support_email = req.body.support_email || null;
+      if (req.body.support_whatsapp !== undefined) insertRow.support_whatsapp = req.body.support_whatsapp || null;
+
       const { data, error } = await supabaseAdmin
         .from('tenants')
-        .insert({ id: finalTenantId, name, type, plan: plan || 'free', status: 'active' })
+        .insert(insertRow)
         .select()
         .single();
 
@@ -587,39 +888,7 @@ export class AdminController {
       // Senior Practice: Auto-create wallet for the new tenant
       await supabaseAdmin.from('wallets').insert({ tenant_id: data.id, balance: 0 });
 
-      // Generate Virtual Account for Tenant using Quasar SDK
-      try {
-        const platformApiKey = await resolvePlatformApiKey(data.id);
-        const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-        const quasar = new QuasarServiceModule(platformApiKey);
-        
-        const platformId = 'platform-admin-owner-id'; // Constant platform parent ID
-        
-        const va = await quasar.createVirtualAccount({
-          childId: data.id,
-          parentId: platformId,
-          currency: 'NGN',
-          email: `billing@tenant-${data.id.substring(0,8)}.invify.app`,
-          firstName: name.split(' ')[0],
-          lastName: name.split(' ').slice(1).join(' ') || 'Business',
-          parentShareBps: 0,
-          metadata: { type: 'tenant_operating_account' }
-        });
-        
-        // Save VA details to the tenant record
-        await supabaseAdmin
-          .from('tenants')
-          .update({
-            virtual_account_number: va.accountNumber,
-            virtual_account_bank: va.bankName,
-            virtual_account_status: 'ACTIVE'
-          })
-          .eq('id', data.id);
-          
-      } catch (vaError: any) {
-        console.error('[AdminController] Failed to generate Virtual Account for tenant:', vaError.message);
-        // We don't block tenant creation if VA generation fails, just log it.
-      }
+      // Virtual accounts wait for maker propose + a different admin's checker approval.
 
       return res.status(201).json(data);
     } catch (error: any) {
@@ -635,18 +904,41 @@ export class AdminController {
   static async updateTenant(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updates = { ...req.body };
-      delete updates.tenant_code;
-      delete updates.agent_code;
+      let updates = sanitizeTenantUpdates(req.body);
 
-      const { data, error } = await supabaseAdmin
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No valid tenant fields to update' });
+      }
+
+      let { data, error } = await supabaseAdmin
         .from('tenants')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      const retried = withoutOptionalTenantColumns(updates, error);
+      if (error && retried) {
+        console.warn('[AdminController] updateTenant retrying without missing optional columns');
+        updates = retried;
+        ({ data, error } = await supabaseAdmin
+          .from('tenants')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single());
+      }
+
+      if (error) {
+        const msg = String(error.message || '');
+        if (error.code === 'PGRST116' || msg.toLowerCase().includes('0 rows')) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+        if (error.code === '23514' || msg.toLowerCase().includes('check constraint')) {
+          return res.status(400).json({ error: msg });
+        }
+        throw error;
+      }
 
       try {
         const { GovAuditService } = require('../services/gov-audit.service');
@@ -842,44 +1134,76 @@ export class AdminController {
 
   /**
    * POST /admin/broadcast
-   * Sends a real-time socket.io broadcast message to terminals/apps.
+   * Sends a real-time socket.io broadcast and/or FCM push to terminals/apps.
+   * Omit `channels` (or include `websocket`) for the historical socket path.
+   * Include `fcm` to fan out via Firebase — requires FCM_SERVICE_ACCOUNT_JSON
+   * or FCM_SERVICE_ACCOUNT_PATH on the backend env.
    */
   static async sendBroadcast(req: Request, res: Response) {
     try {
-      const { message, targetType, targetValue } = req.body;
+      const { message, targetType, targetValue, title, channels, fcmPriority } = req.body;
       if (!message) return res.status(400).json({ error: "Message is required" });
 
+      const requestedChannels = Array.isArray(channels) && channels.length > 0
+        ? channels.map((c: string) => String(c).toLowerCase())
+        : ['websocket'];
+      const sendSocket = requestedChannels.includes('websocket');
+      const sendFcm = requestedChannels.includes('fcm');
+
       const { io } = require('../app');
-      
-      if (targetType === 'agent' && targetValue) {
+      let room: string | undefined;
+      let socketMessage: string | undefined;
+
+      if (sendSocket && targetType === 'agent' && targetValue) {
         const { data: agentTenants } = await supabaseAdmin.from('tenants').select('id').eq('agent_code', targetValue);
         const tenantList = agentTenants || [];
         console.log(`[AdminController] Emitting broadcast to ${tenantList.length} tenants under agent: ${targetValue}`);
         tenantList.forEach((tenant: any) => {
           io.to(`tenant:${tenant.id}`).emit('app_broadcast', { message, timestamp: new Date().toISOString() });
         });
-        return res.status(200).json({ success: true, message: `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}` });
+        socketMessage = `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}`;
+      } else if (sendSocket) {
+        room = 'all';
+
+        if (targetType === 'tenant' && targetValue) {
+          room = `tenant:${targetValue}`;
+        } else if (targetType === 'plan' && targetValue) {
+          room = `plan:${String(targetValue).toLowerCase()}`;
+        } else if (targetType === 'type' && targetValue) {
+          room = `type:${String(targetValue).toLowerCase()}`;
+        }
+
+        console.log(`[AdminController] Sending Broadcast!`);
+        console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
+        console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
+        io.to(room).emit('app_broadcast', {
+          message,
+          timestamp: new Date().toISOString()
+        });
+        socketMessage = 'Broadcast sent successfully';
       }
 
-      let room = 'all';
-
-      if (targetType === 'tenant' && targetValue) {
-        room = `tenant:${targetValue}`;
-      } else if (targetType === 'plan' && targetValue) {
-        room = `plan:${String(targetValue).toLowerCase()}`;
-      } else if (targetType === 'type' && targetValue) {
-        room = `type:${String(targetValue).toLowerCase()}`;
+      let fcm: any = null;
+      if (sendFcm) {
+        const tenantId = targetType === 'tenant' && targetValue ? String(targetValue) : undefined;
+        fcm = await NotificationService.sendToFleet({
+          title: title || 'Invify Broadcast',
+          body: message,
+          tenantId,
+          priority: fcmPriority === 'normal' ? 'normal' : 'high',
+          data: {
+            type: 'admin_broadcast',
+            targetType: String(targetType || 'all'),
+          },
+        });
       }
 
-      console.log(`[AdminController] Sending Broadcast!`);
-      console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
-      console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
-      io.to(room).emit('app_broadcast', {
-        message,
-        timestamp: new Date().toISOString()
+      return res.status(200).json({
+        success: true,
+        room,
+        message: socketMessage || (sendFcm ? 'FCM dispatch attempted' : 'Broadcast sent successfully'),
+        fcm,
       });
-
-      return res.status(200).json({ success: true, room, message: 'Broadcast sent successfully' });
     } catch (error: any) {
       console.error('[AdminController] sendBroadcast Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -908,12 +1232,14 @@ export class AdminController {
       }
 
       // Parallel fetch for deep insights
-      const [tenantRes, usersRes, walletInfo, usageRes, certRes] = await Promise.all([
+      const [tenantRes, usersRes, walletInfo, usageRes, certRes, walletTx, walletRow] = await Promise.all([
         supabaseAdmin.from('tenants').select('*').eq('id', id).single(),
         supabaseAdmin.from('users').select('*').eq('tenant_id', id),
-        WalletService.getBalance(id), // DERIVED: Sum of ledger entries
+        WalletService.getBalance(id), // USER_WALLET projection, not both sides of double-entry
         supabaseAdmin.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
-        supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id),
+        supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id).order('created_at', { ascending: false }),
+        WalletService.getTransactions(id),
+        supabaseAdmin.from('wallets').select('id, balance, updated_at').eq('tenant_id', id).maybeSingle(),
       ]);
 
       if (tenantRes.error) throw tenantRes.error;
@@ -944,23 +1270,130 @@ export class AdminController {
         console.warn('[AdminController] device_registrations unavailable:', devErr.message);
       }
 
-      const certificates = (certRes.data || []).map((a: any) => ({
-        code: a.activation_code,
-        deviceId: a.device_id,
-        plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
-        duration: `${a.duration_days} Days`,
-        expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        status: a.is_used ? 'USED' : 'ACTIVE'
-      }));
+      const viewerEmail = String(user?.email || '').trim().toLowerCase();
+      const mailByCode = new Map<string, { to: string; at: string | null }>();
+      try {
+        const { data: mailLogs } = await supabaseAdmin
+          .from('audit_logs')
+          .select('target, timestamp, metadata')
+          .eq('tenant_id', id)
+          .in('action', ['APPROVE_ACTIVATION_CODE', 'RESEND_ACTIVATION_EMAIL'])
+          .order('timestamp', { ascending: false })
+          .limit(100);
+        for (const log of mailLogs || []) {
+          const code = String((log as any).target || '');
+          const to = String((log as any).metadata?.emailedTo || '').trim();
+          if (!code || !to || mailByCode.has(code)) continue;
+          mailByCode.set(code, { to, at: (log as any).timestamp || null });
+        }
+      } catch (mailLogErr: any) {
+        console.warn('[AdminController] activation email log skipped:', mailLogErr?.message || mailLogErr);
+      }
+
+      const certificates = (certRes.data || []).map((a: any) => {
+        const hidden = a.status === 'awaiting_approval' || a.status === 'rejected';
+        const status =
+          a.status === 'awaiting_approval'
+            ? 'AWAITING APPROVAL'
+            : a.status === 'rejected'
+              ? 'REJECTED'
+              : a.is_used
+                ? 'USED'
+                : 'ACTIVE';
+        const mailed = mailByCode.get(String(a.activation_code || ''));
+        return {
+          id: a.id,
+          code: hidden ? null : a.activation_code,
+          deviceId: a.device_id,
+          plan_index: a.plan_index,
+          plan: String(planNameFromIndex(a.plan_index) || 'basic').toUpperCase(),
+          duration: `${a.duration_days} Days`,
+          expiry: a.expires_at
+            ? new Date(a.expires_at).toLocaleDateString()
+            : new Date(new Date(a.created_at).getTime() + Number(a.duration_days || 0) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          status,
+          createdBy: a.created_by || null,
+          createdAt: a.created_at || null,
+          emailedTo: a.emailed_to || mailed?.to || null,
+          emailedAt: a.emailed_at || mailed?.at || null,
+          canApprove: hidden && a.status === 'awaiting_approval' && canApproveTerminalActivation(viewerEmail, a.created_by).ok,
+        };
+      });
+
+      const rawUsers = usersRes.data || [];
+      const tenant = hydrateTenantOwnerContact(tenantRes.data, rawUsers, registeredDevices);
+
+      let institutePort = null;
+      try {
+        institutePort = await tenantInstitutePortService.getSnapshot(id);
+      } catch (portErr: any) {
+        console.warn('[AdminController] institute port snapshot failed (non-fatal):', portErr.message);
+      }
+
+      let paymentAlerts: any[] = [];
+      try {
+        const { PaymentAlertTrailService } = await import('../services/payment-alert-trail.service');
+        paymentAlerts = await PaymentAlertTrailService.listForTenant(id);
+      } catch (alertErr: any) {
+        console.warn('[AdminController] payment alert trail unavailable:', alertErr.message);
+      }
+
+      let quasarHeld: number | null = null;
+      try {
+        const { QfsQuasarBridgeService } = await import('../services/qfs-quasar-bridge.service');
+        const { sumQuasarSandboxBalancesNaira } = await import('../utils/virtual-account-funds');
+        const accounts = await Promise.race([
+          QfsQuasarBridgeService.listAccounts(id),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Quasar balance lookup timed out')), 2500);
+          }),
+        ]);
+        quasarHeld = sumQuasarSandboxBalancesNaira(accounts || []);
+      } catch (quasarErr: any) {
+        console.warn('[AdminController] Quasar held balance unavailable:', quasarErr.message);
+      }
 
       return res.status(200).json({
-        tenant: tenantRes.data,
-        users: (usersRes.data || []).map((u: any) => ({
+        tenant,
+        institutePort,
+        users: rawUsers.map((u: any) => ({
           ...u,
           // Surface tenant phone on owner rows when users.phone column is empty
-          phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenantRes.data?.phone : null) || null,
+          phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.phone : null) || null,
+          email: u.email || (String(u.role || '').toLowerCase() === 'owner' ? tenant?.owner_email : null) || null,
         })),
-        wallet: { balance: walletInfo.balance }, // Normalized structure for frontend
+        wallet: {
+          balance: walletInfo.balance,
+          updated_at: walletRow.data?.updated_at || walletInfo.timestamp,
+          subAccount: walletRow.data
+            ? {
+                id: walletRow.data.id,
+                balance: walletInfo.balance,
+                walletType: 'SCHOOL_WALLET',
+                ownerType: 'SCHOOL',
+              }
+            : null,
+          transactions: (walletTx || []).map((tx: any) => ({
+            id: tx.id || tx.reference,
+            created_at: tx.created_at,
+            type: WalletService.toSignedAmount(tx) >= 0 ? 'CREDIT' : 'DEBIT',
+            amount: WalletService.toSignedAmount(tx),
+            description: tx.reference || tx.metadata?.description || 'Quasar ledger entry',
+            reference: tx.reference,
+            account: tx.account,
+          })),
+          virtualAccounts: [],
+          paymentAlerts,
+          quasarHeld,
+          allWallets: walletRow.data
+            ? [{
+                id: walletRow.data.id,
+                balance: walletInfo.balance,
+                walletType: 'SCHOOL_WALLET',
+                ownerType: 'SCHOOL',
+              }]
+            : [],
+        },
         recentUsage: usageRes.data,
         certificates,
         registeredDevices
@@ -984,9 +1417,10 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = await resolvePlatformApiKey(tenant.id);
-      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-      const quasar = new QuasarServiceModule(platformApiKey);
+      if (await rejectUnlessMakerCheckerApproved(res, tenant.id)) return;
+
+      const { getQuasarService } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarService(tenant.id, { tenantIntegrationOnly: true });
       const platformId = 'platform-admin-owner-id';
       
       const va = await quasar.createVirtualAccount({
@@ -1023,6 +1457,7 @@ export class AdminController {
   static async provisionStudentVirtualAccount(req: Request, res: Response) {
     try {
       const { id, studentId } = req.params;
+      if (await rejectUnlessMakerCheckerApproved(res, id)) return;
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
@@ -1086,6 +1521,7 @@ export class AdminController {
   static async provisionCustomerVirtualAccount(req: Request, res: Response) {
     try {
       const { id, customerId } = req.params;
+      if (await rejectUnlessMakerCheckerApproved(res, id)) return;
 
       // Get customer from database to use actual information and enforce it's fully populated
       const { data: customer, error: customerErr } = await supabaseAdmin
@@ -1121,6 +1557,7 @@ export class AdminController {
             parentId: platformId,
             currency: 'NGN',
             email: email,
+            phone: customer.phone || undefined,
             firstName: firstName,
             lastName: lastName,
             parentShareBps: 0,
@@ -1148,6 +1585,7 @@ export class AdminController {
         parentId: platformId,
         currency: 'NGN',
         email: email,
+        phone: customer.phone || undefined,
         firstName: firstName,
         lastName: lastName,
         parentShareBps: 0,
@@ -1164,38 +1602,86 @@ export class AdminController {
   /**
    * GET /admin/ledger
    * Immutable financial history with multi-tenant filtering.
+   * Falls back to transactions_log when ledger_entries is missing or unreadable.
    */
   static async listLedger(req: Request, res: Response) {
     try {
       const { tenantId, startDate, endDate, reference } = req.query;
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isSuperAdmin = role === 'super_admin';
+      const roles = String(user?.role || '')
+        .toLowerCase()
+        .split(/[,\s]+/)
+        .filter(Boolean);
+      const isPlatform = roles.some((r) =>
+        ['super_admin', 'admin', 'internal_staff', 'admin_finance'].includes(r),
+      );
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
 
-      let query = supabaseAdmin
-        .from('ledger_entries')
-        .select('*');
-
-      if (!isSuperAdmin) {
+      if (!isPlatform) {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
         }
         if (tenantId && String(tenantId) !== String(user.tenantId)) {
           return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
         }
-        query = query.eq('tenant_id', user.tenantId);
-      } else if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
       }
 
-      if (reference) query = query.ilike('reference', `%${reference}%`);
-      if (startDate) query = query.gte('created_at', startDate);
-      if (endDate) query = query.lte('created_at', endDate);
+      const scopedTenantId = !isPlatform ? user.tenantId : (tenantId || undefined);
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const applyFilters = (query: any, { allowReference = true } = {}) => {
+        let next = query;
+        if (scopedTenantId) next = next.eq('tenant_id', scopedTenantId);
+        if (allowReference && reference) next = next.ilike('reference', `%${reference}%`);
+        if (startDate) next = next.gte('created_at', startDate);
+        if (endDate) next = next.lte('created_at', endDate);
+        return next.order('created_at', { ascending: false }).limit(limit);
+      };
 
-      if (error) throw error;
-      return res.status(200).json(data);
+      const mapTxn = (row: any) => {
+        const typeRaw = String(row.type || row.entry_type || 'CREDIT').toUpperCase();
+        const isDebit = ['DEBIT', 'WITHDRAWAL', 'SWEEP', 'PAYOUT'].some((k) =>
+          typeRaw.includes(k),
+        );
+        return {
+          ...row,
+          type: isDebit ? 'DEBIT' : 'CREDIT',
+          amount: Number(row.amount || 0),
+          journal_id: row.reference || row.journal_id || row.id,
+          account: row.account || row.wallet_id || 'USER_WALLET',
+        };
+      };
+
+      const primary = await applyFilters(
+        supabaseAdmin.from('ledger_entries').select('*'),
+      );
+      const ledgerRows = primary.error ? [] : (primary.data || []);
+      if (primary.error) {
+        console.warn(
+          '[AdminController] listLedger ledger_entries failed, using transactions_log:',
+          primary.error.message,
+        );
+      }
+      if (ledgerRows.length) {
+        return res.status(200).json(ledgerRows);
+      }
+
+      const fallback = await applyFilters(
+        supabaseAdmin.from('transactions_log').select('*'),
+        { allowReference: true },
+      );
+      if (!fallback.error && (fallback.data || []).length) {
+        return res.status(200).json((fallback.data || []).map(mapTxn));
+      }
+
+      const payments = await applyFilters(
+        supabaseAdmin.from('payments').select('*'),
+        { allowReference: true },
+      );
+      if (!payments.error && (payments.data || []).length) {
+        return res.status(200).json((payments.data || []).map(mapTxn));
+      }
+
+      return res.status(200).json([]);
     } catch (error: any) {
       console.error('[AdminController] listLedger Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -1246,6 +1732,413 @@ export class AdminController {
   }
 
   /**
+   * GET /api/admin/tenant-payables
+   * Amount Invify/Quasar currently holds for each tenant (wallet + unswept VAs + unsettled card).
+   */
+  static async listTenantPayables(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' })
+      }
+      const scopedTenantId = isPlatform ? (req.query.tenantId as string | undefined) : user.tenantId
+
+      let tenantQuery = supabaseAdmin
+        .from('tenants')
+        .select('id, name, type, status, virtual_account_number, virtual_account_bank, virtual_account_status, created_at')
+        .order('name', { ascending: true })
+        .limit(500)
+      if (scopedTenantId) tenantQuery = tenantQuery.eq('id', scopedTenantId)
+
+      let walletQuery = supabaseAdmin.from('wallets').select('tenant_id, balance, updated_at').limit(500)
+      if (scopedTenantId) walletQuery = walletQuery.eq('tenant_id', scopedTenantId)
+
+      let ledgerQuery = supabaseAdmin
+        .from('ledger_entries')
+        .select('tenant_id, amount, type, entry_type, account')
+        .limit(5000)
+      if (scopedTenantId) ledgerQuery = ledgerQuery.eq('tenant_id', scopedTenantId)
+
+      let txnQuery = supabaseAdmin
+        .from('transactions_log')
+        .select('tenant_id, amount, type, status, metadata, reference, created_at')
+        .eq('status', 'SUCCESS')
+        .order('created_at', { ascending: false })
+        .limit(2000)
+      if (scopedTenantId) txnQuery = txnQuery.eq('tenant_id', scopedTenantId)
+
+      let posQuery = supabaseAdmin
+        .from('pos_transaction_attempts')
+        .select('tenant_id, amount, status, settlement_status')
+        .limit(3000)
+      if (scopedTenantId) posQuery = posQuery.eq('tenant_id', scopedTenantId)
+
+      const [tenantsRes, walletsRes, ledgerRes, txnRes, posRes] = await Promise.all([
+        tenantQuery,
+        walletQuery,
+        ledgerQuery,
+        txnQuery,
+        posQuery,
+      ])
+      if (tenantsRes.error) throw tenantsRes.error
+
+      const wallets = new Map<string, { balance: number; updated_at: string | null }>()
+      for (const row of walletsRes.data || []) {
+        wallets.set(String(row.tenant_id), {
+          balance: Number(row.balance || 0),
+          updated_at: row.updated_at || null,
+        })
+      }
+      const pendingByTenant = pendingFundsByTenant(txnRes.data || [])
+      const cardByTenant = unsettledCardByTenant({
+        posAttempts: posRes.error ? [] : (posRes.data || []),
+        transactions: txnRes.data || [],
+      })
+      const ledgerRows = ledgerRes.error ? [] : (ledgerRes.data || [])
+
+      const rows = (tenantsRes.data || []).map((tenant: any) => {
+        const stored = wallets.get(String(tenant.id))
+        const ledgerBalance = walletBalanceFromLedger(ledgerRows, tenant.id)
+        const walletBalance = ledgerBalance != null ? ledgerBalance : Number(stored?.balance || 0)
+        const pendingVa = pendingByTenant.get(String(tenant.id)) || 0
+        const unsettledCard = cardByTenant.get(String(tenant.id)) || 0
+        return {
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          type: tenant.type || '—',
+          status: tenant.status || '—',
+          walletBalance,
+          pendingVaBalance: pendingVa,
+          unsettledCardBalance: unsettledCard,
+          totalHeld: Number((walletBalance + pendingVa + unsettledCard).toFixed(2)),
+          virtualAccountNumber: tenant.virtual_account_number || null,
+          virtualAccountBank: tenant.virtual_account_bank || null,
+          virtualAccountStatus: tenant.virtual_account_status || null,
+          walletUpdatedAt: stored?.updated_at || null,
+          createdAt: tenant.created_at || null,
+        }
+      })
+
+      const totals = rows.reduce(
+        (acc, row) => {
+          acc.wallet += Number(row.walletBalance || 0)
+          acc.pendingVa += Number(row.pendingVaBalance || 0)
+          acc.unsettledCard += Number(row.unsettledCardBalance || 0)
+          acc.held += Number(row.totalHeld || 0)
+          if (row.totalHeld > 0) acc.withBalance += 1
+          return acc
+        },
+        { wallet: 0, pendingVa: 0, unsettledCard: 0, held: 0, withBalance: 0 },
+      )
+
+      return res.status(200).json({
+        rows,
+        summary: {
+          tenants: rows.length,
+          withBalance: totals.withBalance,
+          wallet: Number(totals.wallet.toFixed(2)),
+          pendingVa: Number(totals.pendingVa.toFixed(2)),
+          unsettledCard: Number(totals.unsettledCard.toFixed(2)),
+          held: Number(totals.held.toFixed(2)),
+        },
+      })
+    } catch (error: any) {
+      console.error('[AdminController] listTenantPayables Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load tenant payables' })
+    }
+  }
+
+  /**
+   * GET /api/admin/virtual-accounts
+   * Every generated Quasar/Invify NUBAN across tenants.
+   */
+  static async listVirtualAccounts(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' })
+      }
+      const scopedTenantId = isPlatform ? (req.query.tenantId as string | undefined) : user.tenantId
+
+      let customerQuery = supabaseAdmin
+        .from('customers')
+        .select('id, name, phone, email, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let staffQuery = supabaseAdmin
+        .from('users')
+        .select('id, name, phone, email, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let studentQuery = supabaseAdmin
+        .from('students')
+        .select('id, first_name, last_name, admission_number, tenant_id, school_id, virtual_account_number, virtual_account_bank, virtual_account_status')
+        .not('virtual_account_number', 'is', null)
+        .limit(1000)
+      let tenantQuery = supabaseAdmin
+        .from('tenants')
+        .select('id, name, type, virtual_account_number, virtual_account_bank, virtual_account_status')
+        .not('virtual_account_number', 'is', null)
+        .limit(500)
+      let txnQuery = supabaseAdmin
+        .from('transactions_log')
+        .select('tenant_id, amount, type, status, metadata, reference, created_at')
+        .eq('status', 'SUCCESS')
+        .order('created_at', { ascending: false })
+        .limit(2000)
+
+      if (scopedTenantId) {
+        customerQuery = customerQuery.eq('tenant_id', scopedTenantId)
+        staffQuery = staffQuery.eq('tenant_id', scopedTenantId)
+        studentQuery = studentQuery.or(`tenant_id.eq.${scopedTenantId},school_id.eq.${scopedTenantId}`)
+        tenantQuery = tenantQuery.eq('id', scopedTenantId)
+        txnQuery = txnQuery.eq('tenant_id', scopedTenantId)
+      }
+
+      const [customersRes, staffRes, studentsRes, tenantsRes, txnRes, tenantNamesRes] = await Promise.all([
+        customerQuery,
+        staffQuery,
+        studentQuery,
+        tenantQuery,
+        txnQuery,
+        supabaseAdmin.from('tenants').select('id, name, type').limit(500),
+      ])
+
+      const names = new Map<string, { name: string; type: string }>()
+      for (const t of tenantNamesRes.data || []) {
+        names.set(String(t.id), { name: t.name, type: t.type || '—' })
+      }
+      const pending = pendingFundsByVa(txnRes.data || [])
+      const seen = new Set<string>()
+      const rows: any[] = []
+
+      const push = (row: any) => {
+        const accountNumber = String(row.accountNumber || '').trim()
+        if (!accountNumber || seen.has(accountNumber)) return
+        seen.add(accountNumber)
+        rows.push(row)
+      }
+
+      for (const t of tenantsRes.data || []) {
+        push({
+          id: `tenant:${t.id}`,
+          tenantId: t.id,
+          tenantName: t.name,
+          tenantType: t.type || '—',
+          holderType: 'Tenant',
+          holderName: t.name,
+          holderId: t.id,
+          accountNumber: t.virtual_account_number,
+          bankName: t.virtual_account_bank || 'Quasar',
+          accountName: t.name,
+          status: t.virtual_account_status || 'ACTIVE',
+          balance: pending.get(String(t.virtual_account_number).trim()) || 0,
+        })
+      }
+      for (const c of customersRes.data || []) {
+        const tenant = names.get(String(c.tenant_id))
+        push({
+          id: `customer:${c.id}`,
+          tenantId: c.tenant_id,
+          tenantName: tenant?.name || '—',
+          tenantType: tenant?.type || '—',
+          holderType: 'Customer',
+          holderName: c.name,
+          holderId: c.id,
+          accountNumber: c.virtual_account_number,
+          bankName: c.virtual_account_bank || 'Quasar',
+          accountName: c.virtual_account_name || c.name,
+          status: 'ACTIVE',
+          phone: c.phone || null,
+          email: c.email || null,
+          balance: pending.get(String(c.virtual_account_number).trim()) || 0,
+        })
+      }
+      if (!staffRes.error) {
+        for (const s of staffRes.data || []) {
+          const tenant = names.get(String(s.tenant_id))
+          push({
+            id: `staff:${s.id}`,
+            tenantId: s.tenant_id,
+            tenantName: tenant?.name || '—',
+            tenantType: tenant?.type || '—',
+            holderType: 'Staff',
+            holderName: s.name,
+            holderId: s.id,
+            accountNumber: s.virtual_account_number,
+            bankName: s.virtual_account_bank || 'Quasar',
+            accountName: s.virtual_account_name || `${s.name} (Staff)`,
+            status: 'ACTIVE',
+            phone: s.phone || null,
+            email: s.email || null,
+            balance: pending.get(String(s.virtual_account_number).trim()) || 0,
+          })
+        }
+      }
+      if (!studentsRes.error) {
+        for (const st of studentsRes.data || []) {
+          const tenantId = st.tenant_id || st.school_id
+          const tenant = names.get(String(tenantId))
+          const name = `${st.first_name || ''} ${st.last_name || ''}`.trim() || st.admission_number || 'Student'
+          push({
+            id: `student:${st.id}`,
+            tenantId,
+            tenantName: tenant?.name || '—',
+            tenantType: tenant?.type || 'school',
+            holderType: 'Student',
+            holderName: name,
+            holderId: st.id,
+            accountNumber: st.virtual_account_number,
+            bankName: st.virtual_account_bank || 'Quasar',
+            accountName: name,
+            status: st.virtual_account_status || 'ACTIVE',
+            balance: pending.get(String(st.virtual_account_number).trim()) || 0,
+          })
+        }
+      }
+
+      const { applySyncedVirtualAccounts } = await import('../services/virtual-account-inventory')
+      const merged = await applySyncedVirtualAccounts(rows, names)
+      return res.status(200).json({
+        rows: merged,
+        summary: {
+          accounts: merged.length,
+          withBalance: merged.filter((r) => Number(r.balance) > 0).length,
+          pending: Number(merged.reduce((s, r) => s + Number(r.balance || 0), 0).toFixed(2)),
+          quasar: Number(merged.reduce((s, r) => s + Number(r.quasarBalance || 0), 0).toFixed(2)),
+        },
+      })
+    } catch (error: any) {
+      console.error('[AdminController] listVirtualAccounts Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load virtual accounts' })
+    }
+  }
+
+  /**
+   * POST /api/admin/virtual-accounts/refresh
+   * Pull every Quasar virtual account and store it so the inventory table matches Quasar.
+   */
+  static async refreshVirtualAccounts(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      if (!isPlatformFinanceOperator(user)) {
+        return res.status(403).json({ error: 'Platform finance access required' })
+      }
+      const { refreshAllQuasarVirtualAccounts } = await import('../services/virtual-account-inventory')
+      const result = await refreshAllQuasarVirtualAccounts()
+      return res.status(200).json(result)
+    } catch (error: any) {
+      console.error('[AdminController] refreshVirtualAccounts Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to refresh virtual accounts' })
+    }
+  }
+
+  /**
+   * GET /api/admin/virtual-accounts/:accountNumber/transactions
+   */
+  static async getVirtualAccountTransactions(req: Request, res: Response) {
+    try {
+      const user = (req as any).user
+      const isPlatform = isPlatformFinanceOperator(user)
+      const accountNumber = String(req.params.accountNumber || '').trim()
+      if (!accountNumber) return res.status(400).json({ error: 'accountNumber is required' })
+
+      const [customerRes, staffRes, studentRes, tenantRes] = await Promise.all([
+        supabaseAdmin.from('customers').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('users').select('id, name, tenant_id, virtual_account_number, virtual_account_bank, virtual_account_name').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('students').select('id, first_name, last_name, tenant_id, school_id, virtual_account_number, virtual_account_bank').eq('virtual_account_number', accountNumber).limit(1),
+        supabaseAdmin.from('tenants').select('id, name, virtual_account_number, virtual_account_bank').eq('virtual_account_number', accountNumber).limit(1),
+      ])
+
+      const customer = customerRes.data?.[0]
+      const staff = staffRes.error ? null : staffRes.data?.[0]
+      const student = studentRes.error ? null : studentRes.data?.[0]
+      const tenantOwner = tenantRes.data?.[0]
+
+      const owner = customer
+        ? { holderType: 'Customer', holderName: customer.name, holderId: customer.id, tenantId: customer.tenant_id, bankName: customer.virtual_account_bank, accountName: customer.virtual_account_name || customer.name }
+        : staff
+          ? { holderType: 'Staff', holderName: staff.name, holderId: staff.id, tenantId: staff.tenant_id, bankName: staff.virtual_account_bank, accountName: staff.virtual_account_name || staff.name }
+          : student
+            ? { holderType: 'Student', holderName: `${student.first_name || ''} ${student.last_name || ''}`.trim(), holderId: student.id, tenantId: student.tenant_id || student.school_id, bankName: student.virtual_account_bank, accountName: `${student.first_name || ''} ${student.last_name || ''}`.trim() }
+            : tenantOwner
+              ? { holderType: 'Tenant', holderName: tenantOwner.name, holderId: tenantOwner.id, tenantId: tenantOwner.id, bankName: tenantOwner.virtual_account_bank, accountName: tenantOwner.name }
+              : null
+
+      if (owner?.tenantId && !isPlatform && String(user?.tenantId) !== String(owner.tenantId)) {
+        return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' })
+      }
+
+      const loadTxns = async (tenantId?: string | null) => {
+        // Never request channel/provider — those columns are not on transactions_log.
+        let query = supabaseAdmin
+          .from('transactions_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(800)
+        if (tenantId) query = query.eq('tenant_id', tenantId)
+        const { data, error } = await query
+        if (error) throw error
+        return data || []
+      }
+
+      const scopedTenant = owner?.tenantId || (!isPlatform ? user?.tenantId : null)
+      let rawTxns = await loadTxns(scopedTenant)
+      let matched = rawTxns.filter((tx) => virtualAccountMatches(tx, accountNumber))
+      if (!matched.length && isPlatform && scopedTenant) {
+        rawTxns = await loadTxns(null)
+        matched = rawTxns.filter((tx) => virtualAccountMatches(tx, accountNumber))
+      }
+      if (!matched.length) {
+        const targeted = await supabaseAdmin
+          .from('transactions_log')
+          .select('*')
+          .or(
+            [
+              `reference.ilike.%${accountNumber}%`,
+              `metadata->>virtualAccountNumber.eq.${accountNumber}`,
+              `metadata->>accountNumber.eq.${accountNumber}`,
+              `metadata->>virtual_account_number.eq.${accountNumber}`,
+              `metadata->>account_number.eq.${accountNumber}`,
+            ].join(','),
+          )
+          .order('created_at', { ascending: false })
+          .limit(200)
+        if (!targeted.error) {
+          matched = (targeted.data || []).filter((tx) => !scopedTenant || isPlatform || String(tx.tenant_id) === String(scopedTenant))
+        }
+      }
+      const transactions = matched.map(formatVaTransaction)
+
+      const credits = transactions.filter((t) => t.type === 'CREDIT').reduce((s, t) => s + t.amount, 0)
+      const debits = transactions.filter((t) => t.type === 'DEBIT').reduce((s, t) => s + t.amount, 0)
+      const tenantName = owner?.tenantId
+        ? (await supabaseAdmin.from('tenants').select('name').eq('id', owner.tenantId).maybeSingle()).data?.name
+        : null
+
+      return res.status(200).json({
+        account: {
+          accountNumber,
+          bankName: owner?.bankName || 'Quasar',
+          accountName: owner?.accountName || accountNumber,
+          holderType: owner?.holderType || 'Unknown',
+          holderName: owner?.holderName || '—',
+          holderId: owner?.holderId || null,
+          tenantId: owner?.tenantId || null,
+          tenantName: tenantName || '—',
+          balance: Number((credits - debits).toFixed(2)),
+        },
+        transactions,
+      })
+    } catch (error: any) {
+      console.error('[AdminController] getVirtualAccountTransactions Error:', error.message)
+      return res.status(500).json({ error: error.message || 'Failed to load virtual account transactions' })
+    }
+  }
+
+  /**
    * GET /admin/dashboard-stats
    * Scoped insights for School Owners and Admins.
    */
@@ -1266,17 +2159,13 @@ export class AdminController {
       ] = await Promise.all([
         supabaseAdmin
           .from('invoices')
-          .select('amount_paid, payment_status')
+          .select('invoice_number, amount_paid, payment_status, total_amount, created_at')
           .eq('tenant_id', targetTenantId),
         supabaseAdmin
           .from('students')
           .select('id', { count: 'exact', head: true })
           .or(`tenant_id.eq.${targetTenantId},school_id.eq.${targetTenantId}`),
-        supabaseAdmin
-          .from('wallets')
-          .select('balance')
-          .eq('tenant_id', targetTenantId)
-          .maybeSingle(),
+        WalletService.getBalance(String(targetTenantId)),
         supabaseAdmin
           .from('transactions_log')
           .select('amount, type')
@@ -1293,9 +2182,17 @@ export class AdminController {
 
       const invoices = invoicesRes.data || [];
       const totalRevenue = invoices.reduce(
-        (sum, inv) => sum + Number(inv.amount_paid || 0),
+        (sum, inv) => sum + collectedInvoiceAmount(inv),
         0,
       );
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const monthlyRevenue = invoices.reduce((sum, inv) => {
+        const created = Date.parse(String((inv as any).created_at || ''));
+        if (!Number.isFinite(created) || created < monthStart.getTime()) return sum;
+        return sum + collectedInvoiceAmount(inv);
+      }, 0);
       const pendingInvoices = invoices.filter((inv) => {
         const status = String(inv.payment_status || '').toLowerCase();
         return status && !['paid', 'success', 'completed'].includes(status);
@@ -1308,10 +2205,10 @@ export class AdminController {
 
       let stats = {
         total_revenue: totalRevenue,
-        monthly_revenue: totalRevenue,
+        monthly_revenue: monthlyRevenue,
         active_students: studentsRes.count || 0,
         pending_invoices: pendingInvoices,
-        internal_wallet: Number(walletRes.data?.balance || 0),
+        internal_wallet: Number(walletRes?.balance || 0),
         cash_on_hand: 0,
         pending_quasar: pendingQuasar,
       };
@@ -1326,10 +2223,6 @@ export class AdminController {
           const row = Array.isArray(rpcStats) ? rpcStats[0] : rpcStats;
           if (row && Number(row.active_students) > 0) {
             stats.active_students = Number(row.active_students);
-          }
-          if (row && Number(row.total_revenue) > stats.total_revenue) {
-            stats.total_revenue = Number(row.total_revenue);
-            stats.monthly_revenue = Number(row.total_revenue);
           }
         }
       } catch (_) {
@@ -1499,7 +2392,7 @@ export class AdminController {
       if (user.tenant_id) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, phone, country, state, lga, street_address, settings, kyc_data, kyc_status')
+          .select('id, name, phone, country, state, lga, street_address, owner_email, owner_name, settings, kyc_data, kyc_status')
           .eq('id', user.tenant_id)
           .maybeSingle();
         tenant = tenantRow;
@@ -1507,15 +2400,26 @@ export class AdminController {
 
       const ownerProfile = (tenant?.settings as any)?.owner_profile || {};
       const nameParts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+      const streetAddress = String(
+        ownerProfile.streetAddress || ownerProfile.address || tenant?.street_address || '',
+      ).trim();
+      const city = String(ownerProfile.city || tenant?.lga || '').trim();
+      const state = String(ownerProfile.state || tenant?.state || '').trim();
+      const country = String(ownerProfile.country || tenant?.country || '').trim();
+      const address = [streetAddress, city, state, country].filter(Boolean).join(', ');
 
       return res.status(200).json({
         firstName: ownerProfile.firstName || nameParts[0] || '',
         lastName: ownerProfile.lastName || nameParts.slice(1).join(' ') || '',
-        email: user.email,
-        phone: ownerProfile.phone || tenant?.phone || '',
+        ownerName: tenant?.owner_name || [ownerProfile.firstName, ownerProfile.lastName].filter(Boolean).join(' ') || user.name || '',
+        email: user.email || tenant?.owner_email || ownerProfile.email || '',
+        phone: ownerProfile.phone || tenant?.phone || user.phone || '',
         businessName: ownerProfile.businessName || tenant?.name || '',
-        city: ownerProfile.city || tenant?.lga || '',
-        country: ownerProfile.country || tenant?.country || 'Nigeria',
+        streetAddress,
+        address,
+        city,
+        state,
+        country: country || 'Nigeria',
         bio: ownerProfile.bio || '',
         role: user.role,
         tenantId: user.tenant_id,
@@ -1573,7 +2477,7 @@ export class AdminController {
       if (hasProfileFields && tenantId) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
-          .select('settings, name, phone, country, lga')
+          .select('settings, name, phone, country, lga, owner_email, owner_name')
           .eq('id', tenantId)
           .maybeSingle();
 
@@ -1581,6 +2485,12 @@ export class AdminController {
           ? { ...(tenantRow.settings as object) }
           : {};
         const prevOwner = (existingSettings as any).owner_profile || {};
+        const { data: currentUser } = await supabaseAdmin
+          .from('users')
+          .select('email')
+          .eq('id', userId)
+          .maybeSingle();
+        const ownerEmail = String(currentUser?.email || prevOwner.email || '').trim().toLowerCase();
         const owner_profile = {
           ...prevOwner,
           ...(firstName !== undefined ? { firstName: String(firstName || '').trim() } : {}),
@@ -1590,6 +2500,7 @@ export class AdminController {
           ...(city !== undefined ? { city: String(city || '').trim() } : {}),
           ...(country !== undefined ? { country: String(country || '').trim() } : {}),
           ...(bio !== undefined ? { bio: String(bio || '').trim() } : {}),
+          ...(ownerEmail ? { email: ownerEmail } : {}),
           updatedAt: new Date().toISOString(),
           updatedBy: userId,
         };
@@ -1597,6 +2508,9 @@ export class AdminController {
         const tenantUpdate: Record<string, any> = {
           settings: { ...existingSettings, owner_profile },
         };
+        if (ownerEmail && !tenantRow?.owner_email) {
+          tenantUpdate.owner_email = ownerEmail;
+        }
 
         // Keep tenant business/contact/location in sync for Admin Portal
         if (businessName !== undefined && String(businessName).trim()) {
@@ -1812,20 +2726,65 @@ export class AdminController {
         return res.status(400).json({ error: 'No CAC document uploaded.' });
       }
 
-      const { tenantId } = (req as any).user;
-      const fileUrl = `/uploads/cac/${file.filename}`;
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const bucket = resolveContaboBucket();
+      if (!bucket) {
+        return res.status(503).json({ error: 'Object storage is not configured (CONTABO_BUCKET is missing).' });
+      }
 
-      const { error } = await supabaseAdmin
+      const original = String(file.originalname || 'cac_document.jpg');
+      const ext = (original.includes('.') ? original.slice(original.lastIndexOf('.')) : '.jpg').toLowerCase();
+      const objectKey = `tenants/${tenantId}/cac/${Date.now()}${ext || '.jpg'}`;
+      const body = file.buffer;
+      if (!body || !body.length) {
+        return res.status(400).json({ error: 'CAC document file was empty.' });
+      }
+
+      await putContaboObject({
+        bucket,
+        key: objectKey,
+        body,
+        contentType: file.mimetype || 'image/jpeg',
+      });
+
+      const fileUrl = publicContaboObjectUrl(objectKey);
+
+      const { data: tenant, error: readError } = await supabaseAdmin
         .from('tenants')
-        .update({ cac_document_url: fileUrl })
-        .eq('id', tenantId);
+        .select('settings')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (readError) throw readError;
 
-      if (error) throw error;
+      const existingSettings = tenant?.settings && typeof tenant.settings === 'object' ? tenant.settings : {};
+      const { error: saveError } = await supabaseAdmin
+        .from('tenants')
+        .update({
+          settings: {
+            ...existingSettings,
+            cac_document_url: fileUrl,
+            cac_uploaded_at: new Date().toISOString(),
+          },
+          kyc_status: 'PENDING',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenantId);
+      if (saveError) throw saveError;
+
+      await supabaseAdmin.from('tenant_kyc_documents').insert({
+        tenant_id: tenantId,
+        document_type: 'CAC',
+        document_url: fileUrl,
+        status: 'PENDING',
+      }).then(({ error }) => {
+        if (error) console.warn('[AdminController] tenant_kyc_documents skip:', error.message);
+      });
 
       return res.status(200).json({ message: 'CAC document uploaded successfully', url: fileUrl });
     } catch (error: any) {
+      const status = error.status || 500;
       console.error('[AdminController] uploadCacDocument Error:', error.message);
-      return res.status(500).json({ error: error.message });
+      return res.status(status).json({ error: error.message || 'Failed to upload CAC document' });
     }
   }
 

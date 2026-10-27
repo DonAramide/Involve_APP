@@ -1,29 +1,27 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/utils/logo_processor.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../settings/presentation/bloc/staff_bloc.dart';
 import '../../../settings/presentation/bloc/staff_state.dart';
 import '../../../settings/domain/entities/settings.dart';
+import '../../../dashboard/domain/dashboard_menu_catalog.dart';
 import '../../../settings/domain/entities/staff.dart';
 import '../../../settings/presentation/widgets/upgrade_dialog.dart';
-import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:signature/signature.dart';
 import 'two_factor_auth_page.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
-import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/utils/nigerian_banks.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -149,6 +147,28 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 _buildSwitchTile('Merge POS Receipt into Invoice', settings.mergePosReceipt, (val) => _update(context, settings.copyWith(mergePosReceipt: val))),
                 _buildSwitchTile('Enable Tenant Receipt Copy', settings.enableTenantReceiptCopy, (val) => _update(context, settings.copyWith(enableTenantReceiptCopy: val))),
                 _buildSwitchTile('Allow Give Change', settings.allowGiveChange, (val) => _update(context, settings.copyWith(allowGiveChange: val))),
+                if (settings.isServicesMode) ...[
+                  ListTile(
+                    leading: Icon(Icons.handyman_outlined, color: Theme.of(context).colorScheme.primary),
+                    title: const Text('Create Job sections'),
+                    subtitle: Text(
+                      [
+                        if (settings.servicesMaterialsEnabled) 'Materials',
+                        if (settings.servicesLaborEnabled) 'Labor',
+                        if (settings.servicesDescriptionFormatEnabled) 'Add category',
+                      ].isEmpty
+                          ? 'Materials, Labor, and Add category hidden on Create Job'
+                          : [
+                              if (settings.servicesMaterialsEnabled) 'Materials',
+                              if (settings.servicesLaborEnabled) 'Labor',
+                              if (settings.servicesDescriptionFormatEnabled) 'Add category',
+                            ].join(', ') +
+                              ' enabled on Create Job',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showMaterialsLaborDialog(context, settings),
+                  ),
+                ],
                 const Divider(),
 
                 // 4. Account Details
@@ -156,9 +176,19 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 _buildSwitchTile('Always Show Account Details on Receipt', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
                 _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
                 if (settings.showAccountDetails) ...[
-                  _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
-                  _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
-                  _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
+                  ListTile(
+                    leading: const Icon(Icons.account_balance, color: Colors.blue),
+                    title: const Text('Bank & Account Details'),
+                    subtitle: Text(
+                      (settings.accountNumber?.isNotEmpty == true && settings.bankName?.isNotEmpty == true)
+                          ? '${settings.bankName} • ${settings.accountNumber}\n${settings.accountName ?? ''}'
+                          : 'Tap to configure bank account for receipts (validated via Quasar)',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    isThreeLine: settings.accountNumber?.isNotEmpty == true,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showConfigureReceiptAccountDialog(context, settings),
+                  ),
                 ],
                 const Divider(),
 
@@ -193,7 +223,12 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 _buildSwitchTile('Show Stock Value Pie Chart', settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))),
                 const Divider(),
 
-                // 8. Security
+                // 8. Admin Control — home dashboard icons
+                _buildSectionHeader(context, 'Admin Control'),
+                _buildAdminControlSection(context, settings),
+                const Divider(),
+
+                // 9. Security
                 _buildSectionHeader(context, 'Security'),
                 ListTile(
                   title: const Text('Change System Password'),
@@ -207,7 +242,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 ),
                 const Divider(),
 
-                // 9. Data Management
+                // 10. Data Management
                 _buildSectionHeader(context, 'Data Management'),
                 ListTile(
                   title: const Text('Restore Backup'),
@@ -228,6 +263,148 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
   void _update(BuildContext context, AppSettings settings) {
     context.read<SettingsBloc>().add(UpdateAppSettings(settings));
+  }
+
+  void _setDashboardIconVisible(
+    BuildContext context,
+    AppSettings settings,
+    String id,
+    bool visible,
+  ) {
+    if (DashboardMenuCatalog.isPinned(id)) return;
+    final hidden = List<String>.from(settings.hiddenDashboardIcons);
+    if (visible) {
+      hidden.remove(id);
+    } else if (!hidden.contains(id)) {
+      hidden.add(id);
+    }
+    _update(context, settings.copyWith(hiddenDashboardIcons: hidden));
+  }
+
+  Widget _buildAdminControlSection(BuildContext context, AppSettings settings) {
+    final options = DashboardMenuCatalog.forMode(settings.normalizedBusinessMode);
+    final hidden = settings.hiddenDashboardIcons;
+    final hiddenCount = hidden.where((id) => !DashboardMenuCatalog.isPinned(id)).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'Choose which menu icons appear on the home dashboard. Linked devices start with Admin Hub only; you can turn other icons back on here. Admin Hub always stays visible.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+        ),
+        if (hiddenCount > 0)
+          ListTile(
+            leading: const Icon(Icons.visibility_outlined),
+            title: const Text('Show all icons'),
+            subtitle: Text('$hiddenCount currently hidden'),
+            onTap: () => _update(
+              context,
+              settings.copyWith(hiddenDashboardIcons: const []),
+            ),
+          ),
+        ...options.map((option) {
+          final pinned = option.pinned;
+          final visible = pinned || !hidden.contains(option.id);
+          return SwitchListTile(
+            title: Text(option.label),
+            subtitle: Text(
+              pinned
+                  ? 'Always visible — required to open System Setup'
+                  : visible
+                      ? 'Visible on home dashboard'
+                      : 'Hidden from home dashboard',
+            ),
+            value: visible,
+            onChanged: pinned
+                ? null
+                : (val) => _setDashboardIconVisible(context, settings, option.id, val),
+          );
+        }),
+      ],
+    );
+  }
+
+  void _showMaterialsLaborDialog(BuildContext context, AppSettings settings) {
+    var materials = settings.servicesMaterialsEnabled;
+    var labor = settings.servicesLaborEnabled;
+    var addCategory = settings.servicesDescriptionFormatEnabled;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Create Job sections'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Choose which sections appear when creating a service job.',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: materials
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Materials', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Parts and items on Create Job'),
+                value: materials,
+                onChanged: (val) => setDialogState(() => materials = val ?? false),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: labor
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Labor', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Workmanship fee on Create Job'),
+                value: labor,
+                onChanged: (val) => setDialogState(() => labor = val ?? false),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                secondary: addCategory
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                title: const Text('Add category', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Description format tables on Create Job'),
+                value: addCategory,
+                onChanged: (val) => setDialogState(() => addCategory = val ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _update(
+                  context,
+                  settings.copyWith(
+                    servicesMaterialsEnabled: materials,
+                    servicesLaborEnabled: labor,
+                    servicesDescriptionFormatEnabled: addCategory,
+                  ),
+                );
+              },
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSectionHeader(BuildContext context, String title, {bool isPro = false}) {
@@ -325,20 +502,433 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     );
   }
 
+  Future<void> _showConfigureReceiptAccountDialog(BuildContext context, AppSettings settings) async {
+    List<Map<String, String>> banks = [];
+    bool loadingBanks = true;
+    bool banksLoadStarted = false;
+    String? selectedBankCode;
+    String? selectedBankName = settings.bankName;
+    final accountNumberController = TextEditingController(text: settings.accountNumber);
+    final accountNameController = TextEditingController(text: settings.accountName);
+    bool resolving = false;
+    String? resolveError;
+    Timer? resolveDebounce;
+
+    Future<void> loadBanks(StateSetter dialogSetState) async {
+      try {
+        final repo = context.read<FinanceRepository>();
+        final raw = await repo.getPayoutBanks(country: 'nigeria');
+        final mapped = raw
+            .map((b) {
+              final name = (b['name'] ?? b['bank_name'] ?? b['bankName'] ?? '').toString().trim();
+              final code = (b['code'] ?? b['bank_code'] ?? b['bankCode'] ?? '').toString().trim();
+              return {'name': name, 'code': code};
+            })
+            .where((b) => b['name']!.isNotEmpty && b['code']!.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
+
+        final effectiveBanks = mapped.isNotEmpty
+            ? mapped
+            : kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+
+        if (selectedBankName != null && selectedBankName!.isNotEmpty) {
+          final needle = selectedBankName!.toLowerCase();
+          for (final b in effectiveBanks) {
+            final n = b['name']!.toLowerCase();
+            if (n == needle || n.contains(needle)) {
+              selectedBankCode = b['code'];
+              selectedBankName = b['name'];
+              break;
+            }
+          }
+        }
+
+        dialogSetState(() {
+          banks = effectiveBanks;
+          loadingBanks = false;
+        });
+      } catch (_) {
+        dialogSetState(() {
+          banks = kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+          loadingBanks = false;
+        });
+      }
+    }
+
+    Future<void> resolveName(StateSetter dialogSetState) async {
+      final acct = accountNumberController.text.trim();
+      final code = selectedBankCode?.trim() ?? '';
+      if (acct.length < 10 || code.isEmpty) {
+        dialogSetState(() {
+          resolving = false;
+          resolveError = null;
+        });
+        return;
+      }
+
+      dialogSetState(() {
+        resolving = true;
+        resolveError = null;
+        accountNameController.clear();
+      });
+
+      try {
+        final repo = context.read<FinanceRepository>();
+        final result = await repo.resolvePayoutAccount(
+          accountNumber: acct,
+          bankCode: code,
+        );
+        final resolved = (result['account_name'] ??
+                result['accountName'] ??
+                result['AccountName'] ??
+                '')
+            .toString()
+            .trim();
+        dialogSetState(() {
+          if (resolved.isNotEmpty) {
+            accountNameController.text = resolved;
+            resolveError = null;
+          } else {
+            accountNameController.clear();
+            resolveError = 'Could not validate account with Quasar. Please verify bank and account number.';
+          }
+          resolving = false;
+        });
+      } catch (_) {
+        dialogSetState(() {
+          accountNameController.clear();
+          resolving = false;
+          resolveError = 'Could not validate account with Quasar. Please check network and account details.';
+        });
+      }
+    }
+
+    void schedule(StateSetter dialogSetState) {
+      resolveDebounce?.cancel();
+      resolveDebounce = Timer(const Duration(milliseconds: 550), () => resolveName(dialogSetState));
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, dialogSetState) {
+          if (!banksLoadStarted) {
+            banksLoadStarted = true;
+            Future.microtask(() => loadBanks(dialogSetState));
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Row(
+              children: [
+                Icon(Icons.account_balance, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Receipt Bank Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select your bank and enter your 10-digit account number. Quasar will automatically validate and retrieve the account name for your receipts.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  if (loadingBanks)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    )
+                  else
+                    InkWell(
+                      onTap: () {
+                        _showBankSearchDialog(
+                          context: ctx,
+                          banks: banks,
+                          selectedCode: selectedBankCode,
+                          onSelected: (bank) {
+                            dialogSetState(() {
+                              selectedBankCode = bank['code'];
+                              selectedBankName = bank['name'];
+                              accountNameController.clear();
+                              resolveError = null;
+                            });
+                            if (accountNumberController.text.trim().length == 10) {
+                              schedule(dialogSetState);
+                            }
+                          },
+                        );
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Bank',
+                          hintText: 'Select bank (Tap to search)',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.search, color: Colors.blue),
+                        ),
+                        child: Text(
+                          selectedBankName?.isNotEmpty == true
+                              ? selectedBankName!
+                              : 'Select bank (Tap to search)',
+                          style: TextStyle(
+                            color: selectedBankName?.isNotEmpty == true ? Colors.black : Colors.grey.shade500,
+                            fontWeight: selectedBankName?.isNotEmpty == true ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: accountNumberController,
+                    decoration: InputDecoration(
+                      labelText: 'Account Number',
+                      hintText: '10-digit NUBAN',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: resolving
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : null,
+                    ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    onChanged: (val) {
+                      final trimmed = val.trim();
+                      if (trimmed.length < 10) {
+                        resolveDebounce?.cancel();
+                        dialogSetState(() {
+                          resolving = false;
+                          accountNameController.clear();
+                          resolveError = null;
+                        });
+                      } else if (trimmed.length == 10) {
+                        schedule(dialogSetState);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: accountNameController,
+                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                    readOnly: true,
+                    enableInteractiveSelection: false,
+                    decoration: InputDecoration(
+                      labelText: 'Account Name (Auto-populated)',
+                      hintText: resolving ? 'Validating with Quasar…' : 'Auto-populated from Quasar',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.verified_user_outlined, size: 20, color: Colors.blue),
+                      suffixIcon: resolving
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : accountNameController.text.isNotEmpty
+                              ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                              : (selectedBankCode != null && accountNumberController.text.trim().length == 10)
+                                  ? IconButton(
+                                      icon: const Icon(Icons.refresh, size: 18, color: Colors.blue),
+                                      tooltip: 'Retry Quasar validation',
+                                      onPressed: () => resolveName(dialogSetState),
+                                    )
+                                  : null,
+                      helperText: resolveError ?? (accountNameController.text.isNotEmpty ? '✓ Validated by Quasar' : null),
+                      helperMaxLines: 2,
+                      helperStyle: TextStyle(
+                        color: resolveError != null ? Colors.red[700] : Colors.green[700],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              if (settings.accountNumber?.isNotEmpty == true || settings.bankName?.isNotEmpty == true)
+                TextButton(
+                  onPressed: () {
+                    resolveDebounce?.cancel();
+                    Navigator.pop(ctx);
+                    _update(context, settings.copyWith(bankName: '', accountNumber: '', accountName: ''));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Receipt account details cleared')),
+                    );
+                  },
+                  child: const Text('CLEAR', style: TextStyle(color: Colors.red)),
+                ),
+              TextButton(
+                onPressed: () {
+                  resolveDebounce?.cancel();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('CANCEL'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final acct = accountNumberController.text.trim();
+                  final bank = selectedBankName?.trim() ?? '';
+                  final name = accountNameController.text.trim();
+
+                  if (acct.isEmpty && bank.isEmpty && name.isEmpty) {
+                    Navigator.pop(ctx);
+                    return;
+                  }
+
+                  if (selectedBankCode == null || bank.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please select a bank.'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  if (acct.length != 10) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a 10-digit account number.'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  if (resolving) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Validating account with Quasar. Please wait…'), backgroundColor: Colors.orange),
+                    );
+                    return;
+                  }
+
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Account name must be validated by Quasar before saving.'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  resolveDebounce?.cancel();
+                  Navigator.pop(ctx);
+                  _update(context, settings.copyWith(bankName: bank, accountNumber: acct, accountName: name));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Receipt account details updated and verified!'), backgroundColor: Colors.green),
+                  );
+                },
+                child: const Text('SAVE'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(() => resolveDebounce?.cancel());
+  }
+
   void _showChangePassword(BuildContext context) {
-    final controller = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscurePassword = true;
+    bool obscureConfirm = true;
+    String? errorMessage;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set New Password'),
-        content: TextField(controller: controller, obscureText: true, decoration: const InputDecoration(labelText: 'New Password')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          TextButton(onPressed: () {
-            context.read<SettingsBloc>().add(SetSystemPassword(controller.text));
-            Navigator.pop(ctx);
-          }, child: const Text('SET')),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.blueAccent),
+              SizedBox(width: 8),
+              Text('Set New Password'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter a new unlock password for this device and confirm it below.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmController,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    prefixIcon: const Icon(Icons.lock_clock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pwd = passwordController.text.trim();
+                final confirm = confirmController.text.trim();
+                if (pwd.isEmpty) {
+                  setDialogState(() => errorMessage = 'Password cannot be empty');
+                  return;
+                }
+                if (pwd.length < 4) {
+                  setDialogState(() => errorMessage = 'Password must be at least 4 characters');
+                  return;
+                }
+                if (pwd != confirm) {
+                  setDialogState(() => errorMessage = 'Passwords do not match');
+                  return;
+                }
+                context.read<SettingsBloc>().add(SetSystemPassword(pwd));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('System password updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('SET PASSWORD'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -481,14 +1071,16 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
           settings.staffManagementEnabled, 
           (val) => _update(context, settings.copyWith(staffManagementEnabled: val)),
         ),
-        if (settings.staffManagementEnabled)
-          BlocBuilder<StaffBloc, StaffState>(
+        BlocBuilder<StaffBloc, StaffState>(
             builder: (context, state) {
+              if (!settings.staffManagementEnabled && state.staffList.isEmpty) {
+                return const SizedBox.shrink();
+              }
               if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING STAFF CONFIGURATION...');
               
               final userPlan = context.read<SettingsBloc>().state.userPlan;
-              final isBasicPlan = userPlan == null || userPlan.isBasic;
-              final canAddStaff = !isBasicPlan || state.staffList.length < 2;
+              final isBasicOrFreeTier = userPlan == null || userPlan.isBasicOrFreeTier;
+              final canAddStaff = !isBasicOrFreeTier || state.staffList.length < 2;
 
               return Column(
                 children: [
@@ -513,7 +1105,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   ListTile(
                     leading: Icon(canAddStaff ? Icons.add : Icons.lock, color: canAddStaff ? Colors.blue : Colors.orange),
                     title: Text(
-                      canAddStaff ? 'Add Staff' : 'Add Staff (Max 2 reached on Basic Plan)', 
+                      canAddStaff ? 'Add Staff' : 'Add Staff (Max 2 reached on Basic / Free Tier)', 
                       style: TextStyle(color: canAddStaff ? Colors.blue : Colors.orange, fontWeight: FontWeight.bold),
                     ),
                     trailing: canAddStaff ? null : _buildProBadge(),
@@ -523,7 +1115,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Basic Plan supports a maximum of 2 staff accounts. Please upgrade to add more.'),
+                            content: Text('Basic and Free Tier plans support a maximum of 2 staff accounts. Please upgrade your plan to add more staff.'),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -540,13 +1132,30 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
   }
 
   void _showStaffDialog(BuildContext context, {Staff? staff}) {
+    final userPlan = context.read<SettingsBloc>().state.userPlan;
+    final isBasicOrFreeTier = userPlan == null || userPlan.isBasicOrFreeTier;
+
+    if (staff == null) {
+      final staffCount = context.read<StaffBloc>().state.staffList.length;
+
+      if (isBasicOrFreeTier && staffCount >= 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Basic and Free Tier plans support a maximum of 2 staff accounts. Please upgrade your plan to add more staff.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        showDialog(context: context, builder: (_) => const UpgradeDialog());
+        return;
+      }
+    }
     final nameController = TextEditingController(text: staff?.name);
     final existingCode = staff?.staffCode;
     final isCodeHashed = existingCode != null && existingCode.length > 4;
     final pin = isCodeHashed ? '' : existingCode;
     final codeController = TextEditingController(text: pin);
     final staffIdController = TextEditingController(text: staff?.staffId);
-    final phoneController = TextEditingController(text: staff?.phone);
+    final phoneController = TextEditingController(text: PhoneNumberInput.clamp(staff?.phone));
     final virtualBankNameController = TextEditingController(text: staff?.virtualBankName);
     final virtualAccountNumberController = TextEditingController(text: staff?.virtualAccountNumber);
     final virtualAccountNameController = TextEditingController(text: staff?.virtualAccountName);
@@ -559,13 +1168,17 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     String? selectedBankCode = staff?.bankCode?.trim().isNotEmpty == true
         ? staff!.bankCode!.trim()
         : null;
-    bool loadingBanks = true;
+    bool loadingBanks = !isBasicOrFreeTier;
     bool banksLoadStarted = false;
     bool resolvingAccount = false;
     String? resolveError;
     Timer? resolveDebounce;
 
     Future<void> loadBanks(StateSetter dialogSetState) async {
+      if (isBasicOrFreeTier) {
+        dialogSetState(() => loadingBanks = false);
+        return;
+      }
       try {
         final repo = context.read<FinanceRepository>();
         final raw = await repo.getPayoutBanks(country: 'nigeria');
@@ -583,12 +1196,16 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             .toList()
           ..sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
 
+        final effectiveBanks = mapped.isNotEmpty
+            ? mapped
+            : kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+
         // If editing with a bank name but missing code, try match by name
         if ((selectedBankCode == null || selectedBankCode!.isEmpty) &&
             (staff?.virtualBankName?.trim().isNotEmpty ?? false)) {
           final needle = staff!.virtualBankName!.trim().toLowerCase();
           Map<String, String>? match;
-          for (final b in mapped) {
+          for (final b in effectiveBanks) {
             final n = b['name']!.toLowerCase();
             if (n == needle || n.contains(needle)) {
               match = b;
@@ -603,8 +1220,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         }
 
         dialogSetState(() {
-          banks = mapped;
+          banks = effectiveBanks;
           loadingBanks = false;
+          resolveError = null;
           if (selectedBankCode != null) {
             final stillThere = banks.any((b) => b['code'] == selectedBankCode);
             if (!stillThere) selectedBankCode = null;
@@ -613,10 +1231,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
       } catch (e) {
         dialogSetState(() {
           loadingBanks = false;
-          resolveError = friendlyApiError(
-            e,
-            fallback: 'Could not load banks from Quasar. Check connection.',
-          );
+          banks = kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+          resolveError = null;
         });
       }
     }
@@ -635,6 +1251,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
       dialogSetState(() {
         resolvingAccount = true;
         resolveError = null;
+        virtualAccountNameController.clear();
       });
 
       try {
@@ -652,19 +1269,18 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         dialogSetState(() {
           if (resolvedName.isNotEmpty) {
             virtualAccountNameController.text = resolvedName;
+            resolveError = null;
+          } else {
+            virtualAccountNameController.clear();
+            resolveError = 'Could not validate account with Quasar. Please verify bank and account number.';
           }
           resolvingAccount = false;
-          resolveError = resolvedName.isEmpty
-              ? 'Account name not found. Verify bank and account number.'
-              : null;
         });
       } catch (e) {
         dialogSetState(() {
+          virtualAccountNameController.clear();
           resolvingAccount = false;
-          resolveError = friendlyApiError(
-            e,
-            fallback: 'Could not resolve account name. Verify bank and account number.',
-          );
+          resolveError = 'Could not validate account with Quasar. Please check network and account details.';
         });
       }
     }
@@ -748,55 +1364,119 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
                       ),
                       keyboardType: TextInputType.phone,
+                      inputFormatters: PhoneNumberInput.formatters,
+                      maxLength: PhoneNumberInput.maxDigits,
+                      validator: (val) => PhoneNumberInput.validate(val),
                     ),
                     const SizedBox(height: 20),
 
-                    // Staff personal bank (salary / payout destination) — Quasar banks + name enquiry
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    if (isBasicOrFreeTier) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Text(
-                                  'STAFF PERSONAL BANK ACCOUNT',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                    letterSpacing: 0.5,
+                                Icon(Icons.lock_outline, size: 18, color: Colors.amber.shade900),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Staff Bank Account & Virtual Account',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade900,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Banks & account name from Quasar (optional)',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
+                                _buildProBadge(),
                               ],
                             ),
-                          ),
-                          if (staff != null)
-                            TextButton.icon(
-                              icon: const Icon(Icons.autorenew, size: 14),
-                              label: const Text('GENERATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                              onPressed: () => _generateStaffVirtualAccount(
-                                ctx,
-                                staff,
-                                virtualBankNameController,
-                                virtualAccountNumberController,
-                                virtualAccountNameController,
-                                dialogSetState,
+                            const SizedBox(height: 6),
+                            Text(
+                              'Entering staff personal bank accounts for salary payouts and generating dedicated Quasar Virtual Accounts are available on all plans except Basic and Free Tier.',
+                              style: TextStyle(fontSize: 11, color: Colors.amber.shade900, height: 1.35),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(context: context, builder: (_) => const UpgradeDialog());
+                                },
+                                icon: const Icon(Icons.star, size: 14),
+                                label: const Text('UPGRADE PLAN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.amber.shade800,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                ),
                               ),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      // Staff personal bank (salary / payout destination) — Quasar banks + name enquiry
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'STAFF PERSONAL BANK ACCOUNT',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Banks & account name from Quasar (optional)',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (staff != null)
+                              TextButton.icon(
+                                icon: const Icon(Icons.autorenew, size: 14),
+                                label: const Text('GENERATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                onPressed: () => _generateStaffVirtualAccount(
+                                  ctx,
+                                  staff,
+                                  virtualBankNameController,
+                                  virtualAccountNumberController,
+                                  virtualAccountNameController,
+                                  dialogSetState,
+                                  banks: banks,
+                                  onBankCodeResolved: (code) {
+                                    selectedBankCode = code;
+                                    bankCodeController.text = code;
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     if (loadingBanks)
                       const Padding(
@@ -804,46 +1484,50 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         child: LinearProgressIndicator(minHeight: 2),
                       )
                     else
-                      DropdownButtonFormField<String>(
-                        value: selectedBankCode != null &&
-                                banks.any((b) => b['code'] == selectedBankCode)
-                            ? selectedBankCode
-                            : null,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Bank',
-                          hintText: 'Select bank',
-                          labelStyle: TextStyle(color: Colors.grey),
-                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                      InkWell(
+                        onTap: loadingBanks || banks.isEmpty
+                            ? null
+                            : () {
+                                _showBankSearchDialog(
+                                  context: ctx,
+                                  banks: banks,
+                                  selectedCode: selectedBankCode,
+                                  onSelected: (bank) {
+                                    dialogSetState(() {
+                                      selectedBankCode = bank['code'];
+                                      bankCodeController.text = bank['code'] ?? '';
+                                      virtualBankNameController.text = bank['name'] ?? '';
+                                      virtualAccountNameController.clear();
+                                      resolveError = null;
+                                    });
+                                    if (virtualAccountNumberController.text.trim().length == 10) {
+                                      scheduleResolve(dialogSetState);
+                                    }
+                                  },
+                                );
+                              },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Bank',
+                            hintText: 'Select bank (Tap to search)',
+                            labelStyle: const TextStyle(color: Colors.grey),
+                            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                            suffixIcon: Icon(
+                              Icons.search,
+                              color: loadingBanks ? Colors.grey : Colors.blue,
+                            ),
+                          ),
+                          child: Text(
+                            virtualBankNameController.text.isNotEmpty
+                                ? virtualBankNameController.text
+                                : 'Select bank (Tap to search)',
+                            style: TextStyle(
+                              color: virtualBankNameController.text.isNotEmpty ? Colors.black : Colors.grey.shade500,
+                              fontSize: 14,
+                              fontWeight: virtualBankNameController.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
                         ),
-                        items: banks
-                            .map(
-                              (b) => DropdownMenuItem<String>(
-                                value: b['code'],
-                                child: Text(
-                                  b['name']!,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.black, fontSize: 14),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (code) {
-                          dialogSetState(() {
-                            selectedBankCode = code;
-                            Map<String, String>? match;
-                            for (final b in banks) {
-                              if (b['code'] == code) {
-                                match = b;
-                                break;
-                              }
-                            }
-                            bankCodeController.text = code ?? '';
-                            virtualBankNameController.text = match?['name'] ?? '';
-                            resolveError = null;
-                          });
-                          scheduleResolve(dialogSetState);
-                        },
                       ),
                     if (!loadingBanks && banks.isEmpty)
                       Padding(
@@ -875,24 +1559,59 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                       ),
                       keyboardType: TextInputType.number,
                       maxLength: 10,
-                      onChanged: (_) => scheduleResolve(dialogSetState),
+                      onChanged: (val) {
+                        final trimmed = val.trim();
+                        if (trimmed.length < 10) {
+                          resolveDebounce?.cancel();
+                          dialogSetState(() {
+                            resolvingAccount = false;
+                            virtualAccountNameController.clear();
+                            resolveError = null;
+                          });
+                        } else if (trimmed.length == 10) {
+                          scheduleResolve(dialogSetState);
+                        }
+                      },
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: virtualAccountNameController,
-                      style: const TextStyle(color: Colors.black),
-                      readOnly: resolvingAccount,
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                      readOnly: true,
+                      enableInteractiveSelection: false,
                       decoration: InputDecoration(
-                        labelText: 'Personal Account Name',
+                        labelText: 'Personal Account Name (Auto-populated)',
                         hintText: resolvingAccount
-                            ? 'Looking up account name…'
-                            : 'Auto-filled after account number',
+                            ? 'Validating account with Quasar…'
+                            : 'Auto-populated from Quasar validation',
                         labelStyle: const TextStyle(color: Colors.grey),
                         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-                        helperText: resolveError,
+                        prefixIcon: const Icon(Icons.verified_user_outlined, size: 20, color: Colors.blue),
+                        suffixIcon: resolvingAccount
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : virtualAccountNameController.text.isNotEmpty
+                                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                                : (selectedBankCode != null && virtualAccountNumberController.text.trim().length == 10)
+                                    ? IconButton(
+                                        icon: const Icon(Icons.refresh, size: 18, color: Colors.blue),
+                                        tooltip: 'Retry Quasar validation',
+                                        onPressed: () => resolveAccountName(dialogSetState),
+                                      )
+                                    : null,
+                        helperText: resolveError ??
+                            (virtualAccountNameController.text.isNotEmpty ? '✓ Validated by Quasar' : null),
+                        helperMaxLines: 2,
                         helperStyle: TextStyle(
-                          color: resolveError != null ? Colors.red[700] : Colors.grey,
+                          color: resolveError != null ? Colors.red[700] : Colors.green[700],
                           fontSize: 11,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -907,6 +1626,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    ],
 
                     Align(
                       alignment: Alignment.centerLeft,
@@ -952,9 +1672,52 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 ),
                 onPressed: () {
                   if (formKey.currentState!.validate()) {
+                    final acct = virtualAccountNumberController.text.trim();
+                    final bank = virtualBankNameController.text.trim();
+                    final acctName = virtualAccountNameController.text.trim();
+                    final code = (selectedBankCode ?? bankCodeController.text).trim();
+
+                    if (acct.isNotEmpty || bank.isNotEmpty) {
+                      if (code.isEmpty || selectedBankCode == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select a bank for the staff account.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      if (acct.length != 10) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a valid 10-digit account number.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      if (resolvingAccount) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Validating account with Quasar. Please wait…'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+                      if (acctName.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Account name must be validated by Quasar before saving. Please verify the bank and account number.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                    }
+
                     resolveDebounce?.cancel();
                     final pin = codeController.text.trim();
-                    final code = (selectedBankCode ?? bankCodeController.text).trim();
                     final newStaff = Staff(
                       id: staff?.id,
                       name: nameController.text.trim(),
@@ -975,6 +1738,19 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                       bankCode: code.isEmpty ? null : code,
                     );
                     if (staff == null) {
+                      final userPlan = context.read<SettingsBloc>().state.userPlan;
+                      final staffCount = context.read<StaffBloc>().state.staffList.length;
+                      final isBasicOrFreeTier = userPlan == null || userPlan.isBasicOrFreeTier;
+
+                      if (isBasicOrFreeTier && staffCount >= 2) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Cannot add staff: Basic and Free Tier plans are limited to 2 staff accounts. Please upgrade your plan.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
                       context.read<StaffBloc>().add(AddStaff(newStaff));
                     } else {
                       context.read<StaffBloc>().add(UpdateStaff(newStaff));
@@ -1017,6 +1793,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 'phone': s.phone,
                 'role': s.role,
                 'isActive': s.isActive,
+                'pinHash': s.staffCode,
                 'bankName': s.virtualBankName,
                 'bankCode': s.bankCode,
                 'accountNumber': s.virtualAccountNumber,
@@ -1025,6 +1802,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
           .toList();
 
       await repo.apiClient.post('/api/staff/bulk-sync', data: {'staff': payloads});
+      try {
+        await context.read<StaffBloc>().repository.pullCloudGovernance();
+      } catch (_) {}
     } catch (e) {
       debugPrint('Staff cloud sync skipped/failed: $e');
     }
@@ -1091,6 +1871,165 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showBankSearchDialog({
+    required BuildContext context,
+    required List<Map<String, String>> banks,
+    required String? selectedCode,
+    required Function(Map<String, String>) onSelected,
+  }) async {
+    final searchController = TextEditingController();
+    List<Map<String, String>> filteredBanks = List.from(banks);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetCtx) => StatefulBuilder(
+        builder: (bottomSheetCtx, setSheetState) {
+          void filter(String query) {
+            final q = query.trim().toLowerCase();
+            setSheetState(() {
+              if (q.isEmpty) {
+                filteredBanks = List.from(banks);
+              } else {
+                filteredBanks = banks.where((b) {
+                  final name = (b['name'] ?? '').toLowerCase();
+                  final code = (b['code'] ?? '').toLowerCase();
+                  return name.contains(q) || code.contains(q);
+                }).toList();
+              }
+            });
+          }
+
+          return Container(
+            height: MediaQuery.of(bottomSheetCtx).size.height * 0.75,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Title and Close
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Select Bank',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(bottomSheetCtx),
+                      ),
+                    ],
+                  ),
+                ),
+                // Search Input
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search bank by name or code...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                searchController.clear();
+                                filter('');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: filter,
+                  ),
+                ),
+                const Divider(),
+                // Bank List
+                Expanded(
+                  child: filteredBanks.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.account_balance_outlined, size: 48, color: Colors.grey.shade400),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No bank found matching "${searchController.text}"',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: filteredBanks.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1, indent: 64),
+                          itemBuilder: (ctx, index) {
+                            final bank = filteredBanks[index];
+                            final name = bank['name'] ?? '';
+                            final code = bank['code'] ?? '';
+                            final isSelected = selectedCode == code;
+
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: isSelected ? Colors.blue.shade50 : Colors.grey.shade100,
+                                child: Icon(
+                                  Icons.account_balance,
+                                  color: isSelected ? Colors.blue : Colors.grey.shade600,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                name,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected ? Colors.blue.shade800 : Colors.black87,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(Icons.check_circle, color: Colors.blue)
+                                  : Text(
+                                      code,
+                                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                                    ),
+                              onTap: () {
+                                Navigator.pop(bottomSheetCtx);
+                                onSelected(bank);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1224,15 +2163,17 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     TextEditingController bankController,
     TextEditingController numberController,
     TextEditingController nameController,
-    StateSetter dialogSetState,
-  ) async {
+    StateSetter dialogSetState, {
+    List<Map<String, String>> banks = const [],
+    ValueChanged<String>? onBankCodeResolved,
+  }) async {
     final orgName = dialogContext.read<SettingsBloc>().state.settings?.organizationName;
     if (await showFreeTrialVaLockedIfNeeded(dialogContext, businessName: orgName)) {
       return;
     }
 
     final customNameController = TextEditingController(text: staff.name);
-    final phoneController = TextEditingController(text: staff.phone);
+    final phoneController = TextEditingController(text: PhoneNumberInput.clamp(staff.phone));
     final emailController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -1266,8 +2207,12 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     labelText: 'Phone Number (Optional)',
                     border: OutlineInputBorder(),
                     hintText: 'e.g. 08012345678',
+                    counterText: '',
                   ),
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
+                  validator: (val) => PhoneNumberInput.validate(val),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -1321,10 +2266,25 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     Navigator.pop(dialogContext); // Close loading dialog
 
                     if (result['accountNumber'] != null) {
+                      final bName = (result['bankName'] ?? '').toString().trim();
+                      final bCode = (result['bankCode'] ?? result['bank_code'] ?? '').toString().trim();
+                      String? resolvedCode = bCode.isNotEmpty ? bCode : null;
+                      if (resolvedCode == null && bName.isNotEmpty) {
+                        for (final b in banks) {
+                          final n = (b['name'] ?? '').toLowerCase();
+                          if (n == bName.toLowerCase() || n.contains(bName.toLowerCase())) {
+                            resolvedCode = b['code'];
+                            break;
+                          }
+                        }
+                      }
                       dialogSetState(() {
-                        bankController.text = result['bankName'] ?? '';
+                        bankController.text = bName;
                         numberController.text = result['accountNumber'] ?? '';
                         nameController.text = result['accountName'] ?? '';
+                        if (resolvedCode != null && onBankCodeResolved != null) {
+                          onBankCodeResolved(resolvedCode);
+                        }
                       });
 
                       ScaffoldMessenger.of(dialogContext).showSnackBar(

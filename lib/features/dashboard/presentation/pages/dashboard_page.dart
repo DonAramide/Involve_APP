@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
 import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:involve_app/features/settings/presentation/widgets/sync_configuration_dialog.dart';
 import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
@@ -34,7 +34,6 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
 import 'dart:async';
-import 'package:involve_app/services/socket_service.dart';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
 import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
@@ -52,6 +51,7 @@ import 'package:involve_app/features/school/presentation/pages/result_entry_page
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/features/dashboard/domain/dashboard_menu_catalog.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
@@ -61,10 +61,9 @@ import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_d
 
 import 'package:involve_app/services/terminal_sync_service.dart';
 import '../widgets/notification_bell.dart';
+import '../widgets/network_status_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:involve_app/services/socket_service.dart' as import_socket_service;
-import 'package:http/http.dart' as http;
-import 'package:involve_app/core/utils/app_config.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -121,26 +120,26 @@ class _DashboardPageState extends State<DashboardPage> {
         return Scaffold(
           appBar: AppBar(
             title: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Logo on the left
-                if (settings?.logo != null)
-                  Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        settings!.logo!,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.store, size: 40);
-                        },
-                      ),
+                if (settings?.logo != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      settings!.logo!,
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.store, size: 32);
+                      },
                     ),
                   ),
-                // Organization name
-                Expanded(
+                  const SizedBox(width: 8),
+                ],
+                // Organization name & Plan Badge
+                Flexible(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -151,8 +150,9 @@ class _DashboardPageState extends State<DashboardPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (settingsState.userPlan?.isValid == true && !settingsState.userPlan!.isBasic) ...[
-                        const SizedBox(width: 8),
+                      if (settingsState.userPlan?.isValid == true &&
+                          !settingsState.userPlan!.isFreeTrial) ...[
+                        const SizedBox(width: 6),
                         _buildPlanBadge(settingsState.userPlan!),
                       ],
                     ],
@@ -217,115 +217,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               const SizedBox(width: 4),
               if (settings?.showNetworkIndicator == true)
-                FutureBuilder<bool>(
-                  future: StorageService.isOnlineSyncEnabled(),
-                  builder: (context, syncEnabledSnap) {
-                    final syncEnabled = syncEnabledSnap.data ?? true;
-                    return ValueListenableBuilder<bool>(
-                      valueListenable: SocketService().isConnected,
-                      builder: (context, isConnected, child) {
-                        IconData icon;
-                        Color color;
-                        String tooltip;
-
-                        if (!syncEnabled) {
-                          icon = Icons.cloud_off;
-                          color = Colors.white.withOpacity(0.4);
-                          tooltip = 'Sync Disabled';
-                        } else {
-                          icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
-                          color = isConnected ? Colors.greenAccent : Colors.redAccent;
-                          tooltip = isConnected ? 'Server Connected' : 'Server Offline';
-                        }
-
-                        return IconButton(
-                          icon: Icon(icon, size: 20, color: color),
-                          tooltip: tooltip,
-                          onPressed: () async {
-                            final isBasic = settingsState.userPlan == null || settingsState.userPlan!.isBasic;
-                            if (isBasic) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Cloud synchronization is a Pro/Standard Version feature.'),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // Show the gorgeous sync configuration dialog
-                            bool currentSync = await StorageService.isOnlineSyncEnabled();
-                            bool currentInvoice = await StorageService.isOnlineInvoiceUpdateEnabled();
-
-                            if (!context.mounted) return;
-
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                return StatefulBuilder(
-                                  builder: (context, setDialogState) {
-                                    return AlertDialog(
-                                      title: const Row(
-                                        children: [
-                                          Icon(Icons.cloud_sync_rounded, color: Colors.blue),
-                                          SizedBox(width: 10),
-                                          Text('Sync Configuration'),
-                                        ],
-                                      ),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SwitchListTile(
-                                            title: const Text('Online Sync'),
-                                            subtitle: const Text('Synchronize data with the backend server in real-time'),
-                                            value: currentSync,
-                                            activeColor: Colors.blue,
-                                            onChanged: (val) async {
-                                              await StorageService.setOnlineSyncEnabled(val);
-                                              if (val) {
-                                                SocketService().reconnect();
-                                              } else {
-                                                SocketService().disconnect();
-                                              }
-                                              setDialogState(() {
-                                                currentSync = val;
-                                              });
-                                              // Trigger rebuild of the DashboardPage to update the AppBar icon immediately
-                                              setState(() {});
-                                            },
-                                          ),
-                                          const Divider(),
-                                          SwitchListTile(
-                                            title: const Text('Online Invoice Update'),
-                                            subtitle: const Text('Automatically upload created invoices to the cloud'),
-                                            value: currentInvoice,
-                                            activeColor: Colors.blue,
-                                            onChanged: (val) async {
-                                              await StorageService.setOnlineInvoiceUpdateEnabled(val);
-                                              setDialogState(() {
-                                                currentInvoice = val;
-                                              });
-                                              setState(() {});
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text('CLOSE'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
+                NetworkStatusIndicator(
+                  onLongPress: () => showSyncConfigurationDialog(context),
                 ),
               const SizedBox(width: 4),
               BlocBuilder<SettingsBloc, SettingsState>(
@@ -380,9 +273,21 @@ class _DashboardPageState extends State<DashboardPage> {
                     case 'user_guide':
                       Navigator.pushNamed(context, '/user_guide');
                       break;
+                    case 'sync_config':
+                      showSyncConfigurationDialog(context);
+                      break;
                   }
                 },
                 itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'sync_config',
+                    child: ListTile(
+                      leading: Icon(Icons.cloud_sync_rounded),
+                      title: Text('Sync Configuration'),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'about',
                     child: ListTile(
@@ -500,16 +405,16 @@ class _DashboardPageState extends State<DashboardPage> {
             right: 0,
             child: Center(
               child: Text(
-                'v1.0.0',
+                'v1.0.3',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
-          ? const SizedBox.shrink()
-          : FutureBuilder<int>(
+      bottomNavigationBar: (settingsState.userPlan?.isFreeTrial == true ||
+              !(settingsState.userPlan?.isValid ?? false))
+          ? FutureBuilder<int>(
               future: LicenseService.getTrialDaysRemaining(),
               builder: (context, trialSnapshot) {
                 if (!trialSnapshot.hasData || trialSnapshot.data == 0) return const SizedBox.shrink();
@@ -560,7 +465,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 );
               },
-            ),
+            )
+          : const SizedBox.shrink(),
         );
       },
     );
@@ -645,11 +551,18 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  /// Trial + Basic tiers (anything that is not a paid Pro/Standard/Lifetime plan).
-  bool _isTrialOrBasicPlan(UserPlan? plan) =>
-      plan == null || plan.isBasic || plan.isFreeTrial;
+  /// Basic / trial (offline limited) — not Standard or Premium.
+  bool _isBasicPlan(UserPlan? plan) =>
+      plan == null || plan.isBasicTier;
 
-  void _showFeaturePlanLock(BuildContext context, String featureName) {
+  void _showFeaturePlanLock(
+    BuildContext context,
+    String featureName, {
+    String requiredPlan = 'Standard',
+  }) {
+    final requirement = requiredPlan == 'Premium'
+        ? '$featureName requires a Premium plan.'
+        : '$featureName requires a Standard or Premium plan.';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -662,20 +575,16 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         content: Text(
-          '$featureName is available on Pro plans.\n\n'
-          'Trial and Basic users can activate a license to unlock this module.',
+          '$requirement\n\n'
+          '• ${UserPlan.basicSummary}\n'
+          '• ${UserPlan.standardSummary}\n'
+          '• ${UserPlan.premiumSummary}\n\n'
+          'Upgrade to unlock this module.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('NOT NOW'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushNamed(context, '/go_pro');
-            },
-            child: const Text('GO PRO'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -686,7 +595,7 @@ class _DashboardPageState extends State<DashboardPage> {
               backgroundColor: Colors.deepOrange,
               foregroundColor: Colors.white,
             ),
-            child: const Text('ACTIVATE'),
+            child: const Text('UPGRADE'),
           ),
         ],
       ),
@@ -694,10 +603,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
-    final isSchool = settings?.businessMode == 'school';
-    final isServices = settings?.businessMode == 'services';
-    final isBasicTier = userPlan == null || userPlan.isBasic;
-    final lockTrialBasic = _isTrialOrBasicPlan(userPlan);
+    final isSchool = settings?.isSchoolMode == true;
+    final isServices = settings?.isServicesMode == true;
+    final lockBasic = _isBasicPlan(userPlan);
+    // Multi Device: Basic locked; Standard (up to 3) and Premium (unlimited) unlocked.
+    final lockMultiDevice = !(userPlan?.allowsMultiDevice ?? false);
     
     final allItems = <_DashboardMenuItem>[
       if (!isSchool) ...[
@@ -784,43 +694,50 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.deepOrange,
         onTap: () => _verifyAndNavigateToAdminHub(context),
       ),
-      if (!isBasicTier) ...[
-        _DashboardMenuItem(
-          id: 'cloud_metrics',
-          title: 'CLOUD METRICS',
-          icon: Icons.cloud_done_outlined,
-          color: Colors.indigo,
-          onTap: () {
-            Navigator.pushNamed(context, '/cloud_metrics');
-          },
-        ),
-        _DashboardMenuItem(
-          id: 'finance_analytics',
-          title: 'FINANCE ANALYTICS',
-          icon: Icons.insights,
-          color: Colors.blueAccent,
-          onTap: () => _verifyAndNavigateToFinance(context, '/admin_finance'),
-        ),
-        _DashboardMenuItem(
-          id: 'reconciliation',
-          title: 'RECONCILIATION',
-          icon: Icons.account_balance,
-          color: Colors.teal,
-          onTap: () => _verifyAndNavigateToFinance(context, '/executive_finance'),
-        ),
-      ] else ...[
-        _DashboardMenuItem(
-          id: 'go_pro',
-          title: 'GO PRO / CLOUD',
-          icon: Icons.cloud_upload,
-          color: Colors.deepPurple,
-          onTap: () => Navigator.pushNamed(context, '/go_pro'),
-        ),
-      ],
+      _DashboardMenuItem(
+        id: 'cloud_metrics',
+        title: 'CLOUD METRICS',
+        icon: Icons.cloud_done_outlined,
+        color: Colors.indigo,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Cloud Metrics')
+            : () => Navigator.pushNamed(context, '/cloud_metrics'),
+      ),
+      _DashboardMenuItem(
+        id: 'finance_analytics',
+        title: 'FINANCE ANALYTICS',
+        icon: Icons.insights,
+        color: Colors.blueAccent,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Finance Analytics')
+            : () => _verifyAndNavigateToFinance(context, '/admin_finance'),
+      ),
+      _DashboardMenuItem(
+        id: 'reconciliation',
+        title: 'RECONCILIATION',
+        icon: Icons.account_balance,
+        color: Colors.teal,
+        isLocked: lockBasic,
+        onTap: lockBasic
+            ? () => _showFeaturePlanLock(context, 'Reconciliation')
+            : () => _verifyAndNavigateToFinance(context, '/executive_finance'),
+      ),
+      _DashboardMenuItem(
+        id: 'multi_device',
+        title: 'MULTI DEVICE',
+        icon: Icons.devices,
+        color: Colors.deepPurple,
+        isLocked: lockMultiDevice,
+        onTap: lockMultiDevice
+            ? () => _showFeaturePlanLock(context, 'Multi Device')
+            : () => Navigator.pushNamed(context, '/device_sync'),
+      ),
     ];
 
     if (isServices) {
-      return [
+      return _visibleMenuItems([
         _DashboardMenuItem(
           id: 'services_dashboard',
           title: 'SERVICES DASHBOARD',
@@ -861,8 +778,9 @@ class _DashboardPageState extends State<DashboardPage> {
           'cloud_metrics',
           'finance_analytics',
           'reconciliation',
+          'multi_device',
         ].contains(i.id)),
-      ];
+      ], settings);
     }
 
     if (isSchool) {
@@ -882,6 +800,13 @@ class _DashboardPageState extends State<DashboardPage> {
           onTap: () => Navigator.pushNamed(context, '/student_list'),
         ),
         _DashboardMenuItem(
+          id: 'parents',
+          title: 'PARENTS',
+          icon: Icons.family_restroom,
+          color: Colors.teal,
+          onTap: () => Navigator.pushNamed(context, '/parent_list'),
+        ),
+        _DashboardMenuItem(
           id: 'teachers',
           title: 'TEACHERS',
           icon: Icons.assignment_ind,
@@ -893,8 +818,8 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'FINANCE DASHBOARD',
           icon: Icons.dashboard_customize,
           color: Colors.blueGrey,
-          isLocked: lockTrialBasic,
-          onTap: lockTrialBasic
+          isLocked: lockBasic,
+          onTap: lockBasic
               ? () => _showFeaturePlanLock(context, 'Finance Dashboard')
               : () => _verifyAndNavigateToFinance(context, '/school_finance'),
         ),
@@ -934,35 +859,68 @@ class _DashboardPageState extends State<DashboardPage> {
           onTap: () => Navigator.pushNamed(context, '/result_entry'),
         ),
         _DashboardMenuItem(
+          id: 'attendance',
+          title: 'ATTENDANCE',
+          icon: Icons.fact_check_outlined,
+          color: Colors.green,
+          onTap: () => Navigator.pushNamed(context, '/attendance'),
+        ),
+        _DashboardMenuItem(
           id: 'lesson_notes',
           title: 'LESSON NOTES',
           icon: Icons.note_alt,
           color: Colors.teal,
-          isLocked: lockTrialBasic,
-          onTap: lockTrialBasic
+          isLocked: lockBasic,
+          onTap: lockBasic
               ? () => _showFeaturePlanLock(context, 'Lesson Notes')
               : () => Navigator.pushNamed(context, '/lesson_notes_list'),
+        ),
+        _DashboardMenuItem(
+          id: 'my_id_card',
+          title: 'MY ID CARD',
+          icon: Icons.badge_outlined,
+          color: Colors.indigo,
+          onTap: () => Navigator.pushNamed(context, '/my_id_card'),
+        ),
+        _DashboardMenuItem(
+          id: 'gate_clock',
+          title: 'GATE CLOCK',
+          icon: Icons.sensor_door_outlined,
+          color: Colors.blue,
+          onTap: () => Navigator.pushNamed(context, '/gate_clock'),
         ),
       ]);
     }
 
+    final visible = _visibleMenuItems(allItems, settings);
+
     // Sort items based on menuOrder settings
     final order = settings?.menuOrder ?? [];
-    if (order.isEmpty) return allItems;
+    if (order.isEmpty) return visible;
 
+    final remaining = List<_DashboardMenuItem>.from(visible);
     final sortedItems = <_DashboardMenuItem>[];
-    // Add items that are in the order list first
     for (final id in order) {
-      final item = allItems.firstWhereOrNull((e) => e.id == id);
+      final item = remaining.firstWhereOrNull((e) => e.id == id);
       if (item != null) {
         sortedItems.add(item);
-        allItems.remove(item);
+        remaining.remove(item);
       }
     }
-    // Add any remaining items (newly added features etc.)
-    sortedItems.addAll(allItems);
-    
+    sortedItems.addAll(remaining);
+
     return sortedItems;
+  }
+
+  List<_DashboardMenuItem> _visibleMenuItems(
+    List<_DashboardMenuItem> items,
+    AppSettings? settings,
+  ) {
+    final hidden = settings?.hiddenDashboardIcons ?? const <String>[];
+    if (hidden.isEmpty) return items;
+    return items
+        .where((item) => DashboardMenuCatalog.isVisibleOnDashboard(item.id, hidden))
+        .toList();
   }
 
 
@@ -1043,51 +1001,58 @@ class _DashboardPageState extends State<DashboardPage> {
               )
             else if (indicatorColor != null || secondaryIndicatorColor != null)
               Positioned(
-                top: 16,
-                right: 16,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (secondaryIndicatorColor != null)
-                      Tooltip(
-                        message: secondaryIndicatorTooltip ?? '',
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: secondaryIndicatorColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: secondaryIndicatorColor.withOpacity(0.4),
-                                blurRadius: 6,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(isDark ? 0.45 : 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (secondaryIndicatorColor != null)
+                        Tooltip(
+                          message: secondaryIndicatorTooltip ?? '',
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: secondaryIndicatorColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: secondaryIndicatorColor.withOpacity(0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    if (indicatorColor != null)
-                      Tooltip(
-                        message: indicatorTooltip ?? '',
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: indicatorColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: indicatorColor.withOpacity(0.4),
-                                blurRadius: 6,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                      if (indicatorColor != null)
+                        Tooltip(
+                          message: indicatorTooltip ?? '',
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: indicatorColor,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: indicatorColor.withOpacity(0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -1097,22 +1062,22 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildPlanBadge(UserPlan plan) {
-    final isLifetime = plan.isLifetime;
+    final isPremium = plan.isPremium;
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isLifetime 
-              ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] // Gold for Lifetime
-              : [const Color(0xFFE0E0E0), const Color(0xFFBDBDBD)], // Silver for Pro
+          colors: isPremium 
+              ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] // Gold for Premium
+              : [const Color(0xFFE0E0E0), const Color(0xFFBDBDBD)], // Silver for Standard
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: (isLifetime ? Colors.orange : Colors.grey).withOpacity(0.3),
+            color: (isPremium ? Colors.orange : Colors.grey).withOpacity(0.3),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1122,18 +1087,18 @@ class _DashboardPageState extends State<DashboardPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isLifetime ? Icons.stars : Icons.verified,
-            size: 10,
-            color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
+            isPremium ? Icons.stars : Icons.verified,
+            size: 9,
+            color: isPremium ? Colors.brown[900] : Colors.blueGrey[900],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
-            plan.planType.toUpperCase(),
+            plan.displayName,
             style: TextStyle(
-              color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
-              fontSize: 9,
+              color: isPremium ? Colors.brown[900] : Colors.blueGrey[900],
+              fontSize: 8.5,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
+              letterSpacing: 0.3,
             ),
           ),
         ],

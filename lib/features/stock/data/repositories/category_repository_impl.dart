@@ -38,12 +38,34 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<void> addCategory(String name, {String? businessMode}) async {
+    final trimmed = name.trim();
+    final mode = businessMode ?? 'retail';
     final now = DateTime.now();
+
+    final existing = await (db.select(db.categories)
+          ..where((t) => t.name.equals(trimmed)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      if (existing.isDeleted) {
+        // Soft-deleted names still occupy UNIQUE(categories.name).
+        // Re-adding the same name restores that row instead of inserting again.
+        await (db.update(db.categories)..where((t) => t.id.equals(existing.id))).write(
+          CategoriesCompanion(
+            isDeleted: const Value(false),
+            businessMode: Value(mode),
+            updatedAt: Value(now),
+          ),
+        );
+        return;
+      }
+      throw Exception('Category "$trimmed" already exists.');
+    }
+
     final deviceId = await DeviceInfoService.getDeviceSuffix();
-    
     await db.into(db.categories).insert(CategoriesCompanion.insert(
-      name: name,
-      businessMode: Value(businessMode ?? 'retail'),
+      name: trimmed,
+      businessMode: Value(mode),
       syncId: Value(_uuid.v4()),
       updatedAt: Value(now),
       createdAt: Value(now),

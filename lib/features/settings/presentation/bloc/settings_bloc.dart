@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
@@ -12,6 +11,8 @@ import '../../../../core/license/storage_service.dart';
 import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
 import '../../domain/entities/settings.dart';
+import '../../../dashboard/domain/dashboard_menu_catalog.dart';
+import '../../../../services/terminal_sync_service.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -82,6 +83,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       }
       
       await backupService.syncData(bytes);
+      await _retainRestoredBusinessMode();
       
       emit(state.copyWith(
         isImporting: false, 
@@ -97,6 +99,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(isImporting: true, error: null, successMessage: null));
     try {
       await backupService.syncData(event.bytes);
+      await _retainRestoredBusinessMode();
       
       emit(state.copyWith(
         isImporting: false, 
@@ -105,6 +108,17 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       ));
     } catch (e) {
       emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
+    }
+  }
+
+  /// LoadSettings re-applies the stored onboarding industry on every start, so
+  /// it must match the restored mode or the restart would revert it.
+  Future<void> _retainRestoredBusinessMode() async {
+    try {
+      final restored = await repository.getSettings();
+      await StorageService.setOnboardingIndustry(restored.normalizedBusinessMode);
+    } catch (e) {
+      debugPrint('SettingsBloc: could not retain restored business mode: $e');
     }
   }
 
@@ -127,6 +141,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     try {
       final success = await backupService.importDatabase(event.path);
       if (success) {
+        // The imported database carries its own business mode; clear the
+        // onboarding override so LoadSettings does not replace it on restart.
+        await StorageService.setOnboardingIndustry('');
         emit(state.copyWith(
           isImporting: false, 
           successMessage: 'Database restored successfully! App is restarting...',
@@ -179,10 +196,48 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
         // 2. Plan check
         if (workingSettings.serviceBillingEnabled && !plan.isValid) {
-          if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
+          if (!plan.isPremium && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
              debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
              workingSettings = workingSettings.copyWith(serviceBillingEnabled: false);
           }
+        }
+
+        // 3. Apply onboarding industry + brand color if they were chosen
+        //    and have not been locked / overwritten yet.
+        final storedModeRaw = await StorageService.getOnboardingIndustry();
+        final storedColor = await StorageService.getOnboardingThemeColor();
+        final modeLocked = await StorageService.isBusinessModeLocked();
+        if (storedModeRaw != null && storedModeRaw.isNotEmpty && !modeLocked) {
+          final desiredMode = AppSettings.modeFromOnboarding(storedModeRaw);
+          if (workingSettings.normalizedBusinessMode != desiredMode) {
+            workingSettings = workingSettings.copyWith(businessMode: desiredMode);
+          }
+        }
+        if (storedColor != null && storedColor != workingSettings.primaryColor) {
+          const factoryBlue = 0xFF2196F3;
+          if (workingSettings.primaryColor == factoryBlue) {
+            workingSettings = workingSettings.copyWith(primaryColor: storedColor);
+          }
+        }
+
+        final linkedName = event.linkedBusinessName?.trim() ?? '';
+        if (linkedName.isNotEmpty && linkedName != workingSettings.organizationName) {
+          workingSettings = workingSettings.copyWith(organizationName: linkedName);
+        }
+        final tenantProfileMode = await _linkedTenantProfileMode(event.linkedBusinessMode);
+        if (tenantProfileMode != null) {
+          if (workingSettings.normalizedBusinessMode != tenantProfileMode) {
+            workingSettings = workingSettings.copyWith(businessMode: tenantProfileMode);
+          }
+          await StorageService.setBusinessModeLocked(true);
+        }
+
+        final applyLinkedDashboard =
+            await StorageService.consumeLinkedDeviceDashboardDefaultsPending();
+        if (applyLinkedDashboard) {
+          workingSettings = workingSettings.copyWith(
+            hiddenDashboardIcons: DashboardMenuCatalog.hideableIds(),
+          );
         }
 
         // Save if any changes were made during load/migration
@@ -191,10 +246,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         }
       }
 
+      final modeLocked = await StorageService.isBusinessModeLocked();
       emit(state.copyWith(
         settings: workingSettings, 
         userPlan: plan,
-        isLoading: false
+        isLoading: false,
+        isModeLocked: modeLocked,
       ));
     } catch (e) {
       debugPrint('SettingsBloc: Error loading settings: $e');
@@ -202,30 +259,80 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     }
   }
 
-  Future<UserPlan> _loadUserPlan() async {
-    // 1. Check for Lifetime status (Super Admin / Device Authorized)
-    final isLifetime = await securityService.isDeviceAuthorized();
-    if (isLifetime) {
-      return const UserPlan(planType: 'lifetime');
-    }
-    
-    // 2. Check for Manual/Direct Pro status
-    final proExpiry = await StorageService.getProExpiryDate();
-    if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
-      return UserPlan(planType: 'pro', expiryDate: proExpiry);
+  /// Tenant profile mode for a QR-linked device. Null when this handset was not linked.
+  Future<String?> _linkedTenantProfileMode(String? eventMode) async {
+    final fromEvent = eventMode?.trim() ?? '';
+    if (fromEvent.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(fromEvent);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
     }
 
-    // 3. Check for Activation Code License
+    final linked = await StorageService.isDeviceLinkedToTenant() ||
+        await TerminalSyncService.wasLinkedViaDeviceLink();
+    if (!linked) return null;
+
+    final config = await TerminalSyncService.loadCachedConfig();
+    final fromConfig = config?.type?.trim() ?? '';
+    if (fromConfig.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(fromConfig);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
+    }
+
+    final remembered = await StorageService.getLinkedTenantBusinessMode();
+    if (remembered != null && remembered.isNotEmpty) {
+      return AppSettings.modeFromOnboarding(remembered);
+    }
+
+    final industry = await StorageService.getOnboardingIndustry();
+    if (industry != null && industry.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(industry);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
+    }
+    return null;
+  }
+
+  Future<UserPlan> _loadUserPlan() async {
+    // 1. Device authorized → Premium (full + multi-device)
+    final isLifetime = await securityService.isDeviceAuthorized();
+    if (isLifetime) {
+      return const UserPlan(planType: 'premium');
+    }
+    
+    // 2. Manual/Direct Pro status → Standard
+    final proExpiry = await StorageService.getProExpiryDate();
+    if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
+      return UserPlan(planType: 'standard', expiryDate: proExpiry);
+    }
+
+    // 3. Activation Code License
     final settings = await repository.getSettings();
     final license = await LicenseService.getActiveLicense(settings.organizationName);
     if (license != null && DateTime.now().isBefore(license.expiryDate)) {
       return UserPlan(
-        planType: license.planType.name,
+        planType: LicenseService.normalizePlanName(license.planType.name),
         expiryDate: license.expiryDate,
       );
     }
 
-    // 4. Check for Trial validity
+    // 3b. Server-redeemed admin activation
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      return UserPlan(
+        planType: LicenseService.normalizePlanName(serverPlan.planType),
+        expiryDate: serverPlan.expiryDate,
+      );
+    }
+
+    // 3c. Portal / activated without explicit tier → Standard
+    final isActivated = await LicenseService.isActivated(settings.organizationName);
+    if (isActivated) {
+      return const UserPlan(planType: 'standard');
+    }
+
+    // 4. Trial
     final isTrialValid = await LicenseService.isTrialValid();
     if (isTrialValid) {
       final trialStart = await StorageService.getTrialStartDate();
@@ -257,11 +364,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (event.settings.serviceBillingEnabled && !(state.settings?.serviceBillingEnabled ?? false)) {
       // User is trying to ENABLE service billing
       final plan = state.userPlan;
-      if (plan == null || !plan.isValid || plan.isBasic) {
+      if (plan == null || !plan.isValid || plan.isBasicTier) {
          // Double check fresh plan to be safe
          final freshPlan = await _loadUserPlan();
-         if (!freshPlan.isValid || freshPlan.isBasic) {
-            emit(state.copyWith(error: 'Service Billing is available on Pro & Lifetime plans'));
+         if (!freshPlan.isValid || freshPlan.isBasicTier) {
+            emit(state.copyWith(error: 'Service Billing is available on Standard & Premium plans'));
             return;
          }
       }
@@ -271,16 +378,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
     // Pro validation for Custom Receipt Pricing
     if (event.settings.customReceiptPricingEnabled && !(state.settings?.customReceiptPricingEnabled ?? false)) {
-      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
-        emit(state.copyWith(error: 'Custom Receipt Pricing is a Pro Version feature.'));
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasicTier) {
+        emit(state.copyWith(error: 'Custom Receipt Pricing is available on Standard & Premium plans.'));
         return;
       }
     }
 
     // Pro validation for Admin Signature
     if (event.settings.showAdminSignature && !(state.settings?.showAdminSignature ?? false)) {
-      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
-        emit(state.copyWith(error: 'Digital Admin Signature is a Pro Version feature.'));
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasicTier) {
+        emit(state.copyWith(error: 'Digital Admin Signature is available on Standard & Premium plans.'));
         return;
       }
     }

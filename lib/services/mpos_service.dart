@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
 import '../core/mpos/mpos_device_type.dart';
+import '../core/services/finance_api_client.dart';
+import 'terminal_sync_service.dart';
 
 class MposService {
   static const MethodChannel _channel = MethodChannel('com.invify.app/mpos');
@@ -20,6 +24,17 @@ class MposService {
 
   String _deviceTypeArg(String? deviceType) =>
       deviceType ?? MposDeviceType.channelValue(MposDeviceFamily.aisino);
+
+  /// Terminal profile `sendField120`. Missing or false means do not send ISO field 120.
+  Future<bool> _profileSendField120() async {
+    try {
+      final config = await TerminalSyncService.loadCachedConfig();
+      if (config == null) return false;
+      if (config.routingRules?['sendField120'] == true) return true;
+      if (config.tenantPolicy?['sendField120'] == true) return true;
+    } catch (_) {}
+    return false;
+  }
 
   /// Initiates pairing with the assigned MPOS (Aisino VM30 or MoreFun MP63).
   Future<MposResult> pairDevice({
@@ -78,8 +93,8 @@ class MposService {
   }
 
   /// Initiates a payment on the POS device.
-  /// 
-  /// [amount] The amount to charge (must be >= 1.00).
+  ///
+  /// [amount] The amount to charge (must be >= 1.00 except balance/reversal/refund).
   /// [terminalId] The terminal ID for the transaction.
   Future<MposTransactionResponse> initiatePayment({
     required double amount,
@@ -87,8 +102,16 @@ class MposService {
     String activeHost = 'MEDUSA',
     bool processOnDevice = false,
     String? deviceType,
+    String transactionType = 'PURCHASE',
+    double cashbackAmount = 0,
+    String? originalRrn,
+    String? originalStan,
+    double? latitude,
+    double? longitude,
+    bool? sendField120,
   }) async {
     try {
+      final profileSendField120 = sendField120 ?? await _profileSendField120();
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
         'initiatePayment',
         {
@@ -97,6 +120,13 @@ class MposService {
           'activeHost': activeHost,
           'processOnDevice': processOnDevice,
           'deviceType': _deviceTypeArg(deviceType),
+          'transactionType': transactionType,
+          'cashbackAmount': cashbackAmount,
+          if (originalRrn != null) 'originalRrn': originalRrn,
+          if (originalStan != null) 'originalStan': originalStan,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          'sendField120': profileSendField120,
         },
       );
       
@@ -130,6 +160,48 @@ class MposService {
     }
   }
 
+  /// Sends the terminal's packed ISO (field 55 and MAC included) through Invify
+  /// to Quasar POST /pos/card-transaction. The terminal must not dial the host itself.
+  Future<MposTransactionResponse> forwardPackedCardToQuasar({
+    required String? terminalId,
+    required double amount,
+    required EmvData emvData,
+  }) async {
+    final client = GetIt.I<FinanceApiClient>();
+    final posRes = await client.post(
+      '/api/pos/transaction',
+      data: {
+        'terminalId': terminalId,
+        'amount': amount,
+        'emvData': emvData.toJson(),
+      },
+      options: Options(
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 90),
+      ),
+    );
+    final body = posRes.data is Map
+        ? Map<String, dynamic>.from(posRes.data as Map)
+        : <String, dynamic>{};
+    final approved = body['paymentSuccess'] == true || body['statusCode']?.toString() == '00';
+    final message = body['message']?.toString() ?? body['error']?.toString();
+    return MposTransactionResponse(
+      status: approved ? 'payment_success' : 'payment_failed',
+      error: approved ? null : MposErrorData(message: message ?? 'Host did not approve'),
+      transaction: MposTransactionData(
+        paymentSuccess: approved,
+        statusCode: body['statusCode']?.toString(),
+        message: message,
+        rrn: body['rrn']?.toString(),
+        stan: body['stan']?.toString(),
+        authCode: body['authCode']?.toString(),
+        maskedPan: body['maskedPan']?.toString(),
+        balance: body['balance']?.toString(),
+        transactionType: emvData.toJson()['transactionType']?.toString(),
+      ),
+    );
+  }
+
   /// Gets the physical serial number of the paired MPOS device.
   Future<String?> getMposSerialNumber({String? deviceType}) async {
     try {
@@ -141,6 +213,48 @@ class MposService {
     } on PlatformException catch (e) {
       debugPrint('Failed to get MPOS serial number: ${e.message}');
       return null;
+    }
+  }
+
+  /// Persists NIBSS Field 120 coordinates on the VM30 session.
+  Future<Map<String, dynamic>> saveGeoCoordinates({
+    required double latitude,
+    required double longitude,
+    String? deviceType,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'saveGeoCoordinates',
+        {
+          'latitude': latitude,
+          'longitude': longitude,
+          'deviceType': _deviceTypeArg(deviceType),
+        },
+      );
+      return Map<String, dynamic>.from(result ?? {});
+    } on PlatformException catch (e) {
+      return {'status': 'failure', 'message': e.message};
+    }
+  }
+
+  /// Requests location (if provided) and stores coordinates for ISO Field 120.
+  Future<Map<String, dynamic>> initGeofencing({
+    double? latitude,
+    double? longitude,
+    String? deviceType,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'initGeofencing',
+        {
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          'deviceType': _deviceTypeArg(deviceType),
+        },
+      );
+      return Map<String, dynamic>.from(result ?? {});
+    } on PlatformException catch (e) {
+      return {'status': 'failure', 'message': e.message};
     }
   }
 

@@ -78,7 +78,7 @@
                 :rules="[val => val.length === 6 || 'Verification format must equal exactly 6 digits']"
               />
               <div class="text-center text-metric-sm text-muted q-mt-xs">
-                Simulated passing setup tokens: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
+                Use the current 6-digit code from Google Authenticator, Authy, or Microsoft Authenticator. Dummy codes are rejected.
               </div>
             </div>
 
@@ -117,7 +117,7 @@
               :rules="[val => val.length === 6 || 'Verification code must equal exactly 6 digits']"
             />
             <div class="text-center text-metric-sm text-muted q-mt-xs">
-              Simulated validation keys: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
+              Use the current 6-digit code from your authenticator app. Dummy codes like 000000 are rejected.
             </div>
           </div>
 
@@ -149,7 +149,8 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
-import { loginPathForContext } from '../../utils/authLoginPaths'
+import { persistAuthenticatedSession } from '../../auth/session'
+import { loginPathForContext, navigateAfterAuth } from '../../utils/authLoginPaths'
 import { joinApiUrl } from '../../config/env'
 
 const router = useRouter()
@@ -168,31 +169,43 @@ const qrCodeDataUrl = ref('')
 const setupSecretString = ref('')
 
 onMounted(() => {
-  // Check session storage bounds tracking redirect parameter triggers
   const cachedSetupToken = sessionStorage.getItem('mfa_setup_token')
   const cachedUserId = sessionStorage.getItem('mfa_setup_userId')
+  const cachedChallenge = sessionStorage.getItem('mfa_challenge_token')
+  const cachedChallengeUser = sessionStorage.getItem('mfa_challenge_userId')
 
   if (cachedSetupToken && cachedUserId) {
     isSetupMode.value = true
     targetUserId.value = cachedUserId
     triggerRemoteSetupGeneration(cachedUserId)
+  } else if (cachedChallenge && cachedChallengeUser) {
+    targetUserId.value = cachedChallengeUser
   } else {
-    // If target context missing, route gracefully back to standard login screen
-    targetUserId.value = localStorage.getItem('operator_userId') || 'usr-fallback-admin'
+    errorMessage.value = `MFA challenge is required. Sign in again at ${loginPathForContext({ role: sessionStorage.getItem('operator_role') })}, then enter the authenticator code.`
   }
 })
 
 const triggerRemoteSetupGeneration = async (uId) => {
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/setup'), { userId: uId })
+    const setupToken = sessionStorage.getItem('mfa_setup_token') || ''
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/setup'),
+      { userId: uId, challengeToken: setupToken, setupToken },
+      { withCredentials: true },
+    )
     if (res.data?.qrCodeUrl) {
       qrCodeDataUrl.value = res.data.qrCodeUrl
       setupSecretString.value = res.data.secret
     }
+    if (res.data?.challengeToken) {
+      sessionStorage.setItem('mfa_challenge_token', res.data.challengeToken)
+      sessionStorage.removeItem('mfa_setup_token')
+    }
   } catch (err) {
-    // Render working offline visualization block directly
-    setupSecretString.value = 'JBSWY3DPEHPK3PXP'
-    // Draw pure simulated canvas data code directly if offline
+    errorMessage.value =
+      err.response?.data?.message ||
+      `MFA setup failed. Sign in again at ${loginPathForContext({ role: sessionStorage.getItem('operator_role') })} so a new QR code can be issued.`
+    setupSecretString.value = ''
   }
 }
 
@@ -202,18 +215,25 @@ const executeMfaSetupVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: targetUserId.value,
-      tokenCode: totpInput.value,
-      pendingSetup: true,
-      role: sessionStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: targetUserId.value,
+        tokenCode: totpInput.value,
+        challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
+        pendingSetup: true,
+        role: sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'tenant_admin'
+      },
+      { withCredentials: true },
+    )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)
+    } else {
+      errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Verification validation token rejected. Enforce clock offsets.'
+    errorMessage.value = err.response?.data?.message || err.response?.data?.error || 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
@@ -225,41 +245,39 @@ const executeStandardVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: targetUserId.value,
-      tokenCode: totpInput.value,
-      role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: targetUserId.value,
+        tokenCode: totpInput.value,
+        challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
+        role: sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'tenant_admin'
+      },
+      { withCredentials: true },
+    )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)
+    } else {
+      errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Unauthorized single-use code pass envelope.'
+    errorMessage.value = err.response?.data?.message || err.response?.data?.error || 'Invalid or expired OTP'
   } finally {
     loading.value = false
   }
 }
 
 const finalizeValidatedToken = (tokenObj) => {
-  localStorage.setItem('invify_token', tokenObj.token)
-  if (tokenObj.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenObj.refreshToken)
+  persistAuthenticatedSession(tokenObj)
+  const cleanRole = (tokenObj.user?.role || sessionStorage.getItem('operator_role') || localStorage.getItem('operator_role') || 'TENANT_ADMIN').toUpperCase()
+  localStorage.setItem('operator_role', cleanRole)
+  if (tokenObj.user?.email) {
+    localStorage.setItem('operator_email', tokenObj.user.email)
   }
-  
-  // Set explicit verified multi-factor security clearance flags
-  localStorage.setItem('mfa_status_verified', 'true')
-  
-  // Clear pending setup session hooks
-  sessionStorage.removeItem('mfa_setup_token')
-  sessionStorage.removeItem('mfa_setup_userId')
 
-  successMessage.value = 'Multi-factor gateway attested securely. Unlocking platform controls...'
-
-  setTimeout(() => {
-    const dest = route.query?.redirect || '/'
-    router.push(dest).catch(() => {})
-  }, 600)
+  successMessage.value = 'Signed in successfully. Opening your dashboard…'
+  navigateAfterAuth(router, cleanRole, route.query?.redirect)
 }
 
 const returnToRootAuth = () => {

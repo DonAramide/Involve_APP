@@ -16,7 +16,7 @@ async function login(page: Page, email = 'superadmin@iips.app', password?: strin
   const mm = String(now.getMonth() + 1).padStart(2, '0')
   const dd = String(now.getDate()).padStart(2, '0')
   const yy = String(now.getFullYear()).substring(2)
-  const dynamicPassword = password ?? `${mm}${dd}${yy}iips@wendy`
+  const dynamicPassword = password ?? `${mm}${dd}${yy}iips@invify`
 
   await page.fill('[data-testid="login-email"], input[type="email"], input[placeholder*="email" i]', email)
   await page.fill('[data-testid="login-password"], input[type="password"]', dynamicPassword)

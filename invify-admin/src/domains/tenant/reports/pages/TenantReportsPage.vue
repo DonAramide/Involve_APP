@@ -30,10 +30,27 @@
 
           <div class="row q-col-gutter-sm q-mt-md">
             <div class="col-6">
-              <q-btn outline color="grey-5" icon="file_download" label="CSV" @click="downloadReport(rep.title, 'CSV')" class="full-width text-weight-bold text-caption font-mono" />
+              <q-btn
+                outline
+                color="grey-5"
+                icon="file_download"
+                label="CSV"
+                :loading="busyKey === `${rep.title}:CSV`"
+                :disable="!!busyKey"
+                @click="downloadReport(rep.title, 'CSV')"
+                class="full-width text-weight-bold text-caption font-mono"
+              />
             </div>
             <div class="col-6">
-              <q-btn unelevated :color="rep.btnColor" label="Generate PDF" @click="downloadReport(rep.title, 'PDF')" class="full-width text-weight-bold text-caption text-black" />
+              <q-btn
+                unelevated
+                :color="rep.btnColor"
+                label="Generate PDF"
+                :loading="busyKey === `${rep.title}:PDF`"
+                :disable="!!busyKey"
+                @click="downloadReport(rep.title, 'PDF')"
+                class="full-width text-weight-bold text-caption text-black"
+              />
             </div>
           </div>
         </q-card>
@@ -96,29 +113,163 @@
 </template>
 
 <script setup>
-import { useCurrency } from '../../../../composables/useCurrency';
-import { useTenantReportStore } from '../stores/tenantReportStore';
-import { storeToRefs } from 'pinia';
-import { useQuasar } from 'quasar';
+import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useQuasar } from 'quasar'
+import { useCurrency } from '../../../../composables/useCurrency'
+import { useTenantReportStore } from '../stores/tenantReportStore'
+import { adminApi, inventoryApi } from 'src/api'
+import {
+  triggerDownload,
+  toCsv,
+  buildSimplePdf,
+  sha256Hex,
+  unwrapList,
+  slugFile,
+} from '../exportReportFile'
 
-const { currentCurrency } = useCurrency();
-const $q = useQuasar();
-const store = useTenantReportStore();
+const { currentCurrency } = useCurrency()
+const $q = useQuasar()
+const store = useTenantReportStore()
+const { reports, dispersionChart, exportLogs } = storeToRefs(store)
+const busyKey = ref('')
 
-const { reports, dispersionChart, exportLogs } = storeToRefs(store);
+function pickRows(title, ledger, logs, staff, products) {
+  if (title.includes('Inventory')) {
+    return {
+      headers: ['name', 'sku', 'stock_qty', 'price', 'status', 'type'],
+      rows: products.map((p) => ({
+        name: p.name,
+        sku: p.sku,
+        stock_qty: p.stock_qty ?? p.stockQty ?? 0,
+        price: p.price ?? 0,
+        status: p.status || 'active',
+        type: p.type || 'product',
+      })),
+    }
+  }
+  if (title.includes('Operator') || title.includes('Staff')) {
+    const staffRows = staff.map((s) => ({
+      date: s.updatedAt || '',
+      type: 'STAFF',
+      reference: s.staffId || s.id,
+      party: s.name,
+      amount: '',
+      status: s.status || (s.isActive ? 'ACTIVE' : 'SUSPENDED'),
+      method: s.role,
+    }))
+    const logRows = logs.map((l) => ({
+      date: l.created_at || l.timestamp || '',
+      type: l.module || 'AUDIT',
+      reference: l.id,
+      party: l.user_name || l.user_email || l.actor || '',
+      amount: '',
+      status: l.status || '',
+      method: l.action || l.action_type || '',
+    }))
+    return {
+      headers: ['date', 'type', 'reference', 'party', 'amount', 'status', 'method'],
+      rows: [...staffRows, ...logRows],
+    }
+  }
+  return {
+    headers: ['date', 'type', 'reference', 'party', 'amount', 'status', 'method'],
+    rows: ledger.map((t) => ({
+      date: t.date || t.created_at || '',
+      type: t.type || t.paymentMethod || 'LEDGER',
+      reference: t.reference || t.rrn || t.id,
+      party: t.customerName || t.staffName || '',
+      amount: t.amount ?? '',
+      status: t.status || t.settlementStatus || '',
+      method: t.paymentMethod || t.type || '',
+    })),
+  }
+}
 
-const downloadReport = (title, format) => {
-  $q.notify({
-    type: 'positive',
-    message: `Dynamic snapshot [${title}] compiled safely to ${format}. Cryptographic hash attached.`
-  })
+async function loadReportRows(title) {
+  const tenantId = localStorage.getItem('tenant_id')
+  const params = tenantId && tenantId !== 'global' ? { tenantId, limit: 200 } : { limit: 200 }
+  const settled = await Promise.allSettled([
+    adminApi.getFinanceTransactionLedger(),
+    adminApi.getTenantAuditLogs(params),
+    adminApi.getTenantStaff(),
+    inventoryApi.searchProducts(),
+  ])
+  const value = (i) => (settled[i].status === 'fulfilled' ? settled[i].value?.data : null)
+  const ledger = unwrapList(value(0))
+  const logs = unwrapList(value(1))
+  const staff = unwrapList(value(2))
+  let products = unwrapList(value(3))
+  if (!products.length && value(3) && typeof value(3) === 'object') {
+    products = unwrapList(value(3).products) || unwrapList(value(3).items)
+  }
+  return pickRows(title, ledger, logs, staff, products)
+}
+
+const downloadReport = async (title, format) => {
+  busyKey.value = `${title}:${format}`
+  try {
+    const { headers, rows } = await loadReportRows(title)
+    const filename = slugFile(title, format)
+    if (!rows.length) {
+      $q.notify({
+        type: 'warning',
+        message: `No rows yet for ${title}. The ${format} file still downloaded with headers.`,
+      })
+    }
+    if (format === 'CSV') {
+      const csv = toCsv(headers, rows)
+      const hash = await sha256Hex(csv)
+      triggerDownload(new Blob([csv], { type: 'text/csv;charset=utf-8' }), filename)
+      store.exportLogs.unshift({
+        id: `${Date.now()}`,
+        name: filename,
+        type: 'CSV',
+        size: `${Math.max(1, Math.round(csv.length / 1024))} KB`,
+        hash,
+      })
+    } else {
+      const lines = [
+        `Rows: ${rows.length}`,
+        '',
+        headers.join(' | '),
+        ...rows.slice(0, 45).map((r) => headers.map((h) => r[h]).join(' | ')),
+      ]
+      const blob = buildSimplePdf({
+        title,
+        subtitle: `Invify export  ${new Date().toLocaleString()}  rows=${rows.length}`,
+        lines,
+      })
+      const hash = await sha256Hex(await blob.text())
+      triggerDownload(blob, filename)
+      store.exportLogs.unshift({
+        id: `${Date.now()}`,
+        name: filename,
+        type: 'PDF',
+        size: `${Math.max(1, Math.round(blob.size / 1024))} KB`,
+        hash,
+      })
+    }
+    $q.notify({
+      type: 'positive',
+      message: `${format} downloaded: ${filename}`,
+    })
+  } catch (error) {
+    console.error('Report download failed:', error)
+    $q.notify({
+      type: 'negative',
+      message: error?.response?.data?.error || error?.message || `Could not download ${format}`,
+    })
+  } finally {
+    busyKey.value = ''
+  }
 }
 
 const inspectLog = (log) => {
   $q.dialog({
     title: 'Audit Chain Record Verification',
     message: `File: ${log.name}\nType: ${log.type}\nSize: ${log.size}\nSHA-256 Checksum: ${log.hash}\nSignature Verification: SUCCESS (Replay secure)`,
-    dark: true
+    dark: true,
   })
 }
 </script>

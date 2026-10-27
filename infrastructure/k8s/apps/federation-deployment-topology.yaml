@@ -63,7 +63,7 @@ spec:
             - name: REPLAY_VERIFICATION_STRICT
               value: "true"
             - name: REMOTE_PEER_ENDPOINTS
-              value: "https://fed-us-east.IIPS.app/sync,https://fed-ap-south.IIPS.app/sync"
+              value: "https://fed-us-east.invify.org/sync,https://fed-ap-south.invify.org/sync"
             - name: LOCAL_MATRIX_DB_URL
               valueFrom:
                 secretKeyRef:

@@ -213,7 +213,7 @@ export const ContextualIntelligenceRegistry = {
       telemetryImpact: 'Writes queued to temporary high-performance Redis cache buffers for <3s.',
       rollback: 'Strictly prohibited by accounting governance laws. Erroneous records must be balanced by manual correction entries.',
       complianceEffect: 'Generates secure SOX-compliant ledger snapshot markers.',
-      lineage: 'Source: `BillingGovernanceCenterPage.vue` -> `contracts/billing` -> REST `/api/billing/ledger/lock`'
+      lineage: 'Source: `PlatformFeeProfilesPage.vue` -> REST `/api/admin/platform-fees`'
     },
 
     offlineCache: 'Treasury Double-Entry Ledger: Financial ledger capturing transactional credits/debits. Caches offline reports.'
@@ -242,7 +242,7 @@ export const ContextualIntelligenceRegistry = {
       telemetryImpact: 'Zero transactional drop; processing latency recovers immediately if banking gateway is lagging.',
       rollback: 'Instantly reversible with a single supervisor command bypass.',
       complianceEffect: 'Guarantees continuous uptime of platform billing systems (>99.99%).',
-      lineage: 'Source: `BillingGovernanceCenterPage.vue` -> REST `/api/billing/routing/update`'
+      lineage: 'Source: `BillingGovernanceCenterPage.vue` (subscription mock) — platform fees are `/admin/platform-fees`'
     },
 
     offlineCache: 'Virtual Account Routing: Allocates inbound funds into corporate, tenant, and tax envelopes.'

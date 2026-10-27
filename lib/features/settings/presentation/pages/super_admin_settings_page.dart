@@ -13,6 +13,7 @@ import '../../../../core/license/license_generator.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
+import '../../../../core/utils/phone_number_input.dart';
 import '../../../../core/utils/device_info_service.dart';
 
 class SuperAdminSettingsPage extends StatefulWidget {
@@ -211,12 +212,10 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                     controller: _phoneController,
                     label: 'Phone',
                     icon: Icons.phone,
-                    validator: (val) {
-                      if (val != null && val.isNotEmpty && val.length < 10) {
-                        return 'Phone must be at least 10 digits';
-                      }
-                      return null;
-                    },
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: PhoneNumberInput.formatters,
+                    maxLength: PhoneNumberInput.maxDigits,
+                    validator: (val) => PhoneNumberInput.validate(val, minDigits: 10),
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -414,12 +413,16 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     bool obscureText = false,
     int maxLines = 1,
     int? maxLength,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       maxLines: maxLines,
       maxLength: maxLength,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,

@@ -8,6 +8,7 @@ import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
 
 import '../../data/datasources/finance_realtime_data_source.dart';
+import 'package:involve_app/core/utils/nigerian_banks.dart';
 
 /// FinanceRepository provides a high-level API to interact with the Invify Finance backend.
 /// It focuses on data transformation and strong typing.
@@ -278,14 +279,31 @@ class FinanceRepository {
     );
   }
 
+  /// Quotes the treasury service fee for a withdrawal amount.
+  Future<Map<String, dynamic>> quotePayout(double amount) async {
+    final response = await _client.post(
+      '/api/payout/quote',
+      data: {'amount': amount},
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return <String, dynamic>{};
+  }
+
   /// Initiates a fund sweep (withdrawal) to the saved bank account.
-  Future<void> initiatePayout(double amount) async {
-    await _client.post(
+  /// [otp] is the current 6-digit authenticator code. Withdrawal is refused without it.
+  Future<Map<String, dynamic>> initiatePayout(double amount, {required String otp}) async {
+    final response = await _client.post(
       '/api/payout/withdraw',
       data: {
         'amount': amount,
+        'otp': otp,
       },
     );
+    final body = response.data;
+    if (body is Map) return Map<String, dynamic>.from(body);
+    return <String, dynamic>{};
   }
 
   /// Fetches the history of fund sweeps (payouts).
@@ -436,22 +454,28 @@ class FinanceRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Quasar-backed bank list for payout / salary destinations.
+  /// Quasar-backed bank list for payout / salary destinations with resilient fallback.
   /// GET /api/payout/banks
   Future<List<Map<String, dynamic>>> getPayoutBanks({String country = 'nigeria'}) async {
-    final response = await _client.get(
-      '/api/payout/banks',
-      queryParameters: {'country': country},
-    );
-    final body = response.data;
-    final data = body is Map ? body['data'] : null;
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+    try {
+      final response = await _client.get(
+        '/api/payout/banks',
+        queryParameters: {'country': country},
+      );
+      final body = response.data;
+      final data = body is Map ? body['data'] : null;
+      if (data is List && data.isNotEmpty) {
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    } catch (_) {
+      // Gracefully fall back to comprehensive local bank directory if server endpoint is offline/pending onboarding
     }
-    return const [];
+    return kDefaultNigerianBanks
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   /// Resolve account name via Quasar name enquiry.

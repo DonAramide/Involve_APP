@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { logger } from './logger';
+import { readAccessToken } from '../auth/session';
 
 class NotificationEngineService {
   private notifications = ref<any[]>([]);
@@ -11,7 +12,7 @@ class NotificationEngineService {
   private async fetchNotifications() {
     try {
       const response = await fetch('/api/notifications', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('supabase_token')}` }
+        headers: { Authorization: `Bearer ${readAccessToken() || ''}` }
       });
       if (response.ok) {
         const payload = await response.json();
@@ -36,7 +37,7 @@ class NotificationEngineService {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('supabase_token')}`
+          Authorization: `Bearer ${readAccessToken() || ''}`
         },
       });
       if (response.ok) {

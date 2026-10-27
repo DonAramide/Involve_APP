@@ -41,9 +41,31 @@ class StockIncrementRequested extends StockEvent {
   final int itemId;
   final int quantity;
   final String? remarks;
-  StockIncrementRequested(this.itemId, this.quantity, {this.remarks});
+  final String? supplierName;
+  final String? receiptNumber;
+  final String? trackingNumber;
+  final DateTime? receivedAt;
+  final List<int>? receiptImage;
+  StockIncrementRequested(
+    this.itemId,
+    this.quantity, {
+    this.remarks,
+    this.supplierName,
+    this.receiptNumber,
+    this.trackingNumber,
+    this.receivedAt,
+    this.receiptImage,
+  });
   @override
-  List<Object?> get props => [itemId, quantity, remarks];
+  List<Object?> get props => [
+        itemId,
+        quantity,
+        remarks,
+        supplierName,
+        receiptNumber,
+        trackingNumber,
+        receivedAt,
+      ];
 }
 
 class LoadStockHistoryRequested extends StockEvent {

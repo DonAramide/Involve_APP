@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 class InvifyLoadingIndicator extends StatefulWidget {
   final String? message;
@@ -79,17 +80,21 @@ class _InvifyLoadingIndicatorState extends State<InvifyLoadingIndicator> with Si
             );
           },
         ),
-        const SizedBox(height: 24),
-        Text(
-          widget.message ?? 'LOADING SECURE INVENTORY...',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-            color: isDark ? Colors.white70 : Colors.blueGrey[700],
+        if ((widget.message ?? '').isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            widget.message ?? 'LOADING SECURE INVENTORY...',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              color: isDark ? Colors.white70 : Colors.blueGrey[700],
+              decoration: TextDecoration.none,
+              decorationColor: Colors.transparent,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -105,10 +110,7 @@ class _InvifyLoadingIndicatorState extends State<InvifyLoadingIndicator> with Si
       child: ClipOval(
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/logo.png',
-            fit: BoxFit.contain,
-          ),
+          child: InvifyBrandLogo(size: 49, fit: BoxFit.contain),
         ),
       ),
     );

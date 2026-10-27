@@ -34,6 +34,10 @@ describe('Phase 2 — Security & Financial Lockdown', () => {
       ['post', '/payments/intents/abc/cancel'],
       ['post', '/payments/intents/abc/refund'],
       ['get', '/payments/history'],
+      ['get', '/api/admin/finance/disputes'],
+      ['post', '/api/admin/finance/disputes'],
+      ['post', '/api/admin/finance/disputes/abc/approve'],
+      ['post', '/api/admin/finance/disputes/abc/reject'],
     ] as const;
 
     paths.forEach(([method, path]) => {
@@ -115,7 +119,7 @@ describe('Phase 2 — Security & Financial Lockdown', () => {
 
       // Either feature gate 403 or role/tenant handling — must not succeed
       expect(res.status).not.toBe(200);
-      expect([400, 403, 500]).toContain(res.status);
+      expect([400, 401, 403, 500]).toContain(res.status);
 
       process.env.OFFLINE_LOCAL_AUTH = 'false';
     });

@@ -12,7 +12,7 @@
         <div>
           <div class="text-weight-bold" style="font-size: 15px; letter-spacing: 0.3px;">Audit Trail Ledger</div>
           <div class="text-muted font-mono" style="font-size: 10px;">
-            IMMUTABLE · MULTI-SOURCE · IP/LOCATION TRACED · MAKER-CHECKER INCLUSIVE
+            IMMUTABLE · MULTI-SOURCE · IP/LOCATION TRACED · ACTIVATION KEYS · MAKER-CHECKER INCLUSIVE
           </div>
         </div>
       </div>
@@ -356,6 +356,7 @@ import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 import { joinApiUrl } from '../../config/env'
+import { userFacingApiError } from '../../utils/userFacingApiError'
 
 const $q = useQuasar()
 
@@ -561,14 +562,21 @@ async function fetchLogs() {
   loading.value = true
   try {
     const token = localStorage.getItem('invify_token')
+    const search = typeof filters.value.search === 'string' ? filters.value.search.trim() : ''
+    const dateFrom = typeof filters.value.dateFrom === 'string'
+      ? filters.value.dateFrom.slice(0, 10)
+      : ''
+    const dateTo = typeof filters.value.dateTo === 'string'
+      ? filters.value.dateTo.slice(0, 10)
+      : ''
     const params = {
       page: page.value,
       limit,
-      ...(filters.value.search && { search: filters.value.search }),
+      ...(search ? { search } : {}),
       ...(filters.value.module !== 'ALL' && { module: filters.value.module }),
       ...(filters.value.status !== 'ALL' && { status: filters.value.status }),
-      ...(filters.value.dateFrom && { dateFrom: filters.value.dateFrom }),
-      ...(filters.value.dateTo && { dateTo: filters.value.dateTo }),
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
     }
     const res = await axios.get(joinApiUrl('/api/admin/audit/ledger'), {
       headers: { Authorization: `Bearer ${token}` },
@@ -586,7 +594,7 @@ async function fetchLogs() {
     console.warn('[AuditTrail] Failed to load ledger:', err)
     logs.value = []
     totalCount.value = 0
-    $q.notify({ type: 'negative', message: 'Failed to load audit trail' })
+    $q.notify({ type: 'negative', message: userFacingApiError(err, 'Failed to load audit trail') })
   } finally {
     loading.value = false
   }
@@ -669,6 +677,7 @@ function getActionColor(action) {
   if (!action) return 'text-grey-5'
   if (action.includes('BLOCKED') || action.includes('REJECTED') || action.includes('FAILED')) return 'text-red-4'
   if (action.includes('APPROVED') || action.includes('GRANTED') || action.includes('SUCCESS')) return 'text-green-4'
+  if (action.includes('ACTIVATION') || action.includes('GENERATE')) return 'text-amber-4'
   if (action.includes('PENDING') || action.includes('REGISTERED')) return 'text-amber-4'
   if (action.includes('IMPERSONATION') || action.includes('REVOCATION')) return 'text-purple-4'
   return 'text-blue-3'

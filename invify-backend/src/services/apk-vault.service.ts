@@ -1,6 +1,92 @@
 // src/services/apk-vault.service.ts
 import { supabaseAdmin as supabase } from '../db/supabase';
 
+// Helper functions to safely convert between human-readable size string and integer bytes for PostgreSQL INTEGER column
+function parseSizeToBytes(size: any): number {
+  if (typeof size === 'number') {
+    return Math.round(size);
+  }
+  if (typeof size === 'string') {
+    const mbMatch = size.match(/([\d.]+)\s*MB/i);
+    if (mbMatch) {
+      return Math.round(parseFloat(mbMatch[1]) * 1024 * 1024);
+    }
+    const kbMatch = size.match(/([\d.]+)\s*KB/i);
+    if (kbMatch) {
+      return Math.round(parseFloat(kbMatch[1]) * 1024);
+    }
+    const gbMatch = size.match(/([\d.]+)\s*GB/i);
+    if (gbMatch) {
+      return Math.round(parseFloat(gbMatch[1]) * 1024 * 1024 * 1024);
+    }
+    const digits = size.replace(/[^\d]/g, '');
+    return digits ? parseInt(digits, 10) : 0;
+  }
+  return 0;
+}
+
+function formatBytesToHuman(bytes: any): string {
+  if (bytes === null || bytes === undefined || bytes === '') return '—';
+  if (typeof bytes === 'string') {
+    if (bytes.includes('MB') || bytes.includes('KB') || bytes.includes('GB') || bytes.includes('B')) {
+      return bytes;
+    }
+    const num = parseFloat(bytes);
+    if (isNaN(num)) return bytes;
+    bytes = num;
+  }
+  if (typeof bytes === 'number') {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (bytes >= 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
+  }
+  return '—';
+}
+
+function displayPackageName(stored: string): string {
+  return String(stored || '').replace(/#slot-\d+$/i, '');
+}
+
+function publicApkDownloadUrl(id: string): string {
+  const base = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.BASE_URL ||
+    'https://api.invify.org'
+  ).replace(/\/+$/, '');
+  return `${base}/api/apk/${id}/download`;
+}
+
+function mapApkRow(a: any) {
+  const downloadUrl = publicApkDownloadUrl(a.id);
+  return {
+    id: a.id,
+    name: a.name,
+    packageName: displayPackageName(a.package_name),
+    version: a.version,
+    size: formatBytesToHuman(a.size),
+    status: a.status,
+    uploadProgress: Number(a.upload_progress) || 0,
+    installCount: a.install_count,
+    uninstallCount: a.uninstall_count,
+    versionDistribution: a.version_distribution,
+    selectedDeployVersion: a.selected_deploy_version,
+    s3Url: a.s3_url,
+    url: downloadUrl,
+    downloadUrl,
+    createdBy: a.created_by,
+    updatedBy: a.updated_by,
+    createdAt: a.created_at,
+    updatedAt: a.updated_at,
+  };
+}
+
 export class ApkVaultService {
   static async getVault() {
     const { data, error } = await supabase
@@ -13,25 +99,12 @@ export class ApkVaultService {
       return [];
     }
     
-    // Map database columns to camelCase expected by client
-    return (data || []).map((a: any) => ({
-      id: a.id,
-      name: a.name,
-      packageName: a.package_name,
-      version: a.version,
-      size: a.size,
-      status: a.status,
-      uploadProgress: a.upload_progress,
-      installCount: a.install_count,
-      uninstallCount: a.uninstall_count,
-      versionDistribution: a.version_distribution,
-      selectedDeployVersion: a.selected_deploy_version,
-      s3Url: a.s3_url,
-      createdBy: a.created_by,
-      updatedBy: a.updated_by,
-      createdAt: a.created_at,
-      updatedAt: a.updated_at
-    }));
+    return (data || []).map((a: any) => mapApkRow(a));
+  }
+
+  static async getApkById(id: string) {
+    const vault = await this.getVault();
+    return vault.find((a: any) => String(a.id) === String(id)) || null;
   }
 
   static async getLogs() {
@@ -65,53 +138,54 @@ export class ApkVaultService {
     }
 
     const id = `apk-${Date.now()}`;
-    const newApk = {
-      id,
-      name: apkData.name,
-      package_name: apkData.packageName,
-      version: apkData.version,
-      size: apkData.size,
-      status: 'READY',
-      upload_progress: 100,
-      install_count: 0,
-      uninstall_count: 0,
-      version_distribution: [
-        { version: apkData.version, deviceCount: 0 }
-      ],
-      selected_deploy_version: apkData.version,
-      s3_url: apkData.s3Url,
-      created_by: operatorEmail,
-      updated_by: operatorEmail
-    };
+    const basePackage = displayPackageName(apkData.packageName);
+    const packageCandidates = vault.length === 0
+      ? [basePackage]
+      : [basePackage, `${basePackage}#slot-${vault.length + 1}`];
 
-    const { data, error } = await supabase
-      .from('apk_vault')
-      .insert([newApk])
-      .select()
-      .single();
+    let data: any = null;
+    let error: any = null;
+    for (const packageName of packageCandidates) {
+      const newApk = {
+        id,
+        name: apkData.name,
+        package_name: packageName,
+        version: apkData.version,
+        size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
+        status: 'READY',
+        upload_progress: 100,
+        install_count: 0,
+        uninstall_count: 0,
+        version_distribution: [
+          { version: apkData.version, deviceCount: 0 }
+        ],
+        selected_deploy_version: apkData.version,
+        s3_url: apkData.s3Url,
+        created_by: operatorEmail,
+        updated_by: operatorEmail
+      };
+
+      const inserted = await supabase
+        .from('apk_vault')
+        .insert([newApk])
+        .select()
+        .single();
+      data = inserted.data;
+      error = inserted.error;
+      if (!error) break;
+      if (error.code !== '23505') break;
+    }
 
     if (error) {
+      if (error.code === '23505') {
+        throw new Error(
+          `${apkData.packageName} could not occupy a new slot because apk_vault still has a unique package_name index. Apply the 20260909 vault-slots migration, then retry Upload New APK.`,
+        );
+      }
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: data.package_name,
-      version: data.version,
-      size: data.size,
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async updateApkSlot(slotId: string, apkData: any, operatorEmail: string = 'system') {
@@ -135,7 +209,7 @@ export class ApkVaultService {
       .from('apk_vault')
       .update({
         version: apkData.version,
-        size: apkData.size,
+        size: parseSizeToBytes(apkData.size ?? apkData.sizeBytes),
         s3_url: apkData.s3Url,
         version_distribution: dist,
         selected_deploy_version: apkData.version,
@@ -150,24 +224,7 @@ export class ApkVaultService {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: data.package_name,
-      version: data.version,
-      size: data.size,
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async updateApkUrl(slotId: string, s3Url: string, operatorEmail: string = 'system') {
@@ -186,24 +243,7 @@ export class ApkVaultService {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      packageName: data.package_name,
-      version: data.version,
-      size: data.size,
-      status: data.status,
-      uploadProgress: data.upload_progress,
-      installCount: data.install_count,
-      uninstallCount: data.uninstall_count,
-      versionDistribution: data.version_distribution,
-      selectedDeployVersion: data.selected_deploy_version,
-      s3Url: data.s3_url,
-      createdBy: data.created_by,
-      updatedBy: data.updated_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return mapApkRow(data);
   }
 
   static async removeApk(slotId: string) {
@@ -229,9 +269,9 @@ export class ApkVaultService {
     return {
       id: existing.id,
       name: existing.name,
-      packageName: existing.package_name,
+      packageName: displayPackageName(existing.package_name),
       version: existing.version,
-      size: existing.size,
+      size: formatBytesToHuman(existing.size),
       status: existing.status,
       uploadProgress: existing.upload_progress,
       installCount: existing.install_count,

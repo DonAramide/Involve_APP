@@ -1,129 +1,88 @@
 /**
  * PUSH NOTIFICATION DISPATCHER LAYER
- * Interfaces with Firebase Cloud Messaging (FCM) to trigger background synchronizations,
- * offline priority queuing, and critical persistent banner alerts.
+ * Sends FCM via the backend (/admin/broadcast with channels: ['fcm']).
+ * Firebase credentials stay on the server — never in the admin SPA.
  */
 
+import { adminApi } from '../../api';
 import { broadcastEngineSingleton } from './BroadcastOrchestrationEngine';
 
 class PushNotificationDispatcher {
   constructor() {
-    this.deviceTokens = new Map([
-      ["edge-node-01", { token: "fcm_token_alpha_991", valid: true, failCount: 0 }],
-      ["edge-node-02", { token: "fcm_token_beta_882", valid: true, failCount: 0 }],
-      ["kiosk-master", { token: "fcm_token_kiosk_773", valid: true, failCount: 0 }]
-    ]);
-
-    // Internal simulation trace queue storing out-of-band FCM delivery blocks
     this.dispatchedPushHistory = [];
 
-    // Register this instance directly into the master orchestration queue engine
-    broadcastEngineSingleton.registerTransportGateway("fcm", async (envelope) => {
+    broadcastEngineSingleton.registerTransportGateway('fcm', async (envelope) => {
       await this.dispatchPushEnvelope(envelope);
     });
   }
 
-  /**
-   * Resolves appropriate FCM delivery priority parameters depending on message class
-   */
   mapNotificationPriority(severity) {
-    if (["EMERGENCY", "CRITICAL"].includes(severity)) {
-      return "high"; // Immediate background awaken mapping
+    if (['EMERGENCY', 'CRITICAL'].includes(severity)) {
+      return 'high';
     }
-    return "normal"; // Standard background battery-optimized pacing
+    return 'normal';
   }
 
-  /**
-   * Crafts low-overhead raw FCM data envelope blocks avoiding standard consumer notification drops
-   */
-  formatFCMPayload(envelope) {
-    const isSilentMode = envelope.launcherMode === "silent";
-    const priority = this.mapNotificationPriority(envelope.severity);
+  resolveSocketTarget(envelope) {
+    const tenantId = envelope?.tenantId || 'global';
+    const scopes = envelope?.targetScopes || {};
+    const scopedTenants = Array.isArray(scopes.tenants) ? scopes.tenants.filter(Boolean) : [];
 
-    const fcmEnvelope = {
-      message: {
-        token: "<TARGET_DEVICE_TOKEN>",
-        android: {
-          priority: priority,
-          // Refinement 6: Direct launcher execution behavior mapping via intent params
-          data: {
-            broadcast_id: envelope.broadcastId,
-            tenant_id: envelope.tenantId,
-            severity_str: envelope.severity,
-            title_text: envelope.title,
-            body_text: envelope.message,
-            launcher_mode: envelope.launcherMode,
-            requires_ack: envelope.requiresAcknowledgement ? "true" : "false",
-            lineage_hash: envelope.lineageHash,
-            // Silent syncs omit user presentation blocks to operate strictly in background daemons
-            is_silent_sync: isSilentMode ? "true" : "false"
-          }
-        }
-      }
+    if (tenantId === 'global' && scopedTenants.length === 0) {
+      return { targetType: 'all', targetValue: null };
+    }
+    if (scopedTenants.length === 1) {
+      return { targetType: 'tenant', targetValue: scopedTenants[0] };
+    }
+    if (tenantId && tenantId !== 'global') {
+      return { targetType: 'tenant', targetValue: tenantId };
+    }
+    return { targetType: 'all', targetValue: null };
+  }
+
+  buildDeviceMessage(envelope) {
+    const title = (envelope?.title || '').trim();
+    const body = (envelope?.message || '').trim();
+    if (title && body) return `${title}\n${body}`;
+    return title || body || 'Operational broadcast';
+  }
+
+  async dispatchPushEnvelope(envelope) {
+    if (!envelope) throw new Error('Missing broadcast envelope');
+
+    const { targetType, targetValue } = this.resolveSocketTarget(envelope);
+    const message = this.buildDeviceMessage(envelope);
+
+    const payload = {
+      message,
+      targetType,
+      targetValue,
+      title: envelope.title,
+      severity: envelope.severity,
+      launcherMode: envelope.launcherMode,
+      broadcastId: envelope.broadcastId,
+      lineageHash: envelope.lineageHash,
+      channels: ['fcm'],
+      fcmPriority: this.mapNotificationPriority(envelope.severity),
     };
 
-    // Include presentation headers strictly if standard visual overlays apply
-    if (!isSilentMode && envelope.launcherMode !== "kiosk-lock") {
-      fcmEnvelope.message.notification = {
-        title: envelope.title,
-        body: envelope.message
-      };
+    console.log(
+      `[FCM DISPATCHER] Dispatching via /admin/broadcast`,
+      { targetType, targetValue, broadcastId: envelope.broadcastId },
+    );
+
+    const { data } = await adminApi.sendBroadcast(payload);
+
+    this.dispatchedPushHistory.unshift({
+      broadcastId: envelope.broadcastId,
+      dispatchedAt: Date.now(),
+      fcm: data?.fcm || null,
+    });
+    if (this.dispatchedPushHistory.length > 100) {
+      this.dispatchedPushHistory.pop();
     }
 
-    return fcmEnvelope;
-  }
-
-  /**
-   * Invokes network delivery routing loops targeting target FCM endpoints
-   */
-  async dispatchPushEnvelope(envelope) {
-    const formattedPayload = this.formatFCMPayload(envelope);
-    const targetScopes = envelope.targetScopes || {};
-    const tags = targetScopes.deviceTags || [];
-
-    // Resolve targeted tokens or fallback to tenant-wide broadcast simulation mapping
-    const targets = tags.length > 0 ? tags : Array.from(this.deviceTokens.keys());
-
-    for (const devId of targets) {
-      if (this.deviceTokens.has(devId)) {
-        const tokenMeta = this.deviceTokens.get(devId);
-        
-        if (!tokenMeta.valid) {
-          console.warn(`[FCM DISPATCHER] Skipped transmission for target device [${devId}]. Token invalidated.`);
-          continue;
-        }
-
-        // Simulate network delivery trace history logging
-        const record = {
-          broadcastId: envelope.broadcastId,
-          targetToken: tokenMeta.token,
-          deviceId: devId,
-          priority: formattedPayload.message.android.priority,
-          launcherMode: envelope.launcherMode,
-          dispatchedAt: Date.now()
-        };
-
-        this.dispatchedPushHistory.unshift(record);
-        if (this.dispatchedPushHistory.length > 100) {
-          this.dispatchedPushHistory.pop();
-        }
-
-        console.log(`[FCM DISPATCHER] Push notification envelope formatted successfully for device [${devId}] -> Priority mode: ${record.priority}`);
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * Tracks invalidation exceptions to flush stale registry records safely
-   */
-  invalidateToken(deviceId) {
-    if (this.deviceTokens.has(deviceId)) {
-      const meta = this.deviceTokens.get(deviceId);
-      meta.valid = false;
-      console.warn(`[FCM DISPATCHER] Invalidation trigger disabled target device token reference: ${deviceId}`);
-    }
+    return data?.fcm || { configured: false };
   }
 }
 

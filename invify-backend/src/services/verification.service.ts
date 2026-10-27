@@ -17,12 +17,48 @@ export class VerificationService {
     return Math.floor(min + Math.random() * (max - min + 1)).toString();
   }
 
+  public static normalizePurpose(purpose?: string): PurposeType {
+    if (!purpose) return 'SIGNUP';
+    const upper = String(purpose).trim().toUpperCase();
+    if (upper === 'ONBOARDING' || upper === 'SIGNUP') return 'SIGNUP';
+    if (['PASSWORD_RESET', 'LOGIN', 'PHONE_CHANGE', 'EMAIL_CHANGE'].includes(upper)) {
+      return upper as PurposeType;
+    }
+    return 'SIGNUP';
+  }
+
   public async sendOTP(
     identifier: string, // Email or Phone
     channel: ChannelType,
-    purpose: PurposeType,
-    tenantId?: string
+    purpose: PurposeType | string,
+    tenantId?: string,
+    options?: { reuseIfPending?: boolean }
   ): Promise<boolean> {
+    const safePurpose = VerificationService.normalizePurpose(purpose);
+    const normalized =
+      channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
+    const email = channel === 'EMAIL' ? normalized : null;
+    const phone = channel === 'WHATSAPP' ? normalized : null;
+
+    const { data: existingRows } = await supabase
+      .from('verification_codes')
+      .select('id, expires_at, code')
+      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
+      .eq('channel', channel)
+      .eq('purpose', safePurpose)
+      .eq('status', 'PENDING')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const existing = Array.isArray(existingRows) ? existingRows[0] : existingRows;
+    if (
+      options?.reuseIfPending &&
+      existing &&
+      existing.expires_at &&
+      new Date(existing.expires_at) > new Date()
+    ) {
+      return true;
+    }
+
     const rawOtp = this.generateOTP();
     const variant = require('../config/build-variant').BuildVariantService.getInstance();
     if (variant.isLocal() && process.env.LOG_OTP_IN_LOCAL === 'true') {
@@ -31,70 +67,80 @@ export class VerificationService {
     }
     const saltRounds = 10;
     const hashedOtp = await bcrypt.hash(rawOtp, saltRounds);
-    
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
-    const normalized =
-      channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
-    const email = channel === 'EMAIL' ? normalized : null;
-    const phone = channel === 'WHATSAPP' ? normalized : null;
+    const payload: Record<string, unknown> = {
+      tenant_id: tenantId || null,
+      email,
+      phone,
+      code: hashedOtp,
+      // Support-only plaintext for Verification Log (cleared on verify/expire/cancel).
+      plain_code: rawOtp,
+      channel,
+      purpose: safePurpose,
+      status: 'PENDING',
+      attempt_count: 0,
+      expires_at: expiresAt,
+    };
 
-    // Check if there's a recent PENDING OTP for the same channel & identifier to handle Resend Cooldown
-    // Rate limiting (60s cooldown, 5/hr max sends) can be done via DB queries here or via express-rate-limit 
-    // we use express-rate-limit for basic stuff, but checking DB is safer.
-
-    // Upsert or insert into verification_codes
-    // If an active one exists, we could just invalidate it or overwrite.
-    // We will cancel old pending requests for this channel/identifier/purpose
-    const { error: cancelError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('verification_codes')
-      .update({ status: 'CANCELLED' })
-      .match({ 
-         channel, 
-         purpose, 
-         status: 'PENDING' 
-      })
-      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized);
+      .insert(payload)
+      .select('id')
+      .maybeSingle();
 
-    const { error: insertError } = await supabase
-      .from('verification_codes')
-      .insert({
-        tenant_id: tenantId || null,
-        email,
-        phone,
-        code: hashedOtp,
-        channel,
-        purpose,
-        status: 'PENDING',
-        attempt_count: 0,
-        expires_at: expiresAt
-      });
-
-    if (insertError) {
+    if (insertError || !inserted?.id) {
       console.error('[VerificationService] Database error saving OTP:', insertError);
       throw new Error('Failed to save verification code');
     }
 
-    // Delegate to actual sender
     let sent = false;
-    if (channel === 'EMAIL') {
-      if (purpose === 'PASSWORD_RESET') {
-        sent = await emailService.sendPasswordResetCode(normalized, rawOtp);
-      } else {
-        sent = await emailService.sendVerificationCode(normalized, rawOtp);
+    try {
+      if (channel === 'EMAIL') {
+        if (safePurpose === 'PASSWORD_RESET') {
+          sent = await emailService.sendPasswordResetCode(normalized, rawOtp);
+        } else {
+          sent = await emailService.sendVerificationCode(normalized, rawOtp);
+        }
+      } else if (channel === 'WHATSAPP') {
+        sent = await whatsappService.sendOtpTemplate(normalized, rawOtp);
       }
-    } else if (channel === 'WHATSAPP') {
-      sent = await whatsappService.sendOtpTemplate(normalized, rawOtp);
+    } catch (sendErr: any) {
+      console.error('[VerificationService] OTP delivery failed:', sendErr?.message || sendErr);
+      sent = false;
     }
 
-    return sent;
+    if (!sent) {
+      await supabase
+        .from('verification_codes')
+        .update({ status: 'CANCELLED', plain_code: null })
+        .eq('id', inserted.id);
+      throw new Error(
+        channel === 'EMAIL'
+          ? 'Could not send the verification email. Please try again.'
+          : 'Could not send the WhatsApp verification code. Please try again.',
+      );
+    }
+
+    await supabase
+      .from('verification_codes')
+      .update({ status: 'CANCELLED', plain_code: null })
+      .match({
+        channel,
+        purpose: safePurpose,
+        status: 'PENDING',
+      })
+      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
+      .neq('id', inserted.id);
+
+    return true;
   }
 
   public async verifyOTP(
     identifier: string,
     code: string,
     channel: ChannelType,
-    purpose: PurposeType
+    purpose: PurposeType | string
   ): Promise<boolean> {
     const result = await this.verifyOTPDetailed(identifier, code, channel, purpose);
     return result.ok;
@@ -104,29 +150,34 @@ export class VerificationService {
     identifier: string,
     code: string,
     channel: ChannelType,
-    purpose: PurposeType
+    purpose: PurposeType | string
   ): Promise<{ ok: boolean; error?: string }> {
+    const safePurpose = VerificationService.normalizePurpose(purpose);
     const normalized =
       channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
 
-    // Find the pending OTP
-    const { data: record, error } = await supabase
+    const { data: pendingRows, error } = await supabase
       .from('verification_codes')
       .select('*')
       .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
       .eq('channel', channel)
-      .eq('purpose', purpose)
+      .eq('purpose', safePurpose)
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(5);
 
     if (error) {
       console.warn(`[VerificationService] Lookup error for ${normalized}:`, error.message);
       return { ok: false, error: 'Unable to verify code right now. Please try again.' };
     }
 
+    const record = Array.isArray(pendingRows) ? pendingRows[0] : pendingRows;
+
     if (!record) {
+      const recentVerified = await this.findRecentVerified(normalized, channel, safePurpose);
+      if (recentVerified) {
+        return { ok: true };
+      }
       console.warn(`[VerificationService] No pending OTP found for ${normalized}`);
       return {
         ok: false,
@@ -137,13 +188,19 @@ export class VerificationService {
     // Check expiry
     const now = new Date();
     if (new Date(record.expires_at) < now) {
-      await supabase.from('verification_codes').update({ status: 'EXPIRED' }).eq('id', record.id);
+      await supabase
+        .from('verification_codes')
+        .update({ status: 'EXPIRED', plain_code: null })
+        .eq('id', record.id);
       return { ok: false, error: 'Code expired. Tap Resend OTP for a new one.' };
     }
 
     // Check attempt limit
     if (record.attempt_count >= this.MAX_RETRIES) {
-      await supabase.from('verification_codes').update({ status: 'CANCELLED' }).eq('id', record.id);
+      await supabase
+        .from('verification_codes')
+        .update({ status: 'CANCELLED', plain_code: null })
+        .eq('id', record.id);
       return { ok: false, error: 'Too many attempts. Tap Resend OTP for a new code.' };
     }
 
@@ -170,6 +227,7 @@ export class VerificationService {
         .update({
           status: 'VERIFIED',
           verified_at: new Date().toISOString(),
+          plain_code: null,
         })
         .eq('id', record.id);
 
@@ -181,7 +239,7 @@ export class VerificationService {
         );
         const { error: fallbackError } = await supabase
           .from('verification_codes')
-          .update({ status: 'VERIFIED' })
+          .update({ status: 'VERIFIED', plain_code: null })
           .eq('id', record.id);
         if (fallbackError) {
           console.warn(
@@ -198,6 +256,35 @@ export class VerificationService {
     }
 
     return { ok: false, error: 'Incorrect code. Check the latest email and try again.' };
+  }
+
+  private async findRecentVerified(
+    normalized: string,
+    channel: ChannelType,
+    purpose: PurposeType
+  ): Promise<boolean> {
+    const { data: rows, error } = await supabase
+      .from('verification_codes')
+      .select('verified_at, created_at, expires_at')
+      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
+      .eq('channel', channel)
+      .eq('purpose', purpose)
+      .eq('status', 'VERIFIED')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) return false;
+    const record = Array.isArray(rows) ? rows[0] : rows;
+    if (!record) return false;
+
+    const now = Date.now();
+    const verifiedAt = record.verified_at ? new Date(record.verified_at).getTime() : 0;
+    const createdAt = record.created_at ? new Date(record.created_at).getTime() : 0;
+    const expiresAt = record.expires_at ? new Date(record.expires_at).getTime() : 0;
+    const anchor = verifiedAt || createdAt;
+    const withinVerifyWindow = anchor > 0 && now - anchor < 15 * 60 * 1000;
+    const notPastOriginalExpiry = !expiresAt || now <= expiresAt + 5 * 60 * 1000;
+    return withinVerifyWindow && notPastOriginalExpiry;
   }
 
   /**

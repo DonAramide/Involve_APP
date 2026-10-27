@@ -41,7 +41,7 @@
           <div class="text-caption text-muted">Total Volume</div>
           <div class="text-h4 text-weight-bold text-cyan-3">
             <q-spinner v-if="loading" size="sm" />
-            <span v-else>${{ tenants.reduce((acc, t) => acc + (t.volume || 0), 0).toLocaleString() }}</span>
+            <span v-else>₦{{ tenants.reduce((acc, t) => acc + (t.volume || 0), 0).toLocaleString() }}</span>
           </div>
         </div>
         <q-icon name="payments" color="cyan-3" size="lg" />
@@ -62,8 +62,10 @@
       <!-- Empty State -->
       <div v-else-if="!loading && tenants.length === 0" class="flex flex-center q-pa-xl text-center column op-gap-8">
         <q-icon name="cases" size="xl" color="grey-8" />
-        <div class="text-muted text-weight-bold">No tenants onboarded yet</div>
-        <q-btn outline color="amber-4" label="Onboard First Tenant" />
+        <div class="text-muted text-weight-bold">No tenants assigned yet</div>
+        <div class="text-caption text-grey-6" style="max-width: 360px;">
+          Tenants register on the Invify mobile app. Once they are assigned to this Institute they will appear here.
+        </div>
       </div>
 
       <div v-else class="col overflow-auto custom-scrollbar">
@@ -71,6 +73,8 @@
           <thead class="bg-panel-darker text-muted text-metric-mono text-weight-bold border-bottom sticky-header" style="font-size: 10px;">
             <tr>
               <th class="q-pa-sm">Business Name</th>
+              <th class="q-pa-sm">Tenant ID</th>
+              <th class="q-pa-sm">Agent Code</th>
               <th class="q-pa-sm">Industry</th>
               <th class="q-pa-sm">Health Score</th>
               <th class="q-pa-sm">Monthly Vol</th>
@@ -80,12 +84,14 @@
           <tbody class="text-caption" style="font-size: 12px;">
             <tr v-for="t in filteredTenants" :key="t.id" class="border-bottom-light hover-row cursor-pointer" @click="openMerchantDetail(t)">
               <td class="q-pa-sm text-main text-weight-bold">{{ t.business_name || t.businessName || 'Unknown' }}</td>
+              <td class="q-pa-sm text-metric-mono text-muted">{{ t.tenant_id || t.id }}</td>
+              <td class="q-pa-sm text-metric-mono">{{ t.agent_code || '—' }}</td>
               <td class="q-pa-sm text-muted">{{ t.industry_type || t.industry || 'Unknown' }}</td>
               <td class="q-pa-sm">
-                <q-linear-progress :value="t.health / 100" color="green-4" track-color="grey-9" class="q-mt-xs" style="width: 60px" />
-                <span class="text-metric-mono text-muted q-ml-sm" style="font-size: 10px;">{{ t.health }}</span>
+                <q-linear-progress :value="(t.health || 0) / 100" color="green-4" track-color="grey-9" class="q-mt-xs" style="width: 60px" />
+                <span class="text-metric-mono text-muted q-ml-sm" style="font-size: 10px;">{{ t.health || 0 }}</span>
               </td>
-              <td class="q-pa-sm text-metric-mono text-main">${{ t.volume.toLocaleString() }}</td>
+              <td class="q-pa-sm text-metric-mono text-main">₦{{ Number(t.volume || 0).toLocaleString() }}</td>
               <td class="q-pa-sm">
                 <q-badge :color="t.status === 'ACTIVE' ? 'green-9' : 'amber-9'" :text-color="t.status === 'ACTIVE' ? 'green-3' : 'amber-3'">
                   {{ t.status }}
@@ -127,7 +133,7 @@ const fetchTenants = async () => {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
       $q.notify({ type: 'negative', message: 'Not authenticated. Please log in.' })
-      router.push('/agent/login')
+      router.push('/institute/login')
       return
     }
 

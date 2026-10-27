@@ -33,7 +33,7 @@ class TeacherProfilePage extends StatelessWidget {
             ? assignedClasses.map((c) => c.name).join(', ')
             : 'None';
         final assignedSubjects = state.subjects
-            .where((s) => s.teacherId == currentTeacher.id)
+            .where((s) => s.isTaughtBy(currentTeacher.id))
             .toList();
         final assignedSubjectsText = assignedSubjects.isNotEmpty
             ? assignedSubjects.map((s) => s.name).join(', ')

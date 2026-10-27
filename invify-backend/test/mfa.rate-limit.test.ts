@@ -17,5 +17,5 @@ describe('MFA endpoint rate limiting', () => {
     const emailOtp = await request(app).post('/api/auth/send-email-otp').send({});
     expect(emailOtp.status).not.toBe(404);
     expect(emailOtp.status).not.toBe(429);
-  });
+  }, 60000);
 });

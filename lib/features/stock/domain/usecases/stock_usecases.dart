@@ -32,7 +32,26 @@ class DeleteItem {
 class IncreaseStock {
   final ItemRepository repository;
   IncreaseStock(this.repository);
-  Future<void> call(int itemId, int quantity, String? remarks) => repository.increaseStock(itemId, quantity, remarks);
+  Future<void> call(
+    int itemId,
+    int quantity,
+    String? remarks, {
+    String? supplierName,
+    String? receiptNumber,
+    String? trackingNumber,
+    DateTime? receivedAt,
+    List<int>? receiptImage,
+  }) =>
+      repository.increaseStock(
+        itemId,
+        quantity,
+        remarks,
+        supplierName: supplierName,
+        receiptNumber: receiptNumber,
+        trackingNumber: trackingNumber,
+        receivedAt: receivedAt,
+        receiptImage: receiptImage,
+      );
 }
 
 class GetStockHistory {

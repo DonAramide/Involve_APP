@@ -253,7 +253,7 @@
                 placeholder="Enter new password"
                 autocomplete="new-password"
                 class="sac__custom-input"
-                :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
+                :rules="[val => !!val || 'Password required', val => evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).ok || evaluatePasswordPolicy(val, { email: form.email, currentPassword: form.password }).errors[0]]"
               >
                 <template v-slot:prepend>
                   <q-icon name="lock_outline" size="18px" class="sac__input-icon" />
@@ -267,6 +267,11 @@
                   />
                 </template>
               </q-input>
+              <PasswordStrengthHints
+                :password="resetForm.newPassword"
+                :email="form.email"
+                :current-password="form.password"
+              />
             </div>
 
             <div class="sac__form-group">
@@ -359,7 +364,7 @@
                   placeholder="Enter new password"
                   autocomplete="new-password"
                   class="sac__custom-input"
-                  :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
+                  :rules="[val => !!val || 'Password required', val => evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).ok || evaluatePasswordPolicy(val, { email: otpForm.email || form.email }).errors[0]]"
                 >
                   <template v-slot:prepend>
                     <q-icon name="lock_outline" size="18px" class="sac__input-icon" />
@@ -373,6 +378,10 @@
                     />
                   </template>
                 </q-input>
+                <PasswordStrengthHints
+                  :password="otpForm.newPassword"
+                  :email="otpForm.email || form.email"
+                />
               </div>
               <div class="sac__form-group">
                 <label class="sac__input-label">Confirm Password</label>
@@ -561,7 +570,7 @@
     <!-- Footer -->
     <footer class="sac__footer">
       <div class="sac__footer-left">
-        © {{ currentYear }} {{ t.copyright }} <span class="q-ml-sm text-grey-6 text-weight-medium">version 1.0.0</span>
+        © {{ currentYear }} {{ t.copyright }} <span class="q-ml-sm text-grey-6 text-weight-medium">version {{ webAppVersion }}</span>
       </div>
       <div class="sac__footer-right">
         <span class="sac__footer-link" role="button" tabindex="0">{{ t.privacy }}</span>
@@ -602,9 +611,14 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { joinApiUrl } from '../../config/env'
+import { WEB_APP_VERSION } from '../../config/appVersion'
 import { useQuasar, copyToClipboard } from 'quasar'
 import logoImg from '../../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { persistAuthenticatedSession } from '../../auth/session'
+import { navigateAfterAuth } from '../../utils/authLoginPaths'
+import { evaluatePasswordPolicy } from '../../utils/passwordPolicy'
+import PasswordStrengthHints from '../../components/PasswordStrengthHints.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -612,6 +626,7 @@ const $q = useQuasar()
 const { prefs, toggleTheme } = useOperatorPreferences()
 
 const currentYear = new Date().getFullYear()
+const webAppVersion = WEB_APP_VERSION
 
 // Language Selector & Multi-Language Dictionary (English, Yorùbá, Igbo, Hausa)
 const availableLanguages = [
@@ -952,14 +967,30 @@ function startResendCooldown(seconds = RESEND_OTP_COOLDOWN_SEC) {
   }, 1000)
 }
 
-function mapAuthError(err) {
+function authPost(path, data, extra = {}) {
+  return axios.post(joinApiUrl(path), data, extra)
+}
+
+function mapAuthError(err, { otp = false } = {}) {
   const status = err?.response?.status
   const data = err?.response?.data || {}
   const code = String(data.code || data.error || '')
   const raw = String(data.message || data.error || err?.message || '')
+  const combined = `${code} ${raw}`.toLowerCase()
+  const otpFailure =
+    otp ||
+    /otp|2fa|totp|verification code|recovery code|incorrect code|invalid code|expired code|invalid or expired/.test(
+      combined,
+    )
 
+  if (otpFailure && (status === 400 || status === 401 || status === 403 || !err?.response)) {
+    return 'Invalid or expired OTP'
+  }
   if (!err?.response) {
-    return 'Unable to connect to Invify. Check your connection and try again.'
+    return 'No internet connection. Check your network and try again.'
+  }
+  if (status === 503 || data.error === 'AUTH_SERVICE_UNAVAILABLE' || data.retryable) {
+    return data.message || 'No internet connection. Sign-in needs a network connection to Auth.'
   }
   if (status === 429 || /rate|too many/i.test(raw)) {
     return 'Too many sign-in attempts. Please wait before trying again.'
@@ -978,6 +1009,9 @@ function mapAuthError(err) {
   }
   if (status === 403 && /super admin|unauthorized|forbidden|portal/i.test(raw)) {
     return 'This account does not have Super Admin access.'
+  }
+  if (/could not send the verification|smtp|verification email/i.test(combined)) {
+    return 'Recovery email could not be sent. Staging mail delivery is down — this is not a session error.'
   }
   if (status >= 500 || data.error === 'AUTH_SERVICE_UNAVAILABLE') {
     return 'Your session could not be established. Please try again.'
@@ -1068,7 +1102,7 @@ async function requestOtpCode() {
   successMessage.value = ''
   otpForm.value.email = email
   try {
-    await axios.post(joinApiUrl('/api/auth/send-email-otp'), {
+    await authPost('/api/auth/send-email-otp', {
       email,
       purpose: 'PASSWORD_RESET'
     })
@@ -1094,19 +1128,23 @@ async function verifyRecoveryOtp() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/verify-email-otp'), {
+    const res = await authPost('/api/auth/verify-email-otp', {
       email,
       code,
       otp: code,
       purpose: 'PASSWORD_RESET'
     })
-    if (res.data?.success === false) throw new Error(res.data?.error || 'Invalid code')
+    if (res.data?.success === false) {
+      errorMessage.value = 'Invalid or expired OTP'
+      otpVerified.value = false
+      return
+    }
     otpVerified.value = true
     recoveryStep.value = 'password'
     successMessage.value = 'Recovery email verified. Set your new password.'
   } catch (err) {
     otpVerified.value = false
-    errorMessage.value = mapAuthError(err)
+    errorMessage.value = mapAuthError(err, { otp: true })
   } finally {
     loading.value = false
   }
@@ -1119,9 +1157,13 @@ async function executeOtpResetPassword() {
   }
   if (otpForm.value.newPassword !== otpForm.value.confirmPassword) {
     errorMessage.value = 'Passwords do not match.'
+    return
   }
-  if (!otpForm.value.newPassword || otpForm.value.newPassword.length < 6) {
-    errorMessage.value = 'Password must be at least 6 characters.'
+  const otpPolicy = evaluatePasswordPolicy(otpForm.value.newPassword, {
+    email: otpForm.value.email || form.value.email,
+  })
+  if (!otpPolicy.ok) {
+    errorMessage.value = otpPolicy.errors[0]
     return
   }
   loading.value = true
@@ -1129,7 +1171,7 @@ async function executeOtpResetPassword() {
   successMessage.value = ''
   try {
     const email = String(otpForm.value.email || '').trim().toLowerCase()
-    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
+    const res = await authPost('/api/auth/reset-password', {
       email,
       recoveryVerified: true,
       newPassword: otpForm.value.newPassword
@@ -1175,7 +1217,7 @@ async function executeLoginPass() {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/login'), {
+    const res = await authPost('/api/auth/login', {
       email: String(form.value.email || '').trim().toLowerCase(),
       password: form.value.password,
       portal: 'admin',
@@ -1195,12 +1237,16 @@ async function executeLoginPass() {
       activeUserId.value = res.data.userId
       activeUserRole.value = res.data.role || activeUserRole.value
       challengeToken.value = res.data.challengeToken || ''
+      sessionStorage.setItem('mfa_challenge_userId', res.data.userId || '')
+      sessionStorage.setItem('operator_role', activeUserRole.value)
       if (res.data.requiresMfaSetup) {
-        sessionStorage.setItem('mfa_setup_token', res.data.setupToken)
+        sessionStorage.setItem('mfa_setup_token', res.data.setupToken || res.data.challengeToken)
         sessionStorage.setItem('mfa_setup_userId', res.data.userId)
+        sessionStorage.removeItem('mfa_challenge_token')
         router.push('/mfa/challenge').catch(() => {})
         return
       }
+      sessionStorage.setItem('mfa_challenge_token', challengeToken.value)
       pendingChallengeState.value = true
       challengeContextMessage.value =
         res.data.message || 'Enter the 6-digit code from your authenticator app.'
@@ -1253,31 +1299,46 @@ async function executeMfaVerification() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: activeUserId.value,
-      tokenCode: form.value.totpCode,
-      challengeToken: challengeToken.value,
-      role: activeUserRole.value
-    })
+    const res = await authPost(
+      '/api/auth/mfa/verify',
+      {
+        userId: activeUserId.value,
+        tokenCode: form.value.totpCode,
+        challengeToken: challengeToken.value || sessionStorage.getItem('mfa_challenge_token') || '',
+        role: activeUserRole.value
+      },
+      { withCredentials: true },
+    )
     if (res.data?.token) {
-      localStorage.setItem('mfa_status_verified', 'true')
       finalizeAuthenticatedSession(res.data)
     } else {
       errorMessage.value = 'Your session could not be established. Please try again.'
     }
   } catch (err) {
-    errorMessage.value = mapAuthError(err)
+    errorMessage.value = mapAuthError(err, { otp: true })
   } finally {
     loading.value = false
   }
 }
 
 async function executeResetPassword() {
+  if (resetForm.value.newPassword !== resetForm.value.confirmPassword) {
+    errorMessage.value = 'Passwords do not match.'
+    return
+  }
+  const policy = evaluatePasswordPolicy(resetForm.value.newPassword, {
+    email: form.value.email,
+    currentPassword: form.value.password,
+  })
+  if (!policy.ok) {
+    errorMessage.value = policy.errors[0]
+    return
+  }
   loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
+    const res = await authPost('/api/auth/reset-password', {
       userId: activeUserId.value,
       newPassword: resetForm.value.newPassword
     })
@@ -1298,14 +1359,17 @@ function cancelChallengeState() {
 }
 
 function finalizeAuthenticatedSession(tokenData) {
-  localStorage.setItem('invify_token', tokenData.token)
-  if (tokenData.refreshToken) {
-    localStorage.setItem('invify_refresh_token', tokenData.refreshToken)
-  }
-  const cleanRole = (tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
+  persistAuthenticatedSession({
+    ...tokenData,
+    user: {
+      ...(tokenData.user || {}),
+      role: tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN',
+      email: tokenData.user?.email || form.value.email,
+    },
+  })
+  const cleanRole = (localStorage.getItem('operator_role') || 'SUPER_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
   localStorage.setItem('operator_email', form.value.email || tokenData.user?.email || '')
-  localStorage.setItem('mfa_status_verified', 'true')
 
   const fullName = tokenData.user?.name || tokenData.user?.full_name || ''
   if (fullName) {
@@ -1314,14 +1378,9 @@ function finalizeAuthenticatedSession(tokenData) {
     localStorage.setItem('operator_last_name', parts.slice(1).join(' ') || '')
   }
 
-  const tenantId = tokenData.user?.tenantId || tokenData.tenantId
-  if (tenantId) localStorage.setItem('tenant_id', tenantId)
-
+  pendingChallengeState.value = false
   successMessage.value = 'Signed in successfully. Opening your dashboard…'
-  setTimeout(() => {
-    const dest = route.query?.redirect || '/'
-    router.push(dest).catch(() => {})
-  }, 400)
+  navigateAfterAuth(router, cleanRole, route.query?.redirect)
 }
 
 onMounted(() => {

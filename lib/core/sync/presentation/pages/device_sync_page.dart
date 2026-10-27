@@ -46,6 +46,9 @@ class DeviceSyncPage extends StatelessWidget {
             );
         },
         builder: (context, state) {
+          final visiblePeers = state.peers
+              .where((peer) => state.isMaster ? !peer.isMaster : peer.isMaster)
+              .toList();
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -85,19 +88,19 @@ class DeviceSyncPage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Nearby Devices',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      state.isMaster ? 'Client devices' : 'Master device',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    if (state.peers.isNotEmpty)
+                    if (visiblePeers.isNotEmpty)
                       Text(
-                        '${state.peers.length} found',
+                        '${visiblePeers.length} found',
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (state.peers.isEmpty)
+                if (visiblePeers.isEmpty)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -105,7 +108,7 @@ class DeviceSyncPage extends StatelessWidget {
                         children: [
                           const Icon(Icons.devices_other, size: 48, color: Colors.grey),
                           const SizedBox(height: 12),
-                          const Text('No devices found'),
+                          Text(state.isMaster ? 'No client devices found' : 'No master device found'),
                           const SizedBox(height: 4),
                           Text(
                             kIsWeb 
@@ -116,7 +119,7 @@ class DeviceSyncPage extends StatelessWidget {
                           ),
                           if (state.isDiscoveryRunning) ...[
                             const SizedBox(height: 24),
-                            const InvifyLoadingIndicator(message: 'SCANNING FOR PEER DEVICES...'),
+                            const InvifyLoadingIndicator(message: 'Looking for nearby devices...'),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -140,10 +143,10 @@ class DeviceSyncPage extends StatelessWidget {
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: state.peers.length,
+                    itemCount: visiblePeers.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      final peer = state.peers[index];
+                      final peer = visiblePeers[index];
                       return _buildDeviceTile(context, peer, state);
                     },
                   ),
@@ -196,8 +199,8 @@ class DeviceSyncPage extends StatelessWidget {
                       ),
                       Text(
                         state.isMaster
-                            ? 'Other devices can pull data from this device.'
-                            : 'Tap a device below to sync from it.',
+                            ? 'This device pulls data from each client. Match the client ID below.'
+                            : 'This phone sends its data to the master. The master pulls it. Match the master ID below.',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 13,
@@ -213,6 +216,20 @@ class DeviceSyncPage extends StatelessWidget {
                   },
                 ),
               ],
+            ),
+            const Divider(height: 28),
+            _buildInfoRow(
+              context,
+              'Device name',
+              state.localDeviceName.isEmpty ? 'This device' : state.localDeviceName,
+              theme.colorScheme.onSurface,
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              context,
+              'Device ID',
+              state.localDeviceId.isEmpty ? '—' : state.localDeviceId,
+              theme.colorScheme.primary,
             ),
           ],
         ),
@@ -247,24 +264,31 @@ class DeviceSyncPage extends StatelessWidget {
               Theme.of(context).primaryColor,
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: (state.isDiscoveryRunning && !state.isSyncing)
-                    ? () => context.read<SyncBloc>().add(ManualSyncTriggered())
-                    : null,
-                icon: state.isSyncing 
-                  ? const Icon(Icons.sync, size: 18)
-                  : const Icon(Icons.sync),
-                label: Text(state.isSyncing ? 'Syncing...' : 'Auto Sync Now'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            if (state.isMaster)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: (state.isDiscoveryRunning && !state.isSyncing)
+                      ? () => context.read<SyncBloc>().add(ManualSyncTriggered())
+                      : null,
+                  icon: state.isSyncing
+                    ? const Icon(Icons.sync, size: 18)
+                    : const Icon(Icons.sync),
+                  label: Text(state.isSyncing ? 'Pulling...' : 'Pull from clients'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
+              )
+            else
+              const Text(
+                'Auto sync stays on the master. This phone only sends its data when the master pulls.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
-            ),
           ],
         ),
       ),
@@ -273,17 +297,21 @@ class DeviceSyncPage extends StatelessWidget {
 
   Widget _buildInfoRow(BuildContext context, String label, String value, Color valueColor) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 12),
+        Expanded(
+          child: SelectableText(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: valueColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -292,13 +320,14 @@ class DeviceSyncPage extends StatelessWidget {
 
   Widget _buildDeviceTile(BuildContext context, PeerDevice peer, SyncState state) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canSync = peer.isMaster && peer.isOnline && !state.isMaster;
+    final canSync = state.isMaster && !peer.isMaster && peer.isOnline;
 
     return Card(
       elevation: 0,
       color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
+        isThreeLine: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: peer.isOnline
@@ -317,6 +346,7 @@ class DeviceSyncPage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
+          'ID ${peer.confirmId}\n'
           '${peer.isBluetooth ? "Bluetooth" : peer.ip} · ${peer.isMaster ? "Master" : "Client"} · '
           '${peer.isOnline ? "Online" : "Offline"}',
           style: const TextStyle(fontSize: 12),
@@ -329,13 +359,14 @@ class DeviceSyncPage extends StatelessWidget {
                         port: peer.port,
                         bluetoothId: peer.bluetoothId,
                         isBluetooth: peer.isBluetooth,
+                        authToken: peer.authToken,
                         peerName: peer.deviceName,
                       ));
                 },
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                child: const Text('Sync'),
+                child: const Text('Pull'),
               )
             : Container(
                 width: 10,
@@ -350,7 +381,9 @@ class DeviceSyncPage extends StatelessWidget {
   }
 
   Widget _buildSyncTip(BuildContext context, SyncState state) {
-    if (state.isMaster) return const SizedBox.shrink();
+    final message = state.isMaster
+        ? 'Pull copies all data from each client onto this phone. Nothing is sent back to the client.'
+        : 'Leave this phone on. The master pulls all of its data. This phone does not pull from the master.';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -365,9 +398,7 @@ class DeviceSyncPage extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              state.peers.any((p) => p.isMaster && p.isOnline)
-                  ? 'Tap "Sync" on the Master device above to pull its full data.'
-                  : 'Discovery is running. Ensure devices have WiFi or Bluetooth enabled.',
+              message,
               style: const TextStyle(fontSize: 13, color: Colors.blue),
             ),
           ),

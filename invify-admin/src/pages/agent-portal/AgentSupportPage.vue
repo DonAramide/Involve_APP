@@ -108,7 +108,7 @@ const fetchTickets = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    if (!token) { router.push('/agent/login'); return; }
+    if (!token) { router.push('/institute/login'); return; }
     const res = await axios.get('/api/support/tickets', { headers: { Authorization: `Bearer ${token}` } })
     tickets.value = res.data.data || []
   } catch (err) {

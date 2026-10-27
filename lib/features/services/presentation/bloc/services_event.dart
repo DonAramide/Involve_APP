@@ -97,6 +97,10 @@ class CreateServiceCustomer extends ServicesEvent {
   List<Object?> get props => [name, phone, email, address, image];
 }
 
+class EnsureWalkInCustomer extends ServicesEvent {
+  const EnsureWalkInCustomer();
+}
+
 class ExportServicesData extends ServicesEvent {
   const ExportServicesData();
 }
@@ -155,9 +159,10 @@ class AddServiceMaterial extends ServicesEvent {
   final String name;
   final String category;
   final double price;
-  const AddServiceMaterial({required this.name, required this.category, required this.price});
+  final Uint8List? image;
+  const AddServiceMaterial({required this.name, required this.category, required this.price, this.image});
   @override
-  List<Object?> get props => [name, category, price];
+  List<Object?> get props => [name, category, price, image];
 }
 
 class DeleteServiceMaterial extends ServicesEvent {
@@ -171,9 +176,10 @@ class UpdateServiceMaterial extends ServicesEvent {
   final String name;
   final String category;
   final double price;
-  const UpdateServiceMaterial({required this.id, required this.name, required this.category, required this.price});
+  final Uint8List? image;
+  const UpdateServiceMaterial({required this.id, required this.name, required this.category, required this.price, this.image});
   @override
-  List<Object?> get props => [id, name, category, price];
+  List<Object?> get props => [id, name, category, price, image];
 }
 
 class LoadMaterialCategories extends ServicesEvent {

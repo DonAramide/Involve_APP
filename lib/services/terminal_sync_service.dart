@@ -7,6 +7,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
+import 'package:involve_app/features/printer/domain/pos_host_endpoint.dart';
 
 /// Terminal configuration synced from the Invify backend.
 class TerminalConfig {
@@ -144,11 +147,13 @@ class TerminalConfig {
       activeHost: json['activeHost']?.toString(),
       expressPayHost: json['expressPayHost']?.toString(),
       expressPayPort: (json['expressPayPort'] as num?)?.toInt(),
-      nibssIp: json['nibssIp']?.toString() ??
-          (json['primaryHost'] is Map ? (json['primaryHost'] as Map)['ip']?.toString() : null),
-      nibssPort: (json['nibssPort'] as num?)?.toInt() ??
+      nibssIp: PosHostEndpoint.nonEmpty(json['nibssIp']) ??
           (json['primaryHost'] is Map
-              ? ((json['primaryHost'] as Map)['port'] as num?)?.toInt()
+              ? PosHostEndpoint.ipFromHost(Map<String, dynamic>.from(json['primaryHost'] as Map))
+              : null),
+      nibssPort: PosHostEndpoint.parsePort(json['nibssPort']) ??
+          (json['primaryHost'] is Map
+              ? PosHostEndpoint.parsePort((json['primaryHost'] as Map)['port'])
               : null),
       nibssSsl: json['nibssSsl'] == true ||
           (json['primaryHost'] is Map && (json['primaryHost'] as Map)['sslEnabled'] == true),
@@ -456,11 +461,63 @@ class TerminalSyncService {
   }
 
   /// Persist tenant-admin recovery password for System Access.
-  static Future<void> applySystemAccessPasswordFromConfig(TerminalConfig config) async {
+  ///
+  /// [replaceLocalAdminPassword] is for a newly linked replacement tablet:
+  /// the portal password becomes the device System Access password and the
+  /// super-admin password, so the factory default is not left in place.
+  static Future<void> applySystemAccessPasswordFromConfig(
+    TerminalConfig config, {
+    bool replaceLocalAdminPassword = false,
+  }) async {
     final password = config.systemAccessPassword;
     if (password == null || password.isEmpty) return;
-    await SecurityService().setRecoveryPassword(password);
-    debugPrint('[TerminalSync] System access recovery password synced from tenant admin');
+    final security = SecurityService();
+    await security.setRecoveryPassword(password);
+    if (replaceLocalAdminPassword) {
+      await security.setPassword(password);
+      await security.setSuperAdminPassword(password);
+    }
+    debugPrint('[TerminalSync] System access password synced from tenant admin');
+  }
+
+  static const _linkedBootstrapKey = 'linked_device_admin_bootstrap_pending';
+
+  static Future<void> markLinkedDeviceBootstrapPending() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_linkedBootstrapKey, true);
+  }
+
+  static Future<bool> linkedDeviceBootstrapPending() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_linkedBootstrapKey) == true;
+  }
+
+  /// True after a QR link, including after the one-time admin bootstrap finishes.
+  static Future<bool> wasLinkedViaDeviceLink() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(_linkedBootstrapKey);
+  }
+
+  /// Pull portal users (with sign-in codes) and the admin password onto this tablet.
+  static Future<({bool adminPassword, int staff})> bootstrapLinkedDeviceFromAdmin({
+    required String deviceId,
+  }) async {
+    final config = await syncTerminalConfig(deviceId: deviceId);
+    final password = config.systemAccessPassword;
+    final hasPassword = password != null && password.isNotEmpty;
+    await applySystemAccessPasswordFromConfig(
+      config,
+      replaceLocalAdminPassword: hasPassword,
+    );
+    var staff = 0;
+    final sl = GetIt.instance;
+    if (sl.isRegistered<StaffRepositoryImpl>()) {
+      staff = await sl.get<StaffRepositoryImpl>().pullCloudGovernance();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_linkedBootstrapKey, false);
+    debugPrint('[TerminalSync] Replacement bootstrap: adminPassword=$hasPassword staff=$staff');
+    return (adminPassword: hasPassword, staff: staff);
   }
 }
 

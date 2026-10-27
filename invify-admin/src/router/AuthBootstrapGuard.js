@@ -1,6 +1,9 @@
 // invify-admin/src/router/AuthBootstrapGuard.js
 
-import { loginPathForContext } from '../utils/authLoginPaths'
+import { loginPathForContext, homePathForRole, hasPlatformStaffRole } from '../utils/authLoginPaths'
+import { isPlatformShellPath } from '../utils/platformShellPaths'
+import { permissionsForOperatorRole } from '../utils/operatorPermissions'
+import { clearMfaChallengeState, hasVerifiedOperatorSession } from '../auth/session'
 
 /**
  * Enterprise Production-Grade Authentication Gate & Session Rehydration Interceptor.
@@ -14,48 +17,27 @@ import { loginPathForContext } from '../utils/authLoginPaths'
  *    exclusively after token verification and RBAC assertion pipelines complete cleanly.
  */
 export function registerAuthBootstrapGuard(router) {
-  // Helper to parse multiple roles
-  const getRolesArray = (roleStr) => {
-    if (!roleStr) return []
-    return roleStr.split(',').map(r => r.trim())
-  }
-
-  // Helper to determine role-based home landing path
-  const hasPlatformStaffRole = (roleStr) => {
-    const roles = getRolesArray(roleStr)
-    const staffRoles = [
-      'SUPER_ADMIN',
-      'STAFF',
-      'ADMIN_FINANCE',
-      'ADMIN_TREASURY',
-      'ADMIN_RISK',
-      'ADMIN_OPS',
-      'ADMIN_EXECUTIVE',
-      'ADMIN_DEPLOY'
-    ]
-    return roles.some(r => staffRoles.includes(r))
-  }
-
-  const getHomePath = (roleStr) => {
-    if (hasPlatformStaffRole(roleStr)) {
-      return '/fleet/overview'
-    }
-    return '/tenant/dashboard'
-  }
+  const getHomePath = (roleStr) => homePathForRole(roleStr)
 
   const getLoginPath = (toPath) =>
     loginPathForContext({ pathname: toPath, role: localStorage.getItem('operator_role') })
 
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach((to, from, next) => {
+    try {
     // 1. Extract state storage parameters
     const token = localStorage.getItem('invify_token')
-    const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    const pendingSetupToken = sessionStorage.getItem('mfa_setup_token')
-    
-    // Evaluate if token verification demands Multi-Factor challenge clearance
-    // If token exists but an explicit flag requires challenge resolution, or setup tokens exist
-    const isMfaPending = !!pendingSetupToken || localStorage.getItem('mfa_status_verified') === 'false'
-    const isVerifiedSession = !!token && !isMfaPending
+    const operatorRole = localStorage.getItem('operator_role') || ''
+    const isVerifiedSession = hasVerifiedOperatorSession()
+    if (isVerifiedSession) {
+      // Leftover challenge tokens from a later login attempt must not eject a live session.
+      clearMfaChallengeState()
+    }
+    const pendingMfaToken = isVerifiedSession
+      ? null
+      : (sessionStorage.getItem('mfa_setup_token') || sessionStorage.getItem('mfa_challenge_token'))
+    const isMfaPending = !isVerifiedSession && (
+      !!pendingMfaToken || localStorage.getItem('mfa_status_verified') === 'false'
+    )
 
     // 0. Public Website Routes
     // Extremely conservative public route bypass to ensure public pages never require auth.
@@ -69,14 +51,14 @@ export function registerAuthBootstrapGuard(router) {
     // 3. Guest route rules (e.g., /login, /admin/login, /tenant/login)
     if (to.meta?.isGuest) {
       if (isVerifiedSession) {
-        console.warn(`[DEV OVERRIDE] Allowed authenticated user to view guest route: ${to.path}`);
+        return next(getHomePath(operatorRole))
       }
       return next()
     }
 
     // 4. Multi-Factor Challenge Boundary rules (/mfa/challenge)
     if (to.path.startsWith('/mfa/challenge')) {
-      if (!token && !pendingSetupToken) {
+      if (!token && !pendingMfaToken) {
         return next(getLoginPath(from.path || '/'))
       }
       if (isVerifiedSession) {
@@ -100,13 +82,8 @@ export function registerAuthBootstrapGuard(router) {
 
       // Gate 2.5: Platform Administration Layout Isolation (Strict Tenant Redirection)
       if (!hasPlatformStaffRole(operatorRole)) {
-        const adminPathPrefixes = [
-          '/fleet', '/governance', '/observability', '/ai', 
-          '/deployments', '/apps', '/incidents', '/admin/', 
-          '/automation', '/communications'
-        ]
         const pathLower = to.path.toLowerCase()
-        if (to.path === '/' || adminPathPrefixes.some(prefix => pathLower.startsWith(prefix)) || pathLower === '/admin') {
+        if (to.path === '/' || isPlatformShellPath(to.path)) {
           console.warn(`[TENANT ISOLATION ENFORCED] Standard tenant operator [${operatorRole}] attempted global administration workspace traversal to [${to.path}]. Redirection to tenant hub initialized.`)
           return next('/tenant/dashboard')
         }
@@ -121,51 +98,17 @@ export function registerAuthBootstrapGuard(router) {
 
       // Gate 3: Native RBAC Claim evaluations
       if (to.meta?.permission) {
-        const userScopeMatrix = {
-          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications', 'admin_agent_management', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'view_deployment_queue', 'view_governance_queue', 'approve_finance', 'approve_operations', 'approve_deployment', 'approve_governance'],
-          ADMIN_FINANCE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
-          ADMIN_TREASURY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
-          ADMIN_RISK: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
-          ADMIN_OPS: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
-          ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'approve_finance', 'approve_operations'],
-          ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_deployment_queue', 'approve_deployment'],
-          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_own_requests'],
-          OWNER: [
-            'tenant.dashboard.view', 'tenant.transaction.view', 'tenant.wallet.view',
-            'tenant.ledger.view', 'tenant.users.manage', 'tenant.roles.view',
-            'tenant.invitations.manage', 'tenant.activity.view', 'tenant.reports.view',
-            'tenant.settings.manage', 'tenant.settlement.view', 'tenant.payout.create',
-            'tenant.devices.view', 'tenant.terminals.view', 'tenant.compliance.view',
-            'tenant.audit.view', 'tenant.analytics.view', 'tenant.inventory.view'
-          ],
-          TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
-        }
-
-        const rolesArray = getRolesArray(operatorRole)
-        let activePermissions = []
-        
-        if (rolesArray.includes('SUPER_ADMIN')) {
-          activePermissions = userScopeMatrix['SUPER_ADMIN']
-        } else {
-          rolesArray.forEach(r => {
-            if (userScopeMatrix[r]) {
-              activePermissions = activePermissions.concat(userScopeMatrix[r])
-            }
-          })
-          if (activePermissions.length === 0) activePermissions = userScopeMatrix['SUPER_ADMIN'] // fallback
-        }
+        const activePermissions = permissionsForOperatorRole(operatorRole)
 
         if (!activePermissions.includes(to.meta.permission)) {
           console.warn(`[RBAC GATEWAY DENIAL] Operator scope [${operatorRole}] missing required capability claim: [${to.meta.permission}]`)
           
-          // Avoid infinite redirect loops
+          // Never abort in place (next(false) left tenant login stuck on success).
           const homePath = getHomePath(operatorRole)
           if (to.path !== homePath) {
             return next(homePath)
-          } else {
-            // Fallback to error or simply stop navigation
-            return next(false)
           }
+          return next()
         }
       }
 
@@ -184,6 +127,10 @@ export function registerAuthBootstrapGuard(router) {
     }
 
     // Default processing for static catch-all screens
-    next()
+    return next()
+    } catch (err) {
+      console.error('[AuthBootstrapGuard] Navigation guard failed:', err)
+      return next()
+    }
   })
 }

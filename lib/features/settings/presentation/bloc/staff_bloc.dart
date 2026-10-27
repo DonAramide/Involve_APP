@@ -15,6 +15,7 @@ class StaffBloc extends Bloc<StaffEvent, StaffState> {
   Future<void> _onLoadStaff(LoadStaffList event, Emitter<StaffState> emit) async {
     emit(state.copyWith(isLoading: true));
     try {
+      await repository.pullCloudGovernance();
       final list = await repository.getAllStaff();
       emit(state.copyWith(staffList: list, isLoading: false));
     } catch (e) {

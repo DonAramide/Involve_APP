@@ -148,6 +148,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { terminalApi } from 'src/api/terminalApi'
 import { adminApi } from 'src/api'
+import { userFacingApiError } from 'src/utils/userFacingApiError'
 
 const $q = useQuasar()
 
@@ -354,7 +355,7 @@ const handleUnassign = (row) => {
       $q.notify({ type: 'positive', message: 'Hardware bundle unassigned successfully' })
       fetchData()
     } catch (error) {
-      $q.notify({ type: 'negative', message: error.response?.data?.error || 'Failed to unassign' })
+      $q.notify({ type: 'negative', message: userFacingApiError(error, 'Failed to unassign') })
       loadingTable.value = false
     }
   })
@@ -373,7 +374,7 @@ const handleAssign = async () => {
     form.value = { tablet_id: '', mpos_id: '', printer_id: '', terminal_id_id: '', tenant_id: '' }
     fetchData()
   } catch (error) {
-    $q.notify({ type: 'negative', message: error.response?.data?.error || 'Failed to assign bundle' })
+    $q.notify({ type: 'negative', message: userFacingApiError(error, 'Failed to assign bundle') })
   } finally {
     loading.value = false
   }

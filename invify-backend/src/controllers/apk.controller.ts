@@ -1,24 +1,78 @@
-import { Request, Response } from 'express';
+import fs from 'fs';
+import os from 'os';
+import { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ApkVaultService } from '../services/apk-vault.service';
+import { resolveApkObjectKey } from '../utils/apk-object-key';
+import { createContaboS3Client, formatContaboNetworkError, putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
-export const apkUploadMiddleware = upload.single('file');
+const APK_MAX_BYTES = 500 * 1024 * 1024;
 
-const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;
-
-const s3Client = new S3Client({
-  endpoint: process.env.CONTABO_ENDPOINT || '',
-  region: process.env.CONTABO_REGION || 'usc1',
-  credentials: {
-    accessKeyId: process.env.CONTABO_ACCESS_KEY || '',
-    secretAccessKey: process.env.CONTABO_SECRET_KEY || ''
+const diskUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const safe = String(file.originalname || 'app.apk').replace(/[^\w.\-]+/g, '_');
+      cb(null, `invify-apk-${Date.now()}-${safe}`);
+    },
+  }),
+  limits: { fileSize: APK_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const name = String(file.originalname || '').toLowerCase();
+    const type = String(file.mimetype || '').toLowerCase();
+    if (
+      name.endsWith('.apk') ||
+      type === 'application/vnd.android.package-archive' ||
+      type === 'application/octet-stream'
+    ) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Only .apk files are allowed'));
   },
-  forcePathStyle: true // Needed for Contabo Object Storage
 });
 
-import { io } from '../app';
+export const apkUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  diskUpload.single('file')(req, res, (err: any) => {
+    if (!err) return next();
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({
+      error: err.code === 'LIMIT_FILE_SIZE'
+        ? 'APK exceeds the 500 MB upload limit'
+        : (err.message || 'APK upload failed'),
+    });
+  });
+};
+
+function storageUploadErrorMessage(error: any): string {
+  const raw = String(error?.message || '');
+  if (/char ['"][{!]['"] is not expected|deserialization error/i.test(raw)) {
+    return 'Contabo Object Storage rejected the upload (S3-compatible APIs do not accept AWS default checksums).';
+  }
+  return formatContaboNetworkError(error) || raw || 'APK upload failed';
+}
+
+function removeTempApk(filePath?: string) {
+  if (!filePath) return;
+  fs.unlink(filePath, (cleanupErr) => {
+    if (cleanupErr && (cleanupErr as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn('[ApkController] temp APK cleanup failed:', cleanupErr.message);
+    }
+  });
+}
+
+const APK_TRANSFER_TIMEOUT_MS = 30 * 60 * 1000;
+
+function publicApkDownloadUrl(apkId: string): string {
+  const base = (process.env.PUBLIC_API_BASE_URL || process.env.BASE_URL || 'https://api.invify.org').replace(/\/+$/, '');
+  return `${base}/api/apk/${apkId}/download`;
+}
+
+function getIo() {
+  // Lazy import avoids a circular load with app.ts that can 500 APK routes.
+  return require('../app').io;
+}
 
 export class ApkController {
 
@@ -33,13 +87,14 @@ export class ApkController {
   }
 
   static async uploadApk(req: Request, res: Response) {
-    req.setTimeout(APK_UPLOAD_TIMEOUT_MS);
-    res.setTimeout(APK_UPLOAD_TIMEOUT_MS);
+    req.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    res.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    const file = req.file;
+    const tempPath = file?.path;
     try {
-      const file = req.file;
       const { name, packageName, version, targetSlotId } = req.body;
 
-      if (!file) {
+      if (!file || !tempPath) {
         return res.status(400).json({ error: 'No APK file provided' });
       }
 
@@ -47,50 +102,137 @@ export class ApkController {
         return res.status(400).json({ error: 'name, packageName, and version are required' });
       }
 
-      const bucket = process.env.CONTABO_BUCKET;
-      const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
-
-      // Upload to Contabo S3
-      await s3Client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: objectKey,
-        Body: file.buffer,
-        ContentType: 'application/vnd.android.package-archive',
-        ACL: process.env.CONTABO_UPLOAD_PUBLIC_READ === 'true' ? 'public-read' : 'private'
-      }));
-
-      // Construct public URL. Contabo URL is usually https://<endpoint>/<bucket>/<key>
-      let baseUrl = process.env.CONTABO_PUBLIC_BASE_URL;
-      let s3Url = '';
-      if (baseUrl) {
-          if (!baseUrl.endsWith('/')) baseUrl += '/';
-          s3Url = `${baseUrl}${objectKey}`;
-      } else {
-          let endpointUrl = process.env.CONTABO_ENDPOINT || '';
-          if (!endpointUrl.endsWith('/')) endpointUrl += '/';
-          s3Url = `${endpointUrl}${bucket}/${objectKey}`;
+      const bucket = resolveContaboBucket();
+      if (!bucket) {
+        return res.status(503).json({
+          error: 'Object storage is not configured (CONTABO_BUCKET is missing).',
+        });
       }
+      const objectKey = `apks/${packageName}_v${version}_${Date.now()}.apk`;
+      const stat = await fs.promises.stat(tempPath);
+      await putContaboObject({
+        bucket,
+        key: objectKey,
+        filePath: tempPath,
+        contentType: 'application/vnd.android.package-archive',
+      });
+
+      const s3Url = publicContaboObjectUrl(objectKey);
 
       const apkData = {
         name,
         packageName,
         version,
-        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        size: stat.size,
+        sizeFormatted: `${(stat.size / 1024 / 1024).toFixed(1)} MB`,
         s3Url
       };
 
       let result;
       const operatorEmail = (req as any).user?.email || 'system_operator';
-      if (targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined') {
-        result = await ApkVaultService.updateApkSlot(targetSlotId, apkData, operatorEmail);
+      const explicitSlotId =
+        targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined'
+          ? String(targetSlotId)
+          : '';
+
+      if (explicitSlotId) {
+        result = await ApkVaultService.updateApkSlot(explicitSlotId, apkData, operatorEmail);
       } else {
         result = await ApkVaultService.addApk(apkData, operatorEmail);
       }
 
-      return res.status(200).json(result);
+      const downloadUrl = publicApkDownloadUrl(result.id);
+      return res.status(200).json({
+        ...result,
+        url: downloadUrl,
+        downloadUrl,
+        s3Url: result.s3Url || s3Url,
+      });
     } catch (error: any) {
       console.error('[ApkController] upload error:', error);
-      return res.status(500).json({ error: error.message });
+      const isDuplicate = error?.code === '23505' || /already exists|already in the vault/i.test(String(error?.message || ''));
+      return res.status(isDuplicate ? 409 : 500).json({
+        error: isDuplicate
+          ? `${req.body?.packageName || 'This package'} could not occupy a new slot. Apply the 20260909 vault-slots migration, then retry Upload New APK.`
+          : (storageUploadErrorMessage(error)),
+      });
+    } finally {
+      removeTempApk(tempPath);
+    }
+  }
+
+  static async downloadApk(req: Request, res: Response) {
+    req.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    res.setTimeout(APK_TRANSFER_TIMEOUT_MS);
+    try {
+      const apk = await ApkVaultService.getApkById(String(req.params.id || ''));
+      if (!apk?.s3Url) {
+        return res.status(404).json({ error: 'APK not found' });
+      }
+
+      const objectKey = resolveApkObjectKey(apk.s3Url);
+      if (!objectKey) {
+        if (apk.s3Url.startsWith('http')) {
+          return res.redirect(302, apk.s3Url);
+        }
+        return res.status(404).json({ error: 'APK storage key is missing' });
+      }
+
+      const bucket = resolveContaboBucket();
+      const s3Client = createContaboS3Client();
+      
+      try {
+        const object = await s3Client.send(new GetObjectCommand({
+          Bucket: bucket,
+          Key: objectKey,
+        }));
+        if (!object.Body) {
+          if (apk.s3Url.startsWith('http')) {
+            return res.redirect(302, apk.s3Url);
+          }
+          return res.status(404).json({ error: 'APK file is empty' });
+        }
+
+        const filename = `${apk.packageName || 'app'}_v${apk.version || '0'}.apk`
+          .replace(/[^\w.\-]+/g, '_');
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        if (object.ContentLength) {
+          res.setHeader('Content-Length', String(object.ContentLength));
+        }
+        res.setHeader('Cache-Control', 'public, max-age=300');
+
+        const body = object.Body as { pipe?: Function; transformToByteArray?: () => Promise<Uint8Array> };
+        if (typeof body.pipe === 'function') {
+          body.pipe(res);
+          (body as any).on?.('error', (err: Error) => {
+            console.error('[ApkController] download stream error:', err);
+            if (!res.headersSent) {
+              res.redirect(302, apk.s3Url);
+            } else {
+              res.end();
+            }
+          });
+          return;
+        }
+
+        const bytes = await body.transformToByteArray?.();
+        if (!bytes) {
+          return res.redirect(302, apk.s3Url);
+        }
+        return res.send(Buffer.from(bytes));
+      } catch (s3Error: any) {
+        console.warn('[ApkController] S3 stream failed, falling back to Contabo S3 public URL redirect:', s3Error?.message);
+        if (apk.s3Url && apk.s3Url.startsWith('http')) {
+          return res.redirect(302, apk.s3Url);
+        }
+        throw s3Error;
+      }
+    } catch (error: any) {
+      console.error('[ApkController] download error:', error);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: error.message || 'Download failed' });
+      }
     }
   }
 
@@ -127,26 +269,28 @@ export class ApkController {
         return res.status(404).json({ error: 'APK not found' });
       }
 
+      const installUrl = publicApkDownloadUrl(apk.id);
+
       // Broadcast OTA push to targeted devices
       if (targetDevices && targetDevices.length > 0) {
         targetDevices.forEach((deviceId: string) => {
-          io.to(`device:${deviceId}`).emit('ota_push_event', {
+          getIo().to(`device:${deviceId}`).emit('ota_push_event', {
             action: 'INSTALL',
             apkId: apk.id,
             packageName: apk.packageName,
             version: targetVersion,
-            url: apk.s3Url,
+            url: installUrl,
             targetDevices: targetDevices
           });
         });
       } else {
         // Fallback to all if no target devices specified
-        io.emit('ota_push_event', {
+        getIo().emit('ota_push_event', {
           action: 'INSTALL',
           apkId: apk.id,
           packageName: apk.packageName,
           version: targetVersion,
-          url: apk.s3Url,
+          url: installUrl,
           targetDevices: targetDevices
         });
       }

@@ -7,10 +7,14 @@ const router = Router();
 
 const otpRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Max 10 requests per IP per hour for OTP endpoints (to prevent basic spam)
+  max: 30, // send + verify retries share this bucket
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 
+router.get('/check-email', OnboardingController.checkEmail);
+router.post('/check-email', OnboardingController.checkEmail);
+router.get('/check-agent-code', OnboardingController.checkAgentCode);
+router.post('/check-agent-code', OnboardingController.checkAgentCode);
 router.post('/send-email-otp', otpRateLimiter, OnboardingController.sendEmailOtp);
 router.post('/verify-email-otp', otpRateLimiter, OnboardingController.verifyEmailOtp);
 router.post('/send-whatsapp-otp', otpRateLimiter, OnboardingController.sendWhatsappOtp);

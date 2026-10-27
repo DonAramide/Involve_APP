@@ -84,9 +84,9 @@ const isEligible = ref(true);
 const selectedIntent = ref(null);
 
 const metrics = ref({
-  revenue: 1250000, // $12,500.00
-  pending: 345000,
-  refunds: 15000
+  revenue: 0,
+  pending: 0,
+  refunds: 0
 });
 
 const recentPayments = ref([]);

@@ -7,14 +7,14 @@ class ServicesRemoteDataSource {
   ServicesRemoteDataSource(this.client);
 
   Future<void> syncJobs(List<Map<String, dynamic>> jobs) async {
-    await client.post('/services/sync/jobs', data: {'jobs': jobs});
+    await client.post('/api/v1/services/sync/jobs', data: {'jobs': jobs});
   }
 
   Future<void> syncPayments(List<Map<String, dynamic>> payments) async {
-    await client.post('/services/sync/payments', data: {'payments': payments});
+    await client.post('/api/v1/services/sync/payments', data: {'payments': payments});
   }
 
   Future<void> syncCustomers(List<Map<String, dynamic>> customers) async {
-    await client.post('/services/sync/customers', data: {'customers': customers});
+    await client.post('/api/v1/services/sync/customers', data: {'customers': customers});
   }
 }

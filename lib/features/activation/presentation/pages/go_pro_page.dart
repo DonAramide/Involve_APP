@@ -2,6 +2,7 @@ import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 
@@ -121,7 +122,10 @@ class _GoProPageState extends State<GoProPage> {
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
-              validator: (v) => v!.isEmpty ? 'Required' : null,
+              keyboardType: TextInputType.phone,
+              inputFormatters: PhoneNumberInput.formatters,
+              maxLength: PhoneNumberInput.maxDigits,
+              validator: (v) => PhoneNumberInput.validate(v, required: true),
             ),
             const SizedBox(height: 16),
             TextFormField(

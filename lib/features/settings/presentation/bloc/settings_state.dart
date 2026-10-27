@@ -8,7 +8,15 @@ abstract class SettingsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadSettings extends SettingsEvent {}
+class LoadSettings extends SettingsEvent {
+  /// Business name and mode returned by the server when this device was linked
+  /// to an existing tenant; applied and persisted during this load.
+  final String? linkedBusinessName;
+  final String? linkedBusinessMode;
+  LoadSettings({this.linkedBusinessName, this.linkedBusinessMode});
+  @override
+  List<Object?> get props => [linkedBusinessName, linkedBusinessMode];
+}
 
 class UpdateAppSettings extends SettingsEvent {
   final AppSettings settings;

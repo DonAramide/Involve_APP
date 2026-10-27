@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum PlanType { basic, standard, premium, enterprise }
+enum PlanType { basic, standard, premium, enterprise } // enterprise kept for legacy licenses; maps to premium in UI
 
 class LicenseModel {
   final String businessName;

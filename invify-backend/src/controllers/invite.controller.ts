@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { InviteService, NotificationService } from '../services/invite.service';
 import { supabase } from '../db/supabase';
+import { holdForSupportApproval } from '../services/maker-checker.service';
 
 export class InviteController {
   /**
@@ -10,6 +11,14 @@ export class InviteController {
    */
   static async sendInvite(req: Request, res: Response) {
     try {
+      const held = await holdForSupportApproval(req, res, {
+        domain: 'staff_management',
+        action: 'staff_invite',
+        target: String(req.body?.email || '').trim().toLowerCase(),
+        summary: `Invite staff ${String(req.body?.email || '').trim()}`,
+        body: req.body || {},
+      });
+      if (held) return;
       const { email } = req.body;
       const { tenantId } = (req as any).user;
 

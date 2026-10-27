@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top Revenue Tenant:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">Shoprite Mega Store</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Fastest Growing:</span>
-            <q-badge color="green-10" text-color="green-3"><q-icon name="trending_up" size="xs" class="q-mr-xs"/>Invify Agency Network</q-badge>
+            <q-badge color="grey-10" text-color="grey-4">—</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Highest Risk:</span>
-            <span class="text-red-4 text-weight-bold">BetKing (Compliance Watchlist)</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top School:</span>
-            <span class="text-cyan-4 text-weight-bold">Ahmadu Bello University</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <q-icon name="apartment" color="green-4" size="sm" />
         </div>
@@ -53,37 +53,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total / Active Tenants</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">842 / 815</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Tenant Revenue</div>
-          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}1.4M <span class="text-caption text-muted">(+8%)</span></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Settlement Success / Compliance</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">99.8% / 96%</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">—</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">High Growth / Rev Generating</div>
-          <div class="text-h5 text-metric-mono text-amber-5">142 / 680</div>
+          <div class="text-h5 text-metric-mono text-amber-5">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">High Risk / Churn Risk</div>
-          <div class="text-h5 text-metric-mono text-red-5">12 / 24</div>
+          <div class="text-h5 text-metric-mono text-red-5">0 / 0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Tenant Growth</div>
-          <div class="text-h5 text-metric-mono text-purple-4">+14.2%</div>
+          <div class="text-h5 text-metric-mono text-purple-4">—</div>
         </div>
       </div>
     </div>
@@ -300,7 +300,7 @@
                   </div>
                 </div>
                 <div class="text-caption text-muted border-bottom q-pb-xs q-mb-sm">Risk Vectors & Analysis</div>
-                <div class="row justify-between q-mb-xs"><span class="text-muted">Settlement Risk:</span><span class="text-green-4">LOW (99.8% Success)</span></div>
+                <div class="row justify-between q-mb-xs"><span class="text-muted">Settlement Risk:</span><span class="text-grey-5">—</span></div>
                 <div class="row justify-between q-mb-xs"><span class="text-muted">Operational Risk:</span><span class="text-green-4">LOW</span></div>
                 <div class="row justify-between q-mb-xs"><span class="text-muted">Revenue Concentration Risk:</span><span class="text-amber-4">MEDIUM</span></div>
                 <div class="q-mt-sm text-caption text-muted border-top q-pt-sm">AI Recommendation: {{ selectedTenant.recommendedAction }}</div>
@@ -388,77 +388,7 @@ const tenantCols = [
   { name: 'riskScore', label: 'RISK', field: 'riskScore', align: 'center' }
 ]
 
-const tenantRecords = ref([
-  {
-    id: 'TEN-SCH-001',
-    tenantName: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    healthScore: 98,
-    growthScore: 14.5,
-    revenue: 45000000,
-    txnVolume: 1250000,
-    walletCount: 84000,
-    terminalCount: 42,
-    cardCount: 22000,
-    complianceScore: 100,
-    riskScore: 2,
-    churnScore: 1,
-    anomalyScore: 0.01,
-    fraudExposure: 'LOW',
-    status: 'ACTIVE',
-    relationshipManager: 'Dr. S. Okonkwo',
-    createdDate: '2025-01-15',
-    recommendedAction: 'Offer premium treasury services',
-    forecastScore: 92,
-    predictionStatus: 'STABLE_GROWTH'
-  },
-  {
-    id: 'TEN-MER-042',
-    tenantName: 'Shoprite Mega Store',
-    tenantType: 'RETAIL',
-    healthScore: 95,
-    growthScore: 8.2,
-    revenue: 125000000,
-    txnVolume: 3500000,
-    walletCount: 1,
-    terminalCount: 240,
-    cardCount: 0,
-    complianceScore: 98,
-    riskScore: 14,
-    churnScore: 5,
-    anomalyScore: 0.05,
-    fraudExposure: 'MEDIUM (Card Testing)',
-    status: 'ACTIVE',
-    relationshipManager: 'A. Bello',
-    createdDate: '2024-11-20',
-    recommendedAction: 'Monitor terminal offline rates',
-    forecastScore: 88,
-    predictionStatus: 'STABLE'
-  },
-  {
-    id: 'TEN-AGT-881',
-    tenantName: 'Invify Agency Network',
-    tenantType: 'AGENT',
-    healthScore: 82,
-    growthScore: 42.1,
-    revenue: 18500000,
-    txnVolume: 890000,
-    walletCount: 1400,
-    terminalCount: 1200,
-    cardCount: 1400,
-    complianceScore: 85,
-    riskScore: 45,
-    churnScore: 22,
-    anomalyScore: 0.45,
-    fraudExposure: 'HIGH (Velocity)',
-    status: 'ACTIVE',
-    relationshipManager: 'Unassigned',
-    createdDate: '2025-06-10',
-    recommendedAction: 'Deploy advanced fraud rules; KYC audit',
-    forecastScore: 74,
-    predictionStatus: 'HIGH_VOLATILITY'
-  }
-])
+const tenantRecords = ref([])
 
 </script>
 

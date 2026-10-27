@@ -9,7 +9,7 @@ spec:
     # The ACME server URL for Let's Encrypt's production endpoint
     server: https://acme-v02.api.letsencrypt.org/directory
     # Email address used for ACME registration and expiration notification warnings
-    email: soc-security@IIPS.app
+    email: soc-security@invify.org
     # Name of a secret used to store the ACME account private key
     privateKeySecretRef:
       name: letsencrypt-production-account-key
@@ -37,7 +37,7 @@ spec:
   dnsNames:
     - api.invify.org
     - app.invify.org
-    - stream.IIPS.app
+    - stream.invify.org
   privateKey:
     algorithm: RSA
     encoding: PKCS1

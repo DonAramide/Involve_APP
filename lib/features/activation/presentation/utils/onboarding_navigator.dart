@@ -6,11 +6,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../pages/verify_email_page.dart';
 import '../pages/verify_whatsapp_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
-import '../pages/activation_page.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/services/socket_service.dart';
+import 'onboarding_draft_store.dart';
 
 class OnboardingNavigator {
   static Future<void> proceed(BuildContext context, Map<String, dynamic> payload, List<String> requiredChannels, {bool isMounted = true}) async {
@@ -31,17 +33,20 @@ class OnboardingNavigator {
     } else {
       // Navigate to the next channel
       Widget nextScreen;
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ));
       
       try {
         switch (nextChannel) {
           case 'EMAIL':
             payload['email'] = (payload['email']?.toString() ?? '').trim().toLowerCase();
-            await _sendOtp(dio, payload['email'], 'email');
+            await _sendOtp(dio, payload['email'], 'email', deviceId: payload['deviceId']?.toString());
             nextScreen = VerifyEmailPage(payload: payload, requiredChannels: requiredChannels);
             break;
           case 'WHATSAPP':
-            await _sendOtp(dio, payload['phone'], 'whatsapp');
+            await _sendOtp(dio, payload['whatsapp'] ?? payload['phone'], 'whatsapp');
             nextScreen = VerifyWhatsappPage(payload: payload, requiredChannels: requiredChannels);
             break;
           default:
@@ -62,14 +67,17 @@ class OnboardingNavigator {
       }
 
       if (isMounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => nextScreen));
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => nextScreen));
       }
     }
   }
 
   static Future<void> activateAccount(BuildContext context, Map<String, dynamic> payload, bool isMounted) async {
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 25),
+      ));
       
       final signupUrls = [
         '${AppConfig.baseUrl}/auth/register',
@@ -97,16 +105,38 @@ class OnboardingNavigator {
             'streetAddress': payload['streetAddress'],
             // Device identity fields
             'deviceId': payload['deviceId'],
-            'agentCode': payload['agentCode'] ?? 'AAA000',
+            'agentCode': payload['agentCode'],
             'location': payload['location'],
           });
           
           if (response.data != null && response.data['offlineToken'] != null) {
-            await SecurityService().setOfflineToken(response.data['offlineToken']);
+            final token = response.data['offlineToken'].toString();
+            await SecurityService().setOfflineToken(token);
+            // App start connected the socket before this JWT existed (red cloud).
+            await SocketService().initializeSocket(
+              AppConfig.baseUrl,
+              tenantId: response.data['tenantId']?.toString(),
+              deviceId: payload['deviceId']?.toString(),
+              businessName: payload['businessName']?.toString(),
+              token: token,
+            );
           }
           
           signupSuccess = true;
           break;
+        } on DioException catch (dioErr) {
+          debugPrint('Signup error on $url: $dioErr');
+          if (dioErr.response?.statusCode == 409 ||
+              (dioErr.response?.data is Map &&
+                  (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                   dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+            lastError = 'An account with this email already exists. Please sign in or use a different email.';
+            break;
+          }
+          lastError = friendlyApiError(
+            dioErr,
+            fallback: 'Could not create your account. Please try again.',
+          );
         } catch (e) {
           debugPrint('Signup error on $url: $e');
           lastError = friendlyApiError(
@@ -124,22 +154,35 @@ class OnboardingNavigator {
         );
       }
 
-      // Mark device as onboarded locally
+      // Mark device as onboarded locally and start/refresh the local trial window
+      // so LandingPage does not send them to the activation-key screen.
       await StorageService.setOnboardingCompleted(true);
-      if (payload['isTrial'] == true) {
-        await StorageService.saveTrialStartDate(DateTime.now());
-      }
+      await StorageService.saveTrialStartDate(DateTime.now());
+      await _persistOnboardingPreferences(payload);
+      await OnboardingDraftStore.clear();
 
       if (isMounted) {
-        // Sync the business name globally
+        // Sync the business name, operational mode, and brand color globally
         try {
           final settingsBloc = context.read<SettingsBloc>();
           final currentSettings = settingsBloc.state.settings;
           if (currentSettings != null) {
+            final street = (payload['streetAddress']?.toString() ?? '').trim();
+            final nextAddress = street.isNotEmpty
+                ? street
+                : (AppSettings.isPlaceholderAddress(currentSettings.address)
+                    ? ''
+                    : currentSettings.address);
+            final nextEmail = (payload['email']?.toString() ?? '').trim().toLowerCase();
+            final nextColor = AppSettings.colorFromHex(payload['themeColor']?.toString());
             settingsBloc.add(UpdateAppSettings(
               currentSettings.copyWith(
                 organizationName: payload['businessName'] ?? currentSettings.organizationName,
                 phone: payload['phone'] ?? currentSettings.phone,
+                email: nextEmail.isNotEmpty ? nextEmail : currentSettings.email,
+                address: nextAddress,
+                businessMode: AppSettings.modeFromOnboarding(payload['industry']?.toString()),
+                primaryColor: nextColor ?? currentSettings.primaryColor,
               )
             ));
           }
@@ -147,9 +190,10 @@ class OnboardingNavigator {
           debugPrint('Error syncing business name: $e');
         }
 
-        final isTrial = payload['isTrial'] == true;
+        // Self-register already created the tenant and device JWT. Do not send
+        // them to the activation-key screen (that POST /devices/validate 400).
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => isTrial ? const DashboardPage() : const ActivationPage(isExpired: false)),
+          MaterialPageRoute(builder: (_) => const DashboardPage()),
           (route) => false,
         );
       }
@@ -164,7 +208,28 @@ class OnboardingNavigator {
     }
   }
 
-  static Future<void> _sendOtp(Dio dio, String identifier, String type) async {
+  static Future<void> persistOnboardingPreferences({
+    String? industry,
+    String? themeColor,
+  }) async {
+    final mode = (industry ?? '').trim();
+    if (mode.isNotEmpty) {
+      await StorageService.setOnboardingIndustry(AppSettings.modeFromOnboarding(mode));
+    }
+    final color = AppSettings.colorFromHex(themeColor);
+    if (color != null) {
+      await StorageService.setOnboardingThemeColor(color);
+    }
+  }
+
+  static Future<void> _persistOnboardingPreferences(Map<String, dynamic> payload) {
+    return persistOnboardingPreferences(
+      industry: payload['industry']?.toString(),
+      themeColor: payload['themeColor']?.toString(),
+    );
+  }
+
+  static Future<void> _sendOtp(Dio dio, String identifier, String type, {String? deviceId}) async {
     // Email OTP is registered on /api/auth/*; WhatsApp OTP remains on /auth/*.
     final otpPath = type == 'email'
         ? '/api/auth/send-email-otp'
@@ -177,9 +242,29 @@ class OnboardingNavigator {
     String? lastError;
     for (var url in urls) {
       try {
-        await dio.post(url, data: {type == 'email' ? 'email' : 'phone': identifier});
+        await dio.post(
+          url,
+          data: {
+            type == 'email' ? 'email' : 'phone': identifier,
+            'purpose': 'SIGNUP',
+            'reuseIfPending': true,
+            if (type == 'email' && deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+          },
+        );
         otpSent = true;
         break;
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 409 ||
+            (dioErr.response?.data is Map &&
+                (dioErr.response?.data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+                 dioErr.response?.data['error']?.toString().toLowerCase().contains('already exists') == true))) {
+          lastError = 'An account with this email already exists. Please sign in or use a different email.';
+          break;
+        }
+        lastError = friendlyApiError(
+          dioErr,
+          fallback: 'Could not send $type verification code.',
+        );
       } catch (e) {
         lastError = friendlyApiError(
           e,

@@ -28,9 +28,12 @@
           <q-input 
             v-model="form.phone" 
             label="Phone Number" 
+            type="tel"
             outlined 
             dark 
             dense 
+            maxlength="13"
+            counter
             :rules="[val => !!val || 'Phone is required']" 
           />
           <q-input 

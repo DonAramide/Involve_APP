@@ -30,6 +30,34 @@ void main() {
       expect(msg, contains('first and last name'));
     });
 
+    test('hides Authorization header internals', () {
+      final msg = friendlyApiError(
+        Exception('Generation failed: Missing or malformed Authorization header'),
+        fallback: 'Could not generate the lesson note. Please try again.',
+      );
+      expect(msg, 'The server could not verify this device. Please try again.');
+      expect(msg.toLowerCase(), isNot(contains('authorization')));
+    });
+
+    test('maps unprovisioned financial platform to an activate-platform message', () {
+      final msg = friendlyApiError(
+        'FINANCIAL_PLATFORM_UNPROVISIONED: platform is UNPROVISIONED',
+        fallback: 'Could not generate virtual account. Please try again.',
+      );
+      expect(msg.toLowerCase(), contains('financial platform'));
+      expect(msg.toLowerCase(), contains('activate platform'));
+      expect(msg.toLowerCase(), isNot(contains('free trial')));
+    });
+
+    test('hides Invalid API key internals', () {
+      final msg = friendlyApiError(
+        'Invalid API key',
+        fallback: 'Could not generate virtual account. Please try again.',
+      );
+      expect(msg.toLowerCase(), contains('payment accounts'));
+      expect(msg.toLowerCase(), isNot(contains('api key')));
+    });
+
     test('falls back for opaque technical dumps', () {
       final msg = friendlyApiError(
         'DioException [bad response]: status code of 500',

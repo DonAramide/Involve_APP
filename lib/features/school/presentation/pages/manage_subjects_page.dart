@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
-import 'package:collection/collection.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
@@ -56,14 +55,26 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
             itemCount: state.subjects.length,
             itemBuilder: (context, index) {
               final subject = state.subjects[index];
-              final teacher = state.teachers.firstWhereOrNull((t) => t.id == subject.teacherId);
+              final teacherNames = state.teachers
+                  .where((t) => subject.isTaughtBy(t.id))
+                  .map((t) => t.fullName)
+                  .join(', ');
+              final classNames = (subject.classIds == null || subject.classIds!.isEmpty)
+                  ? 'All classes'
+                  : state.classes
+                      .where((c) => subject.classIds!.contains(c.id))
+                      .map((c) => c.name)
+                      .join(', ');
+              final details = [
+                if (subject.code != null && subject.code!.isNotEmpty) 'Code: ${subject.code}',
+                if (teacherNames.isNotEmpty) 'Teachers: $teacherNames',
+                'Classes: $classNames',
+              ].join(' • ');
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   title: Text(subject.name),
-                  subtitle: subject.code != null 
-                    ? Text('Code: ${subject.code}${teacher != null ? ' • Teacher: ${teacher.fullName}' : ''}') 
-                    : teacher != null ? Text('Teacher: ${teacher.fullName}') : null,
+                  subtitle: Text(details),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -89,7 +100,12 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
   void _showSubjectDialog(BuildContext context, {Subject? subject}) {
     final nameController = TextEditingController(text: subject?.name);
     final codeController = TextEditingController(text: subject?.code);
-    int? selectedTeacherId = subject?.teacherId;
+    final selectedTeacherIds = <int>{
+      ...?subject?.assignedTeacherIds,
+    };
+    final selectedClassIds = <int>{
+      ...?subject?.classIds,
+    };
 
     showDialog(
       context: context,
@@ -101,68 +117,152 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
             context.read<SchoolBloc>().add(ResetSchoolStatus());
           }
         },
-        child: AlertDialog(
-          title: Text(subject == null ? 'Add Subject' : 'Edit Subject'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Subject Name (e.g. Mathematics)'),
-                autofocus: true,
-              ),
-              TextField(
-                controller: codeController,
-                decoration: const InputDecoration(labelText: 'Subject Code (Optional)'),
-              ),
-              const SizedBox(height: 16),
-              BlocBuilder<SchoolBloc, SchoolState>(
-                builder: (context, state) {
-                  return DropdownButtonFormField<int>(
-                    value: selectedTeacherId,
-                    decoration: const InputDecoration(labelText: 'Assign Teacher', border: OutlineInputBorder()),
-                    items: [
-                      const DropdownMenuItem<int>(value: null, child: Text('None')),
-                      ...state.teachers.map((t) => DropdownMenuItem(value: t.id, child: Text(t.fullName))),
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(subject == null ? 'Add Subject' : 'Edit Subject'),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Subject Name (e.g. Mathematics)'),
+                        autofocus: true,
+                      ),
+                      TextField(
+                        controller: codeController,
+                        decoration: const InputDecoration(labelText: 'Subject Code (Optional)'),
+                      ),
+                      const SizedBox(height: 16),
+                      BlocBuilder<SchoolBloc, SchoolState>(
+                        builder: (context, state) {
+                          final classes = [...state.classes]
+                            ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+                          final teachers = [...state.teachers]
+                            ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Teachers who offer this subject',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                selectedTeacherIds.isEmpty
+                                    ? 'None selected'
+                                    : '${selectedTeacherIds.length} teacher${selectedTeacherIds.length == 1 ? '' : 's'} selected',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 8),
+                              if (teachers.isEmpty)
+                                const Text('Add teachers first, then assign them here.')
+                              else
+                                ...teachers.map((t) {
+                                  final checked = selectedTeacherIds.contains(t.id);
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(t.fullName),
+                                    subtitle: t.profession == null || t.profession!.isEmpty
+                                        ? null
+                                        : Text(t.profession!),
+                                    value: checked,
+                                    onChanged: (val) {
+                                      setDialogState(() {
+                                        if (val == true) {
+                                          selectedTeacherIds.add(t.id!);
+                                        } else {
+                                          selectedTeacherIds.remove(t.id);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Classes that take this subject',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                selectedClassIds.isEmpty
+                                    ? 'None selected — offered to all classes'
+                                    : '${selectedClassIds.length} class${selectedClassIds.length == 1 ? '' : 'es'} selected',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              const SizedBox(height: 8),
+                              if (classes.isEmpty)
+                                const Text('Add classes in Academic Setup first.')
+                              else
+                                ...classes.map((c) {
+                                  final checked = selectedClassIds.contains(c.id);
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(c.name),
+                                    value: checked,
+                                    onChanged: (val) {
+                                      setDialogState(() {
+                                        if (val == true) {
+                                          selectedClassIds.add(c.id!);
+                                        } else {
+                                          selectedClassIds.remove(c.id);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }),
+                            ],
+                          );
+                        },
+                      ),
                     ],
-                    onChanged: (v) => selectedTeacherId = v,
-                  );
-                },
+                  ),
+                ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  if (subject == null) {
-                    context.read<SchoolBloc>().add(AddSubjectEvent(
-                      name: nameController.text,
-                      code: codeController.text.isNotEmpty ? codeController.text : null,
-                      teacherId: selectedTeacherId,
-                    ));
-                  } else {
-                    context.read<SchoolBloc>().add(UpdateSubjectEvent(
-                      subject.copyWith(
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameController.text.isEmpty) return;
+                    final classIds = selectedClassIds.toList()..sort();
+                    final teacherIds = selectedTeacherIds.toList()..sort();
+                    if (subject == null) {
+                      context.read<SchoolBloc>().add(AddSubjectEvent(
                         name: nameController.text,
                         code: codeController.text.isNotEmpty ? codeController.text : null,
-                        teacherId: selectedTeacherId,
-                      ),
-                    ));
-                  }
-                }
-              },
-              child: BlocBuilder<SchoolBloc, SchoolState>(
-                builder: (context, state) {
-                  if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
-                  }
-                  return Text(subject == null ? 'ADD' : 'SAVE');
-                },
-              ),
-            ),
-          ],
+                        teacherId: teacherIds.isEmpty ? null : teacherIds.first,
+                        teacherIds: teacherIds,
+                        classIds: classIds,
+                      ));
+                    } else {
+                      context.read<SchoolBloc>().add(UpdateSubjectEvent(
+                        subject.copyWith(
+                          name: nameController.text,
+                          code: codeController.text.isNotEmpty ? codeController.text : null,
+                          teacherIds: teacherIds,
+                          classIds: classIds,
+                        ),
+                      ));
+                    }
+                  },
+                  child: BlocBuilder<SchoolBloc, SchoolState>(
+                    builder: (context, state) {
+                      if (state.isLoading && state.status == SchoolStatus.loading) {
+                        return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
+                      }
+                      return Text(subject == null ? 'ADD' : 'SAVE');
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

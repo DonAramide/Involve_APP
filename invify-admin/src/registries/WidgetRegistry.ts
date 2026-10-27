@@ -32,6 +32,12 @@ export const WidgetRegistry = {
     permissions: [],
     cacheTTL: 60
   },
+  PlatformHeldWidget: {
+    id: 'PlatformHeldWidget',
+    component: defineAsyncComponent(() => import('../components/adapters/PlatformHeldAdapter.vue')),
+    permissions: ['finance.view'],
+    cacheTTL: 60
+  },
   TransactionHistoryWidget: {
     id: 'TransactionHistoryWidget',
     component: defineAsyncComponent(() => import('../components/adapters/TransactionHistoryAdapter.vue')),
@@ -43,5 +49,11 @@ export const WidgetRegistry = {
     component: defineAsyncComponent(() => import('../components/adapters/SalesSummaryWidgetAdapter.vue')),
     permissions: ['finance.view'],
     cacheTTL: 60
+  },
+  ServiceJobsWidget: {
+    id: 'ServiceJobsWidget',
+    component: defineAsyncComponent(() => import('../components/adapters/ServiceJobsAdapter.vue')),
+    permissions: ['finance.view'],
+    cacheTTL: 30
   }
 };

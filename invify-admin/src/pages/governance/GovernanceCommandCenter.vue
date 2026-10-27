@@ -24,20 +24,20 @@
         <q-card flat class="bg-panel border-muted rounded-borders q-pa-md h-full">
           <div class="text-subtitle2 text-muted font-mono q-mb-xs">Governance Health Score</div>
           <div class="text-h3 text-metric-mono text-green-4">
-            96.8%
+            —
           </div>
         </q-card>
       </div>
       <div class="col-12 col-md-3">
         <q-card flat class="bg-panel border-muted rounded-borders q-pa-md h-full">
           <div class="text-subtitle2 text-muted font-mono q-mb-xs">Operational Efficiency</div>
-          <div class="text-h3 text-metric-mono text-cyan-4">99.2%</div>
+          <div class="text-h3 text-metric-mono text-cyan-4">—</div>
         </q-card>
       </div>
       <div class="col-12 col-md-3">
         <q-card flat class="bg-panel border-muted rounded-borders q-pa-md h-full text-center cursor-pointer hover-bg">
           <div class="text-subtitle2 text-muted font-mono q-mb-xs">Pending Approvals</div>
-          <div class="text-h4 text-metric-mono text-amber-4">14</div>
+          <div class="text-h4 text-metric-mono text-amber-4">0</div>
         </q-card>
       </div>
       <div class="col-12 col-md-3">

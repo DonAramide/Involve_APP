@@ -16,22 +16,29 @@ registerAuthBootstrapGuard(router)
 registerRuntimeGuards(router)
 
 router.afterEach((to) => {
+  sessionStorage.removeItem('invify_chunk_reload')
   const routeTitle = typeof to.meta?.title === 'string' ? to.meta.title.trim() : ''
   document.title = routeTitle
     ? routeTitle.startsWith('Invify') ? routeTitle : `${routeTitle} | Invify`
     : 'Invify - Enterprise Business & Financial Operations Platform'
 })
 
-// Gracefully recover from dynamic import/chunk loading failures due to HMR/network drift or server port changes
-router.onError((error, to) => {
-  const isChunkError = error.message.includes('Failed to fetch dynamically imported module') || 
-                       error.message.includes('Importing a module script failed') ||
-                       error.message.includes('chunk') ||
-                       error.message.includes('net::ERR_CONNECTION_REFUSED')
-  if (isChunkError) {
-    console.warn('[Vite HMR/Router] Dynamic module chunk loading failed. Initiating systemic layout recovery reload...', error)
-    window.location.reload()
+// Recover from a stale deploy/chunk once. Repeated reloads left the boot splash spinning forever.
+router.onError((error) => {
+  const message = String(error?.message || '')
+  const isChunkError = message.includes('Failed to fetch dynamically imported module') ||
+                       message.includes('Importing a module script failed') ||
+                       message.includes('chunk') ||
+                       message.includes('net::ERR_CONNECTION_REFUSED')
+  if (!isChunkError) return
+  const reloadKey = 'invify_chunk_reload'
+  if (sessionStorage.getItem(reloadKey) === '1') {
+    console.warn('[Router] Chunk load failed after one reload. Staying put so the page can recover.', error)
+    return
   }
+  sessionStorage.setItem(reloadKey, '1')
+  console.warn('[Router] Dynamic module chunk loading failed. Reloading once...', error)
+  window.location.reload()
 })
 
 export default router

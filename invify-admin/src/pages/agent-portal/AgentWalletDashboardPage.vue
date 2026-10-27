@@ -11,7 +11,14 @@
         </div>
       </div>
       <div>
-        <q-btn color="amber-4" text-color="black" label="Request Withdrawal" @click="showWithdrawalModal = true" />
+        <q-btn
+          color="amber-4"
+          text-color="black"
+          label="Request Withdrawal"
+          :disable="withdrawalBlocked"
+          @click="showWithdrawalModal = true"
+        />
+        <div class="text-caption text-amber-4 q-mt-xs" v-if="withdrawalBlockedReason">{{ withdrawalBlockedReason }}</div>
       </div>
     </div>
 
@@ -21,14 +28,41 @@
 
     <!-- Main Workspace -->
     <div v-else class="column op-gap-16 pb-4">
+      <div class="bg-panel-darker border-muted rounded-borders q-pa-sm text-caption text-amber-4">
+        Commission is currently in assessment/shadow mode and is not available for withdrawal.
+        Payout execution is currently unavailable.
+      </div>
+      <div class="row op-gap-16" v-if="kpiData.feeOrchestration">
+        <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted">
+          <div class="text-muted text-uppercase text-caption">Assessed Commission</div>
+          <div class="text-h5 text-weight-bold text-amber-4 q-mt-sm">₦{{ (Number(kpiData.feeOrchestration.assessed_kobo || 0) / 100).toLocaleString() }}</div>
+        </div>
+        <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted">
+          <div class="text-muted text-uppercase text-caption">Pending Commission</div>
+          <div class="text-h5 text-weight-bold q-mt-sm">₦{{ (Number(kpiData.feeOrchestration.pending_kobo || kpiData.feeOrchestration.pending_payable_kobo || 0) / 100).toLocaleString() }}</div>
+        </div>
+        <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted">
+          <div class="text-muted text-uppercase text-caption">Available Commission</div>
+          <div class="text-h5 text-weight-bold q-mt-sm">₦{{ (Number(kpiData.feeOrchestration.available_kobo || 0) / 100).toLocaleString() }}</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">NOT YET AVAILABLE</div>
+        </div>
+        <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted">
+          <div class="text-muted text-uppercase text-caption">Pending Withdrawal</div>
+          <div class="text-h5 text-weight-bold q-mt-sm">₦{{ (Number(kpiData.feeOrchestration.pending_withdrawal_kobo || 0) / 100).toLocaleString() }}</div>
+        </div>
+        <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted">
+          <div class="text-muted text-uppercase text-caption">Total Withdrawn</div>
+          <div class="text-h5 text-weight-bold q-mt-sm">₦{{ (Number(kpiData.feeOrchestration.withdrawn_kobo || 0) / 100).toLocaleString() }}</div>
+        </div>
+      </div>
       
       <!-- ROW 1: TOP KPI CARDS -->
       <div class="row op-gap-16">
         <!-- Available Balance -->
         <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted column justify-between">
-          <div class="text-muted text-uppercase text-caption">Available Balance</div>
+          <div class="text-muted text-uppercase text-caption">Legacy Wallet Available</div>
           <div class="text-h4 text-weight-bold text-amber-4 q-my-sm">₦{{ Number(kpiData.availableBalance).toLocaleString() }}</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">Ready for withdrawal</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">Not fee-orchestration cash</div>
         </div>
         <!-- Pending Earnings -->
         <div class="col-xs-12 col-sm bg-panel-darker q-pa-md rounded-borders border-muted column justify-between">
@@ -207,7 +241,7 @@
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancel" color="white" v-close-popup />
-          <q-btn label="Submit" color="amber-4" text-color="black" @click="submitWithdrawal" :loading="submitting" :disable="!primaryBank || withdrawalForm.amount <= 0 || withdrawalForm.amount > kpiData.availableBalance" />
+          <q-btn label="Submit" color="amber-4" text-color="black" @click="submitWithdrawal" :loading="submitting" :disable="withdrawalBlocked || !primaryBank || withdrawalForm.amount <= 0" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -252,6 +286,15 @@ const commissions = ref([])
 const withdrawals = ref([])
 const bankAccounts = ref([])
 const primaryBank = computed(() => bankAccounts.value.find(b => b.is_primary) || bankAccounts.value[0])
+const withdrawalBlocked = computed(() => {
+  const available = Number(kpiData.value.feeOrchestration?.available_kobo || 0)
+  return !kpiData.value.payout_execution_enabled || available <= 0
+})
+const withdrawalBlockedReason = computed(() => {
+  if (!kpiData.value.payout_execution_enabled) return 'Payout execution is currently unavailable.'
+  if (Number(kpiData.value.feeOrchestration?.available_kobo || 0) <= 0) return 'Insufficient available balance.'
+  return ''
+})
 
 const showWithdrawalModal = ref(false)
 const showBankModal = ref(false)
@@ -291,7 +334,7 @@ const fetchDashboardData = async () => {
   try {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
-      router.push('/agent/login')
+      router.push('/institute/login')
       return
     }
 

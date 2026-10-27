@@ -12,6 +12,7 @@
  */
 
 import { Request, Response } from 'express';
+import { supabaseAdmin } from '../db/supabase';
 import { QuasarConnectivityHealthService } from '../integrations/quasar/quasar-connectivity-health.service';
 import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
 
@@ -64,12 +65,30 @@ export class QuasarHealthController {
   static async listIntegrations(req: Request, res: Response) {
     try {
       const integrations = await QuasarIntegrationStore.listAll();
+      const ids = [...new Set((integrations || []).map((r: any) => r.invify_tenant_id).filter(Boolean))];
+      const names = new Map<string, string>();
+      if (ids.length) {
+        const { data, error } = await supabaseAdmin.from('tenants').select('id, name').in('id', ids);
+        if (error) console.warn('[QuasarHealthController] tenant names:', error.message);
+        for (const tenant of (data || []) as Array<{ id: string; name?: string }>) {
+          const label = String(tenant.name || '').trim();
+          if (label) names.set(tenant.id, label);
+        }
+      }
+      const mapped = (integrations || []).map((r: any) => ({
+        invifyTenantId: r.invify_tenant_id,
+        quasarTenantId: r.quasar_tenant_id,
+        tenantName: names.get(r.invify_tenant_id) || '',
+        vertical: r.quasar_vertical,
+        environment: r.quasar_environment,
+        status: r.status,
+      }));
       return res.status(200).json({
         responseCode: '00',
         responseMessage: 'Success',
         data: {
-          count: integrations.length,
-          integrations,
+          count: mapped.length,
+          integrations: mapped,
         },
       });
     } catch (err: any) {
@@ -130,6 +149,7 @@ export class QuasarHealthController {
 
       // Persist as runtime fallback (applies immediately without restart)
       process.env.QUASAR_WEBHOOK_SIGNING_SECRET = signingSecret;
+      process.env.QUASAR_WEBHOOK_SECRET = signingSecret;
 
       // Persist in Enterprise Integration Vault (survives restarts)
       const { IntegrationVaultService } = await import('../services/integration-vault.service');

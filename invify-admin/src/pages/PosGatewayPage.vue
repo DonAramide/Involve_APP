@@ -10,6 +10,7 @@
         <div class="text-caption text-secondary font-sans letter-spacing-1">
           Processor-Grade Routing Governance, SLA Governance &amp; Key Distribution
         </div>
+        <div class="text-caption text-amber-5 q-mt-xs">Saves wait for approval. Only support@iips.app can approve.</div>
       </div>
       <div class="col-12 col-md-auto row q-gutter-sm items-center justify-end q-mt-sm-only">
         <!-- Live Status Badge -->
@@ -19,6 +20,8 @@
         <q-btn unelevated color="purple-8" icon="refresh" label="Reload Switchboard" @click="loadAll" :loading="loading" :dark="prefs.isDarkMode" class="animate-pulse" />
       </div>
     </div>
+
+    <MakerCheckerQueue ref="posApprovals" domain="pos_switchboard" @changed="loadAll" />
 
     <!-- ── Overview KPI Cards ────────────────────────────────────── -->
     <div class="row q-col-gutter-md q-mb-lg">
@@ -89,7 +92,7 @@
                 </div>
                 <div class="row q-gutter-sm">
                   <q-btn dense outline color="purple-4" label="Production" no-caps
-                    @click="quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'" :dark="prefs.isDarkMode" />
+                    @click="quasarBaseUrl = 'https://api-quasar.invify.org/api/v1'" :dark="prefs.isDarkMode" />
                 </div>
               </div>
               <div class="col-12 col-md-4">
@@ -878,6 +881,8 @@
 
           <q-separator :dark="prefs.isDarkMode" />
           <q-toggle v-model="profileForm.processOnDevice" label="Process Transactions Directly on MPOS Device" color="purple-3" :dark="prefs.isDarkMode" />
+          <q-toggle v-model="profileForm.sendField120" label="Send ISO field 120 (GPS location)" color="purple-3" :dark="prefs.isDarkMode" />
+          <div class="text-caption text-grey-6 q-mb-sm">Off by default. Leave off so card payments do not include field 120.</div>
           <q-input v-if="profileForm.processOnDevice" v-model="profileForm.webhookUrl" filled label="Webhook Endpoint URL" placeholder="https://your.webhook.com/api/pos/transaction" :dark="prefs.isDarkMode" hint="Endpoint to hit after device processing succeeds/fails" />
 
           <q-slide-transition>
@@ -1027,6 +1032,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 import { posApi, adminApi } from '../api'
+import MakerCheckerQueue from '../components/MakerCheckerQueue.vue'
 import ApexCharts from 'vue3-apexcharts'
 
 const apexchart = ApexCharts
@@ -1037,6 +1043,7 @@ const { prefs } = useOperatorPreferences()
 // ── State ──────────────────────────────────────────────────────────
 const activeTab  = ref('hosts')
 const loading    = ref(false)
+const posApprovals = ref(null)
 const history    = ref([])
 const showTxDialog = ref(false)
 const selectedTx   = ref(null)
@@ -1046,7 +1053,7 @@ const quasarBaseUrl = ref('')
 const savingQuasarUrl = ref(false)
 const normalizeQuasarBase = (raw) => {
   let u = String(raw || '').trim()
-  if (!u) return 'https://api-quasar.iips.app/api/v1'
+  if (!u) return 'https://api-quasar.invify.org/api/v1'
   u = u.split('?')[0].split('#')[0].replace(/\/+$/, '')
   const suffixes = ['/pos/card-transaction', '/pos/icc-data', '/pos/transactionFromMpos', '/pos/icc']
   for (const s of suffixes) {
@@ -1055,7 +1062,7 @@ const normalizeQuasarBase = (raw) => {
       break
     }
   }
-  return u || 'https://api-quasar.iips.app/api/v1'
+  return u || 'https://api-quasar.invify.org/api/v1'
 }
 const quasarCardTxPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/card-transaction`)
 const quasarIccPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/icc-data`)
@@ -1075,7 +1082,13 @@ const saveQuasarBaseUrl = async () => {
     const normalized = String(quasarBaseUrl.value || '').trim()
       ? normalizeQuasarBase(quasarBaseUrl.value)
       : ''
-    await adminApi.updateGlobalSettings({ quasar_base_url: normalized })
+    const saved = await adminApi.updateGlobalSettings({ quasar_base_url: normalized })
+    if (saved.data?.pending) {
+      $q.notify({ type: 'info', message: saved.data.message })
+      await posApprovals.value?.refresh()
+      await loadQuasarBaseUrl()
+      return
+    }
     quasarBaseUrl.value = normalized
     $q.notify({
       type: 'positive',
@@ -1110,6 +1123,7 @@ const profileForm = ref({
   preferredHosts: [],
   fallbackHosts: [],
   processOnDevice: false,
+  sendField120: false,
   webhookUrl: '',
   amountThresholds: [],
   transactionTypeRules: []
@@ -1573,7 +1587,11 @@ const loadAll = async () => {
     let cfgOk = false
     try {
       const cfgRes = await posApi.getRoutingConfig()
-      config.value = cfgRes.data || {}
+      const cfg = cfgRes.data
+      if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg) || typeof cfg === 'string') {
+        throw new Error('Routing config API returned HTML or a non-JSON body. Check that /api/admin/pos/routing is proxied to the backend.')
+      }
+      config.value = cfg
       if (!Array.isArray(config.value.tenantRoutingProfiles)) {
         config.value.tenantRoutingProfiles = []
       }
@@ -1626,6 +1644,12 @@ const saveConfig = async (reason = 'Updated POS routing configuration') => {
       adminId: 'SuperAdmin',
       reason
     })
+    if (res.data?.pending) {
+      $q.notify({ type: 'info', message: res.data.message })
+      await posApprovals.value?.refresh()
+      await loadAll()
+      return
+    }
     const broadcasted = res.data?.broadcasted === true
     const version = res.data?.configVersion
     $q.notify({
@@ -1773,6 +1797,7 @@ const openProfileDialog = (profile = null) => {
       preferredHosts: [...(profile.preferredHosts || [])],
       fallbackHosts: [...(profile.fallbackHosts || [])],
       processOnDevice: !!profile.processOnDevice,
+      sendField120: profile.sendField120 === true,
       webhookUrl: profile.webhookUrl || '',
       amountThresholds: (profile.amountThresholds || []).map(r => ({ ...r })),
       transactionTypeRules: (profile.transactionTypeRules || []).map(r => ({ ...r })),
@@ -1787,6 +1812,7 @@ const openProfileDialog = (profile = null) => {
       preferredHosts: [],
       fallbackHosts: [],
       processOnDevice: false,
+      sendField120: false,
       webhookUrl: '',
       amountThresholds: [],
       transactionTypeRules: []
@@ -1809,6 +1835,7 @@ const saveProfile = async () => {
   const payload = {
     ...profileForm.value,
     processOnDevice: !!profileForm.value.processOnDevice,
+    sendField120: profileForm.value.sendField120 === true,
     webhookUrl: profileForm.value.processOnDevice ? (profileForm.value.webhookUrl || '') : '',
     amountThresholds: [...(profileForm.value.amountThresholds || [])],
     transactionTypeRules: [...(profileForm.value.transactionTypeRules || [])],

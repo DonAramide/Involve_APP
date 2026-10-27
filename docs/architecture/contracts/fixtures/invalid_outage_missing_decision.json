@@ -1,0 +1,12 @@
+{
+  "code": "ROUTING_ALL_PROVIDERS_UNAVAILABLE",
+  "message": "All allowed providers are unavailable, but the decision field was omitted.",
+  "traceId": "trc_err_outage_missing_decision",
+  "details": {
+    "serviceType": "PAYMENTS",
+    "operationType": "CHECKOUT",
+    "institutionCode": "PROV01",
+    "allowedProviders": ["paystack", "flutterwave"],
+    "safeHalt": true
+  }
+}

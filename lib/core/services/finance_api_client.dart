@@ -4,13 +4,15 @@
 // Injects JWT (from Supabase session), tenant_id (school_id),
 // and provides structured error handling for all API calls.
 
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../features/settings/domain/services/security_service.dart';
+import '../utils/device_info_service.dart';
 import '../license/storage_service.dart';
 import '../license/license_validator.dart';
 import '../license/license_model.dart';
-import '../license/license_service.dart';
 import '../utils/api_error_message.dart';
 
 // ── Custom Exceptions ──────────────────────────────────────────────────────────
@@ -32,7 +34,10 @@ class FinanceApiException implements Exception {
 
 class UnauthorizedException extends FinanceApiException {
   const UnauthorizedException()
-      : super(message: 'Session expired. Please log in again.', statusCode: 401);
+      : super(
+          message: 'The server could not verify this device. Please try again.',
+          statusCode: 401,
+        );
 }
 
 class NetworkException extends FinanceApiException {
@@ -47,6 +52,17 @@ class ServerException extends FinanceApiException {
 // ── Auth Interceptor ───────────────────────────────────────────────────────────
 
 /// Injects the Supabase JWT token into every request's Authorization header.
+class FormDataContentTypeInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.data is FormData) {
+      options.headers.remove('Content-Type');
+      options.contentType = Headers.multipartFormDataContentType;
+    }
+    handler.next(options);
+  }
+}
+
 class JwtInterceptor extends Interceptor {
   final Future<String?> Function() getToken;
 
@@ -80,6 +96,20 @@ class TenantInterceptor extends Interceptor {
   }
 }
 
+/// Sends the hardware id so /api/v1/sync/outbox can pass device trust.
+class DeviceInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (DeviceInfoService.isUsableDeviceId(deviceId)) {
+        options.headers['X-Device-ID'] = deviceId;
+      }
+    } catch (_) {}
+    super.onRequest(options, handler);
+  }
+}
+
 // ── Plan Gating Interceptor ───────────────────────────────────────────────────
 
 class PlanGatingInterceptor extends Interceptor {
@@ -89,7 +119,40 @@ class PlanGatingInterceptor extends Interceptor {
     if (options.path.contains('/api/admin/register-device') ||
         options.path.contains('/public/lookup') ||
         options.path.contains('/api/license/verify') ||
-        options.path.contains('/api/auth/')) {
+        options.path.contains('/api/auth/') ||
+        options.path.contains('/api/school/bulk-sync') ||
+        options.path.contains('/api/school/payments/sync') ||
+        options.path.contains('/api/school/term-bills') ||
+        options.path.contains('/api/inventory/products/bulk-sync') ||
+        options.path.contains('/api/v1/crm/customers/bulk-sync') ||
+        options.path.contains('/api/staff/bulk-sync') ||
+        options.path.contains('/api/staff') ||
+        options.path.contains('/api/v1/finance/invoices/bulk-sync') ||
+        options.path.contains('/api/tenant/kyc') ||
+        options.path.contains('/api/admin/profile') ||
+        options.path.contains('/api/admin/upload-cac') ||
+        options.path.contains('/api/admin/claude-backup') ||
+        options.path.contains('/api/mobile/terminal/sync') ||
+        options.path.contains('/attendance') ||
+        options.path.contains('/api/attendance')) {
+      return super.onRequest(options, handler);
+    }
+
+    if (isPermittedMobileHealthPath(options.path)) {
+      final hasEntitlement = await checkHasHealthInsuranceEntitlement(options);
+      if (!hasEntitlement) {
+        handler.reject(
+          DioException(
+            requestOptions: options,
+            error: const FinanceApiException(
+              message: 'Health insurance requires valid authentication and institution scope.',
+              statusCode: 403,
+            ),
+            type: DioExceptionType.badResponse,
+          ),
+        );
+        return;
+      }
       return super.onRequest(options, handler);
     }
 
@@ -99,7 +162,8 @@ class PlanGatingInterceptor extends Interceptor {
         DioException(
           requestOptions: options,
           error: const FinanceApiException(
-            message: 'Local operations only. Cloud synchronisation and online features require a Pro Plan subscription.',
+            message:
+                'Cloud sync and the tenant dashboard require Standard or Premium. Basic and free trial stay on the device only.',
             statusCode: 403,
           ),
           type: DioExceptionType.badResponse,
@@ -116,43 +180,138 @@ class PlanGatingInterceptor extends Interceptor {
       final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
       if (!isSyncEnabled) return false;
 
-      // 1. Check for Lifetime status
+      // 1. Check for Lifetime status (Premium)
       final isLifetime = await SecurityService().isDeviceAuthorized();
       if (isLifetime) return true;
 
-      // 2. Check for Manual/Direct Pro status
+      // 2. Check for Manual/Direct Pro status (Standard)
       final proExpiry = await StorageService.getProExpiryDate();
       if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
         return true;
       }
 
-      // 3. Check for Active License key
+      // 3. Server-redeemed Standard / Premium (QR / portal), even without HMAC blob
+      final serverPlan = await StorageService.getServerActivatedPlan();
+      if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+        final p = serverPlan.planType.toLowerCase().trim();
+        if (p == 'standard' ||
+            p == 'pro' ||
+            p == 'premium' ||
+            p == 'enterprise' ||
+            p == 'lifetime') {
+          return true;
+        }
+      }
+
+      // 4. Paid activation key: Standard / Premium / Enterprise only — not Basic
       final code = await StorageService.getLicense();
       if (code != null) {
         final peeked = LicenseValidator.peek(code);
         if (peeked != null) {
           final planType = peeked['planType'] as PlanType;
           final expiryDate = peeked['expiryDate'] as DateTime;
-          if (DateTime.now().isBefore(expiryDate)) {
-            if (planType != PlanType.basic) {
-              return true;
-            }
+          if (DateTime.now().isBefore(expiryDate) &&
+              planType != PlanType.basic) {
+            return true;
           }
         }
       }
 
-      // 4. Check for Trial validity
-      final isTrialValid = await LicenseService.isTrialValid();
-      if (isTrialValid) return true;
+      // Free trial and Basic stay offline: no tenant dashboard upload.
     } catch (_) {
       // Fallback
     }
     return false;
   }
+
+  static bool isPermittedMobileHealthPath(String path) {
+    final p = path.toLowerCase().trim();
+    if (!p.startsWith('/api/v1/health-insurance')) return false;
+    if (p.contains('/platform') ||
+        p.contains('/hmo-portal') ||
+        p.contains('/provider-webhooks')) {
+      return false;
+    }
+    return p.contains('/settings') ||
+        p.contains('/overview') ||
+        p.contains('/tenant-offers') ||
+        p.contains('/guardian/children') ||
+        p.contains('/enrolments');
+  }
+
+  static Future<bool> checkHasHealthInsuranceEntitlement(RequestOptions options) async {
+    final auth = options.headers['Authorization'] as String? ?? '';
+    final hasAuth = auth.startsWith('Bearer ') && auth.length > 7;
+    if (!hasAuth) return false;
+
+    if (options.path.contains('/guardian/children')) {
+      return true;
+    }
+
+    final tenantId = options.headers['X-Tenant-ID'] as String? ??
+        options.headers['x-tenant-id'] as String?;
+    return tenantId != null && tenantId.trim().isNotEmpty;
+  }
 }
 
 
 // ── Error Interceptor ──────────────────────────────────────────────────────────
+
+/// Logs full VA request/response bodies for Android Studio Logcat.
+/// Filter Logcat by: `INVIFY_VA`
+class _VaTrafficLogInterceptor extends Interceptor {
+  static bool _isVa(RequestOptions o) {
+    final p = o.path.toLowerCase();
+    final u = o.uri.path.toLowerCase();
+    return p.contains('virtual-account') || u.contains('virtual-account');
+  }
+
+  static String _safeJson(Object? data) {
+    try {
+      if (data == null) return 'null';
+      if (data is Map || data is List) {
+        return const JsonEncoder.withIndent('  ').convert(data);
+      }
+      return data.toString();
+    } catch (_) {
+      return data.toString();
+    }
+  }
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (_isVa(options)) {
+      // ignore: avoid_print — must appear in release Logcat for Quasar support
+      print('──────── INVIFY_VA REQUEST ────────');
+      print('[INVIFY_VA] ${options.method} ${options.uri}');
+      print('[INVIFY_VA] headers.tenant=${options.headers['X-Tenant-ID'] ?? options.headers['x-tenant-id']}');
+      print('[INVIFY_VA] body=${_safeJson(options.data)}');
+    }
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    if (_isVa(response.requestOptions)) {
+      print('──────── INVIFY_VA RESPONSE ────────');
+      print('[INVIFY_VA] status=${response.statusCode} ${response.requestOptions.uri}');
+      print('[INVIFY_VA] body=${_safeJson(response.data)}');
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (_isVa(err.requestOptions)) {
+      print('──────── INVIFY_VA ERROR ────────');
+      print('[INVIFY_VA] status=${err.response?.statusCode} ${err.requestOptions.uri}');
+      print('[INVIFY_VA] requestBody=${_safeJson(err.requestOptions.data)}');
+      print('[INVIFY_VA] responseBody=${_safeJson(err.response?.data)}');
+      print('[INVIFY_VA] message=${err.message}');
+    }
+    handler.next(err);
+  }
+}
 
 /// Converts Dio errors into structured [FinanceApiException] subtypes.
 class ErrorInterceptor extends Interceptor {
@@ -235,6 +394,23 @@ String? _messageForHttpStatus(int? statusCode) {
   }
 }
 
+/// Strips authenticator codes from HTTP debug output.
+String redactAuthCode(String text) {
+  return text
+      .replaceAll(
+        RegExp(r'("otp"\s*:\s*")[^"]*(")', caseSensitive: false),
+        r'$1[REDACTED]$2',
+      )
+      .replaceAll(
+        RegExp(r"('otp'\s*:\s*')[^']*(')", caseSensitive: false),
+        r"$1[REDACTED]$2",
+      )
+      .replaceAll(
+        RegExp(r'\botp\b(\s*[:=]\s*)\d{4,8}', caseSensitive: false),
+        r'otp$1[REDACTED]',
+      );
+}
+
 // ── FinanceApiClient ───────────────────────────────────────────────────────────
 
 /// The single HTTP client for all Finance API calls.
@@ -260,8 +436,9 @@ class FinanceApiClient {
   }) {
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(minutes: 2),
+      connectTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 45),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -270,16 +447,24 @@ class FinanceApiClient {
 
     // Order matters: auth → tenant → plan gating → error handling → logging
     _dio.interceptors.addAll([
+      FormDataContentTypeInterceptor(),
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
+      DeviceInterceptor(),
       PlanGatingInterceptor(),
       ErrorInterceptor(),
+      _VaTrafficLogInterceptor(),
       LogInterceptor(
         requestHeader: true,
         requestBody: true,
-        responseHeader: true,
+        responseHeader: false,
         responseBody: true,
         error: true,
+        logPrint: (Object object) {
+          // Visible in Android Studio Logcat (filter: INVIFY_HTTP or flutter).
+          // Authenticator codes must not appear in logs.
+          debugPrint('[INVIFY_HTTP] ${redactAuthCode(object.toString())}');
+        },
       ),
     ]);
   }
@@ -306,12 +491,14 @@ class FinanceApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
+    Options? options,
   }) async {
     try {
       return await _dio.post<T>(
         path,
         data: data,
         queryParameters: queryParameters,
+        options: options,
       );
     } on DioException catch (e) {
       throw _unwrap(e);

@@ -7,7 +7,6 @@ import org.jpos.iso.ISODate
 import org.jpos.iso.ISOException
 import org.jpos.iso.ISOMsg
 import org.jpos.iso.ISOUtil
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,11 +74,9 @@ internal object ISOUtils {
     }
 
     fun maskCardPAN(cardPAN: String): String {
-        return String.format(
-            "%s************%s",
-            cardPAN.substring(0, 4),
-            cardPAN.substring(cardPAN.length - 3)
-        )
+        val digits = cardPAN.filter { it.isDigit() }
+        if (digits.length < 8) return "****"
+        return "${digits.take(4)} **** **** ${digits.takeLast(4)}"
     }
 
     fun getNibssMessage(responseCode: String): String {
@@ -297,15 +294,36 @@ internal object ISOUtils {
         return data
     }
 
-    fun extractAmountFromField54(field54: String): String {
-        return if (field54.isNotEmpty()) {
-            val f54 = field54.substring(9, 20).toDouble()
-            val amount = f54 / 100
-            val formatter = NumberFormat.getCurrencyInstance()
-            val formattedAmount = formatter.format(amount)
-            formattedAmount.substring(1)
-        } else ""
+    /**
+     * ISO DE54: AccountType(2) + AmountType(2) + Currency(3) + Sign(1) + Amount(12), repeated.
+     * Prefer available (02) or ledger (01). Amount is minor units.
+     */
+    fun parseAdditionalAmountNaira(field54: String?): String {
+        val raw = field54?.replace("\\s".toRegex(), "").orEmpty()
+        if (raw.length < 20) return ""
+        var preferred: String? = null
+        var fallback: String? = null
+        var index = 0
+        while (index + 20 <= raw.length) {
+            val chunk = raw.substring(index, index + 20)
+            val amountType = chunk.substring(2, 4)
+            val sign = chunk[7]
+            val minor = chunk.substring(8, 20).toLongOrNull()
+            if (minor != null) {
+                val signed = if (sign == 'D' || sign == 'd') -minor else minor
+                val formatted = String.format(Locale.US, "%,.2f", signed / 100.0)
+                if (amountType == "02" || amountType == "01") {
+                    preferred = formatted
+                } else if (fallback == null) {
+                    fallback = formatted
+                }
+            }
+            index += 20
+        }
+        return preferred ?: fallback ?: ""
     }
+
+    fun extractAmountFromField54(field54: String): String = parseAdditionalAmountNaira(field54)
 
     fun hexToAscii(hexStr: String?): String {
         if (hexStr.isNullOrEmpty() || hexStr.length % 2 != 0) {

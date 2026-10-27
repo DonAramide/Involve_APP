@@ -312,7 +312,7 @@ const rotateCredentials = async () => {
 const requestRotateCredentials = () => {
   $q.dialog({
     title: 'Confirm credential rotation',
-    message: 'This will revoke existing Quasar sandbox credentials and generate a new set. Active financial operations might experience momentary disruption.',
+    message: 'This will revoke the current Quasar tenant API key and issue a new one (live on production, test on staging). Active financial operations might experience momentary disruption.',
     cancel: true,
     persistent: true,
     ok: { label: 'Confirm Rotation', color: 'warning' }

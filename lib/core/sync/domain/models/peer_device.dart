@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 class PeerDevice extends Equatable {
   final String deviceId;
   final String deviceName;
+  /// Hardware serial shown so the other phone can confirm this handset.
+  final String? hardwareId;
   final String? ip;
   final int? port;
   final String? bluetoothId;
@@ -14,6 +16,7 @@ class PeerDevice extends Equatable {
   const PeerDevice({
     required this.deviceId,
     required this.deviceName,
+    this.hardwareId,
     this.ip,
     this.port,
     this.bluetoothId,
@@ -28,6 +31,7 @@ class PeerDevice extends Equatable {
   PeerDevice copyWith({
     String? deviceId,
     String? deviceName,
+    String? hardwareId,
     String? ip,
     int? port,
     String? bluetoothId,
@@ -39,6 +43,7 @@ class PeerDevice extends Equatable {
     return PeerDevice(
       deviceId: deviceId ?? this.deviceId,
       deviceName: deviceName ?? this.deviceName,
+      hardwareId: hardwareId ?? this.hardwareId,
       ip: ip ?? this.ip,
       port: port ?? this.port,
       bluetoothId: bluetoothId ?? this.bluetoothId,
@@ -53,6 +58,7 @@ class PeerDevice extends Equatable {
     return {
       'deviceId': deviceId,
       'deviceName': deviceName,
+      'hardwareId': hardwareId,
       'ip': ip,
       'port': port,
       'bluetoothId': bluetoothId,
@@ -66,6 +72,7 @@ class PeerDevice extends Equatable {
     return PeerDevice(
       deviceId: json['deviceId'],
       deviceName: json['deviceName'],
+      hardwareId: json['hardwareId']?.toString(),
       ip: json['ip'],
       port: json['port'],
       bluetoothId: json['bluetoothId'],
@@ -77,5 +84,11 @@ class PeerDevice extends Equatable {
   }
 
   @override
-  List<Object?> get props => [deviceId, deviceName, ip, port, isBluetooth, isMaster, authToken, lastSeen];
+  String get confirmId {
+    final hardware = hardwareId?.trim() ?? '';
+    return hardware.isNotEmpty ? hardware : deviceId;
+  }
+
+  @override
+  List<Object?> get props => [deviceId, deviceName, hardwareId, ip, port, isBluetooth, isMaster, authToken, lastSeen];
 }

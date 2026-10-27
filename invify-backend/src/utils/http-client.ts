@@ -24,7 +24,12 @@ export class EnterpriseHttpClient {
     this.instance.interceptors.request.use((req) => {
       const cid = config.correlationId || req.headers['X-Correlation-Id'] || req.headers['x-correlation-id'] || crypto.randomUUID();
       req.headers['X-Correlation-Id'] = cid;
-      (req as any).metadata = { startTime: Date.now(), retryCount: 0 };
+      const existing = (req as any).metadata;
+      if (existing && Number.isFinite(Number(existing.retryCount))) {
+        existing.startTime = Date.now();
+      } else {
+        (req as any).metadata = { startTime: Date.now(), retryCount: 0 };
+      }
       return req;
     });
 

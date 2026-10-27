@@ -2,14 +2,16 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/core/sync/domain/services/outbox_dispatcher.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_ack.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 
 class OutboxWorker {
   final AppDatabase _db;
   final OutboxDispatcher _dispatcher;
+  final Future<void> Function(String commandId, String? ack)? onFinanceAck;
   bool _isRunning = false;
 
-  OutboxWorker(this._db, this._dispatcher);
+  OutboxWorker(this._db, this._dispatcher, {this.onFinanceAck});
 
   /// Event-driven trigger. Can be called on app startup, network reconnect, etc.
   Future<void> triggerSync() async {
@@ -62,10 +64,46 @@ class OutboxWorker {
       
       final processedIds = (result['processedIds'] as List?)?.cast<String>() ?? [];
       final failedIds = (result['failedIds'] as List?) ?? [];
+      final acks = (result['acks'] as List?) ?? [];
 
       // 3. Handle Successes
       for (final event in batch) {
-        if (processedIds.contains(event.id)) {
+        final ackRow = acks.cast<dynamic>().firstWhere(
+          (item) => item is Map && item['eventId'] == event.id,
+          orElse: () => null,
+        );
+        final ack = ackRow is Map ? ackRow['status']?.toString() : null;
+        final mapped = outboxStatusForAck(ack);
+        if (onFinanceAck != null &&
+            (event.eventName.startsWith('finance.') ||
+                event.aggregateType == 'finance_command')) {
+          final effectiveAck = (mapped == 'COMPLETED' ||
+                  (mapped.isEmpty && processedIds.contains(event.id)))
+              ? (ack ?? 'accepted')
+              : ack;
+          await onFinanceAck!(event.id, effectiveAck);
+        }
+        if (mapped == 'COMPLETED') {
+          await (_db.update(_db.outboxTable)..where((t) => t.id.equals(event.id)))
+              .write(OutboxTableCompanion(
+                  status: const Value('COMPLETED'),
+                  processedAt: Value(DateTime.now()),
+                  updatedAt: Value(DateTime.now())));
+        } else if (mapped == 'DEAD_LETTER') {
+          await _handleFailure(
+            event,
+            ackRow is Map ? (ackRow['reason'] ?? 'rejected') : 'rejected',
+            StackTrace.empty,
+            retryable: false,
+          );
+        } else if (mapped == 'FAILED') {
+          await _handleFailure(
+            event,
+            ackRow is Map ? (ackRow['reason'] ?? 'reconciliation-required') : 'reconciliation-required',
+            StackTrace.empty,
+            retryable: true,
+          );
+        } else if (processedIds.contains(event.id)) {
           await (_db.update(_db.outboxTable)..where((t) => t.id.equals(event.id)))
               .write(OutboxTableCompanion(
                   status: const Value('COMPLETED'),

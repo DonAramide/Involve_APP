@@ -138,11 +138,21 @@ class SyncRepositoryImpl implements SyncRepository {
   // Returns the local id of the saved invoice (null if skipped)
   Future<int?> _applyInvoice(SyncRecord record) async {
     final remote = InvoiceTable.fromJson(record.data);
-    if (remote.syncId == null) return null;
+    final hasSyncId = remote.syncId != null && remote.syncId!.trim().isNotEmpty;
+    final number = remote.invoiceNumber.trim();
+    if (!hasSyncId && number.isEmpty) return null;
 
-    final existing = await (db.select(db.invoices)
-          ..where((t) => t.syncId.equals(remote.syncId!)))
-        .getSingleOrNull();
+    final matches = <InvoiceTable>[];
+    if (hasSyncId) {
+      matches.addAll(await (db.select(db.invoices)..where((t) => t.syncId.equals(remote.syncId!))).get());
+    }
+    if (number.isNotEmpty) {
+      final byNumber = await (db.select(db.invoices)..where((t) => t.invoiceNumber.equals(number))).get();
+      for (final row in byNumber) {
+        if (!matches.any((match) => match.id == row.id)) matches.add(row);
+      }
+    }
+    final existing = await _keepNewestInvoice(matches);
 
     if (existing == null) {
       // Insert without remote id — let SQLite auto-assign a fresh local id
@@ -195,7 +205,7 @@ class SyncRepositoryImpl implements SyncRepository {
         paymentMethod: Value(remote.paymentMethod),
         staffId: Value(remote.staffId),
         staffName: Value(remote.staffName),
-        syncId: Value(remote.syncId),
+        syncId: Value(remote.syncId ?? existing.syncId),
         updatedAt: Value(remote.updatedAt),
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
@@ -214,14 +224,22 @@ class SyncRepositoryImpl implements SyncRepository {
 
   Future<void> _applyInvoiceItem(SyncRecord record, Map<int, int> invoiceIdMap) async {
     final remote = InvoiceItemTable.fromJson(record.data);
-    if (remote.syncId == null) return;
+    if (remote.syncId == null || remote.syncId!.trim().isEmpty) return;
 
-    // Remap invoiceId from the remote device's local id to our local id
-    final localInvoiceId = invoiceIdMap[remote.invoiceId] ?? remote.invoiceId;
+    // Only attach a line to the invoice merged in this batch. A raw client id
+    // can point at a different bill on this phone.
+    final localInvoiceId = invoiceIdMap[remote.invoiceId];
+    if (localInvoiceId == null) return;
 
-    final existing = await (db.select(db.invoiceItems)
+    final matches = await (db.select(db.invoiceItems)
           ..where((t) => t.syncId.equals(remote.syncId!)))
-        .getSingleOrNull();
+        .get();
+    final existing = await _keepNewest(
+      matches,
+      updatedAt: (row) => row.updatedAt,
+      id: (row) => row.id,
+      deleteById: (id) => (db.delete(db.invoiceItems)..where((t) => t.id.equals(id))).go(),
+    );
 
     if (existing == null) {
       await db.into(db.invoiceItems).insert(InvoiceItemsCompanion(
@@ -260,11 +278,15 @@ class SyncRepositoryImpl implements SyncRepository {
 
   Future<void> _applyItem(SyncRecord record) async {
     final remote = ItemTable.fromJson(record.data);
-    if (remote.syncId == null) return;
+    if (remote.syncId == null || remote.syncId!.trim().isEmpty) return;
 
-    final existing = await (db.select(db.items)
-          ..where((t) => t.syncId.equals(remote.syncId!)))
-        .getSingleOrNull();
+    final matches = await (db.select(db.items)..where((t) => t.syncId.equals(remote.syncId!))).get();
+    final existing = await _keepNewest(
+      matches,
+      updatedAt: (row) => row.updatedAt,
+      id: (row) => row.id,
+      deleteById: (id) => (db.delete(db.items)..where((t) => t.id.equals(id))).go(),
+    );
 
     if (existing == null) {
       await db.into(db.items).insert(ItemsCompanion(
@@ -313,11 +335,26 @@ class SyncRepositoryImpl implements SyncRepository {
 
   Future<void> _applyCategory(SyncRecord record) async {
     final remote = CategoryTable.fromJson(record.data);
-    if (remote.syncId == null) return;
+    final hasSyncId = remote.syncId != null && remote.syncId!.trim().isNotEmpty;
+    final name = remote.name.trim();
+    if (!hasSyncId && name.isEmpty) return;
 
-    final existing = await (db.select(db.categories)
-          ..where((t) => t.syncId.equals(remote.syncId!)))
-        .getSingleOrNull();
+    final matches = <CategoryTable>[];
+    if (hasSyncId) {
+      matches.addAll(await (db.select(db.categories)..where((t) => t.syncId.equals(remote.syncId!))).get());
+    }
+    if (name.isNotEmpty) {
+      final byName = await (db.select(db.categories)..where((t) => t.name.equals(name))).get();
+      for (final row in byName) {
+        if (!matches.any((match) => match.id == row.id)) matches.add(row);
+      }
+    }
+    final existing = await _keepNewest(
+      matches,
+      updatedAt: (row) => row.updatedAt,
+      id: (row) => row.id,
+      deleteById: (id) => (db.delete(db.categories)..where((t) => t.id.equals(id))).go(),
+    );
 
     if (existing == null) {
       await db.into(db.categories).insert(CategoriesCompanion(
@@ -336,7 +373,7 @@ class SyncRepositoryImpl implements SyncRepository {
       await (db.update(db.categories)..where((t) => t.id.equals(existing.id)))
           .write(CategoriesCompanion(
         name: Value(remote.name),
-        syncId: Value(remote.syncId),
+        syncId: Value(remote.syncId ?? existing.syncId),
         updatedAt: Value(remote.updatedAt),
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
@@ -348,11 +385,26 @@ class SyncRepositoryImpl implements SyncRepository {
 
   Future<void> _applyStaff(SyncRecord record) async {
     final remote = StaffTable.fromJson(record.data);
-    if (remote.syncId == null) return;
+    final hasSyncId = remote.syncId != null && remote.syncId!.trim().isNotEmpty;
+    final code = (remote.staffCode ?? '').trim();
+    if (!hasSyncId && code.isEmpty) return;
 
-    final existing = await (db.select(db.staff)
-          ..where((t) => t.syncId.equals(remote.syncId!)))
-        .getSingleOrNull();
+    final matches = <StaffTable>[];
+    if (hasSyncId) {
+      matches.addAll(await (db.select(db.staff)..where((t) => t.syncId.equals(remote.syncId!))).get());
+    }
+    if (code.isNotEmpty) {
+      final byCode = await (db.select(db.staff)..where((t) => t.staffCode.equals(code))).get();
+      for (final row in byCode) {
+        if (!matches.any((match) => match.id == row.id)) matches.add(row);
+      }
+    }
+    final existing = await _keepNewest(
+      matches,
+      updatedAt: (row) => row.updatedAt,
+      id: (row) => row.id,
+      deleteById: (id) => (db.delete(db.staff)..where((t) => t.id.equals(id))).go(),
+    );
 
     if (existing == null) {
       await db.into(db.staff).insert(StaffCompanion(
@@ -384,7 +436,7 @@ class SyncRepositoryImpl implements SyncRepository {
         phone: Value(remote.phone),
         role: Value(remote.role),
         isActive: Value(remote.isActive),
-        syncId: Value(remote.syncId),
+        syncId: Value(remote.syncId ?? existing.syncId),
         updatedAt: Value(remote.updatedAt),
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
@@ -395,5 +447,39 @@ class SyncRepositoryImpl implements SyncRepository {
         bankCode: Value(remote.bankCode),
       ));
     }
+  }
+
+  Future<InvoiceTable?> _keepNewestInvoice(List<InvoiceTable> rows) async {
+    if (rows.isEmpty) return null;
+    rows.sort((a, b) {
+      final at = a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
+    final keep = rows.first;
+    for (final extra in rows.skip(1)) {
+      await (db.delete(db.invoiceItems)..where((t) => t.invoiceId.equals(extra.id))).go();
+      await (db.delete(db.invoices)..where((t) => t.id.equals(extra.id))).go();
+    }
+    return keep;
+  }
+
+  Future<T?> _keepNewest<T>(
+    List<T> rows, {
+    required DateTime? Function(T row) updatedAt,
+    required int Function(T row) id,
+    required Future<void> Function(int id) deleteById,
+  }) async {
+    if (rows.isEmpty) return null;
+    rows.sort((a, b) {
+      final at = updatedAt(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = updatedAt(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
+    final keep = rows.first;
+    for (final extra in rows.skip(1)) {
+      await deleteById(id(extra));
+    }
+    return keep;
   }
 }

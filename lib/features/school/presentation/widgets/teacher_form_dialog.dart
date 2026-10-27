@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import '../../domain/entities/school_entities.dart';
 
 class TeacherFormDialog extends StatefulWidget {
@@ -33,6 +34,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
   late TextEditingController certCtrl;
   DateTime? selectedEmploymentDate;
   List<int> selectedClassIds = [];
+  List<int> selectedSubjectIds = [];
   Uint8List? imageBytes;
  
   @override
@@ -48,6 +50,15 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
         ? List<int>.from(widget.teacher!.classIds!)
         : (widget.teacher?.classId != null ? [widget.teacher!.classId!] : []);
     imageBytes = widget.teacher?.image;
+    if (widget.teacher?.id != null) {
+      selectedSubjectIds = context
+          .read<SchoolBloc>()
+          .state
+          .subjects
+          .where((s) => s.isTaughtBy(widget.teacher!.id))
+          .map((s) => s.id!)
+          .toList();
+    }
   }
 
   @override
@@ -58,6 +69,30 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
     salaryCtrl.dispose();
     certCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImageFrom(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        imageQuality: 85,
+      );
+      if (pickedFile == null) return;
+      final bytes = await pickedFile.readAsBytes();
+      if (!mounted) return;
+      setState(() => imageBytes = bytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}. $e',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -92,21 +127,32 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: state.isLoading ? null : () async {
-                          final picker = ImagePicker();
-                          final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-                          if (pickedFile != null) {
-                            final bytes = await pickedFile.readAsBytes();
-                            setState(() {
-                              imageBytes = bytes;
-                            });
-                          }
-                        },
+                        onTap: state.isLoading ? null : () => _pickImageFrom(ImageSource.gallery),
                         child: CircleAvatar(
                           radius: 40,
                           backgroundImage: imageBytes != null ? MemoryImage(imageBytes!) : null,
                           child: imageBytes == null ? const Icon(Icons.add_a_photo) : null,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: state.isLoading ? null : () => _pickImageFrom(ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                              label: const Text('Take photo'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: state.isLoading ? null : () => _pickImageFrom(ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_outlined, size: 18),
+                              label: const Text('Gallery'),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -121,14 +167,11 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                         enabled: !state.isLoading,
                         decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
                         keyboardType: TextInputType.phone,
-                        maxLength: 15,
+                        inputFormatters: PhoneNumberInput.formatters,
+                        maxLength: PhoneNumberInput.maxDigits,
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'Required';
-                          final cleanVal = v.replaceAll(' ', '');
-                          if (!RegExp(r'^\d{11,15}$').hasMatch(cleanVal)) {
-                            return 'Enter a valid phone (11-15 digits)';
-                          }
-                          return null;
+                          return PhoneNumberInput.validate(v, required: true, minDigits: 11);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -153,6 +196,28 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                                   : state.classes
                                       .where((c) => selectedClassIds.contains(c.id))
                                       .map((c) => c.name)
+                                      .join(', '),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: state.isLoading ? null : () => _showMultiSelectSubjectsDialog(context, state.subjects),
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            key: ValueKey(selectedSubjectIds.join(',')),
+                            decoration: const InputDecoration(
+                              labelText: 'Assign to Subjects',
+                              border: OutlineInputBorder(),
+                              suffixIcon: Icon(Icons.arrow_drop_down),
+                            ),
+                            controller: TextEditingController(
+                              text: selectedSubjectIds.isEmpty
+                                  ? 'None'
+                                  : state.subjects
+                                      .where((s) => selectedSubjectIds.contains(s.id))
+                                      .map((s) => s.name)
                                       .join(', '),
                             ),
                           ),
@@ -223,9 +288,13 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                           );
 
                           if (widget.teacher == null) {
-                            context.read<SchoolBloc>().add(AddTeacherEvent(newTeacher));
+                            context.read<SchoolBloc>().add(
+                              AddTeacherEvent(newTeacher, subjectIds: selectedSubjectIds),
+                            );
                           } else {
-                            context.read<SchoolBloc>().add(UpdateTeacherEvent(newTeacher));
+                            context.read<SchoolBloc>().add(
+                              UpdateTeacherEvent(newTeacher, subjectIds: selectedSubjectIds),
+                            );
                           }
                         }
                       },
@@ -237,6 +306,52 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
           );
         },
       ),
+    );
+  }
+
+  void _showMultiSelectSubjectsDialog(BuildContext context, List<Subject> subjects) {
+    final sorted = [...subjects]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select Subjects'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: sorted.isEmpty
+                      ? [const Text('Add subjects first, then assign this teacher.')]
+                      : sorted.map((s) {
+                          final isSelected = selectedSubjectIds.contains(s.id);
+                          return CheckboxListTile(
+                            title: Text(s.name),
+                            value: isSelected,
+                            onChanged: (checked) {
+                              setDialogState(() {
+                                if (checked == true) {
+                                  selectedSubjectIds.add(s.id!);
+                                } else {
+                                  selectedSubjectIds.remove(s.id);
+                                }
+                              });
+                              setState(() {});
+                            },
+                          );
+                        }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

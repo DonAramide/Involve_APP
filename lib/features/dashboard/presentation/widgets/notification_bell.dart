@@ -37,6 +37,13 @@ class NotificationInbox {
     Map<String, dynamic>? extra,
   }) async {
     final items = await load();
+    final reference = extra?['reference']?.toString().trim();
+    if (reference != null && reference.isNotEmpty) {
+      final already = items.any(
+        (e) => e['reference']?.toString() == reference && e['type'] == type,
+      );
+      if (already) return;
+    }
     items.insert(0, {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
       'message': message,
@@ -51,6 +58,27 @@ class NotificationInbox {
   static Future<int> unreadCount() async {
     final items = await load();
     return items.where((e) => e['read'] != true).length;
+  }
+
+  /// Drop a payment notice once the device has shown it. The banner is the receipt.
+  static Future<void> removeReceivedPayment({
+    String? reference,
+    String? message,
+  }) async {
+    final ref = reference?.trim() ?? '';
+    final text = message?.trim() ?? '';
+    if (ref.isEmpty && text.isEmpty) return;
+    final items = await load();
+    final kept = items.where((e) {
+      final type = e['type']?.toString();
+      final isPayment = type == 'payment' || type == 'broadcast';
+      if (!isPayment) return true;
+      if (ref.isNotEmpty && e['reference']?.toString() == ref) return false;
+      if (text.isNotEmpty && e['message']?.toString().trim() == text) return false;
+      return true;
+    }).toList();
+    if (kept.length == items.length) return;
+    await save(kept);
   }
 }
 

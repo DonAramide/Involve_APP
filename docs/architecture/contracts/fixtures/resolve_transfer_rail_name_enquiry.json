@@ -1,0 +1,19 @@
+{
+  "decision": "RESOLVED",
+  "serviceType": "TRANSFERS",
+  "operationType": "NAME_ENQUIRY",
+  "quasarTenantId": "c3d11b8b-e85d-4f2b-8a8f-2872bc900382",
+  "provider": "nomba",
+  "allowedProviders": [
+    "nomba",
+    "paystack"
+  ],
+  "precedenceTier": "INSTITUTION_DEFAULT",
+  "institutionId": "11111111-2222-3333-4444-555555555555",
+  "institutionCode": "PROV01",
+  "institutionName": "Providus Bank Institution Portal",
+  "decisionTraceId": "trc_ne_12345678",
+  "policyVersion": 1,
+  "evaluatedAt": "2026-10-20T00:15:00.000Z",
+  "expiresAt": "2026-10-20T00:16:00.000Z"
+}

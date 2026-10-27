@@ -7,7 +7,7 @@
         <q-icon name="manage_accounts" size="sm" color="amber-4" />
         <div>
           <div class="text-operator-title text-weight-bold" style="font-size: 16px;">IDENTITY & SECURITY CENTER</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ profile?.agent_code || 'LOADING' }} // ACTIVE_PROFILE</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ profileCode || '—' }}<template v-if="profile?.status"> // {{ profile.status }}</template></div>
         </div>
       </div>
       <div>
@@ -27,10 +27,11 @@
       <!-- Desktop Sidebar / Mobile Accordion -->
       <div class="col-xs-12 col-md-3 bg-panel border-muted rounded-borders q-pa-md column shrink-0" style="max-height: 500px;">
         <div class="flex flex-center column q-mb-md">
-          <q-avatar size="100px" class="q-mb-sm border-muted shadow-2">
-            <img :src="profile?.profile?.photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
+          <q-avatar size="100px" color="amber-9" text-color="amber-2" class="q-mb-sm border-muted shadow-2">
+            <img v-if="profile?.profile?.photo_url || profile?.profile?.profile_photo_url" :src="profile?.profile?.photo_url || profile?.profile?.profile_photo_url" />
+            <span v-else>{{ profileInitials }}</span>
           </q-avatar>
-          <div class="text-h6 text-weight-bold">{{ profile?.first_name }} {{ profile?.last_name }}</div>
+          <div class="text-h6 text-weight-bold">{{ profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() }}</div>
           <div class="text-caption text-muted">{{ profile?.email }}</div>
           <div class="text-caption text-amber-4 q-mt-xs">{{ profile?.territory || 'Unassigned Territory' }}</div>
           
@@ -50,6 +51,7 @@
           style="width: 100%"
         >
           <q-tab name="personal" icon="person" label="Personal Info" class="justify-start q-pl-md" />
+          <q-tab name="branding" icon="palette" label="Institution Branding" class="justify-start q-pl-md" />
           <q-tab name="kyc" icon="verified_user" label="KYC Documents" class="justify-start q-pl-md" />
           <q-tab name="security" icon="security" label="Security & MFA" class="justify-start q-pl-md" />
           <q-tab name="idcard" icon="badge" label="Identity Card" class="justify-start q-pl-md" />
@@ -77,6 +79,88 @@
               <q-btn type="submit" color="amber-4" text-color="black" label="Save Changes" :loading="saving" />
             </div>
           </q-form>
+        </div>
+
+        <!-- INSTITUTION BRANDING TAB -->
+        <div v-if="activeTab === 'branding'" class="column op-gap-16">
+          <div class="row items-center justify-between border-bottom-light q-pb-sm">
+            <div>
+              <div class="text-h6 text-weight-bold">Institution Branding & Identity</div>
+              <div class="text-caption text-muted">Manage your institution's official brand logo displayed across invoices, student portals, and health certificates.</div>
+            </div>
+            <q-badge color="teal-9" text-color="teal-2" class="text-caption">
+              Classification: {{ profile?.institution_type || 'INSTITUTION' }}
+            </q-badge>
+          </div>
+
+          <div class="bg-panel-darker q-pa-md rounded-borders border-muted column op-gap-16" style="max-width: 600px;">
+            <div class="row items-center justify-between">
+              <div>
+                <div class="text-weight-bold">Official Institution Logo</div>
+                <div class="text-caption text-muted">PNG, JPEG, or WebP. Max 3MB. Standard 512x512 canvas recommended.</div>
+              </div>
+              <q-btn
+                v-if="profile?.logo_url || profile?.logoUrl"
+                flat
+                dense
+                size="sm"
+                color="red-4"
+                label="Remove Logo"
+                icon="delete"
+                :loading="updatingLogo"
+                @click="removeInstitutionLogo"
+              />
+            </div>
+
+            <!-- Current / Preview Logo Avatar -->
+            <div class="row items-center op-gap-16">
+              <q-avatar size="80px" class="bg-panel rounded-borders border-muted shadow-2">
+                <img v-if="logoPreviewUrl || profile?.logo_url || profile?.logoUrl" :src="logoPreviewUrl || profile?.logo_url || profile?.logoUrl" alt="Institution Logo" style="object-fit: contain;" />
+                <q-icon v-else name="account_balance" size="40px" color="grey-6" />
+              </q-avatar>
+              <div class="column col op-gap-4">
+                <div class="text-weight-bold">{{ profile?.institution_name || profile?.name || 'Your Institution' }}</div>
+                <div class="text-caption text-muted">
+                  {{ (logoPreviewUrl || profile?.logo_url || profile?.logoUrl) ? 'Official logo active on public documents and portals' : 'No official logo configured yet' }}
+                </div>
+                <div v-if="logoFile" class="text-caption text-cyan-3">
+                  Selected: {{ logoFile.name }} ({{ (logoFile.size / 1024).toFixed(0) }} KB)
+                </div>
+              </div>
+            </div>
+
+            <!-- Upload File Input -->
+            <div class="row items-center op-gap-12">
+              <div class="col">
+                <q-file
+                  v-model="logoFile"
+                  dark
+                  filled
+                  dense
+                  label="Select Logo File (PNG/JPEG/WebP, Max 3MB, 512x512)"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="bg-panel text-caption"
+                  :loading="updatingLogo"
+                  @update:model-value="onLogoFileSelected"
+                >
+                  <template v-slot:prepend><q-icon name="cloud_upload" color="cyan-3" /></template>
+                  <template v-slot:append v-if="logoFile">
+                    <q-icon name="close" class="cursor-pointer" @click.stop="clearProfileLogoSelection" />
+                  </template>
+                </q-file>
+              </div>
+              <q-btn
+                v-if="logoFile"
+                color="amber-4"
+                text-color="black"
+                label="Upload & Save"
+                icon="save"
+                no-caps
+                :loading="updatingLogo"
+                @click="uploadInstitutionLogo"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- KYC TAB -->
@@ -169,10 +253,10 @@
             </div>
             <div class="q-pa-lg row items-center op-gap-16">
               <q-avatar size="100px" class="shadow-2 border-muted">
-                <img :src="profile?.profile?.photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
+                <img :src="profile?.profile?.photo_url || profile?.profile?.profile_photo_url || 'https://cdn.quasar.dev/img/avatar.png'" />
               </q-avatar>
               <div class="column flex-1">
-                <div class="text-h5 text-weight-bold">{{ profile?.first_name }} {{ profile?.last_name }}</div>
+                <div class="text-h5 text-weight-bold">{{ profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() }}</div>
                 <div class="text-caption text-amber-4 text-uppercase">Field Agent</div>
                 <div class="text-metric-mono text-muted q-mt-sm" style="font-size: 11px;">
                   <div>ID: {{ profile?.agent_code }}</div>
@@ -226,13 +310,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import QrcodeVue from 'qrcode.vue'
+import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
 const saving = ref(false)
@@ -245,7 +331,16 @@ const showMfaModal = ref(false)
 const mfaSetupData = ref({})
 const mfaVerifyCode = ref('')
 
-const activeTab = ref('personal')
+const activeTab = ref(['personal', 'kyc', 'security'].includes(String(route.query.tab || '')) ? String(route.query.tab) : 'personal')
+const profileCode = computed(() =>
+  pickInstituteCode(profile.value?.agent_code, profile.value?.agentCode),
+)
+
+const profileInitials = computed(() => {
+  const name = profile.value?.name || `${profile.value?.first_name || ''} ${profile.value?.last_name || ''}`.trim() || profile.value?.email || ''
+  const parts = String(name).split(/\s+/).filter(Boolean)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase() || '?'
+})
 
 const formData = ref({
   first_name: '',
@@ -271,33 +366,40 @@ const fetchProfileData = async () => {
   try {
     const token = localStorage.getItem('invify_agent_token')
     if (!token) {
-      router.push('/agent/login')
+      router.push('/institute/login')
       return
     }
+    try {
+      const stored = JSON.parse(localStorage.getItem('invify_agent_info') || 'null')
+      if (stored) profile.value = stored
+    } catch { /* ignore */ }
 
     const headers = { Authorization: `Bearer ${token}` }
-    
-    const [pRes, kycRes, secRes, qrRes] = await Promise.all([
+    const [pRes, kycRes, secRes, qrRes] = await Promise.allSettled([
       axios.get('/api/agent/profile', { headers }),
       axios.get('/api/agent/profile/kyc', { headers }),
       axios.get('/api/agent/security/sessions', { headers }),
-      axios.get('/api/agent/profile/id-card', { headers })
+      axios.get('/api/agent/profile/id-card', { headers }),
     ])
 
-    profile.value = pRes.data.data
-    kycDocs.value = kycRes.data.data || []
-    sessions.value = secRes.data.data?.history || []
-    qrData.value = qrRes.data.data || {}
+    if (pRes.status === 'fulfilled' && pRes.value.data?.data) {
+      profile.value = pRes.value.data.data
+    }
+    kycDocs.value = kycRes.status === 'fulfilled' ? (kycRes.value.data.data || []) : []
+    sessions.value = secRes.status === 'fulfilled' ? (secRes.value.data.data?.history || []) : []
+    qrData.value = qrRes.status === 'fulfilled' ? (qrRes.value.data.data || {}) : {}
 
-    // Populate form
     formData.value = {
-      first_name: profile.value.first_name || '',
-      last_name: profile.value.last_name || '',
-      email: profile.value.email || '',
-      phone_number: profile.value.phone_number || '',
-      residential_address: profile.value.profile?.residential_address || ''
+      first_name: profile.value?.first_name || '',
+      last_name: profile.value?.last_name || '',
+      email: profile.value?.email || '',
+      phone_number: profile.value?.phone_number || profile.value?.phone || '',
+      residential_address: profile.value?.profile?.residential_address || profile.value?.profile?.address || '',
     }
 
+    if (pRes.status === 'rejected') {
+      $q.notify({ type: 'negative', message: 'Failed to load profile data' })
+    }
   } catch (err) {
     console.error(err)
     $q.notify({ type: 'negative', message: 'Failed to load profile data' })
@@ -306,15 +408,19 @@ const fetchProfileData = async () => {
   }
 }
 
-onMounted(fetchProfileData)
+onMounted(() => {
+  if (String(route.query.tab || '') === 'security') activeTab.value = 'security'
+  fetchProfileData()
+})
 
 const updateProfile = async () => {
   saving.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.patch('/api/agent/profile', formData.value, {
+    const res = await axios.patch('/api/agent/profile', formData.value, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    if (res.data?.data) profile.value = res.data.data
     $q.notify({ type: 'positive', message: 'Profile updated successfully' })
     await fetchProfileData()
   } catch (err) {
@@ -408,24 +514,39 @@ const changePassword = async () => {
 
 const toggleMfa = async () => {
   const isEnabled = profile.value?.profile?.mfa_enabled
-  const endpoint = isEnabled ? '/api/agent/security/mfa/disable' : '/api/agent/security/mfa/enable'
-  
+  if (isEnabled) {
+    $q.dialog({
+      title: 'Disable 2FA',
+      message: 'Enter the current 6-digit authenticator code to disable 2FA.',
+      prompt: { model: '', type: 'text' },
+      cancel: true,
+      persistent: true,
+      dark: true,
+    }).onOk(async (code) => {
+      try {
+        const token = localStorage.getItem('invify_agent_token')
+        await axios.post('/api/agent/security/mfa/disable', { code }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        $q.notify({ type: 'positive', message: '2FA disabled' })
+        await fetchProfileData()
+      } catch (err) {
+        $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Failed to disable 2FA' })
+      }
+    })
+    return
+  }
+
   try {
     const token = localStorage.getItem('invify_agent_token')
-    const res = await axios.post(endpoint, {}, {
+    const res = await axios.post('/api/agent/security/mfa/enable', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    
-    if (isEnabled) {
-      $q.notify({ type: 'positive', message: 'MFA Disabled' })
-      await fetchProfileData()
-    } else {
-      mfaSetupData.value = res.data
-      mfaVerifyCode.value = ''
-      showMfaModal.value = true
-    }
+    mfaSetupData.value = res.data
+    mfaVerifyCode.value = ''
+    showMfaModal.value = true
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to update MFA settings' })
+    $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Failed to start 2FA setup' })
   }
 }
 
@@ -436,13 +557,100 @@ const verifyMfa = async () => {
     await axios.post('/api/agent/security/mfa/verify', { code: mfaVerifyCode.value }, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    $q.notify({ type: 'positive', message: 'MFA Enabled & Verified' })
+    $q.notify({ type: 'positive', message: '2FA enabled' })
     showMfaModal.value = false
     await fetchProfileData()
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Invalid verification code' })
+    $q.notify({ type: 'negative', message: err?.response?.data?.message || 'Invalid verification code' })
   } finally {
     saving.value = false
+  }
+}
+
+// Institution Official Logo Management
+const logoFile = ref(null)
+const logoPreviewUrl = ref('')
+const updatingLogo = ref(false)
+
+const toBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.readAsDataURL(file)
+  reader.onload = () => resolve(reader.result)
+  reader.onerror = (error) => reject(error)
+})
+
+const onLogoFileSelected = (file) => {
+  if (!file) {
+    logoPreviewUrl.value = ''
+    return
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    $q.notify({ type: 'negative', message: 'Logo file size exceeds the 3MB limit.', position: 'top-right' })
+    logoFile.value = null
+    logoPreviewUrl.value = ''
+    return
+  }
+  const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+  if (!allowed.includes(file.type)) {
+    $q.notify({ type: 'negative', message: 'Only PNG, JPEG, and WebP logos are supported.', position: 'top-right' })
+    logoFile.value = null
+    logoPreviewUrl.value = ''
+    return
+  }
+  logoPreviewUrl.value = URL.createObjectURL(file)
+}
+
+const clearProfileLogoSelection = () => {
+  logoFile.value = null
+  logoPreviewUrl.value = ''
+}
+
+const uploadInstitutionLogo = async () => {
+  if (!logoFile.value) return
+  updatingLogo.value = true
+  try {
+    const base64Data = await toBase64(logoFile.value)
+    const token = localStorage.getItem('invify_agent_token')
+    const res = await axios.post('/api/agent/profile/logo', {
+      logoImage: base64Data
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const newUrl = res.data?.logoUrl || ''
+    if (profile.value) {
+      profile.value.logo_url = newUrl
+      profile.value.logoUrl = newUrl
+    }
+    clearProfileLogoSelection()
+    $q.notify({ type: 'positive', message: 'Institution logo updated successfully', position: 'top-right' })
+    await fetchProfileData()
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Logo update failed: ${msg}`, position: 'top-right' })
+  } finally {
+    updatingLogo.value = false
+  }
+}
+
+const removeInstitutionLogo = async () => {
+  updatingLogo.value = true
+  try {
+    const token = localStorage.getItem('invify_agent_token')
+    await axios.delete('/api/agent/profile/logo', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (profile.value) {
+      profile.value.logo_url = null
+      profile.value.logoUrl = null
+    }
+    clearProfileLogoSelection()
+    $q.notify({ type: 'positive', message: 'Institution logo removed successfully', position: 'top-right' })
+    await fetchProfileData()
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Logo removal failed: ${msg}`, position: 'top-right' })
+  } finally {
+    updatingLogo.value = false
   }
 }
 </script>

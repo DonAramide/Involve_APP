@@ -1,0 +1,74 @@
+-- PROPOSAL ONLY. Do not apply to production, staging, or any shared database.
+-- Not in supabase/migrations. FEATURE_REAL_MONEY_PAYOUTS must stay off until a
+-- separate approval applies an equivalent function and two-connection tests pass.
+--
+-- Design:
+-- * Tenant isolation: advisory lock keyed by tenant uuid (two int4 keys, not hashtext).
+-- * Idempotency: unique (tenant_id, idempotency_key). Replay returns DE-DUPLICATED.
+-- * Atomic pool: lock, read unconsumed school-owned naira, subtract reserved rows,
+--   insert this reservation only when remaining >= p_amount. Never credits USER_WALLET.
+-- * Concurrent withdrawals: two connections serialize on the same tenant lock.
+--
+-- CREATE TABLE IF NOT EXISTS public.school_withdrawal_reservations (
+--   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+--   tenant_id uuid NOT NULL,
+--   idempotency_key text NOT NULL,
+--   amount numeric(15,2) NOT NULL CHECK (amount > 0),
+--   status text NOT NULL DEFAULT 'RESERVED',
+--   created_at timestamptz NOT NULL DEFAULT now(),
+--   UNIQUE (tenant_id, idempotency_key)
+-- );
+--
+-- CREATE OR REPLACE FUNCTION public.reserve_school_withdrawal(
+--   p_tenant_id uuid,
+--   p_idempotency_key text,
+--   p_amount numeric
+-- ) RETURNS jsonb
+-- LANGUAGE plpgsql
+-- AS $$
+-- DECLARE
+--   v_existing uuid;
+--   v_pool numeric(15,2) := 0;
+--   v_reserved numeric(15,2) := 0;
+--   v_lock_a int;
+--   v_lock_b int;
+-- BEGIN
+--   IF p_tenant_id IS NULL OR p_idempotency_key IS NULL OR p_idempotency_key NOT LIKE 'payout:%' THEN
+--     RAISE EXCEPTION 'RESERVATION_INVALID_KEY';
+--   END IF;
+--   IF p_amount IS NULL OR p_amount <= 0 OR p_amount <> trunc(p_amount, 2) THEN
+--     RAISE EXCEPTION 'RESERVATION_INVALID_AMOUNT';
+--   END IF;
+--
+--   v_lock_a := ('x' || substr(replace(p_tenant_id::text, '-', ''), 1, 8))::bit(32)::int;
+--   v_lock_b := ('x' || substr(replace(p_tenant_id::text, '-', ''), 9, 8))::bit(32)::int;
+--   PERFORM pg_advisory_xact_lock(v_lock_a, v_lock_b);
+--
+--   SELECT id INTO v_existing
+--   FROM public.school_withdrawal_reservations
+--   WHERE tenant_id = p_tenant_id AND idempotency_key = p_idempotency_key;
+--   IF FOUND THEN
+--     RETURN jsonb_build_object('status', 'DE-DUPLICATED', 'id', v_existing);
+--   END IF;
+--
+--   -- Pool must be proven school-owned settleable naira, not wallets.balance and
+--   -- not parent liability. Replace the 0 placeholder only when that query is approved.
+--   v_pool := 0;
+--   SELECT COALESCE(SUM(amount), 0) INTO v_reserved
+--   FROM public.school_withdrawal_reservations
+--   WHERE tenant_id = p_tenant_id
+--     AND status IN ('RESERVED', 'PENDING', 'PROCESSING', 'SUCCESS');
+--
+--   IF v_pool - v_reserved < p_amount THEN
+--     RAISE EXCEPTION 'INSUFFICIENT_BALANCE';
+--   END IF;
+--
+--   INSERT INTO public.school_withdrawal_reservations (
+--     tenant_id, idempotency_key, amount, status
+--   ) VALUES (
+--     p_tenant_id, p_idempotency_key, p_amount, 'RESERVED'
+--   );
+--
+--   RETURN jsonb_build_object('status', 'RESERVED');
+-- END;
+-- $$;

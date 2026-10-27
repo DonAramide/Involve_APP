@@ -7,4 +7,6 @@ abstract class StaffRepository {
   Future<void> updateStaff(Staff staff);
   Future<void> deleteStaff(int id);
   Future<Staff?> authenticateStaff(int id, String code);
+  Future<int> applyCloudStaffRecords(List<Map<String, dynamic>> records);
+  Future<int> pullCloudGovernance();
 }

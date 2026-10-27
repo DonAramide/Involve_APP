@@ -21,6 +21,13 @@ class ServicesDashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencySymbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final bloc = context.read<ServicesBloc>();
+      if (bloc.state.status == ServicesStatus.initial) {
+        bloc.add(const LoadServicesJobs());
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -297,7 +304,7 @@ class ServicesDashboardPage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
         title: Text(job.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('ID: ${job.jobId} • Balance: ${CurrencyFormatter.formatWithSymbol(job.balance, symbol: currencySymbol)}'),
+        subtitle: Text('ID: ${job.jobId} • Balance: ${CurrencyFormatter.formatWithSymbol(job.remainingBalance, symbol: currencySymbol)}'),
         trailing: _buildStatusChip(job.status),
         onTap: () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => JobDetailsPage(job: job)));
@@ -313,6 +320,7 @@ class ServicesDashboardPage extends StatelessWidget {
       case 'in_progress': color = Colors.orange; break;
       case 'ready': color = Colors.green; break;
       case 'delivered': color = Colors.blue; break;
+      case 'cancelled': color = Colors.red; break;
       default: color = Colors.grey;
     }
     return Container(

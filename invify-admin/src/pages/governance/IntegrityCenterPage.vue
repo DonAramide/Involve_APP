@@ -150,31 +150,30 @@
             <div class="column op-gap-8 q-py-sm">
               <div class="row items-center justify-between text-caption text-muted">
                 <span>Core Operating Base</span>
-                <span class="text-metric-mono text-green-3">99.8% Nominal</span>
+                <span class="text-metric-mono text-grey-5">—</span>
               </div>
-              <q-linear-progress :dark="true" value="0.998" color="green-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0" color="green-4" track-color="grey-9" size="xs" />
 
               <div class="row items-center justify-between text-caption text-muted">
                 <span>Kiosk Subfleet Drift</span>
-                <span class="text-metric-mono text-amber-5">94.1% Impacted</span>
+                <span class="text-metric-mono text-grey-5">—</span>
               </div>
-              <q-linear-progress :dark="true" value="0.941" color="amber-5" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0" color="amber-5" track-color="grey-9" size="xs" />
 
               <div class="row items-center justify-between text-caption text-muted">
                 <span>Compromised Scanner Waves</span>
-                <span class="text-metric-mono text-red-5">71.2% Degraded</span>
+                <span class="text-metric-mono text-grey-5">—</span>
               </div>
-              <q-linear-progress :dark="true" value="0.712" color="red-5" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0" color="red-5" track-color="grey-9" size="xs" />
             </div>
 
-            <!-- Dynamic Correlation notice banner -->
-            <div class="bg-red-focus q-pa-sm rounded-borders border-left-critical q-mt-xs">
+            <div class="bg-subpanel q-pa-sm rounded-borders q-mt-xs">
               <div class="text-main text-weight-bold text-caption row items-center op-gap-4">
-                <q-icon name="warning" color="red-5" size="xs" />
-                <span>Incident Correlation Hook</span>
+                <q-icon name="info" color="grey-5" size="xs" />
+                <span>No live integrity snapshot</span>
               </div>
-              <div class="text-red-5 q-mt-xs" style="font-size: 10px;">
-                Unresolved parity failures triggered cascade trust depreciation targeting hardware sector [tenant-omega].
+              <div class="text-grey-5 q-mt-xs" style="font-size: 10px;">
+                Hardware attestation metrics appear here when telemetry is available.
               </div>
             </div>
           </div>

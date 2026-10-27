@@ -305,8 +305,8 @@ const kpiCards = computed(() => {
   if (activeWorkspace.value === 'fleet') {
     if (fleetSubMode.value === 'presence') {
       return {
-        kpi1: { label: 'Triangulation Influx', value: '8.4', unit: 'pps', sub: 'Signal latency: 12ms', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Active Edge Nodes', value: String(activeNodesCount.value), unit: '/ 18', sub: 'Locations: Lagos, Abuja, London', border: 'border-indigo-left', icon: 'radar' },
+        kpi1: { label: 'Triangulation Influx', value: String(throughputEps.value || '0'), unit: 'pps', sub: 'Live telemetry', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Edge Nodes', value: String(activeNodesCount.value), unit: '', sub: 'Live edge nodes', border: 'border-indigo-left', icon: 'radar' },
         kpi3: { label: 'Presence Warnings', value: '0', unit: '', sub: 'Triangulation anomalies: None', border: 'border-amber-left', dot: 'pulse-healthy' },
         kpi4: { label: 'Signal Degradations', value: '0', unit: 'drops', sub: 'Cellular tower handshakes stable', border: 'border-red-left', dot: 'pulse-healthy' }
       }
@@ -340,8 +340,8 @@ const kpiCards = computed(() => {
     }
     if (fleetSubMode.value === 'actions') {
       return {
-        kpi1: { label: 'Executed Commands', value: '42', unit: 'actions', sub: 'Diagnostics, reboots, token resets', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Operator Approvals', value: '100%', unit: 'RBAC', sub: 'Elevation authorizations cleared', border: 'border-indigo-left', icon: 'terminal' },
+        kpi1: { label: 'Executed Commands', value: '0', unit: 'actions', sub: 'No mock command volume', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Operator Approvals', value: '—', unit: 'RBAC', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'terminal' },
         kpi3: { label: 'Queued Actions', value: '0', unit: 'pending', sub: 'Awaiting execution window: None', border: 'border-amber-left', dot: 'pulse-healthy' },
         kpi4: { label: 'Action Exceptions', value: '0', unit: 'errors', sub: 'Zero-touch script execution perfect', border: 'border-red-left', dot: 'pulse-healthy' }
       }
@@ -351,52 +351,52 @@ const kpiCards = computed(() => {
   if (activeWorkspace.value === 'observability') {
     if (observabilitySubMode.value === 'streams') {
       return {
-        kpi1: { label: 'Stream Influx', value: throughputEps.value || '4.8', unit: 'eps', sub: 'Peak buffer: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Active Topics', value: '3', unit: 'streams', sub: 'Topics: wallet, fleet, reconciliation', border: 'border-indigo-left', icon: 'rss_feed' },
+        kpi1: { label: 'Stream Influx', value: throughputEps.value || '0', unit: 'eps', sub: 'Live stream rate', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Topics', value: '0', unit: 'streams', sub: 'No mock topic count', border: 'border-indigo-left', icon: 'rss_feed' },
         kpi3: { label: 'Stream Warnings', value: String(warningEventsCount.value), unit: '', sub: 'Stale packets in window', border: 'border-amber-left', dot: 'pulse-warning' },
         kpi4: { label: 'Corrupt Packets Rejected', value: String(criticalEventsCount.value), unit: 'drops', sub: 'Schema verification check failed', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }
     if (observabilitySubMode.value === 'metrics') {
       return {
-        kpi1: { label: 'Ingested Telemetry Packets', value: '254k', unit: 'packets', sub: 'Aggregated historical rollup', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Polled Datapoints', value: '142', unit: 'metrics', sub: 'CPU, RAM, Signal Strength, etc.', border: 'border-indigo-left', icon: 'query_stats' },
-        kpi3: { label: 'Drift Alerts', value: '2', unit: 'anomalies', sub: 'Active baseline deviations', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi1: { label: 'Ingested Telemetry Packets', value: '0', unit: 'packets', sub: 'No mock rollup', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Polled Datapoints', value: '0', unit: 'metrics', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'query_stats' },
+        kpi3: { label: 'Drift Alerts', value: String(warningEventsCount.value), unit: 'anomalies', sub: 'Active baseline deviations', border: 'border-amber-left', dot: 'pulse-warning' },
         kpi4: { label: 'Out of Bounds Violations', value: '0', unit: 'critical', sub: 'Absolute threshold violations', border: 'border-red-left', dot: 'pulse-healthy' }
       }
     }
     if (observabilitySubMode.value === 'queues') {
       return {
-        kpi1: { label: 'Queue Load', value: '12%', unit: 'capacity', sub: 'Processing capacity: 10k/sec', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Active Workers', value: '8', unit: 'threads', sub: 'Consumer partitions: 16 total', border: 'border-indigo-left', icon: 'dns' },
-        kpi3: { label: 'Pending Message Lag', value: '14', unit: 'messages', sub: 'Average lag duration: 18ms', border: 'border-amber-left', dot: 'pulse-warning' },
-        kpi4: { label: 'Dead Letter locks', value: '1', unit: 'DLQ', sub: 'Traceability exception envelope locked', border: 'border-red-left', dot: 'pulse-critical' }
+        kpi1: { label: 'Queue Load', value: '—', unit: 'capacity', sub: 'Awaiting live snapshot', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Workers', value: '0', unit: 'threads', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'dns' },
+        kpi3: { label: 'Pending Message Lag', value: '0', unit: 'messages', sub: 'Awaiting live snapshot', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Dead Letter locks', value: '0', unit: 'DLQ', sub: 'No mock DLQ count', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }
     if (observabilitySubMode.value === 'websocket-health') {
       return {
-        kpi1: { label: 'Duplex Socket Latency', value: '12', unit: 'ms', sub: 'Round-trip ping verification', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi1: { label: 'Duplex Socket Latency', value: '—', unit: 'ms', sub: 'Awaiting live snapshot', border: 'border-cyan-left', dot: 'pulse-healthy' },
         kpi2: { label: 'Active Socket Clients', value: String(activeNodesCount.value), unit: 'clients', sub: 'Persistent channel tunnels active', border: 'border-indigo-left', icon: 'swap_calls' },
         kpi3: { label: 'Transient Disconnects', value: '0', unit: 'warnings', sub: 'Keepalive heartbeat stable', border: 'border-amber-left', dot: 'pulse-healthy' },
-        kpi4: { label: 'Hard Socket Resets', value: '1', unit: 'resets', sub: 'Forceful recovery reconnect executed', border: 'border-red-left', dot: 'pulse-critical' }
+        kpi4: { label: 'Hard Socket Resets', value: '0', unit: 'resets', sub: 'No mock reconnect count', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }
     if (observabilitySubMode.value === 'pipelines') {
       return {
-        kpi1: { label: 'Pipeline Convergence', value: '100%', unit: 'uptime', sub: 'Ingestion channels nominal', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Active Transforms', value: '6', unit: 'filters', sub: 'Zero-touch payload verification', border: 'border-indigo-left', icon: 'filter_alt' },
-        kpi3: { label: 'Schema Drift Warnings', value: '3', unit: 'warnings', sub: 'Coerced type assertions in pipeline', border: 'border-amber-left', dot: 'pulse-warning' },
-        kpi4: { label: 'Dropped Ingestion Frames', value: '1', unit: 'drops', sub: 'Corrupted telemetry records', border: 'border-red-left', dot: 'pulse-critical' }
+        kpi1: { label: 'Pipeline Convergence', value: '—', unit: 'uptime', sub: 'Awaiting live snapshot', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Transforms', value: '0', unit: 'filters', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'filter_alt' },
+        kpi3: { label: 'Schema Drift Warnings', value: String(warningEventsCount.value), unit: 'warnings', sub: 'Live warning count', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Dropped Ingestion Frames', value: String(criticalEventsCount.value), unit: 'drops', sub: 'Live drop count', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }
   }
 
   if (activeWorkspace.value === 'incidents') {
     return {
-      kpi1: { label: 'SLA Status', value: '99.2%', unit: 'ratio', sub: 'Target operational SLA: 99.9%', border: 'border-cyan-left', dot: 'pulse-healthy' },
-      kpi2: { label: 'Active Alerts', value: '1', unit: 'active', sub: 'Reconciliation queue lockout', border: 'border-indigo-left', icon: 'warning' },
+      kpi1: { label: 'SLA Status', value: '—', unit: 'ratio', sub: 'No mock SLA', border: 'border-cyan-left', dot: 'pulse-healthy' },
+      kpi2: { label: 'Active Alerts', value: String(warningEventsCount.value), unit: 'active', sub: 'Live warning count', border: 'border-indigo-left', icon: 'warning' },
       kpi3: { label: 'Acknowledged Incidents', value: '0', unit: 'resolved', sub: 'Awaiting operator review', border: 'border-amber-left', dot: 'pulse-healthy' },
-      kpi4: { label: 'Unresolved Critical Alerts', value: '1', unit: 'locks', sub: 'Temporal state drift failure', border: 'border-red-left', dot: 'pulse-critical' }
+      kpi4: { label: 'Unresolved Critical Alerts', value: String(criticalEventsCount.value), unit: 'locks', sub: 'Live critical count', border: 'border-red-left', dot: 'pulse-critical' }
     }
   }
 
@@ -413,26 +413,26 @@ const kpiCards = computed(() => {
     }
     if (financeSubMode.value === 'card-telemetry') {
       return {
-        kpi1: { label: 'Auth Success Rate', value: '98.4%', unit: 'Rate', sub: 'Network average: 97.2%', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Live Transactions', value: '142', unit: 'TPS', sub: 'Peak volume threshold', border: 'border-indigo-left', icon: 'credit_card' },
-        kpi3: { label: 'High-Risk Flags', value: '14', unit: 'Holds', sub: 'Fraud engine interceptions', border: 'border-amber-left', dot: 'pulse-warning' },
-        kpi4: { label: 'Gateway Declines', value: '3', unit: 'Fails', sub: 'Hard network rejections', border: 'border-red-left', dot: 'pulse-critical' }
+        kpi1: { label: 'Auth Success Rate', value: '—', unit: 'Rate', sub: 'Awaiting live snapshot', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Live Transactions', value: '0', unit: 'TPS', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'credit_card' },
+        kpi3: { label: 'High-Risk Flags', value: '0', unit: 'Holds', sub: 'Awaiting live snapshot', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Gateway Declines', value: '0', unit: 'Fails', sub: 'Awaiting live snapshot', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }
     if (financeSubMode.value === 'cross-tenant') {
       return {
-        kpi1: { label: 'Analyzed Transfers', value: '14.2k', unit: 'Scans', sub: 'Cross-boundary validation', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Ledger Parity', value: '100%', unit: 'Match', sub: 'Double-entry books balanced', border: 'border-indigo-left', icon: 'fact_check' },
-        kpi3: { label: 'Orphaned Records', value: '4', unit: 'Anomalies', sub: 'Pending trace investigation', border: 'border-amber-left', dot: 'pulse-warning' },
-        kpi4: { label: 'Double Spend Risks', value: '0', unit: 'Blocks', sub: 'Cryptographic lock intact', border: 'border-red-left', dot: 'pulse-healthy' }
+        kpi1: { label: 'Analyzed Transfers', value: '0', unit: 'Scans', sub: 'Awaiting live snapshot', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Ledger Parity', value: '—', unit: 'Match', sub: 'Awaiting live snapshot', border: 'border-indigo-left', icon: 'fact_check' },
+        kpi3: { label: 'Orphaned Records', value: '0', unit: 'Anomalies', sub: 'Awaiting live snapshot', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Double Spend Risks', value: '0', unit: 'Blocks', sub: 'Awaiting live snapshot', border: 'border-red-left', dot: 'pulse-healthy' }
       }
     }
   }
 
   // Default (Fallback)
   return {
-    kpi1: { label: 'Ingestion Rate', value: throughputEps.value || '4.2', unit: 'eps', sub: 'Peak buffer utilization: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
-    kpi2: { label: 'Active Fleet Nodes', value: activeNodesCount.value, unit: '/ 18', sub: 'Edge deployment distribution: 99.8% stable', border: 'border-indigo-left', icon: 'devices' },
+    kpi1: { label: 'Ingestion Rate', value: throughputEps.value || '0', unit: 'eps', sub: 'Live ingestion rate', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Fleet Nodes', value: activeNodesCount.value, unit: '', sub: 'Live edge nodes', border: 'border-indigo-left', icon: 'devices' },
     kpi3: { label: 'Active Warnings', value: warningEventsCount.value, unit: '', sub: 'Drift severity index: ELEVATED', border: 'border-amber-left', dot: 'pulse-warning' },
     kpi4: { label: 'Critical Rollbacks', value: criticalEventsCount.value, unit: 'locks', sub: `${criticalEventsCount.value} pipeline locks`, border: 'border-red-left', dot: 'pulse-critical' }
   }

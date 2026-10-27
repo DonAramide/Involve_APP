@@ -1,10 +1,14 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:involve_app/core/license/storage_service.dart';
+import 'package:involve_app/services/cloud_realtime_socket.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/required_location.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'dart:developer';
@@ -12,18 +16,25 @@ import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_worker.dart';
+import 'package:involve_app/core/sync/domain/services/web_cloud_sync_service.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class SocketService {
+  static final StreamController<double> withdrawableUpdates =
+      StreamController<double>.broadcast();
   static final SocketService _instance = SocketService._internal();
   factory SocketService() => _instance;
   SocketService._internal();
 
-  IO.Socket? _socket;
+  CloudRealtimeSocket? _socket;
   GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   GlobalKey<NavigatorState>? navigatorKey;
   
   final ValueNotifier<bool> isConnected = ValueNotifier<bool>(false);
+  final ValueNotifier<String?> lastError = ValueNotifier<String?>(null);
 
   // Cached parameters to allow delayed initialization on toggles
   String? _lastServerUrl;
@@ -33,16 +44,55 @@ class SocketService {
   String? _lastDeviceId;
   String? _lastBusinessName;
   String? _lastToken;
+  Future<String?> Function()? tokenProvider;
+  String? _boundServerUrl;
 
   // ── Auto-reconnect engine ──────────────────────────────────────────────────
   static const int _maxBackoffSeconds = 60;   // cap at 60 s
   static const int _heartbeatIntervalSeconds = 25;
 
+  static const int _watchdogIntervalSeconds = 15;
+  static const int _connectTimeoutSeconds = 20;
+
   int _reconnectAttempts = 0;
   bool _intentionalDisconnect = false;         // set true when WE call disconnect()
+  bool _reconnectInFlight = false;
+  DateTime? _reconnectInFlightAt;
+  DateTime? _lastConnectivityReconnectAt;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
+  Timer? _watchdogTimer;
+  Timer? _connectTimeoutTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
+  Map<String, dynamic> _authPayload(String? token, String? tenantId) {
+    return {
+      if (token != null) 'token': token,
+      if (tenantId != null) 'tenantId': tenantId,
+      if (_lastDeviceId != null) 'deviceId': _lastDeviceId,
+    };
+  }
+
+  void _applyAuth(String? token, String? tenantId) {
+    _lastToken = token;
+    if (_socket != null) {
+      _socket!.auth = _authPayload(token, tenantId);
+    }
+  }
+
+  void _disposeSocketInstance() {
+    _intentionalDisconnect = true;
+    _cancelReconnectTimer();
+    try {
+      _socket?.disconnect();
+      _socket?.dispose();
+    } catch (_) {}
+    _socket = null;
+    _boundServerUrl = null;
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+    _intentionalDisconnect = false;
+  }
 
   Future<void> initializeSocket(String serverUrl, {String? tenantId, String? plan, String? type, String? deviceId, String? businessName, String? token}) async {
     _lastServerUrl = serverUrl;
@@ -53,37 +103,71 @@ class SocketService {
     _lastBusinessName = businessName;
     _lastToken = token;
 
-    final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
-    if (!isSyncEnabled) {
-      debugPrint('[SocketService] Online sync is disabled. Skipping connection.');
-      isConnected.value = false;
-      if (_socket != null) {
-        _socket!.disconnect();
-      }
+    // Live presence stays up on every plan (emergency lock, broadcasts).
+    // isOnlineSyncEnabled only gates data/outbox sync, not this socket.
+    _ensureConnectivityListener();
+    _startWatchdog();
+
+    // Reuse the existing manager. Recreating IO.io() + checkConnectivity()
+    // on every retry made Android fire "Network restored" in a tight loop.
+    if (_socket != null && _boundServerUrl == serverUrl) {
+      _applyAuth(token, tenantId);
+      if (deviceId != null) _lastDeviceId = deviceId;
+      if (businessName != null) _lastBusinessName = businessName;
+      if (plan != null) _lastPlan = plan;
+      if (type != null) _lastType = type;
+      if (_socket!.connected) _startHeartbeat();
+      if (_socket!.connected || _reconnectInFlight) return;
+      _markReconnectInFlight();
+      _socket!.connect();
+      _armConnectTimeout();
       return;
     }
 
-    if (_socket != null) {
-      _socket!.disconnect();
+    _disposeSocketInstance();
+    _boundServerUrl = serverUrl;
+
+    final tokenKind = token == null || token.isEmpty
+        ? 'none'
+        : token == 'mock-super-admin'
+            ? 'mock'
+            : 'jwt';
+
+    // Flutter socket_io_client on Android only implements WebSocket reliably.
+    // Hosted production (api.invify.org) rejects the WS upgrade with HTTP 400;
+    // LAN ws:// often times out. Engine.IO HTTP polling works for both.
+    if (!kIsWeb) {
+      debugPrint('[SocketService] Connecting $serverUrl via HTTP polling auth=$tokenKind');
+      final polling = EngineIoPollingClient(serverUrl);
+      polling.auth = _authPayload(token, tenantId);
+      _socket = polling;
+    } else {
+      debugPrint('[SocketService] Connecting $serverUrl via polling,websocket auth=$tokenKind');
+      final io = IO.io(serverUrl, IO.OptionBuilder()
+        .setTransports(['polling', 'websocket'])
+        .setUpgrade(false)
+        .disableReconnection()
+        .setPath('/socket.io')
+        .setTimeout(20000)
+        .disableAutoConnect()
+        .enableForceNew()
+        .setAuth(_authPayload(token, tenantId))
+        .setExtraHeaders({'ngrok-skip-browser-warning': 'true'})
+        .build()
+      );
+      _socket = SocketIoRealtimeSocket(io);
     }
-
-    _socket = IO.io(serverUrl, IO.OptionBuilder()
-      .setTransports(['websocket'])
-      .disableAutoConnect()
-      .setAuth({
-        if (token != null) 'token': token,
-        if (tenantId != null) 'tenantId': tenantId,
-      })
-      .setExtraHeaders({'ngrok-skip-browser-warning': 'true'})
-      .build()
-    );
-
-    _socket!.connect();
 
     _socket!.onConnect((_) {
       isConnected.value = true;
+      lastError.value = null;
       _reconnectAttempts = 0;        // reset backoff counter on success
       _intentionalDisconnect = false;
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
+      _startHeartbeat();
       debugPrint('[SocketService] Socket successfully connected to server!');
       debugPrint('[SocketService] Emitting join_room with: tenantId=$tenantId, plan=$plan, type=$type, deviceId=$deviceId, businessName=$businessName');
       
@@ -121,7 +205,16 @@ class SocketService {
     });
 
     _socket!.onConnectError((err) {
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
+      isConnected.value = false;
+      lastError.value = err?.toString();
       debugPrint('[SocketService] Connect Error: $err');
+      if (!_intentionalDisconnect) {
+        _scheduleReconnect();
+      }
     });
 
     _socket!.onError((err) {
@@ -131,9 +224,26 @@ class SocketService {
     _socket!.on('app_broadcast', (data) async {
       debugPrint('[SocketService] Broadcast received from server: $data');
       if (data != null && data['message'] != null) {
+        final targetDevice = (data['deviceId'] ?? data['device_id'])?.toString();
+        if (targetDevice != null &&
+            targetDevice.isNotEmpty &&
+            _lastDeviceId != null &&
+            targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+          return;
+        }
         _showBroadcastBanner(data['message']);
-        
-        // Save broadcast to history
+        if (data['type']?.toString() == 'payment') {
+          try {
+            await NotificationInbox.removeReceivedPayment(
+              reference: data['reference']?.toString(),
+              message: data['message']?.toString(),
+            );
+          } catch (e) {
+            debugPrint('Error clearing received payment notice: $e');
+          }
+          return;
+        }
+
         try {
           await NotificationInbox.add(
             message: data['message'].toString(),
@@ -143,6 +253,11 @@ class SocketService {
           debugPrint('Error saving broadcast: $e');
         }
       }
+    });
+
+    _socket!.on('device_identity_ping', (data) {
+      debugPrint('[SocketService] device_identity_ping received: $data');
+      unawaited(_replyDeviceIdentity(data));
     });
 
     _socket!.on('pos_routing_updated', (data) async {
@@ -161,35 +276,66 @@ class SocketService {
       }
     });
 
+    _socket!.on('withdrawable_updated', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final available = map['available'];
+      final amount = available is num ? available.toDouble() : double.tryParse('$available');
+      if (amount == null) return;
+      if (!withdrawableUpdates.isClosed) withdrawableUpdates.add(amount);
+    });
+
     _socket!.on('payment.success', (data) {
       debugPrint('[SocketService] payment.success received: $data');
-      // Defense-in-depth: ignore payments for other tenants if payload includes tenantId.
-      try {
-        final map = data is Map
-            ? Map<String, dynamic>.from(data as Map)
-            : <String, dynamic>{};
-        final eventTenant = map['tenantId']?.toString();
-        if (eventTenant != null &&
-            eventTenant.isNotEmpty &&
-            _lastTenantId != null &&
-            _lastTenantId!.isNotEmpty &&
-            eventTenant != _lastTenantId) {
-          debugPrint(
-            '[SocketService] Ignoring payment.success for other tenant '
-            '$eventTenant (this device=$_lastTenantId)',
-          );
-          return;
-        }
-      } catch (_) {}
-      unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess(data));
-      unawaited(PaymentCatchUpService.instance.markSeenFromLivePayment(data));
-      _showPaymentSuccessBanner(data);
+      final map = data is Map
+          ? Map<String, dynamic>.from(data as Map)
+          : <String, dynamic>{};
+      final eventTenant = map['tenantId']?.toString();
+      if (eventTenant != null &&
+          eventTenant.isNotEmpty &&
+          _lastTenantId != null &&
+          _lastTenantId!.isNotEmpty &&
+          eventTenant != _lastTenantId) {
+        debugPrint(
+          '[SocketService] Ignoring payment.success for other tenant '
+          '$eventTenant (this device=$_lastTenantId)',
+        );
+        return;
+      }
+      _ackPaymentAlert(map);
+      final reference = map['reference']?.toString().trim() ?? '';
+      unawaited(() async {
+        final shouldNotify = reference.isEmpty
+            ? true
+            : await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        await CustomerWalletCreditService.instance.applyPaymentSuccess(data);
+        await PaymentCatchUpService.instance.markSeenFromLivePayment(data);
+        if (shouldNotify) await _showPaymentSuccessBanner(data, alreadyClaimed: true);
+      }());
     });
 
     _socket!.on('emergency_lock', (data) async {
       debugPrint('[SocketService] Emergency Lock received: $data');
-      if (data != null && data['passcode'] != null) {
-        final passcode = data['passcode'].toString();
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final targetDevice = (map['deviceId'] ?? map['device_id'])?.toString();
+      if (targetDevice != null &&
+          targetDevice.isNotEmpty &&
+          _lastDeviceId != null &&
+          targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+        return;
+      }
+      final action = map['action']?.toString() ?? 'lock';
+      if (action == 'unlock') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_emergency_locked', false);
+        await prefs.remove('emergency_lock_passcode');
+        final ctx = navigatorKey?.currentContext;
+        if (ctx != null) {
+          Navigator.of(ctx, rootNavigator: true).maybePop();
+        }
+        return;
+      }
+      if (map['passcode'] != null) {
+        final passcode = map['passcode'].toString();
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('emergency_lock_passcode', passcode);
@@ -198,6 +344,91 @@ class SocketService {
         if (navigatorKey?.currentContext != null) {
           showEmergencyLockScreen(navigatorKey!.currentContext!, passcode);
         }
+      }
+    });
+
+    _socket!.on('device_command', (data) async {
+      debugPrint('[SocketService] device_command received: $data');
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final targetDevice = (map['deviceId'] ?? map['device_id'])?.toString();
+      if (targetDevice != null &&
+          targetDevice.isNotEmpty &&
+          _lastDeviceId != null &&
+          targetDevice.toUpperCase() != _lastDeviceId!.toUpperCase()) {
+        return;
+      }
+      final action = map['action']?.toString() ?? '';
+      if (action == 'pull_sync') {
+        _showBroadcastBanner('Admin requested a data sync. Uploading records…');
+        try {
+          final sl = GetIt.instance;
+          if (sl.isRegistered<OutboxWorker>()) {
+            await sl.get<OutboxWorker>().triggerSync();
+          }
+          await WebCloudSyncService.pushSchoolRoster();
+          try {
+            final sl2 = GetIt.instance;
+            if (sl2.isRegistered<StaffRepositoryImpl>()) {
+              await sl2.get<StaffRepositoryImpl>().pullCloudGovernance();
+            }
+          } catch (e) {
+            debugPrint('[SocketService] staff governance pull failed: $e');
+          }
+          if (_lastDeviceId != null && _lastDeviceId!.isNotEmpty) {
+            await TerminalSyncService.syncTerminalConfig(deviceId: _lastDeviceId!);
+          }
+          _showBroadcastBanner('Records uploaded to the web portal.');
+        } catch (e) {
+          debugPrint('[SocketService] pull_sync failed: $e');
+          _showBroadcastBanner('Sync failed: $e');
+        }
+      } else if (action == 'restore_from_web') {
+        _showBroadcastBanner('Downloading school records from the web portal…');
+        try {
+          final restored = await WebCloudSyncService.pullSchoolRoster();
+          try {
+            final sl2 = GetIt.instance;
+            if (sl2.isRegistered<StaffRepositoryImpl>()) {
+              await sl2.get<StaffRepositoryImpl>().pullCloudGovernance();
+            }
+          } catch (e) {
+            debugPrint('[SocketService] staff governance pull failed: $e');
+          }
+          if (_lastDeviceId != null && _lastDeviceId!.isNotEmpty) {
+            await TerminalSyncService.syncTerminalConfig(deviceId: _lastDeviceId!);
+          }
+          _showBroadcastBanner(restored.banner);
+        } catch (e) {
+          debugPrint('[SocketService] restore_from_web failed: $e');
+          _showBroadcastBanner('Could not download school data: $e');
+        }
+      }
+    });
+
+    _socket!.on('staff_governance', (data) async {
+      debugPrint('[SocketService] staff_governance received: $data');
+      try {
+        final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+        final raw = map['staff'];
+        final records = raw is List
+            ? raw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : <Map<String, dynamic>>[];
+        final sl = GetIt.instance;
+        if (!sl.isRegistered<StaffRepositoryImpl>()) return;
+        final repo = sl.get<StaffRepositoryImpl>();
+        final applied = records.isNotEmpty
+            ? await repo.applyCloudStaffRecords(records)
+            : await repo.pullCloudGovernance();
+        if (applied > 0) {
+          _showBroadcastBanner(
+            'Staff roles updated from the web portal. Sign in again to apply new permissions.',
+          );
+        }
+      } catch (e) {
+        debugPrint('[SocketService] staff_governance failed: $e');
       }
     });
 
@@ -286,31 +517,118 @@ class SocketService {
 
     _socket!.onDisconnect((_) {
       isConnected.value = false;
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
       log('[SocketService] Socket disconnected.');
       if (!_intentionalDisconnect) {
         _scheduleReconnect();
       }
     });
 
-    // Start heartbeat to detect silently dead connections
-    _startHeartbeat();
+    _markReconnectInFlight();
+    _socket!.connect();
+    _armConnectTimeout();
+  }
 
-    // Watch network connectivity — reconnect immediately when coming back online
-    _connectivitySub?.cancel();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
-      final hasNetwork = results.any((r) => r != ConnectivityResult.none);
-      if (hasNetwork && !isConnected.value) {
-        debugPrint('[SocketService] Network restored. Triggering reconnect...');
-        _cancelReconnectTimer();
-        _reconnectAttempts = 0;
-        await _doReconnect();
+  bool _resultsHaveNetwork(List<ConnectivityResult> results) {
+    if (results.isEmpty) return true;
+    return results.any((r) => r != ConnectivityResult.none);
+  }
+
+  Future<bool> _isNetworkAvailable() async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      return _resultsHaveNetwork(results);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  void _ensureConnectivityListener() {
+    if (_connectivitySub != null) return;
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (_resultsHaveNetwork(results)) {
+        _onNetworkRestored();
       }
+    });
+    unawaited(_probeNetworkAndReconnect());
+  }
+
+  void _onNetworkRestored() {
+    if (_intentionalDisconnect || _lastServerUrl == null) return;
+    if (_socket == null) return;
+    if (isConnected.value && _socket?.connected == true) return;
+    final now = DateTime.now();
+    if (_lastConnectivityReconnectAt != null &&
+        now.difference(_lastConnectivityReconnectAt!) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastConnectivityReconnectAt = now;
+    debugPrint('[SocketService] Network restored. Triggering reconnect...');
+    _reconnectAttempts = 0;
+    _cancelReconnectTimer();
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+    unawaited(_doReconnect());
+  }
+
+  Future<void> _probeNetworkAndReconnect() async {
+    if (!await _isNetworkAvailable()) return;
+    _onNetworkRestored();
+  }
+
+  void _startWatchdog() {
+    _watchdogTimer ??= Timer.periodic(
+      const Duration(seconds: _watchdogIntervalSeconds),
+      (_) => unawaited(_watchdogTick()),
+    );
+  }
+
+  Future<void> _watchdogTick() async {
+    if (_intentionalDisconnect || _lastServerUrl == null) return;
+    if (isConnected.value && _socket?.connected == true) return;
+
+    if (_reconnectInFlight &&
+        _reconnectInFlightAt != null &&
+        DateTime.now().difference(_reconnectInFlightAt!) >
+            const Duration(seconds: _connectTimeoutSeconds)) {
+      debugPrint('[SocketService] Watchdog: connect hung, resetting.');
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _connectTimeoutTimer?.cancel();
+      _connectTimeoutTimer = null;
+    }
+
+    if (_reconnectInFlight) return;
+    if (!await _isNetworkAvailable()) return;
+    if (_reconnectTimer != null) return;
+    debugPrint('[SocketService] Watchdog: network up, socket down. Reconnecting...');
+    await _doReconnect();
+  }
+
+  void _markReconnectInFlight() {
+    _reconnectInFlight = true;
+    _reconnectInFlightAt = DateTime.now();
+  }
+
+  void _armConnectTimeout() {
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = Timer(const Duration(seconds: _connectTimeoutSeconds), () {
+      if (_intentionalDisconnect || isConnected.value) return;
+      debugPrint('[SocketService] Connect timed out after ${_connectTimeoutSeconds}s.');
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      _scheduleReconnect();
     });
   }
 
   // ── Reconnect helpers ──────────────────────────────────────────────────────
 
   void _scheduleReconnect() {
+    if (_intentionalDisconnect || _reconnectInFlight) return;
+    if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
     _cancelReconnectTimer();
     // Exponential backoff: 2^attempt seconds, capped at _maxBackoffSeconds
     final delaySeconds = _reconnectAttempts == 0
@@ -319,33 +637,35 @@ class SocketService {
             ? _maxBackoffSeconds
             : (2 << _reconnectAttempts));
     debugPrint('[SocketService] Reconnect attempt ${_reconnectAttempts + 1} scheduled in ${delaySeconds}s...');
-    _reconnectTimer = Timer(Duration(seconds: delaySeconds), _doReconnect);
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _reconnectTimer = null;
+      unawaited(_doReconnect());
+    });
   }
 
   Future<void> _doReconnect() async {
+    _reconnectTimer = null;
     if (_intentionalDisconnect || _lastServerUrl == null) return;
-
-    final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
-    if (!isSyncEnabled) {
-      debugPrint('[SocketService] Online sync disabled — skipping reconnect.');
-      return;
-    }
-
-    // Check network before attempting
-    final connectivity = await Connectivity().checkConnectivity();
-    final hasNetwork = connectivity.any((r) => r != ConnectivityResult.none);
-    if (!hasNetwork) {
-      debugPrint('[SocketService] No network — will reconnect when network returns.');
-      return;
-    }
+    if (_reconnectInFlight) return;
+    if (isConnected.value && _socket?.connected == true) return;
 
     debugPrint('[SocketService] Reconnecting (attempt ${_reconnectAttempts + 1})...');
     _reconnectAttempts++;
+    _markReconnectInFlight();
 
-    if (_socket != null && !_socket!.connected) {
-      _socket!.connect();
-    } else {
-      // Socket was disposed — full re-init
+    try {
+      final token = tokenProvider != null ? await tokenProvider!() : _lastToken;
+      if (_socket != null && _boundServerUrl == _lastServerUrl) {
+        _applyAuth(token, _lastTenantId);
+        if (!_socket!.connected) {
+          _socket!.connect();
+          _armConnectTimeout();
+        } else {
+          _reconnectInFlight = false;
+          _reconnectInFlightAt = null;
+        }
+        return;
+      }
       await initializeSocket(
         _lastServerUrl!,
         tenantId: _lastTenantId,
@@ -353,8 +673,13 @@ class SocketService {
         type: _lastType,
         deviceId: _lastDeviceId,
         businessName: _lastBusinessName,
-        token: _lastToken,
+        token: token,
       );
+    } catch (e) {
+      _reconnectInFlight = false;
+      _reconnectInFlightAt = null;
+      debugPrint('[SocketService] Reconnect failed: $e');
+      _scheduleReconnect();
     }
   }
 
@@ -373,6 +698,13 @@ class SocketService {
           _socket!.emit('ping_heartbeat', {'timestamp': DateTime.now().toIso8601String()});
         } else if (!isConnected.value) {
           debugPrint('[SocketService] Heartbeat: socket dead, scheduling reconnect.');
+          if (_reconnectInFlight &&
+              _reconnectInFlightAt != null &&
+              DateTime.now().difference(_reconnectInFlightAt!) >
+                  const Duration(seconds: _connectTimeoutSeconds)) {
+            _reconnectInFlight = false;
+            _reconnectInFlightAt = null;
+          }
           _scheduleReconnect();
         }
       },
@@ -390,8 +722,14 @@ class SocketService {
   /// Manually trigger a reconnect (e.g. called from a UI "Retry" button).
   Future<void> reconnect() async {
     _intentionalDisconnect = false;
+    _ensureConnectivityListener();
+    _startWatchdog();
     _cancelReconnectTimer();
     _reconnectAttempts = 0;
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     await _doReconnect();
   }
 
@@ -399,9 +737,45 @@ class SocketService {
     _intentionalDisconnect = true;
     _cancelReconnectTimer();
     _heartbeatTimer?.cancel();
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     _connectivitySub?.cancel();
+    _connectivitySub = null;
     _socket?.disconnect();
     isConnected.value = false;
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
+  }
+
+  Future<void> _replyDeviceIdentity(dynamic data) async {
+    try {
+      var deviceId = _lastDeviceId;
+      if (!DeviceInfoService.isUsableDeviceId(deviceId)) {
+        deviceId = await DeviceInfoService.getDeviceSuffix();
+      }
+      if (DeviceInfoService.isUsableDeviceId(deviceId)) {
+        _lastDeviceId = deviceId;
+      } else {
+        deviceId = null;
+      }
+
+      String? location;
+      final gps = await RequiredLocation.capture();
+      if (gps.ok) location = gps.location;
+
+      if (_socket == null || !_socket!.connected) return;
+      _socket!.emit('device_identity_pong', {
+        'requestId': data is Map ? data['requestId'] : null,
+        'tenantId': _lastTenantId,
+        'deviceId': deviceId,
+        'location': location,
+      });
+      debugPrint('[SocketService] device_identity_pong sent deviceId=$deviceId location=$location');
+    } catch (e) {
+      debugPrint('[SocketService] device_identity_pong failed: $e');
+    }
   }
 
   void _showBroadcastBanner(String message) {
@@ -436,14 +810,30 @@ class SocketService {
     );
   }
 
-  void _showPaymentSuccessBanner(dynamic data) {
-    try {
-      // Loud POS-style beep as soon as payment lands
-      unawaited(PaymentAlertSound.play());
+  void _ackPaymentAlert(Map<String, dynamic> map) {
+    final reference = map['reference']?.toString().trim() ?? '';
+    if (reference.isEmpty || _socket == null) return;
+    _socket!.emit('payment.alert.ack', {'reference': reference});
+  }
 
+  Future<void> _showPaymentSuccessBanner(dynamic data, {bool alreadyClaimed = false}) async {
+    try {
       final map = data is Map
           ? Map<String, dynamic>.from(data as Map)
           : <String, dynamic>{};
+      final reference = map['reference']?.toString().trim() ?? '';
+      if (!alreadyClaimed && reference.isNotEmpty) {
+        final shouldNotify =
+            await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
+        if (!shouldNotify) {
+          debugPrint('[SocketService] Skip duplicate payment notification for $reference');
+          return;
+        }
+      }
+
+      // Loud POS-style beep as soon as payment lands
+      unawaited(PaymentAlertSound.play());
+
       final amount = map['amount'] ?? 0;
       final metadataRaw = map['metadata'];
       Map<String, dynamic> metadata = {};
@@ -466,13 +856,13 @@ class SocketService {
           : amountNum.toStringAsFixed(2);
 
       final message = '₦$formatted received from $sender';
-      unawaited(NotificationInbox.add(
+      unawaited(NotificationInbox.removeReceivedPayment(
+        reference: reference,
         message: message,
-        type: 'payment',
-        extra: {
-          'reference': map['reference']?.toString(),
-          'amount': amountNum,
-        },
+      ));
+      unawaited(DeviceNotificationService.showPayment(
+        message: message,
+        reference: reference.isEmpty ? null : reference,
       ));
 
       scaffoldMessengerKey.currentState?.showSnackBar(
@@ -580,9 +970,17 @@ class SocketService {
     _intentionalDisconnect = true;
     _cancelReconnectTimer();
     _heartbeatTimer?.cancel();
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _connectTimeoutTimer?.cancel();
+    _connectTimeoutTimer = null;
     _connectivitySub?.cancel();
+    _connectivitySub = null;
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+    _boundServerUrl = null;
+    _reconnectInFlight = false;
+    _reconnectInFlightAt = null;
   }
 }

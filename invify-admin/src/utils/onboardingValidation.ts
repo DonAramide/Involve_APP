@@ -1,7 +1,7 @@
 const EMAIL_RE =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
-export const MIN_PASSWORD_LENGTH = 6;
+export const MIN_PASSWORD_LENGTH = 9;
 
 export function isValidEmail(value: string): boolean {
   const email = String(value || '').trim();
@@ -59,6 +59,15 @@ export function passwordRule(val: string): true | string {
   if (!val) return 'Password is required';
   if (val.length < MIN_PASSWORD_LENGTH) {
     return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  if (!/[A-Z]/.test(val)) {
+    return 'Password must contain at least one capital letter (A-Z)';
+  }
+  if (!/[0-9]/.test(val)) {
+    return 'Password must contain at least one number (0-9)';
+  }
+  if (!/[^A-Za-z0-9]/.test(val)) {
+    return 'Password must contain at least one symbol (!@#$%...)';
   }
   return true;
 }

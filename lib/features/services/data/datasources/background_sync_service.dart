@@ -34,7 +34,13 @@ class BackgroundSyncService {
             ..where((t) => t.syncStatus.equals('pending')))
           .get();
       if (pendingCustomers.isNotEmpty) {
-        await remoteDataSource.syncCustomers(pendingCustomers.map((c) => c.toJson()).toList());
+        await remoteDataSource.syncCustomers(
+          pendingCustomers.map((c) {
+            final json = Map<String, dynamic>.from(c.toJson());
+            json.remove('image');
+            return json;
+          }).toList(),
+        );
         for (final c in pendingCustomers) {
           await (db.update(db.customers)..where((t) => t.id.equals(c.id)))
               .write(CustomersCompanion(syncStatus: Value('synced')));
@@ -46,7 +52,13 @@ class BackgroundSyncService {
             ..where((t) => t.syncStatus.equals('pending')))
           .get();
       if (pendingJobs.isNotEmpty) {
-        await remoteDataSource.syncJobs(pendingJobs.map((j) => j.toJson()).toList());
+        await remoteDataSource.syncJobs(
+          pendingJobs.map((j) {
+            final json = Map<String, dynamic>.from(j.toJson());
+            json.remove('image');
+            return json;
+          }).toList(),
+        );
         for (final j in pendingJobs) {
           await (db.update(db.serviceJobs)..where((t) => t.id.equals(j.id)))
               .write(ServiceJobsCompanion(syncStatus: Value('synced')));

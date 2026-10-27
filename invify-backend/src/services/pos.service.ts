@@ -30,6 +30,7 @@ import type {
 import { supabaseAdmin as supabase } from '../db/supabase';
 import { TerminalAuditService } from './terminal-audit.service';
 import { BuildVariantService } from '../config/build-variant';
+import { FeeShadowIntegration } from './fee-shadow-integration';
 
 import {
   unpackPosMessage,
@@ -41,6 +42,10 @@ const DEFAULT_SPLIT_THRESHOLD_NAIRA = 50_000;
 
 export class PosService {
   // P0-5A: CONFIG_FILE_PATH removed — config persisted to Supabase pos_routing_configs table
+
+  /** key_version=1: plaintext-era rows. key_version=2+: field-level AES via POS_ENCRYPTION_KEY. */
+  static readonly CURRENT_KEY_VERSION = 2;
+  static readonly SECRET_MASK = '[SECRET_MASKED]';
 
   /**
    * AES-256-CBC encryption key derived from POS_ENCRYPTION_KEY env var.
@@ -57,21 +62,34 @@ export class PosService {
   }
   private static IV_LENGTH = 16;
 
+  private static isEncryptedSecretFormat(text: string): boolean {
+    return /^[0-9a-f]+:[0-9a-f]+$/i.test(String(text || '').trim());
+  }
+
   private static encryptSecret(text: string): string {
     if (!text) return '';
+    if (text === this.SECRET_MASK) {
+      throw new Error('[POS Service] Refusing to encrypt UI placeholder secret value.');
+    }
+    // Idempotent: already encrypted (ivHex:cipherHex)
+    if (this.isEncryptedSecretFormat(text)) return text;
     try {
       const iv = crypto.randomBytes(this.IV_LENGTH);
       const cipher = crypto.createCipheriv('aes-256-cbc', this.ENCRYPTION_KEY, iv);
       let encrypted = cipher.update(text, 'utf8', 'hex');
       encrypted += cipher.final('hex');
       return iv.toString('hex') + ':' + encrypted;
-    } catch (_) {
-      return text;
+    } catch (err: any) {
+      throw new Error(
+        `[POS Service] Failed to encrypt secret (fail-closed): ${err?.message || 'unknown error'}`,
+      );
     }
   }
 
   private static decryptSecret(text: string): string {
-    if (!text || !text.includes(':')) return text;
+    if (!text) return '';
+    // key_version=1 / plaintext-era compatibility: values without iv:cipher stay as-is
+    if (!text.includes(':')) return text;
     try {
       const parts = text.split(':');
       const iv = Buffer.from(parts.shift()!, 'hex');
@@ -80,8 +98,10 @@ export class PosService {
       let decrypted = decipher.update(encryptedText, undefined, 'utf8') as string;
       decrypted += decipher.final('utf8');
       return decrypted;
-    } catch (_) {
-      return text;
+    } catch (err: any) {
+      throw new Error(
+        `[POS Service] Failed to decrypt secret (fail-closed): ${err?.message || 'unknown error'}`,
+      );
     }
   }
 
@@ -103,7 +123,31 @@ export class PosService {
         if (h.kimonoFallbackParameters && h.kimonoFallbackParameters.token) {
           h.kimonoFallbackParameters.token = mode === 'encrypt' ? this.encryptSecret(h.kimonoFallbackParameters.token) : this.decryptSecret(h.kimonoFallbackParameters.token);
         }
+        if (h.nibssConfig?.ctmk) {
+          h.nibssConfig.ctmk =
+            mode === 'encrypt' ? this.encryptSecret(h.nibssConfig.ctmk) : this.decryptSecret(h.nibssConfig.ctmk);
+        }
       }
+    }
+    return cloned;
+  }
+
+  /**
+   * Server-side redaction for API responses. Never returns decrypted secrets to clients.
+   * Does not mutate the in-memory routingConfig used by POS internals.
+   */
+  static sanitizeRoutingConfigForClient(config: PosRoutingConfig): PosRoutingConfig {
+    const cloned: PosRoutingConfig = JSON.parse(JSON.stringify(config));
+    const mask = this.SECRET_MASK;
+    for (const h of cloned.hosts || []) {
+      if (h.authToken) h.authToken = mask;
+      if (h.kimonoKeys) {
+        if (h.kimonoKeys.masterKey) h.kimonoKeys.masterKey = mask;
+        if (h.kimonoKeys.pinKey) h.kimonoKeys.pinKey = mask;
+        if ((h.kimonoKeys as any).ctmk) (h.kimonoKeys as any).ctmk = mask;
+      }
+      if (h.kimonoFallbackParameters?.token) h.kimonoFallbackParameters.token = mask;
+      if (h.nibssConfig?.ctmk) h.nibssConfig.ctmk = mask;
     }
     return cloned;
   }
@@ -160,7 +204,7 @@ export class PosService {
           institutionCode: '',
           terminalId: '',
           merchantId: '',
-          ctmk: '66D4AF3321D8564E9F6F35411755E730',
+          ctmk: '',
           ptspCode: ''
         }
       }
@@ -185,8 +229,14 @@ export class PosService {
         console.error('[POS Service] Supabase error loading config:', error.message);
         // Do NOT bootstrap-save on read errors — that can wipe a good prior revision.
         this.tryHydrateFromLegacyJson();
-        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'staging') {
-          console.warn('[POS Service] Development/Test/Staging mode — using in-memory/legacy config (no overwrite).');
+        const message = String(error.message || '');
+        if (
+          process.env.NODE_ENV === 'development' ||
+          process.env.NODE_ENV === 'test' ||
+          process.env.NODE_ENV === 'staging' ||
+          message.toLowerCase().includes('jwt issued at future')
+        ) {
+          console.warn('[POS Service] Using in-memory/legacy config after Supabase read error (no overwrite).');
         } else {
           throw new Error(`[POS Service] Failed to load routing config from Supabase: ${error.message}`);
         }
@@ -209,6 +259,7 @@ export class PosService {
         this.tryHydrateProfilesFromLegacyJson();
       }
       this.repairNibssSecretsFromLegacy();
+      this.applyNibssHostDefaults();
       console.log(`[POS Service] Config loaded from Supabase (key_version=${data.key_version}, config_version=${data.config_version}, profiles=${this.routingConfig.tenantRoutingProfiles?.length || 0})`);
     } catch (e: any) {
       console.error('[POS Service] Failed to load config:', e.message);
@@ -342,14 +393,15 @@ export class PosService {
 
       const { error } = await supabase.from('pos_routing_configs').insert({
         config_blob: JSON.stringify(encrypted),
-        key_version: 1,              // Increment when POS_ENCRYPTION_KEY is rotated
+        // key_version=1 retained for historical plaintext-era rows; new encrypted writes use CURRENT_KEY_VERSION (2+)
+        key_version: this.CURRENT_KEY_VERSION,
         config_version: nextConfigVersion,  // Increments on every config update
         updated_by: updatedBy,
         updated_at: new Date().toISOString()
       });
       if (error) throw error;
       this.configVersion = nextConfigVersion;
-      console.log(`[POS Service] Config encrypted and saved to Supabase (config_version=${nextConfigVersion})`);
+      console.log(`[POS Service] Config encrypted and saved to Supabase (config_version=${nextConfigVersion}, key_version=${this.CURRENT_KEY_VERSION})`);
       this.mirrorConfigToLegacyJson();
       return nextConfigVersion;
     } catch (e: any) {
@@ -366,13 +418,17 @@ export class PosService {
     }
   }
 
-  /** Keep pos_routing_config.json aligned with in-memory routing (dev/hydrate safety). */
+  /**
+   * Keep pos_routing_config.json aligned with routing structure for hydrate/compat.
+   * Never persists decrypted secrets — secrets are masked before write.
+   */
   static mirrorConfigToLegacyJson(): void {
     try {
       const fs = require('fs');
       const path = require('path');
       const legacyPath = path.join(process.cwd(), 'pos_routing_config.json');
-      fs.writeFileSync(legacyPath, JSON.stringify(this.routingConfig, null, 2), 'utf8');
+      const safe = this.sanitizeRoutingConfigForClient(this.routingConfig);
+      fs.writeFileSync(legacyPath, JSON.stringify(safe, null, 2), 'utf8');
     } catch (e: any) {
       console.warn('[POS Service] Legacy JSON mirror skipped:', e.message);
     }
@@ -810,39 +866,85 @@ export class PosService {
   //  PUBLIC API
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /** Fill blank NIBSS IP/port with production switch defaults (admin drawer shows these without Save). */
+  static applyNibssHostDefaults(): void {
+    const nibss = this.routingConfig.hosts?.find(
+      (h) => String(h.hostCode || '').toLowerCase() === 'nibss',
+    );
+    if (!nibss) return;
+    if (!String(nibss.ip || '').trim()) nibss.ip = '196.6.103.18';
+    if (!nibss.port || Number(nibss.port) <= 0 || Number(nibss.port) === 4018) {
+      nibss.port = 5001;
+    }
+  }
+
   static async getRoutingConfig() {
     this.repairNibssSecretsFromLegacy();
+    this.applyNibssHostDefaults();
     return this.routingConfig;
   }
 
+  /**
+   * Resolve an incoming secret field for update.
+   * - `[SECRET_MASKED]` or empty/missing → keep existing (never persist the placeholder)
+   * - any other value → treat as intentional replacement
+   * Only apply to known secret fields (ctmk / authToken / kimono keys / fallback token).
+   */
+  private static resolveIncomingSecret(
+    incoming: string | undefined | null,
+    existing: string | undefined | null,
+  ): string {
+    const next = incoming == null ? '' : String(incoming);
+    const prev = existing == null ? '' : String(existing);
+    if (!next || next === this.SECRET_MASK) {
+      return prev && prev !== this.SECRET_MASK ? prev : '';
+    }
+    return next;
+  }
+
   static async updateRoutingConfig(newConfig: any, adminId = 'Admin', reason = 'Updated POS routing configuration') {
-    // Preserve secrets that were stripped by the frontend
+    // Preserve secrets that were stripped/masked by the frontend (never persist [SECRET_MASKED])
     if (newConfig.hosts) {
       for (const newHost of newConfig.hosts) {
         const oldHost = this.routingConfig.hosts.find(h => h.hostCode === newHost.hostCode);
         if (oldHost) {
-          if (oldHost.authToken && !newHost.authToken) newHost.authToken = oldHost.authToken;
-          if (oldHost.kimonoKeys && oldHost.kimonoKeys.masterKey && (!newHost.kimonoKeys || !newHost.kimonoKeys.masterKey)) {
-            newHost.kimonoKeys = { ...newHost.kimonoKeys, masterKey: oldHost.kimonoKeys.masterKey };
+          newHost.authToken = this.resolveIncomingSecret(newHost.authToken, oldHost.authToken);
+
+          if (newHost.kimonoKeys || oldHost.kimonoKeys) {
+            newHost.kimonoKeys = {
+              ...(oldHost.kimonoKeys || {}),
+              ...(newHost.kimonoKeys || {}),
+              masterKey: this.resolveIncomingSecret(
+                newHost.kimonoKeys?.masterKey,
+                oldHost.kimonoKeys?.masterKey,
+              ),
+              pinKey: this.resolveIncomingSecret(
+                newHost.kimonoKeys?.pinKey,
+                oldHost.kimonoKeys?.pinKey,
+              ),
+            };
           }
-          if (oldHost.kimonoKeys && oldHost.kimonoKeys.pinKey && (!newHost.kimonoKeys || !newHost.kimonoKeys.pinKey)) {
-            newHost.kimonoKeys = { ...newHost.kimonoKeys, pinKey: oldHost.kimonoKeys.pinKey };
+
+          if (newHost.kimonoFallbackParameters || oldHost.kimonoFallbackParameters) {
+            newHost.kimonoFallbackParameters = {
+              ...(oldHost.kimonoFallbackParameters || {}),
+              ...(newHost.kimonoFallbackParameters || {}),
+              token: this.resolveIncomingSecret(
+                newHost.kimonoFallbackParameters?.token,
+                oldHost.kimonoFallbackParameters?.token,
+              ),
+            };
           }
-          if (oldHost.kimonoFallbackParameters && oldHost.kimonoFallbackParameters.token && (!newHost.kimonoFallbackParameters || !newHost.kimonoFallbackParameters.token)) {
-            newHost.kimonoFallbackParameters = { ...newHost.kimonoFallbackParameters, token: oldHost.kimonoFallbackParameters.token };
-          }
-          if (oldHost.nibssConfig && oldHost.nibssConfig.ctmk && (!newHost.nibssConfig || !newHost.nibssConfig.ctmk)) {
-            newHost.nibssConfig = { ...newHost.nibssConfig, ctmk: oldHost.nibssConfig.ctmk };
-          }
-          // Never persist UI placeholder secrets
-          if (newHost.nibssConfig?.ctmk === '[SECRET_MASKED]') {
-            newHost.nibssConfig.ctmk =
-              oldHost.nibssConfig?.ctmk && oldHost.nibssConfig.ctmk !== '[SECRET_MASKED]'
-                ? oldHost.nibssConfig.ctmk
-                : '';
-          }
-          if (newHost.authToken === '[SECRET_MASKED]') {
-            newHost.authToken = oldHost.authToken || '';
+
+          if (newHost.nibssConfig || oldHost.nibssConfig) {
+            newHost.nibssConfig = {
+              ...(oldHost.nibssConfig || {}),
+              ...(newHost.nibssConfig || {}),
+              ctmk: this.resolveIncomingSecret(
+                newHost.nibssConfig?.ctmk,
+                oldHost.nibssConfig?.ctmk,
+              ),
+            };
           }
         }
       }
@@ -1017,11 +1119,17 @@ export class PosService {
     emvData: MposEmvData;
     staffName?: string;
     items?: any[];
+    latitude?: number;
+    longitude?: number;
+    field120?: string;
+    geofencing?: Record<string, unknown>;
   }): Promise<PosTransactionResult> {
 
     const pan: string = params.emvData?.pan ?? params.emvData?.cardNo ?? '';
     const cardScheme = this.detectCardScheme(pan);
     const transactionType = params.emvData?.transactionType || 'PURCHASE';
+    const isBalance = /balance/i.test(String(transactionType));
+    const bookedAmount = isBalance ? 0 : params.amount;
 
     // Ensure tenant category + agent are cached before scoped profile resolution
     if (params.tenantId && params.tenantId !== 'default') {
@@ -1038,7 +1146,7 @@ export class PosService {
         terminalGroup: this.resolveTerminalGroup(),
       }
     );
-    console.log(`\n[POS Gateway] ▶ Routing ₦${params.amount} transaction → ${route.name}`);
+    console.log(`\n[POS Gateway] ▶ Routing ₦${bookedAmount} transaction → ${route.name}`);
     console.log(`[POS Gateway]   Terminal: ${params.terminalId} | Tenant: ${params.tenantId}`);
 
     // Pre-log the transaction as Pending
@@ -1049,7 +1157,7 @@ export class PosService {
       tenantId:    params.tenantId || 'Unknown',
       tenantName:  null as string | null,
       terminalId:  params.terminalId,
-      amount:      params.amount,
+      amount:      bookedAmount,
       status:      'Pending',
       statusCode:  '',
       date:        new Date().toISOString(),
@@ -1071,6 +1179,10 @@ export class PosService {
         rrn: pendingRrn,
         stan: pendingStan,
         source: 'switchboard',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
       }),
       rawResponse: '',
     };
@@ -1082,7 +1194,7 @@ export class PosService {
       id: pendingId,
       tenant_id: params.tenantId,
       terminal_id: params.terminalId,
-      amount: params.amount,
+      amount: bookedAmount,
       status: 'Pending',
       host: route.name,
       masked_pan: pendingEntry.maskedPan,
@@ -1092,12 +1204,16 @@ export class PosService {
       items_jsonb: params.items || [],
       raw_request: {
         terminalId: params.terminalId,
-        amount: params.amount,
+        amount: bookedAmount,
         host: route.name,
         staffName: params.staffName || 'System',
         rrn: pendingRrn,
         stan: pendingStan,
         source: 'switchboard',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
       },
       is_device_processed: false,
     });
@@ -1144,7 +1260,14 @@ export class PosService {
     }
 
     await this.updateTransaction(pendingId, params, response);
-    return response;
+    return FeeShadowIntegration.afterPosResult(response, {
+      tenantId: params.tenantId,
+      amountNaira: bookedAmount,
+      rrn: response?.rrn,
+      stan: (response as any)?.stan,
+      terminalId: params.terminalId,
+      txId: pendingId,
+    });
   }
 
   static async recordDeviceTransaction(params: {
@@ -1159,6 +1282,10 @@ export class PosService {
     transactionResponse?: any;
     tenantProfile?: any;
     deviceInfo?: any;
+    latitude?: number;
+    longitude?: number;
+    field120?: string;
+    geofencing?: Record<string, unknown>;
   }) {
     const isApproved = params.deviceStatus === 'payment_success';
     const txId = this.newTxId();
@@ -1179,7 +1306,15 @@ export class PosService {
       items:       params.items || [],
       isDeviceProcessed: true,
       processedBy: 'MPOS_DEVICE',
-      rawRequest:  JSON.stringify({ source: 'device', terminalId: params.terminalId, amount: params.amount }),
+      rawRequest:  JSON.stringify({
+        source: 'device',
+        terminalId: params.terminalId,
+        amount: params.amount,
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
+      }),
       rawResponse: JSON.stringify(params.transactionResponse || {}),
     };
     
@@ -1200,7 +1335,13 @@ export class PosService {
       auth_code: entry.authCode,
       staff_name: entry.staffName,
       items_jsonb: entry.items,
-      raw_request: { source: 'device' },
+      raw_request: {
+        source: 'device',
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        field120: params.field120 ?? null,
+        geofencing: params.geofencing ?? null,
+      },
       raw_response: params.transactionResponse || {},
       is_device_processed: true,
     });
@@ -1311,7 +1452,15 @@ export class PosService {
       }
     }
 
-    return { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
+    const recorded = { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
+    return FeeShadowIntegration.afterPosResult(recorded, {
+      tenantId: params.tenantId,
+      amountNaira: params.amount,
+      rrn: entry.rrn,
+      stan: entry.stan,
+      terminalId: params.terminalId,
+      txId,
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1641,7 +1790,8 @@ export class PosService {
       ssl,
     );
 
-    // Device-packed ISO is authoritative — never invent STAN/RRN/MCC for Quasar.
+    // Device-packed ISO is authoritative. Quasar forwards packed_iso_hex unchanged.
+    // Rebuilding it (to drop field 120) also drops the MAC, and the host then closes.
     const packedHex = String(params.emvData?.packedIsoMessage || '').replace(/\s/g, '');
 
     console.log(
@@ -1657,6 +1807,12 @@ export class PosService {
 
     // Prefer DE55 from packed ISO — IsoMessageBuilder may rewrite 9F34 after EmvDetailResult.iccData
     // was snapshotted; Quasar rejects icc_token when it does not match packed field 55.
+    if (fields && !String(fields['128'] || '').trim() && !String(fields['64'] || '').trim()) {
+      throw new Error(
+        'PACKED_ISO_MAC_REQUIRED: packed ISO has no field 128 or 64. ' +
+          'The host closes the socket when the MAC is missing.',
+      );
+    }
     const iccFromPacked = String(fields?.['55'] || '').replace(/\s/g, '');
     const iccFromEmv = String(
       params.emvData?.iccData ||
@@ -1702,15 +1858,19 @@ export class PosService {
       }
     }
 
-    delete fields['55']; // Quasar injects DE55 from icc_token
     const stan = fields['11'].trim();
     const rrn = fields['37'].trim();
+    const mti = String(fields['0'] || '').trim();
+    const macField = String(fields['128'] || '').trim()
+      ? '128'
+      : String(fields['64'] || '').trim()
+        ? '64'
+        : 'in-packed-hex';
     const reference = `card_${rrn}_${stan}_${params.terminalId}`;
 
-    if (!fields['0']) fields['0'] = '0200';
-    if (!fields['41']) {
-      fields['41'] = String(params.terminalId).slice(0, 8).padEnd(8, ' ');
-    }
+    console.log(
+      `[POS Gateway] Forwarding packed ISO unchanged mti=${mti || 'unknown'} mac=${macField} f55=${iccHex.length / 2}B`,
+    );
 
     try {
       const { getQuasarService } = require('../integrations/quasar/factory');
@@ -1740,6 +1900,10 @@ export class PosService {
         result?.outcome === 'APPROVED' ||
         result?.status === 'APPROVED';
       const statusCode = String(result?.responseCode || result?.statusCode || (approved ? '00' : '05'));
+      const responseFields =
+        result?.fields || result?.isoFields || result?.iso_fields || result?.response_fields || {};
+      const field54 = responseFields?.['54'] ?? responseFields?.[54] ?? result?.field54;
+      const balance = this.additionalAmountNaira(field54);
 
       console.log(
         `[POS Gateway] ✓ Quasar card-transaction ${approved ? 'APPROVED' : 'DECLINED'} ` +
@@ -1757,6 +1921,7 @@ export class PosService {
         stan: result?.stan || stan,
         maskedPan: this.maskPan(String(params.emvData?.pan || params.emvData?.cardNo || '')),
         authCode: result?.authCode || result?.auth_code || '',
+        balance: balance || undefined,
         host: route.name as any,
         isoFields: result?.fields || result?.isoFields || undefined,
       };
@@ -1838,6 +2003,29 @@ export class PosService {
     const rrn =
       String(packed?.['37'] || emv?.rrn || (emv as any)?.field37 || '').trim() || 'N/A';
     return { rrn, stan };
+  }
+
+  /** NIBSS field 54 additional amount, formatted as naira. */
+  private static additionalAmountNaira(field54: unknown): string {
+    const raw = String(field54 || '').replace(/\s/g, '');
+    if (raw.length < 20) return '';
+    let preferred = '';
+    let fallback = '';
+    for (let index = 0; index + 20 <= raw.length; index += 20) {
+      const chunk = raw.slice(index, index + 20);
+      const amountType = chunk.slice(2, 4);
+      const sign = chunk[7];
+      const minor = Number(chunk.slice(8, 20));
+      if (!Number.isFinite(minor)) continue;
+      const signed = sign === 'D' || sign === 'd' ? -minor : minor;
+      const formatted = (signed / 100).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      if (amountType === '02' || amountType === '01') preferred = formatted;
+      else if (!fallback) fallback = formatted;
+    }
+    return preferred || fallback;
   }
 
   /**

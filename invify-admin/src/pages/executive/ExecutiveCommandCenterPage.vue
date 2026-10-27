@@ -16,19 +16,19 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 30px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Global Platform Health:</span>
-            <q-badge color="green-10" text-color="green-3" class="text-subtitle2"><q-icon name="monitor_heart" size="xs" class="q-mr-xs"/>98.4%</q-badge>
+            <q-badge color="grey-10" text-color="grey-4" class="text-subtitle2">—</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Top Revenue:</span>
-            <span class="text-green-4 text-weight-bold">Shoprite Mega Store</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Highest Risk:</span>
-            <span class="text-red-4 text-weight-bold">BetKing (Compliance)</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">AI Treasury Forecast:</span>
-            <span class="text-cyan-4 text-weight-bold">+12% Liquidity Demand</span>
+            <span class="text-grey-5 text-weight-bold">—</span>
           </div>
           <q-icon name="dashboard_customize" color="indigo-4" size="sm" />
         </div>
@@ -55,11 +55,11 @@
               <q-icon name="notifications_active" color="cyan-4" /> Global Comms
             </div>
           </div>
-          <div class="text-h4 text-weight-bold text-main q-mb-sm">4,192 <span class="text-caption text-cyan-4">+8%</span></div>
-          <q-linear-progress value="0.94" color="cyan-4" class="q-mb-xs" />
+          <div class="text-h4 text-weight-bold text-main q-mb-sm">0</div>
+          <q-linear-progress value="0" color="cyan-4" class="q-mb-xs" />
           <div class="row justify-between text-muted" style="font-size: 10px;">
-            <span>94% Resolution Rate</span>
-            <span class="text-amber-4">12 Critical Pending</span>
+            <span>No live comms snapshot</span>
+            <span class="text-grey-5">0 pending</span>
           </div>
         </q-card>
 
@@ -70,11 +70,11 @@
               <q-icon name="timer" color="purple-4" /> SLA Compliance
             </div>
           </div>
-          <div class="text-h4 text-weight-bold text-main q-mb-sm">98.5% <span class="text-caption text-cyan-4">+1.2%</span></div>
-          <q-linear-progress value="0.985" color="purple-4" class="q-mb-xs" />
+          <div class="text-h4 text-weight-bold text-main q-mb-sm">—</div>
+          <q-linear-progress value="0" color="purple-4" class="q-mb-xs" />
           <div class="row justify-between text-muted" style="font-size: 10px;">
-            <span>Target: 99.9%</span>
-            <span class="text-red-4">2 Breached Today</span>
+            <span>No live SLA snapshot</span>
+            <span class="text-grey-5">0 breaches</span>
           </div>
         </q-card>
 
@@ -85,11 +85,11 @@
               <q-icon name="account_tree" color="indigo-4" /> Automation Health
             </div>
           </div>
-          <div class="text-h4 text-weight-bold text-main q-mb-sm">100% <span class="text-caption text-cyan-4">+0%</span></div>
-          <q-linear-progress value="1.0" color="indigo-4" class="q-mb-xs" />
+          <div class="text-h4 text-weight-bold text-main q-mb-sm">—</div>
+          <q-linear-progress value="0" color="indigo-4" class="q-mb-xs" />
           <div class="row justify-between text-muted" style="font-size: 10px;">
-            <span>187 Executions</span>
-            <span class="text-main">0 Failures</span>
+            <span>0 executions</span>
+            <span class="text-main">No snapshot</span>
           </div>
         </q-card>
 
@@ -100,11 +100,11 @@
               <q-icon name="admin_panel_settings" color="cyan-4" /> Gov. Health Score
             </div>
           </div>
-          <div class="text-h4 text-weight-bold text-main q-mb-sm">96.8% <span class="text-caption text-cyan-4">+2.1%</span></div>
-          <q-linear-progress value="0.968" color="cyan-4" class="q-mb-xs" />
+          <div class="text-h4 text-weight-bold text-main q-mb-sm">—</div>
+          <q-linear-progress value="0" color="cyan-4" class="q-mb-xs" />
           <div class="row justify-between text-muted" style="font-size: 10px;">
-            <span>Op Efficiency: 99.2%</span>
-            <span class="text-amber-4">14 Pending Apps</span>
+            <span>No live governance snapshot</span>
+            <span class="text-grey-5">—</span>
           </div>
         </q-card>
       </div>
@@ -115,29 +115,29 @@
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg" @click="openDrawer('Revenue')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Gross Revenue (YTD) / Net</div>
-          <div class="text-h3 text-metric-mono text-green-4 q-mt-sm">{{ currentCurrency.symbol }}1.24B</div>
-          <div class="text-caption text-green-3 font-mono q-mt-xs">Net: {{ currentCurrency.symbol }}984M (79% Margin) <q-icon name="trending_up"/></div>
+          <div class="text-h3 text-metric-mono text-green-4 q-mt-sm">{{ currentCurrency.symbol }}0</div>
+          <div class="text-caption text-grey-5 font-mono q-mt-xs">No live YTD snapshot</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg" @click="openDrawer('Transactions')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Total Txn Volume / Value</div>
-          <div class="text-h3 text-metric-mono text-cyan-4 q-mt-sm">14.2M</div>
-          <div class="text-caption text-cyan-3 font-mono q-mt-xs">Value: {{ currentCurrency.symbol }}84.5B <q-icon name="trending_up"/></div>
+          <div class="text-h3 text-metric-mono text-cyan-4 q-mt-sm">0</div>
+          <div class="text-caption text-grey-5 font-mono q-mt-xs">Value: {{ currentCurrency.symbol }}0</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg" @click="openDrawer('Ecosystem')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Active Tenants / Ecosystem</div>
-          <div class="text-h3 text-metric-mono text-amber-4 q-mt-sm">815</div>
-          <div class="text-caption text-amber-3 font-mono q-mt-xs">142K Wallets | 42K Cards | 1.2K Terms</div>
+          <div class="text-h3 text-metric-mono text-amber-4 q-mt-sm">0</div>
+          <div class="text-caption text-grey-5 font-mono q-mt-xs">No live ecosystem snapshot</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg" @click="openDrawer('Treasury')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Settlement Success / Treasury</div>
-          <div class="text-h3 text-metric-mono text-indigo-4 q-mt-sm">99.8%</div>
-          <div class="text-caption text-indigo-3 font-mono q-mt-xs">Float: {{ currentCurrency.symbol }}4.2B | Exposure: LOW</div>
+          <div class="text-h3 text-metric-mono text-indigo-4 q-mt-sm">—</div>
+          <div class="text-caption text-grey-5 font-mono q-mt-xs">No live treasury snapshot</div>
         </div>
       </div>
     </div>
@@ -336,15 +336,15 @@ const navigateTo = (path) => {
 }
 
 const healthScores = ref([
-  { name: 'Platform Health Score', score: '98.4', status: 'STABLE', trend: 1.2, color: 'green-4', icon: 'monitor_heart' },
-  { name: 'Financial Health Score', score: '99.1', status: 'OPTIMAL', trend: 2.4, color: 'green-4', icon: 'account_balance' },
-  { name: 'Revenue Health Score', score: '92.5', status: 'GROWING', trend: 14.2, color: 'cyan-4', icon: 'payments' },
-  { name: 'Operational Health', score: '96.8', status: 'STABLE', trend: 0.5, color: 'indigo-4', icon: 'precision_manufacturing' },
-  { name: 'Fraud Defense Score', score: '94.2', status: 'SECURE', trend: -1.1, color: 'amber-4', icon: 'security' },
-  { name: 'Compliance Health', score: '96.0', status: 'STABLE', trend: 0.0, color: 'purple-4', icon: 'policy' },
-  { name: 'Tenant Health Score', score: '88.5', status: 'MONITORING', trend: -2.5, color: 'amber-4', icon: 'apartment' },
-  { name: 'Treasury Health Score', score: '99.9', status: 'OPTIMAL', trend: 0.1, color: 'green-4', icon: 'account_balance_wallet' },
-  { name: 'Governance Health', score: '96.8', status: 'STABLE', trend: 2.1, color: 'cyan-4', icon: 'admin_panel_settings' }
+  { name: 'Platform Health Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'monitor_heart' },
+  { name: 'Financial Health Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'account_balance' },
+  { name: 'Revenue Health Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'payments' },
+  { name: 'Operational Health', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'precision_manufacturing' },
+  { name: 'Fraud Defense Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'security' },
+  { name: 'Compliance Health', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'policy' },
+  { name: 'Tenant Health Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'apartment' },
+  { name: 'Treasury Health Score', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'account_balance_wallet' },
+  { name: 'Governance Health', score: '—', status: 'UNAVAILABLE', trend: 0, color: 'grey-5', icon: 'admin_panel_settings' }
 ])
 
 </script>

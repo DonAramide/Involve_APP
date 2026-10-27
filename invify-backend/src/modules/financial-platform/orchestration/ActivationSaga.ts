@@ -9,6 +9,10 @@ import {
   QuasarPlatformClient as VerticalResolver,
   type InvifyVertical,
 } from '../../../integrations/quasar/quasar-platform.client';
+import {
+  resolveQuasarTenantKeyEnvironment,
+  scopesForQuasarTenantKeyEnvironment,
+} from '../../../integrations/quasar/quasar-tenant-key-environment';
 
 export class ActivationSaga {
   constructor(
@@ -100,11 +104,17 @@ export class ActivationSaga {
         });
       }
 
-      // Step 3: Issue API Key
-      const keyIdempotency = `provision-apikey:${tenantId}:test:${quasarTenantId}`;
+      // Step 3: Issue API Key (PROD → sk_live_*, otherwise sk_test_*)
+      const keyEnvironment = resolveQuasarTenantKeyEnvironment();
+      const keyScopes = scopesForQuasarTenantKeyEnvironment(keyEnvironment);
+      const keyIdempotency = `provision-apikey:${tenantId}:${keyEnvironment}:${quasarTenantId}`;
+      console.log(
+        `[ActivationSaga] Issuing Quasar API key environment=${keyEnvironment} for tenant=${tenantId}`,
+      );
       const apiKeyResp = await this.quasarClient.createTenantApiKey(quasarTenantId!, {
         name: `Invify MPOS — ${tenantData.name}`,
-        environment: 'test'
+        environment: keyEnvironment,
+        scopes: keyScopes,
       }, context, keyIdempotency, vertical);
 
       const keyPayload = this.unwrapQuasarEntity(apiKeyResp);
@@ -117,13 +127,19 @@ export class ActivationSaga {
         );
       }
 
+      if (keyEnvironment === 'live' && !String(secretKey).startsWith('sk_live_')) {
+        throw new Error(
+          `Expected sk_live_* from Quasar (environment=live) but got prefix=${String(secretKey).slice(0, 8)}`,
+        );
+      }
+
       // Step 4: Persist in Vault
       vaultUrn = `quasarTenant/${tenantId}`;
       await this.vaultClient.write(vaultUrn, {
         tenantId: quasarTenantId,
         apiKeySecret: secretKey,
         apiKeyPublic: publicKey,
-        environment: 'test'
+        environment: keyEnvironment,
       });
 
       // Step 5: Persist Metadata
@@ -139,7 +155,7 @@ export class ActivationSaga {
         vertical: verticalToPersist,
         publicKey: publicKey ?? null,
         secretKey,
-        environment: 'test',
+        environment: keyEnvironment,
         status: 'active',
       });
 
@@ -328,7 +344,7 @@ export class ActivationSaga {
         quasar_vertical: meta.vertical,
         quasar_public_key: null,
         quasar_sk_secret_enc: JSON.stringify(placeholder),
-        quasar_environment: 'test',
+        quasar_environment: resolveQuasarTenantKeyEnvironment(),
         status: 'provisioned',
         quasar_provisioned_at: new Date().toISOString(),
       },

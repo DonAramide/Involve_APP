@@ -66,6 +66,9 @@ export const POS_FIELD_SPECS: ReadonlyMap<number, PosFieldSpec> = new Map([
   [95, { id: 95, kind: 'fixed_char', max: 42 }],
   // Account id on approved 0210 (device IFA_LLCHAR(28))
   [102, { id: 102, kind: 'll_char', max: 28 }],
+  // NIBSS / CBN geo-tag (device IFA_LLLCHAR(999)). Purchase messages include this;
+  // without it PosPackager stops and the cashier sees "incomplete card data".
+  [120, { id: 120, kind: 'lll_char', max: 999 }],
   [123, { id: 123, kind: 'lll_char', max: 999 }],
   // IFA_BINARY(32) — 32 MAC bytes as 64 ASCII hex on wire (jPOS AsciiHexInterpreter)
   [128, { id: 128, kind: 'binary', max: 32 }],

@@ -44,11 +44,14 @@ import {
   SESSION_STORAGE_KEYS,
   _resetSessionRuntimeForTests,
   attachSessionInterceptors,
+  restrictedAccessNotice,
   clearAuthenticatedSession,
   persistAuthenticatedSession,
   refreshSessionSingleFlight,
   logoutAuthenticatedSession,
   isAuthSessionUrl,
+  hasVerifiedOperatorSession,
+  isSoftSessionFailureUrl,
 } from '../src/auth/session';
 
 describe('Admin session lifecycle', () => {
@@ -68,6 +71,36 @@ describe('Admin session lifecycle', () => {
     expect(localStorage.getItem('invify_refresh_token')).toBe('refresh-1');
     expect(localStorage.getItem('tenant_id')).toBe('tenant-a');
     expect(localStorage.getItem('operator_role')).toBe('OWNER');
+    expect(localStorage.getItem('supabase_token')).toBe('access-1');
+    expect(localStorage.getItem('invify_access_token')).toBe('access-1');
+    expect(hasVerifiedOperatorSession()).toBe(true);
+  });
+
+  test('persist accepts refresh_token alias from provider payloads', () => {
+    persistAuthenticatedSession({
+      token: 'access-2',
+      refresh_token: 'refresh-alias',
+      user: { id: 'user-b', role: 'super_admin' },
+    });
+    expect(localStorage.getItem('invify_refresh_token')).toBe('refresh-alias');
+  });
+
+  test('verified access token is not treated as MFA-pending leftover', () => {
+    persistAuthenticatedSession({
+      token: 'access-1',
+      refreshToken: 'refresh-1',
+      user: { role: 'SUPER_ADMIN' },
+    });
+    sessionStorage.setItem('mfa_challenge_token', 'stale-challenge');
+    expect(hasVerifiedOperatorSession()).toBe(true);
+  });
+
+  test('soft 401 urls include dashboard and notifications', () => {
+    expect(isSoftSessionFailureUrl('/api/notifications')).toBe(true);
+    expect(isSoftSessionFailureUrl('/api/dashboard/overview')).toBe(true);
+    expect(isSoftSessionFailureUrl('/api/v1/finance/executive-summary')).toBe(true);
+    expect(isSoftSessionFailureUrl('/api/v1/wallet')).toBe(true);
+    expect(isSoftSessionFailureUrl('/payments/history')).toBe(false);
   });
 
   test('logout clears access token, refresh token, tenant context, and MFA transients', async () => {
@@ -171,6 +204,39 @@ describe('Admin session lifecycle', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  test('a platform grant denial is not described as role read-only mode', async () => {
+    const notices: string[] = [];
+    const errorHandlers: Array<(err: any) => Promise<unknown>> = [];
+    const api: any = {
+      interceptors: {
+        response: { use: (_ok: unknown, err: (e: any) => Promise<unknown>) => errorHandlers.push(err) },
+      },
+    };
+    attachSessionInterceptors(api, {
+      Notify: { create: ({ message }: { message: string }) => notices.push(message) },
+    });
+    const body = {
+      error: {
+        code: 'PLATFORM_PERMISSION_DENIED',
+        message: "Explicit unexpired platform grant required for 'platform.plans.manage'",
+      },
+    };
+    await expect(
+      errorHandlers[0]({
+        response: { status: 403, data: body },
+        config: { url: '/api/v1/health-insurance/platform/plans', headers: {} },
+      }),
+    ).rejects.toMatchObject({ response: { status: 403 } });
+    expect(restrictedAccessNotice(body)).toBe(
+      "Explicit unexpired platform grant required for 'platform.plans.manage'",
+    );
+    expect(notices).toEqual([
+      "Explicit unexpired platform grant required for 'platform.plans.manage'",
+    ]);
+    expect(restrictedAccessNotice({})).toContain('Read-Only mode');
+    expect(restrictedAccessNotice({ error: 'MFA_REQUIRED' })).toBe('');
+  });
+
   test('auth endpoints do not enter a refresh loop', async () => {
     persistAuthenticatedSession({ token: 'old-access', refreshToken: 'refresh-1' });
     const errorHandlers: Array<(err: any) => Promise<unknown>> = [];
@@ -214,6 +280,29 @@ describe('Admin session lifecycle', () => {
     expect(localStorage.getItem('invify_token')).toBeNull();
     expect(localStorage.getItem('invify_refresh_token')).toBeNull();
     expect(api.request).not.toHaveBeenCalled();
+  });
+
+  test('401 on dashboard overview does not wipe a live session', async () => {
+    persistAuthenticatedSession({ token: 'old-access', refreshToken: 'refresh-1' });
+    const errorHandlers: Array<(err: any) => Promise<unknown>> = [];
+    const api: any = {
+      interceptors: {
+        response: { use: (_ok: unknown, err: (e: any) => Promise<unknown>) => errorHandlers.push(err) },
+      },
+      post: jest.fn().mockRejectedValue(new Error('invalid')),
+      request: jest.fn(),
+    };
+    attachSessionInterceptors(api, {
+      loginPathForContext: () => '/admin/login',
+    });
+    await expect(
+      errorHandlers[0]({
+        response: { status: 401 },
+        config: { url: '/api/dashboard/overview', headers: {} },
+      }),
+    ).rejects.toBeTruthy();
+    expect(localStorage.getItem('invify_token')).toBe('old-access');
+    expect(localStorage.getItem('invify_refresh_token')).toBe('refresh-1');
   });
 
   test('clearAuthenticatedSession does not leave MFA challenge material', () => {

@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/logo_compressor.dart';
 import '../../domain/entities/service_material.dart';
 import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
@@ -16,12 +20,23 @@ class ManageMaterialsPage extends StatefulWidget {
 
 class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
   final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
     context.read<ServicesBloc>().add(const LoadServiceMaterials());
     context.read<ServicesBloc>().add(const LoadMaterialCategories());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -30,170 +45,531 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
       appBar: AppBar(
         title: const Text('Materials & Parts'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showMaterialDialog(context),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search materials...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.shade50,
+          Tooltip(
+            message: 'Refresh',
+            child: InkWell(
+              onTap: _loadData,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(height: 2),
+                    Text('Refresh', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
-              onChanged: (v) {
-                // Future implementation: Local search or Bloc event
-              },
             ),
           ),
-          Expanded(
-            child: BlocBuilder<ServicesBloc, ServicesState>(
-              builder: (context, state) {
-                if (state.status == ServicesStatus.loading && state.materials.isEmpty) {
-                  return const InvifyLoadingIndicator(message: 'SYNCING SERVICE MATERIALS...');
-                }
+          Tooltip(
+            message: 'Add Material',
+            child: InkWell(
+              onTap: () => _showMaterialDialog(context),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 20),
+                    SizedBox(height: 2),
+                    Text('Add', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showMaterialDialog(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Material'),
+      ),
+      body: BlocConsumer<ServicesBloc, ServicesState>(
+        listener: (context, state) {
+          if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.errorMessage!), backgroundColor: Colors.red),
+            );
+          }
+          if (state.successMessage != null && state.successMessage!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state.status == ServicesStatus.loading && state.materials.isEmpty) {
+            return const InvifyLoadingIndicator(message: 'SYNCING SERVICE MATERIALS...');
+          }
 
-                if (state.materials.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        const Text('No materials found'),
-                        TextButton(
-                          onPressed: () => _showMaterialDialog(context),
-                          child: const Text('Add your first material'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+          final allMaterials = state.materials;
+          final filteredMaterials = allMaterials.where((m) {
+            if (_searchQuery.isEmpty) return true;
+            final q = _searchQuery.toLowerCase();
+            return m.name.toLowerCase().contains(q) || m.category.toLowerCase().contains(q);
+          }).toList();
 
-                final categories = state.categories;
-                final materials = state.materials;
+          // Build group map of category -> list of materials
+          final Map<String, List<ServiceMaterial>> grouped = {};
+          
+          // Seed configured categories first
+          for (final cat in state.categories) {
+            if (cat.trim().isNotEmpty) {
+              grouped[cat.trim()] = [];
+            }
+          }
 
-                return ListView.builder(
-                  itemCount: categories.length,
-                  itemBuilder: (context, catIdx) {
-                    final cat = categories[catIdx];
-                    final catMaterials = materials.where((m) => m.category == cat).toList();
+          // Populate with filtered materials
+          for (final m in filteredMaterials) {
+            final catKey = m.category.trim().isNotEmpty ? m.category.trim() : 'General';
+            grouped.putIfAbsent(catKey, () => []).add(m);
+          }
 
-                    return ExpansionTile(
-                      initiallyExpanded: true,
-                      title: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                      children: catMaterials.map((m) => ListTile(
-                        title: Text(m.name),
-                        subtitle: Text('Default: ${CurrencyFormatter.formatWithSymbol(m.defaultPrice)}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+          // Filter out empty category headers when searching, but keep them when viewing all
+          final displayCategories = grouped.keys.where((cat) {
+            if (_searchQuery.isNotEmpty) {
+              return (grouped[cat]?.isNotEmpty ?? false);
+            }
+            return true;
+          }).toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search materials or parts...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                ),
+              ),
+              Expanded(
+                child: allMaterials.isEmpty && state.categories.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, color: Colors.blue),
-                              onPressed: () => _showMaterialDialog(context, material: m),
+                            const Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No materials or parts added yet',
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () => _confirmDelete(context, m),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () => _showMaterialDialog(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add your first material'),
                             ),
                           ],
                         ),
-                      )).toList(),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                      )
+                    : filteredMaterials.isEmpty && _searchQuery.isNotEmpty
+                        ? Center(
+                            child: Text(
+                              'No materials match "$_searchQuery"',
+                              style: const TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () async => _loadData(),
+                            child: ListView.builder(
+                              padding: const EdgeInsets.only(bottom: 80),
+                              itemCount: displayCategories.length,
+                              itemBuilder: (context, catIdx) {
+                                final cat = displayCategories[catIdx];
+                                final catMaterials = grouped[cat] ?? [];
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: ExpansionTile(
+                                    initiallyExpanded: true,
+                                    title: Row(
+                                      children: [
+                                        Text(
+                                          cat,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            '${catMaterials.length}',
+                                            style: const TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    children: [
+                                      if (catMaterials.isEmpty)
+                                        ListTile(
+                                          title: Text(
+                                            'No items in $cat',
+                                            style: TextStyle(color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                                          ),
+                                        )
+                                      else
+                                        ...catMaterials.map((m) => ListTile(
+                                              leading: _materialAvatar(context, m),
+                                              title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                              subtitle: Text('Default: ${CurrencyFormatter.formatWithSymbol(m.defaultPrice)}'),
+                                              trailing: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+                                                    tooltip: 'Edit',
+                                                    onPressed: () => _showMaterialDialog(context, material: m),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                                    tooltip: 'Delete',
+                                                    onPressed: () => _confirmDelete(context, m),
+                                                  ),
+                                                ],
+                                              ),
+                                            )),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                          child: TextButton.icon(
+                                            onPressed: () => _showMaterialDialog(context, initialCategory: cat),
+                                            icon: const Icon(Icons.add, size: 16),
+                                            label: const Text('Add Item'),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  void _showMaterialDialog(BuildContext context, {ServiceMaterial? material}) {
-    final nameCtrl = TextEditingController(text: material?.name);
-    final catCtrl = TextEditingController(text: material?.category);
-    final priceCtrl = TextEditingController(text: material?.defaultPrice.toString());
+  void _showMaterialDialog(
+    BuildContext pageContext, {
+    ServiceMaterial? material,
+    String? initialCategory,
+    _MaterialDraft? draft,
+  }) {
+    final state = pageContext.read<ServicesBloc>().state;
     final isEdit = material != null;
 
+    final nameCtrl = TextEditingController(text: draft?.name ?? material?.name ?? '');
+    final priceCtrl = TextEditingController(
+      text: draft?.priceText ??
+          (material != null
+              ? (material.defaultPrice == 0.0 ? '' : material.defaultPrice.toStringAsFixed(0))
+              : ''),
+    );
+    final customCatCtrl = TextEditingController(text: draft?.customCategory ?? '');
+
+    final availableCategories = state.categories.where((c) => c.trim().isNotEmpty).toList();
+    if (!availableCategories.contains('General')) {
+      availableCategories.add('General');
+    }
+
+    String selectedCategory = draft?.selectedCategory ??
+        material?.category ??
+        initialCategory ??
+        (availableCategories.isNotEmpty ? availableCategories.first : 'General');
+    bool isAddingNewCategory = draft?.isAddingNewCategory ?? false;
+    String? nameError;
+    String? priceError;
+    Uint8List? imageBytes = draft?.imageBytes ?? material?.image;
+
+    _MaterialDraft captureDraft() => _MaterialDraft(
+          name: nameCtrl.text,
+          priceText: priceCtrl.text,
+          selectedCategory: selectedCategory,
+          isAddingNewCategory: isAddingNewCategory,
+          customCategory: customCatCtrl.text,
+          imageBytes: imageBytes,
+        );
+
+    Future<void> pickImage(BuildContext dialogCtx, ImageSource source) async {
+      final captured = captureDraft();
+      Navigator.of(dialogCtx).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
+
+      try {
+        final picker = ImagePicker();
+        final file = await picker.pickImage(
+          source: source,
+          maxWidth: 800,
+          imageQuality: 80,
+        );
+        if (!mounted) return;
+
+        var nextImage = captured.imageBytes;
+        if (file != null) {
+          nextImage = LogoCompressor.compress(
+            await file.readAsBytes(),
+            maxDimension: 512,
+            quality: 80,
+          ) ??
+              nextImage;
+        }
+
+        if (!mounted) return;
+        _showMaterialDialog(
+          this.context,
+          material: material,
+          initialCategory: initialCategory,
+          draft: captured.copyWith(imageBytes: nextImage),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}. $e',
+            ),
+          ),
+        );
+        _showMaterialDialog(
+          this.context,
+          material: material,
+          initialCategory: initialCategory,
+          draft: captured,
+        );
+      }
+    }
+
+    Widget photoSourceButtons(BuildContext dialogCtx) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => pickImage(dialogCtx, ImageSource.camera),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Take photo'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => pickImage(dialogCtx, ImageSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Gallery'),
+            ),
+          ),
+        ],
+      );
+    }
+
     showDialog(
-      context: context,
-      builder: (context) => BlocBuilder<ServicesBloc, ServicesState>(
-        builder: (context, state) {
+      context: pageContext,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogInnerCtx, setDialogState) {
           return AlertDialog(
-            title: Text(isEdit ? 'Edit Material' : 'Add Material'),
+            title: Text(isEdit ? 'Edit Material / Part' : 'Add Material / Part'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Material Name',
-                      hintText: 'e.g. Engine Oil',
+                    decoration: InputDecoration(
+                      labelText: 'Material Name (Required)',
+                      hintText: 'e.g. Engine Oil, Zipper, Brake Pad',
+                      errorText: nameError,
+                      border: const OutlineInputBorder(),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: state.categories.contains(catCtrl.text) ? catCtrl.text : (state.categories.isNotEmpty ? state.categories.first : null),
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: state.categories.map((c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(c),
-                    )).toList(),
-                    onChanged: (v) {
-                      if (v != null) catCtrl.text = v;
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (_) {
+                      if (nameError != null) setDialogState(() => nameError = null);
                     },
-                    hint: const Text('Select Category'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+                  if (!isAddingNewCategory) ...[
+                    DropdownButtonFormField<String>(
+                      value: availableCategories.contains(selectedCategory)
+                          ? selectedCategory
+                          : (availableCategories.isNotEmpty ? availableCategories.first : null),
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: availableCategories
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c),
+                              ))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setDialogState(() => selectedCategory = v);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setDialogState(() => isAddingNewCategory = true);
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Add New Category', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: customCatCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'New Category Name',
+                        hintText: 'e.g. Fluids, Fasteners, Tools',
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          setDialogState(() => isAddingNewCategory = false);
+                        },
+                        child: const Text('Select Existing Category', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  const Text('Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  if (imageBytes != null)
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            height: 140,
+                            width: 280,
+                            child: Image.memory(
+                              imageBytes!,
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) => ColoredBox(
+                                color: Theme.of(dialogInnerCtx).colorScheme.surfaceContainerHighest,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => setDialogState(() => imageBytes = null),
+                          tooltip: 'Remove photo',
+                          icon: const CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.black54,
+                            child: Icon(Icons.close, size: 16, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    photoSourceButtons(dialogCtx),
+                  if (imageBytes != null) ...[
+                    const SizedBox(height: 8),
+                    photoSourceButtons(dialogCtx),
+                  ],
+                  const SizedBox(height: 10),
                   TextField(
                     controller: priceCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
                       labelText: 'Default Price',
                       prefixText: '₦ ',
+                      errorText: priceError,
+                      border: const OutlineInputBorder(),
                     ),
+                    onChanged: (_) {
+                      if (priceError != null) setDialogState(() => priceError = null);
+                    },
                   ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogCtx),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  final name = nameCtrl.text;
-                  final cat = catCtrl.text;
-                  final price = double.tryParse(priceCtrl.text) ?? 0.0;
+                  final name = nameCtrl.text.trim();
+                  final rawPrice = priceCtrl.text.trim();
+                  final price = double.tryParse(rawPrice) ?? 0.0;
 
-                  if (name.isNotEmpty && cat.isNotEmpty) {
-                    if (isEdit) {
-                      context.read<ServicesBloc>().add(UpdateServiceMaterial(
-                        id: material.id,
-                        name: name,
-                        category: cat,
-                        price: price,
-                      ));
-                    } else {
-                      context.read<ServicesBloc>().add(AddServiceMaterial(
-                        name: name,
-                        category: cat,
-                        price: price,
-                      ));
-                    }
-                    Navigator.pop(context);
+                  final category = isAddingNewCategory
+                      ? (customCatCtrl.text.trim().isNotEmpty ? customCatCtrl.text.trim() : 'General')
+                      : selectedCategory.trim();
+
+                  if (name.isEmpty) {
+                    setDialogState(() => nameError = 'Material name is required');
+                    return;
                   }
+
+                  if (isEdit) {
+                    pageContext.read<ServicesBloc>().add(UpdateServiceMaterial(
+                          id: material.id,
+                          name: name,
+                          category: category,
+                          price: price,
+                          image: imageBytes,
+                        ));
+                  } else {
+                    pageContext.read<ServicesBloc>().add(AddServiceMaterial(
+                          name: name,
+                          category: category,
+                          price: price,
+                          image: imageBytes,
+                        ));
+                  }
+
+                  Navigator.pop(dialogCtx);
                 },
                 child: Text(isEdit ? 'Save Changes' : 'Add Material'),
               ),
@@ -204,23 +580,97 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
     );
   }
 
+  Widget _materialAvatar(BuildContext context, ServiceMaterial material) {
+    return GestureDetector(
+      onTap: material.image == null ? null : () => _viewMaterialImage(context, material),
+      child: CircleAvatar(
+        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+        backgroundImage: material.image != null ? MemoryImage(material.image!) : null,
+        child: material.image == null
+            ? const Icon(Icons.build_outlined, color: Colors.blue, size: 20)
+            : null,
+      ),
+    );
+  }
+
+  void _viewMaterialImage(BuildContext context, ServiceMaterial material) {
+    final bytes = material.image;
+    if (bytes == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(material.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                ],
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confirmDelete(BuildContext context, ServiceMaterial material) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Delete Material?'),
         content: Text('Are you sure you want to delete "${material.name}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               context.read<ServicesBloc>().add(DeleteServiceMaterial(material.id));
-              Navigator.pop(context);
+              Navigator.pop(ctx);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MaterialDraft {
+  const _MaterialDraft({
+    required this.name,
+    required this.priceText,
+    required this.selectedCategory,
+    required this.isAddingNewCategory,
+    required this.customCategory,
+    required this.imageBytes,
+  });
+
+  final String name;
+  final String priceText;
+  final String selectedCategory;
+  final bool isAddingNewCategory;
+  final String customCategory;
+  final Uint8List? imageBytes;
+
+  _MaterialDraft copyWith({Uint8List? imageBytes}) {
+    return _MaterialDraft(
+      name: name,
+      priceText: priceText,
+      selectedCategory: selectedCategory,
+      isAddingNewCategory: isAddingNewCategory,
+      customCategory: customCategory,
+      imageBytes: imageBytes,
     );
   }
 }

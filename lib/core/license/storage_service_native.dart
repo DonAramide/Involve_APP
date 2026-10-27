@@ -14,12 +14,18 @@ class StorageService {
   static const _modeLockedKey = 'is_mode_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
+  static const _serverPlanKey = 'server_activated_plan';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
+  static const _onboardingIndustryKey = 'onboarding_industry';
+  static const _onboardingThemeColorKey = 'onboarding_theme_color';
   static const _licenseFileName = 'license.dat';
   static const _mposTerminalIdKey = 'mpos_terminal_id';
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
+  static const _linkedDashboardDefaultsKey = 'linked_device_dashboard_defaults';
+  static const _deviceLinkedKey = 'device_linked_to_tenant';
+  static const _linkedTenantModeKey = 'linked_tenant_business_mode';
 
   static const _encryptionKey = 0xAF;
 
@@ -214,6 +220,46 @@ class StorageService {
     }
   }
 
+  /// Plan applied from POST /devices/validate (admin activation QR), not HMAC license.
+  static Future<void> saveServerActivatedPlan({
+    required String planType,
+    required DateTime expiryDate,
+  }) async {
+    final payload = jsonEncode({
+      'planType': planType,
+      'expiry': expiryDate.toIso8601String(),
+    });
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _serverPlanKey, value: payload);
+    } else {
+      final file = await _getDesktopFile('server_plan.dat');
+      await file.writeAsString(payload);
+    }
+  }
+
+  static Future<({String planType, DateTime expiryDate})?> getServerActivatedPlan() async {
+    String? raw;
+    if (Platform.isAndroid || Platform.isIOS) {
+      raw = await _secureStorage.read(key: _serverPlanKey);
+    } else {
+      final file = await _getDesktopFile('server_plan.dat');
+      if (await file.exists()) {
+        raw = await file.readAsString();
+      }
+    }
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final map = jsonDecode(raw);
+      if (map is! Map) return null;
+      final planType = map['planType']?.toString();
+      final expiry = DateTime.tryParse(map['expiry']?.toString() ?? '');
+      if (planType == null || planType.isEmpty || expiry == null) return null;
+      return (planType: planType, expiryDate: expiry);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> setDeviceAccessGranted(bool granted) async {
     final value = granted ? 'true' : 'false';
     if (Platform.isAndroid || Platform.isIOS) {
@@ -260,6 +306,53 @@ class StorageService {
     return value == 'true';
   }
 
+  static Future<void> setOnboardingIndustry(String industry) async {
+    final value = industry.trim().toLowerCase();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onboardingIndustryKey, value: value);
+    } else {
+      final file = await _getDesktopFile('onboarding_industry.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<String?> getOnboardingIndustry() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onboardingIndustryKey);
+    } else {
+      final file = await _getDesktopFile('onboarding_industry.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    final clean = (value ?? '').trim();
+    return clean.isEmpty ? null : clean;
+  }
+
+  static Future<void> setOnboardingThemeColor(int color) async {
+    final value = color.toString();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onboardingThemeColorKey, value: value);
+    } else {
+      final file = await _getDesktopFile('onboarding_theme_color.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<int?> getOnboardingThemeColor() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onboardingThemeColorKey);
+    } else {
+      final file = await _getDesktopFile('onboarding_theme_color.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return int.tryParse((value ?? '').trim());
+  }
+
   static Future<void> setOnlineSyncEnabled(bool enabled) async {
     final value = enabled ? 'true' : 'false';
     if (Platform.isAndroid || Platform.isIOS) {
@@ -304,6 +397,74 @@ class StorageService {
       }
     }
     return value != 'false'; // Default to true
+  }
+
+  static Future<void> markLinkedDeviceDashboardDefaultsPending() async {
+    const value = 'true';
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: value);
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> consumeLinkedDeviceDashboardDefaultsPending() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _linkedDashboardDefaultsKey);
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    if (value != 'true') return false;
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: 'false');
+    } else {
+      final file = await _getDesktopFile('linked_dashboard_defaults.dat');
+      await file.writeAsString('false');
+    }
+    return true;
+  }
+
+  static Future<void> markDeviceLinkedToTenant(String businessMode) async {
+    final mode = businessMode.trim();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _deviceLinkedKey, value: 'true');
+      if (mode.isNotEmpty) {
+        await _secureStorage.write(key: _linkedTenantModeKey, value: mode);
+      }
+    } else {
+      final flag = await _getDesktopFile('device_linked_to_tenant.dat');
+      await flag.writeAsString('true');
+      if (mode.isNotEmpty) {
+        final modeFile = await _getDesktopFile('linked_tenant_business_mode.dat');
+        await modeFile.writeAsString(mode);
+      }
+    }
+  }
+
+  static Future<bool> isDeviceLinkedToTenant() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await _secureStorage.read(key: _deviceLinkedKey) == 'true';
+    }
+    final flag = await _getDesktopFile('device_linked_to_tenant.dat');
+    if (!await flag.exists()) return false;
+    return (await flag.readAsString()).trim() == 'true';
+  }
+
+  static Future<String?> getLinkedTenantBusinessMode() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _linkedTenantModeKey);
+    } else {
+      final modeFile = await _getDesktopFile('linked_tenant_business_mode.dat');
+      if (await modeFile.exists()) value = await modeFile.readAsString();
+    }
+    final mode = value?.trim() ?? '';
+    return mode.isEmpty ? null : mode;
   }
 
   static Future<File> _getDesktopFile(String fileName) async {

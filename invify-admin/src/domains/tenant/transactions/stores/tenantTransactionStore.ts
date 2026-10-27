@@ -13,6 +13,7 @@ export const useTenantTransactionStore = defineStore('tenantTransaction', {
       { label: 'Cleared Treasury Balance', amount: '0', count: 0, badgeBg: 'green-10', badgeColor: 'green-3', timeline: 'None' },
       { label: 'Active Disputes Scope', amount: '0', count: 0, badgeBg: 'red-10', badgeColor: 'red-3', timeline: 'None' }
     ],
+    dailyTrend: [] as { date: string; revenue: number }[],
     rows: [] as any[]
   }),
   getters: {
@@ -20,7 +21,7 @@ export const useTenantTransactionStore = defineStore('tenantTransaction', {
       return state.rows.filter(row => {
         if (state.filters.search) {
           const q = state.filters.search.toLowerCase();
-          if (!row.ref.toLowerCase().includes(q) && !row.type.toLowerCase().includes(q)) {
+          if (!String(row.ref || '').toLowerCase().includes(q) && !String(row.type || '').toLowerCase().includes(q)) {
             return false;
           }
         }
@@ -57,21 +58,60 @@ export const useTenantTransactionStore = defineStore('tenantTransaction', {
         }
         
         const { FinanceRepository } = await import('../../../../repositories/FinanceRepository');
-        
-        // Fetch stats and transactions in parallel
-        const [data, stats] = await Promise.all([
-          FinanceRepository.getWalletTransactions(tenantId, { refresh: forceRefresh }),
-          FinanceRepository.getPayoutStats(tenantId, { refresh: forceRefresh })
+
+        const [schoolTx, walletData, stats, trend] = await Promise.all([
+          FinanceRepository.getSchoolTransactions(tenantId, { refresh: forceRefresh }).catch(() => []),
+          FinanceRepository.getWalletTransactions(tenantId, { refresh: forceRefresh }).catch(() => ({ transactions: [] })),
+          FinanceRepository.getPayoutStats(tenantId, { refresh: forceRefresh }).catch(() => ({
+            pendingSettlement: 0, clearedToday: 0, heldFunds: 0, failedTransfers: 0,
+          })),
+          FinanceRepository.getDailyRevenue(tenantId, 14, { refresh: forceRefresh }).catch(() => []),
         ]);
 
-        this.rows = data.transactions.map(tx => ({
-          id: tx.id,
-          date: new Date(tx.created_at).toLocaleString(),
-          ref: tx.reference || 'SYSTEM',
-          type: tx.entry_type,
-          amount: tx.amount,
-          status: tx.status.toUpperCase()
-        }));
+        const mapStatus = (raw) => {
+          const s = String(raw || 'SETTLED').toUpperCase();
+          if (s === 'SUCCESS' || s === 'PAID' || s === 'COMPLETED' || s === 'CLEARED') return 'SETTLED';
+          if (s === 'PENDING' || s === 'PROCESSING') return 'PENDING';
+          if (s === 'DISPUTED' || s === 'FAILED') return 'DISPUTED';
+          return s || 'SETTLED';
+        };
+        const mapChannel = (raw) => {
+          const t = String(raw || '').toUpperCase();
+          if (t.includes('CARD') || t === 'POS PAYMENT') return 'POS PAYMENT';
+          if (t.includes('QUASAR') || t.includes('VA') || t.includes('TRANSFER') || t === 'CREDIT') return 'BANK TRANSFER';
+          if (t.includes('PAYOUT') || t === 'DEBIT' || t === 'WITHDRAWAL') return 'Treasury Payout';
+          if (t.includes('CASH')) return 'CASH';
+          if (t.includes('WALLET')) return 'WALLET';
+          return raw || 'OTHER';
+        };
+        const toRow = (tx, fallbackType) => {
+          const iso = tx.created_at || tx.createdAt || tx.date;
+          const when = iso ? new Date(iso) : new Date(NaN);
+          return {
+            id: tx.id || tx.reference,
+            createdAt: Number.isNaN(when.getTime()) ? '' : when.toISOString(),
+            date: Number.isNaN(when.getTime()) ? String(iso || '—') : when.toLocaleString(),
+            ref: tx.reference || tx.ref || tx.invoice_number || 'SYSTEM',
+            type: mapChannel(tx.channel || tx.entry_type || tx.type || fallbackType),
+            amount: Number(tx.amount || 0),
+            status: mapStatus(tx.status || tx.payment_status || 'SETTLED'),
+          };
+        };
+
+        const byId = new Map();
+        (Array.isArray(schoolTx) ? schoolTx : []).forEach((tx) => {
+          const row = toRow(tx, tx.channel || 'CREDIT');
+          if (row.id) byId.set(String(row.id), row);
+        });
+        (walletData?.transactions || []).forEach((tx) => {
+          const row = toRow(tx, tx.entry_type);
+          const key = String(row.id || row.ref);
+          if (key && !byId.has(key) && !Array.from(byId.values()).some((r) => r.ref === row.ref && row.ref !== 'SYSTEM')) {
+            byId.set(key, row);
+          }
+        });
+        this.rows = Array.from(byId.values()).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+        this.dailyTrend = Array.isArray(trend) ? trend : [];
 
         this.payoutStats = [
           { label: 'Pending Settlement Balance', amount: `₦${(stats.pendingSettlement || 0).toLocaleString()}`, count: 0, badgeBg: 'amber-10', badgeColor: 'amber-3', timeline: 'None' },
@@ -83,6 +123,7 @@ export const useTenantTransactionStore = defineStore('tenantTransaction', {
         console.error('Failed to load real transactions', err);
         // Fallback for safety during testing
         this.rows = [];
+        this.dailyTrend = [];
         this.payoutStats = [
           { label: 'Pending Settlement Balance', amount: '₦0', count: 0, badgeBg: 'amber-10', badgeColor: 'amber-3', timeline: 'None' },
           { label: 'Cleared Treasury Balance', amount: '₦0', count: 0, badgeBg: 'green-10', badgeColor: 'green-3', timeline: 'None' },

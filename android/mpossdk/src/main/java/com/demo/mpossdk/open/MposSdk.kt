@@ -361,7 +361,16 @@ object MposSdk {
             return
         }
 
-        if (paymentRequest.amount < 1.00) {
+        val txType = paymentRequest.transactionType.uppercase()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", "")
+        val allowsZeroAmount = txType.contains("BALANCE") ||
+            txType.contains("REVERSAL") ||
+            txType.contains("REFUND") ||
+            txType.contains("PREAUTHCOMPLETE") ||
+            txType.contains("PREAUTHCOMPLETION")
+        if (!allowsZeroAmount && paymentRequest.amount < 1.00) {
             transactionListener(
                 TransactionResultListener.OnCompleted(
                     TransactionResult(
@@ -394,7 +403,49 @@ object MposSdk {
         this.paymentRequest = paymentRequest
         this.transactionListener = transactionListener
 
+        paymentRequest.latitude?.let { lat ->
+            paymentRequest.longitude?.let { lng ->
+                saveGeoCoordinates(lat, lng)
+            }
+        }
+        captureLocation()
+
         val intent = Intent(activity, ProcessingTransactionActivity::class.java)
         activity.startActivity(intent)
+    }
+
+    fun saveGeoCoordinates(latitude: Double, longitude: Double) {
+        val context = appContext ?: return
+        val sessionManager = ServiceLocator.getInstance(context).provideSessionManager()
+        sessionManager.saveLatitude(latitude.toString())
+        sessionManager.saveLongitude(longitude.toString())
+        LogUtil.i("Saved NIBSS geo $latitude,$longitude")
+    }
+
+    fun captureLocation() {
+        val context = appContext ?: return
+        try {
+            ServiceLocator.getInstance(context).provideLocationProvider().getLocation { }
+        } catch (e: Exception) {
+            LogUtil.e("Location capture failed: ${e.message}")
+        }
+    }
+
+    fun geoField120(): String? {
+        val context = appContext ?: return null
+        val sessionManager = ServiceLocator.getInstance(context).provideSessionManager()
+        val latitude = sessionManager.getLatitude()?.toDoubleOrNull() ?: return null
+        val longitude = sessionManager.getLongitude()?.toDoubleOrNull() ?: return null
+        return com.demo.mpossdk.internal.utils.PosGeoCoordinates.toField120(latitude, longitude)
+    }
+
+    fun savedGeoCoordinates(): Map<String, String?> {
+        val context = appContext ?: return emptyMap()
+        val sessionManager = ServiceLocator.getInstance(context).provideSessionManager()
+        return mapOf(
+            "latitude" to sessionManager.getLatitude(),
+            "longitude" to sessionManager.getLongitude(),
+            "field120" to geoField120(),
+        )
     }
 }

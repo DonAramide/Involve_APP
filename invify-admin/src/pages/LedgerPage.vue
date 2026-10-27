@@ -1,6 +1,6 @@
 
 <template>
-  <q-page class="q-pa-lg text-white" style="background: #090c15;">
+  <q-page class="q-pa-lg bg-main text-main">
     <LedgerAdapter />
   </q-page>
 </template>

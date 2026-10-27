@@ -6,17 +6,24 @@ export class SyncController {
   static async handleSync(req: Request, res: Response) {
     try {
       const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
-      const deviceId = req.headers['x-device-id'] as string;
+      const deviceId = String(req.headers['x-device-id'] || '').trim();
       const correlationId = (req as any).correlationId || req.headers['x-correlation-id'] as string;
       
       if (!tenantId) {
         return res.status(401).json({ success: false, message: 'Tenant ID required for sync' });
       }
 
-      try {
-        await DeviceTrustService.verifyDeviceOrThrow(deviceId, tenantId);
-      } catch (trustError: any) {
-        return res.status(403).json({ success: false, message: `Device Trust Failed: ${trustError.message}` });
+      // Authenticated tenant JWTs must still sync when the tablet omits
+      // X-Device-ID (current production APKs). Enforce trust only when a
+      // device id is present so mismatched devices stay blocked.
+      if (deviceId) {
+        try {
+          await DeviceTrustService.verifyDeviceOrThrow(deviceId, String(tenantId));
+        } catch (trustError: any) {
+          return res.status(403).json({ success: false, message: `Device Trust Failed: ${trustError.message}` });
+        }
+      } else {
+        console.warn(`[SyncController] Allowing outbox without X-Device-ID for tenant ${tenantId}`);
       }
 
       const { events } = req.body;

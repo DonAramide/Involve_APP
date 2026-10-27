@@ -24,12 +24,23 @@ export class StudentService {
       // 2. Fetch Student Details (Required for SDK)
       const { data: student, error: studentError } = await supabase
         .from('students')
-        .select('first_name, last_name, admission_number')
+        .select('first_name, last_name, admission_number, phone, parent_phone')
         .eq('id', studentId)
         .single();
 
       if (studentError || !student) {
         throw new Error(`Student ${studentId} not found`);
+      }
+
+      const { loadActivationGate, virtualAccountGenerationBlockReason } = await import(
+        '../modules/financial-platform/activation/activation-gate'
+      );
+      const { gate } = await loadActivationGate(schoolId);
+      const blocked = virtualAccountGenerationBlockReason(gate);
+      if (blocked) {
+        const err = new Error(blocked) as Error & { code?: string };
+        err.code = 'MAKER_CHECKER_REQUIRED';
+        throw err;
       }
 
       // 3. Resolve Quasar Service (Multi-Tenant)
@@ -43,12 +54,14 @@ export class StudentService {
         childId: quasarChildId,
         parentId: schoolId,
         email: `${student.admission_number}@invify.edu`, // Fallback email
+        phone: (student as any).phone || (student as any).parent_phone || undefined,
         firstName: student.first_name,
         lastName: student.last_name,
         metadata: {
           admissionNumber: student.admission_number,
           source: 'student_provisioning',
           externalStudentKey: studentId,
+          phone: (student as any).phone || (student as any).parent_phone || undefined,
         },
       });
 

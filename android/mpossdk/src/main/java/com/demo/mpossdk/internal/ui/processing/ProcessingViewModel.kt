@@ -53,7 +53,7 @@ internal class ProcessingViewModel(
     private val isoMessageBuilder: IsoMessageBuilder,
     private val socketChannel: SocketChannel
 ) : ViewModel() {
-    private val _actionTextLiveData = MutableLiveData("Processing...")
+    private val _actionTextLiveData = MutableLiveData("Checking device...")
     val actionTextLiveData = _actionTextLiveData
 
     private val _errorFlow = Channel<ErrorData?>()
@@ -70,6 +70,7 @@ internal class ProcessingViewModel(
 
     fun startTransaction(paymentRequest: PaymentRequest) = coroutineScope.launch {
         currentPaymentRequest = paymentRequest
+        persistGeoFromRequest(paymentRequest)
         LcdApi.LedLightOn_Api(Led.LED_BLUE)
         SystemApi.Beep_Api(0)
 
@@ -77,10 +78,28 @@ internal class ProcessingViewModel(
 
         emvDetailResult = emvDetailResult.copy(terminalId = paymentRequest.terminalId)
 
+        val emvAmount = emvKernelAmount(paymentRequest)
+        val cashbackIso = if (paymentRequest.cashbackAmount > 0) {
+            ((paymentRequest.cashbackAmount * 100.0).toLong()).toString().padStart(12, '0')
+        } else {
+            null
+        }
+        emvDetailResult = emvDetailResult.copy(
+            amountAuthorisedNumeric = ((emvAmount * 100.0).toLong()).toString().padStart(12, '0'),
+            amountOtherNumeric = cashbackIso,
+            transactionType = paymentRequest.transactionType,
+        )
+
+        val balanceCheck = isBalanceRequest()
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(0, 0, "Transaction Amount:", 0x08)
-        LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(paymentRequest.amount.toString())}", 0x08)
-        LcdApi.ScrDisp_Api(2, 0, "Swipe/Insert/Tap card", 0x08)
+        if (balanceCheck) {
+            LcdApi.ScrDisp_Api(0, 0, "Check Balance", 0x08)
+            LcdApi.ScrDisp_Api(1, 0, "Swipe/Insert/Tap card", 0x08)
+        } else {
+            LcdApi.ScrDisp_Api(0, 0, "Transaction Amount:", 0x08)
+            LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(emvAmount.toString())}", 0x08)
+            LcdApi.ScrDisp_Api(2, 0, "Swipe/Insert/Tap card", 0x08)
+        }
         LcdApi.ScrDrLogoxy_Api(162, 96, 90, 100, Constants.clLogo)
 
 
@@ -101,11 +120,12 @@ internal class ProcessingViewModel(
 
         LcdApi.LedLightOn_Api(Led.LED_YELLOW)
 
-        _actionTextLiveData.postValue("Processing...")
+        val processingLabel = if (isBalanceRequest()) "Checking balance..." else "Processing..."
+        _actionTextLiveData.postValue(processingLabel)
         _loadingLiveData.postValue(true)
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(1, 0, "Processing...", 0x08)
+        LcdApi.ScrDisp_Api(1, 0, processingLabel, 0x08)
 
         when (CardType.fromMode(result)) {
             CardType.ICC -> {
@@ -113,11 +133,11 @@ internal class ProcessingViewModel(
                 if (result == 0) {
                     LogUtil.d("Contactless Api Closed")
                 }
-                processIccTransaction(paymentRequest.amount)
+                processIccTransaction(emvAmount)
             }
 
             CardType.CONTACTLESS -> {
-                processContactlessTransaction(paymentRequest.amount)
+                processContactlessTransaction(emvAmount)
             }
 
             CardType.MAG -> {
@@ -125,7 +145,7 @@ internal class ProcessingViewModel(
                 if (result == 0) {
                     LogUtil.d("Contactless Api Closed")
                 }
-                processMagTransaction(paymentRequest.amount)
+                processMagTransaction(emvAmount)
             }
 
             CardType.UNKNOWN -> Unit
@@ -232,7 +252,13 @@ internal class ProcessingViewModel(
 
         IcApi.IccInit_Api(0, 3, ByteArray(256), ShortArray(4))
         val isoAmount = AmountUtils.toIsoAmount(amount, "566")
-        EmvApi.EMV_SetTradeAmt_Api(CommonConvert.ascStringToBCD(isoAmount), ByteArray(6))
+        val otherAmount = currentPaymentRequest?.cashbackAmount?.takeIf { it > 0 }?.let {
+            ((it * 100.0).toLong()).toString().padStart(12, '0')
+        } ?: "000000000000"
+        EmvApi.EMV_SetTradeAmt_Api(
+            CommonConvert.ascStringToBCD(isoAmount),
+            CommonConvert.ascStringToBCD(otherAmount),
+        )
 
         emvDetailResult = emvDetailResult.copy(amountAuthorisedNumeric = isoAmount)
 
@@ -292,10 +318,11 @@ internal class ProcessingViewModel(
             return
         }
 
-        _actionTextLiveData.postValue("Processing...")
+        val onlineLabel = if (isBalanceRequest()) "Checking balance..." else "Processing..."
+        _actionTextLiveData.postValue(onlineLabel)
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(3, 0, "Processing...", Led.LED_RED)
+        LcdApi.ScrDisp_Api(3, 0, onlineLabel, Led.LED_RED)
 
         result = EmvApi.EMV_Complete_Api(
             CommonApi.ONLINE_APPROVE,
@@ -400,6 +427,8 @@ internal class ProcessingViewModel(
                     
                     if (responseIsoMsg != null) {
                         val responseCode = responseIsoMsg.getString(39)
+                        val field54 = if (responseIsoMsg.hasField(54)) responseIsoMsg.getString(54) else null
+                        val cardBalance = ISOUtils.parseAdditionalAmountNaira(field54)
                         val mposResponse = com.demo.mpossdk.open.MposTransactionResponse(
                             aid = emvDetailResult.aid,
                             amount = emvDetailResult.amountAuthorisedNumeric,
@@ -408,11 +437,19 @@ internal class ProcessingViewModel(
                             cardExpireDate = emvDetailResult.cardExpirationDate,
                             cardHolderName = emvDetailResult.cardHolderName,
                             dateTime = responseIsoMsg.getString(7),
-                            maskedPan = emvDetailResult.cardNo,
+                            maskedPan = ISOUtils.maskCardPAN(emvDetailResult.cardNo ?: ""),
                             rrn = responseIsoMsg.getString(37),
                             stan = responseIsoMsg.getString(11),
                             statusCode = responseCode,
-                            transactionType = emvDetailResult.transactionType
+                            transactionType = emvDetailResult.transactionType,
+                            balance = cardBalance.ifEmpty { null },
+                            message = if (responseCode == "00" && isBalanceRequest()) {
+                                if (cardBalance.isNotEmpty()) "Available balance ₦$cardBalance" else "00 Approved"
+                            } else if (responseCode == "00") {
+                                "00 Approved"
+                            } else {
+                                null
+                            }
                         )
                         
                         if (responseCode == "00") {
@@ -491,8 +528,30 @@ internal class ProcessingViewModel(
             rrn = response.getString(37),
             stan = response.getString(11),
             statusCode = responseCode,
-            transactionType = "PURCHASE",
+            transactionType = currentPaymentRequest?.transactionType ?: "PURCHASE",
         )
+    }
+
+    private fun normalizeTx(raw: String?): String =
+        raw.orEmpty().uppercase().replace(" ", "").replace("-", "").replace("_", "")
+
+    private fun isBalanceRequest(): Boolean =
+        normalizeTx(currentPaymentRequest?.transactionType).contains("BALANCE")
+
+    private fun emvKernelAmount(request: PaymentRequest): Double {
+        val type = normalizeTx(request.transactionType)
+        return when {
+            type.contains("BALANCE") -> 2.0
+            type.contains("PURCHASEWITHCB") || type.contains("CASHBACK") ->
+                request.amount + request.cashbackAmount
+            request.amount < 0.01 -> 1.0
+            else -> request.amount
+        }
+    }
+
+    private fun persistGeoFromRequest(request: PaymentRequest) {
+        request.latitude?.let { sessionManager.saveLatitude(it.toString()) }
+        request.longitude?.let { sessionManager.saveLongitude(it.toString()) }
     }
 
 
@@ -641,7 +700,11 @@ internal class ProcessingViewModel(
         _actionTextLiveData.postValue("Enter Card PIN")
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(0, 0, "NGN$amount", 0x08)
+        if (isBalanceRequest()) {
+            LcdApi.ScrDisp_Api(0, 0, "Check Balance", 0x08)
+        } else {
+            LcdApi.ScrDisp_Api(0, 0, "NGN$amount", 0x08)
+        }
         LcdApi.ScrDisp_Api(1, 0, "Enter PIN:", 0x08)
 
         val pin = ByteArray(8)

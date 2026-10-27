@@ -459,76 +459,7 @@ const handleExportInsight = () => {
   })
 }
 
-const allInsights = ref([
-  {
-    id: 'INS-001',
-    category: 'revenue',
-    title: 'Revenue expected to increase by 12% next month',
-    summary: 'Based on current transaction velocity and historical seasonal patterns in the School segment, gross platform revenue is projected to hit {{ currentCurrency.symbol }}145M.',
-    color: 'green',
-    icon: 'trending_up',
-    confidence: 92,
-    modelName: 'RevForecast_v4',
-    reasoningPreview: 'School segment returning from holiday period; 24% spike in wallet funding observed over 7 days.',
-    explanationText: 'The model detected a sustained 24% week-over-week increase in inbound wallet funding across the School segment, perfectly aligning with historical patterns preceding academic term starts. Terminal transactions in related geographic zones also show a 14% uptick.',
-    signals: ['Wallet Funding Spike (+24%)', 'Historical Term Starts', 'Geographic Terminal Activity'],
-    entities: ['Ahmadu Bello University', 'University of Lagos', 'School Segment (Global)'],
-    riskWeight: 'LOW',
-    actionText: 'Review Revenue Forecast',
-    suggestedActions: ['Expand School Segment marketing budget by 10%.', 'Ensure Settlement routing liquidity can handle increased volume.', 'Generate Q3 Revenue Projections for Board.']
-  },
-  {
-    id: 'INS-002',
-    category: 'treasury',
-    title: 'Treasury liquidity pressure expected in next 14 days',
-    summary: 'A convergence of high-volume school fee settlements and weekend retail batch delays is likely to create temporary liquidity pressure in the primary settlement account.',
-    color: 'amber',
-    icon: 'account_balance_wallet',
-    confidence: 88,
-    modelName: 'LiquidityRisk_v2',
-    reasoningPreview: 'Pending settlement pipeline exceeds historical weekend threshold by 18%.',
-    explanationText: 'The treasury anomaly detection model flagged that the volume of un-settled, high-value transactions currently in the ledger is outpacing the historical weekend processing capability of our primary banking partner. Without a buffer, delays are probable.',
-    signals: ['Ledger/Settlement Delta', 'Bank Partner Processing Windows', 'High Value Txn Spikes'],
-    entities: ['Primary Settlement Account', 'Guaranty Trust Partner'],
-    riskWeight: 'HIGH',
-    actionText: 'Open Treasury Workspace',
-    suggestedActions: ['Prepare a {{ currentCurrency.symbol }}50M liquidity buffer for Monday morning settlements.', 'Review pending Ledger batches to prioritize School payouts.']
-  },
-  {
-    id: 'INS-003',
-    category: 'fraud',
-    title: 'Fraud risk increasing among Agent Network',
-    summary: 'A novel velocity abuse pattern is emerging across the South West agent network, bypassing standard rules.',
-    color: 'red',
-    icon: 'security',
-    confidence: 96,
-    modelName: 'VelocityThreat_AI',
-    reasoningPreview: 'Correlated micro-transactions detected across 42 geographically linked terminals.',
-    explanationText: 'The threat correlation engine found a structural link between 42 different terminals in the South West. These terminals are independently executing micro-transactions that collectively form a high-velocity extraction pattern consistent with wallet-draining attacks.',
-    signals: ['Terminal Geo-Clustering', 'Micro-Txn Velocity', 'Shared Beneficiary Wallets'],
-    entities: ['Agent Network (South West)', 'Terminals: TRM-AGT-*', 'Wallet: WAL-AGT-8812'],
-    riskWeight: 'CRITICAL',
-    actionText: 'Open Fraud Monitoring',
-    suggestedActions: ['Freeze associated beneficiary wallets immediately.', 'Suspend the 42 implicated terminals.', 'Assign Fraud Team to Case CAS-2026-8812.']
-  },
-  {
-    id: 'INS-004',
-    category: 'compliance',
-    title: 'Merchant BetKing likely to require compliance review',
-    summary: 'Transaction patterns suggest potential threshold breach for enhanced due diligence (EDD) reporting.',
-    color: 'purple',
-    icon: 'policy',
-    confidence: 85,
-    modelName: 'RegRisk_Engine',
-    reasoningPreview: 'Transaction volume nearing {{ currentCurrency.symbol }}100M monthly limit without Tier 4 KYC.',
-    explanationText: 'The compliance engine predicts that at the current daily processing rate, the tenant will breach the Tier 3 limits within 4 days, which legally requires an immediate freeze or escalation to Tier 4 EDD.',
-    signals: ['Run-rate Txn Volume', 'Current KYC Tier Limits'],
-    entities: ['BetKing (TEN-RET-992)'],
-    riskWeight: 'MEDIUM',
-    actionText: 'Review Compliance Case',
-    suggestedActions: ['Request Tier 4 Documents (Proof of Address, Ultimate Beneficial Owner).', 'Schedule automated hold if documents not received in 3 days.']
-  }
-])
+const allInsights = ref([])
 
 const filteredInsights = computed(() => {
   let list = allInsights.value

@@ -8,12 +8,23 @@ export interface MfaPendingSession {
   refreshToken: string;
 }
 
+export interface MfaUserSnapshot {
+  id: string;
+  email: string;
+  role?: string;
+  tenantId?: string | null;
+  name?: string;
+  mfaSecret?: string | null;
+  mfaEnabled?: boolean;
+}
+
 interface StoredChallenge {
   jti: string;
   userId: string;
   operation: MfaOperation;
   expiresAt: number;
   session: MfaPendingSession;
+  snapshot?: MfaUserSnapshot;
 }
 
 export interface ValidatedMfaChallenge {
@@ -21,6 +32,7 @@ export interface ValidatedMfaChallenge {
   userId: string;
   operation: MfaOperation;
   expiresAt: number;
+  snapshot?: MfaUserSnapshot;
 }
 
 export class MfaChallengeError extends Error {
@@ -61,6 +73,7 @@ export function issueMfaChallenge(
   userId: string,
   operation: MfaOperation,
   session: MfaPendingSession,
+  snapshot?: MfaUserSnapshot,
 ): { token: string; expiresAt: number } {
   if (!userId || !session?.token || !session?.refreshToken) {
     throw new MfaChallengeError(
@@ -90,7 +103,7 @@ export function issueMfaChallenge(
     },
   );
 
-  activeChallenges.set(jti, { jti, userId, operation, expiresAt, session });
+  activeChallenges.set(jti, { jti, userId, operation, expiresAt, session, snapshot });
   return { token, expiresAt };
 }
 
@@ -165,6 +178,7 @@ export function validateMfaChallenge(
     userId,
     operation: expectedOperation,
     expiresAt: stored.expiresAt,
+    snapshot: stored.snapshot,
   };
 }
 

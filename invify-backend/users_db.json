@@ -2,7 +2,7 @@
   {
     "id": "usr-sa-001",
     "name": "Super Admin Master",
-    "email": "superadmin@IIPS.app",
+    "email": "superadmin@invify.org",
     "role": "super_admin",
     "tenant_id": null,
     "is_mfa_enabled": true,
@@ -12,7 +12,7 @@
   {
     "id": "usr-st-002",
     "name": "Security Staff Node",
-    "email": "sec-staff-node@IIPS.app",
+    "email": "sec-staff-node@invify.org",
     "role": "internal_staff",
     "tenant_id": null,
     "is_mfa_enabled": true,
@@ -42,7 +42,7 @@
   {
     "id": "usr-pc-005",
     "name": "Pro Customer",
-    "email": "pro-user@IIPS.app",
+    "email": "pro-user@invify.org",
     "role": "pro_customer",
     "tenant_id": "00000000-0000-0000-0000-000000000002",
     "is_mfa_enabled": true,

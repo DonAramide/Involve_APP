@@ -1,10 +1,19 @@
 import { syncRegistry, SyncEvent } from './sync-handlers/registry';
 import { InvoiceCreatedHandler } from './sync-handlers/invoice.handler';
 import { CustomerCreatedHandler } from './sync-handlers/customer.handler';
+import {
+  InvoicePayHandler,
+  ParentAllocateHandler,
+  ParentFundHandler,
+} from './sync-handlers/finance-command.handler';
 
 // Register known handlers
 syncRegistry.register('invoice.created', new InvoiceCreatedHandler());
+syncRegistry.register('invoice.updated', new InvoiceCreatedHandler());
 syncRegistry.register('customer.created', new CustomerCreatedHandler());
+syncRegistry.register('finance.parent_fund', new ParentFundHandler());
+syncRegistry.register('finance.parent_allocate', new ParentAllocateHandler());
+syncRegistry.register('finance.invoice_pay', new InvoicePayHandler());
 // We can add PaymentRecordedHandler, ProductCreatedHandler, etc., here later.
 
 export class SyncService {
@@ -14,6 +23,7 @@ export class SyncService {
   ) {
     const processedIds: string[] = [];
     const failedIds: Array<{ eventId: string; reason: string; retryable: boolean }> = [];
+    const acks: Array<{ eventId: string; status: string; reason?: string }> = [];
 
     for (const event of events) {
       try {
@@ -24,6 +34,7 @@ export class SyncService {
             reason: `No handler registered for event: ${event.eventName}`,
             retryable: false // Dead letter immediately if we don't support the event
           });
+          acks.push({ eventId: event.eventId, status: 'rejected', reason: 'unknown_event' });
           continue;
         }
 
@@ -33,7 +44,15 @@ export class SyncService {
         }
 
         await handler.handle(event, context);
-        processedIds.push(event.eventId);
+        const ack = String((event as any).ack || 'accepted');
+        acks.push({ eventId: event.eventId, status: ack, reason: (event as any).ackReason });
+        if (ack === 'rejected') {
+          failedIds.push({ eventId: event.eventId, reason: (event as any).ackReason || 'rejected', retryable: false });
+        } else if (ack === 'reconciliation-required') {
+          failedIds.push({ eventId: event.eventId, reason: (event as any).ackReason || 'recon', retryable: true });
+        } else {
+          processedIds.push(event.eventId);
+        }
         
       } catch (err: any) {
         console.error(`[SyncService] Failed to process event ${event.eventId}: ${err.message}`);
@@ -41,11 +60,17 @@ export class SyncService {
         // Determine if it's a retryable network/transient error or a permanent payload error.
         // For simplicity, we treat database errors as retryable unless they are explicit format errors.
         const isFormatError = err.message.includes('JSON') || err.message.includes('format');
+        const rejected = String(err.message || '').includes('rejected') || String(err.message || '').includes('_required');
         
         failedIds.push({
           eventId: event.eventId,
           reason: err.message,
-          retryable: !isFormatError
+          retryable: !isFormatError && !rejected
+        });
+        acks.push({
+          eventId: event.eventId,
+          status: rejected ? 'rejected' : 'reconciliation-required',
+          reason: err.message,
         });
       }
     }
@@ -53,7 +78,8 @@ export class SyncService {
     return {
       success: true,
       processedIds,
-      failedIds
+      failedIds,
+      acks,
     };
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
@@ -14,9 +15,11 @@ import 'package:involve_app/features/stock/presentation/pages/stock_history_page
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/profit_report_page.dart';
 import 'package:involve_app/features/stock/presentation/widgets/log_expense_dialog.dart';
-import 'package:collection/collection.dart';
 import '../../../../core/utils/terminology.dart';
+import 'package:involve_app/features/stock/domain/catalog_category.dart';
+import 'package:involve_app/features/stock/domain/entities/category.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
+import 'package:involve_app/features/stock/presentation/widgets/stock_up_dialog.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StockManagementPage extends StatefulWidget {
@@ -31,18 +34,48 @@ class _StockManagementPageState extends State<StockManagementPage> {
   String _selectedCategoryFilter = 'All';
 
   String _getCategoryName(Item item, List<dynamic> categories) {
-    if (item.categoryId != null) {
-      final cat = categories.firstWhereOrNull((c) => c.id == item.categoryId);
-      return cat?.name ?? 'Uncategorized';
-    }
-    final name = item.name.toLowerCase();
-    if (name.contains('rice') || name.contains('beans') || name.contains('food')) {
-      return 'Grains & Food';
-    }
-    if (name.contains('book') || name.contains('fee') || name.contains('tuition')) {
-      return 'Education';
-    }
-    return 'General Store';
+    return catalogCategoryLabel(
+      item,
+      categories.whereType<Category>().toList(),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? color,
+    String? tooltip,
+    double iconSize = 20,
+  }) {
+    return Tooltip(
+      message: tooltip ?? label,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 4.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: iconSize, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -61,17 +94,19 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return Scaffold(
       appBar: AppBar(
         title: BlocBuilder<SettingsBloc, SettingsState>(
-          builder: (context, state) => Text(state.settings?.stockLabel ?? 'Stock Management'),
+          builder: (context, state) => Text(
+            state.settings?.stockLabel ?? 'Stock',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
         actions: [
           BlocBuilder<SettingsBloc, SettingsState>(
             builder: (context, state) {
               if (state.settings?.businessMode == 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: Icon(
-                  _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
-                  color: _showLowStockOnly ? Colors.orange : null,
-                ),
+              return _buildActionButton(
+                icon: _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
+                label: _showLowStockOnly ? 'All Items' : 'Low Stock',
+                color: _showLowStockOnly ? Colors.orange : null,
                 tooltip: _showLowStockOnly ? 'Show All Items' : 'Show Low Stock Only',
                 onPressed: () {
                   setState(() {
@@ -82,8 +117,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
             },
           ),
           BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, settingsState) => IconButton(
-              icon: const Icon(Icons.category, size: 28),
+            builder: (context, settingsState) => _buildActionButton(
+              icon: Icons.category_outlined,
+              label: settingsState.settings?.categoryLabel ?? 'Categories',
               tooltip: 'Manage ${settingsState.settings?.categoryLabel ?? 'Categories'}',
               onPressed: () => _verifyAndExecute(
                 context,
@@ -94,16 +130,18 @@ class _StockManagementPageState extends State<StockManagementPage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.assessment_outlined),
+          _buildActionButton(
+            icon: Icons.assessment_outlined,
+            label: 'Inventory',
             tooltip: 'Inventory Report',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const InventoryReportPage()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.show_chart),
+          _buildActionButton(
+            icon: Icons.show_chart,
+            label: 'Profit',
             tooltip: 'Profit Report',
             onPressed: () => _verifyAndExecute(
               context,
@@ -113,26 +151,32 @@ class _StockManagementPageState extends State<StockManagementPage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.payments_outlined),
+          _buildActionButton(
+            icon: Icons.payments_outlined,
+            label: 'Expense',
             tooltip: 'Log Expense',
             onPressed: () => _verifyAndExecute(
               context,
               () => _showLogExpenseDialog(context),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 32),
-            onPressed: () => _verifyAndExecute(
-              context,
-              () => _showItemDialog(context),
+          BlocBuilder<SettingsBloc, SettingsState>(
+            builder: (context, settingsState) => _buildActionButton(
+              icon: Icons.add_circle_outline,
+              label: 'Add ${settingsState.settings?.productLabel ?? 'Item'}',
+              tooltip: 'Add ${settingsState.settings?.productLabel ?? 'Item'}',
+              onPressed: () => _verifyAndExecute(
+                context,
+                () => _showItemDialog(context),
+              ),
             ),
           ),
           BlocBuilder<SettingsBloc, SettingsState>(
             builder: (context, state) {
               if (state.settings?.businessMode != 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.school_outlined),
+              return _buildActionButton(
+                icon: Icons.school_outlined,
+                label: 'Setup',
                 tooltip: 'Academic Setup (Years/Terms/Classes)',
                 onPressed: () => _verifyAndExecute(
                   context,
@@ -141,6 +185,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
               );
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: BlocBuilder<SettingsBloc, SettingsState>(
@@ -460,54 +505,28 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  void _showStockUpDialog(BuildContext context, Item item) {
-    final qtyController = TextEditingController();
-    final remarksController = TextEditingController();
-
-    showDialog(
+  Future<void> _showStockUpDialog(BuildContext context, Item item) async {
+    final result = await showDialog<StockUpResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Stock Up: ${item.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Current Stock: ${item.stockQty}', 
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: qtyController,
-              decoration: const InputDecoration(labelText: 'Quantity to Add'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: remarksController,
-              decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              final qty = int.tryParse(qtyController.text);
-              if (qty != null && qty > 0) {
-                context.read<StockBloc>().add(StockIncrementRequested(
-                      item.id!,
-                      qty,
-                      remarks: remarksController.text,
-                    ));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Added $qty to ${item.name}')),
-                );
-              }
-            },
-            child: const Text('ADD'),
-          ),
-        ],
+      builder: (ctx) => StockUpDialog(
+        itemName: item.name,
+        currentQty: item.stockQty,
       ),
+    );
+    if (result == null || !context.mounted) return;
+
+    context.read<StockBloc>().add(StockIncrementRequested(
+          item.id!,
+          result.quantity,
+          remarks: result.remarks,
+          supplierName: result.supplierName,
+          receiptNumber: result.receiptNumber,
+          trackingNumber: result.trackingNumber,
+          receivedAt: result.receivedAt,
+          receiptImage: result.receiptImage,
+        ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added ${result.quantity} to ${item.name}')),
     );
   }
 

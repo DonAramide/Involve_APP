@@ -9,6 +9,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 class GenerateLessonWizardPage extends StatefulWidget {
   const GenerateLessonWizardPage({super.key});
@@ -81,8 +82,10 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
             ),
           );
         } else if (state is LessonError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+          showFriendlyErrorSnackBar(
+            context,
+            state.message,
+            fallback: 'Could not generate the lesson note. Please try again.',
           );
         }
       },
@@ -124,7 +127,13 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                           DropdownMenuItem(value: c.id, child: Text(c.name))
                         ).toList(),
                         onChanged: (val) {
-                          setState(() => _selectedClassId = val);
+                          setState(() {
+                            _selectedClassId = val;
+                            final stillOffered = schoolState.subjects.any(
+                              (s) => s.id == _selectedSubjectId && s.isOfferedTo(val),
+                            );
+                            if (!stillOffered) _selectedSubjectId = null;
+                          });
                           _attemptTopicAutofill();
                         },
                         icon: Icons.class_,
@@ -135,9 +144,10 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                       _buildDropdown<int>(
                         label: 'Subject',
                         value: _selectedSubjectId,
-                        items: schoolState.subjects.map((s) => 
-                          DropdownMenuItem(value: s.id, child: Text(s.name))
-                        ).toList(),
+                        items: schoolState.subjects
+                          .where((s) => s.isOfferedTo(_selectedClassId))
+                          .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                          .toList(),
                         onChanged: (val) {
                           setState(() => _selectedSubjectId = val);
                           _attemptTopicAutofill();

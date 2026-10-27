@@ -1,0 +1,153 @@
+name: CI — Build, Test, Staging Path
+
+# Promotion foundation for Invify monorepo:
+# FEATURE → PR → main → build & test (backend + admin) → container smoke → STAGING deploy
+# Production releases remain strictly approval-gated and are never targeted by this workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-backend:
+    name: Backend Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: invify-backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: invify-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Unit and integration tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          BUILD_VARIANT: LOCAL
+          JWT_SECRET: ci-test-jwt-secret-key-32chars!!
+          SUPABASE_JWT_SECRET: ci-test-supabase-jwt-secret-32!
+          LICENSE_HMAC_SECRET: ci-test-license-hmac-secret-32!
+
+      - name: Phase 2 security regression
+        run: npm test -- --testPathPattern="phase2.security|commission.security"
+        env:
+          NODE_ENV: test
+          BUILD_VARIANT: LOCAL
+          JWT_SECRET: ci-test-jwt-secret-key-32chars!!
+          SUPABASE_JWT_SECRET: ci-test-supabase-jwt-secret-32!
+          LICENSE_HMAC_SECRET: ci-test-license-hmac-secret-32!
+
+  validate-admin:
+    name: Admin Frontend Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: invify-admin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: invify-admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build staging bundle
+        run: npm run build:staging
+
+      - name: Run admin unit tests
+        run: npm test -- tests/session-lifecycle.test.ts tests/idle-logout.test.ts tests/onboardingValidation.test.ts tests/dashboard-registry.test.ts tests/checker-mfa.test.ts tests/operator-permissions.test.ts
+
+  container:
+    name: Build Container Artifact
+    needs: [validate-backend, validate-admin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t invify-backend:ci --target runner -f invify-backend/Dockerfile invify-backend
+
+      - name: Smoke start + health contract
+        run: |
+          docker run -d --name invify-ci \
+            -e NODE_ENV=development \
+            -e BUILD_VARIANT=LOCAL \
+            -e JWT_SECRET=ci-test-jwt-secret-key-32chars!! \
+            -e SUPABASE_JWT_SECRET=ci-test-supabase-jwt-secret-32! \
+            -e LICENSE_HMAC_SECRET=ci-test-license-hmac-secret-32! \
+            -e PORT=3000 \
+            -p 3000:3000 \
+            invify-backend:ci
+          sleep 8
+          curl --fail http://127.0.0.1:3000/livez
+          curl --fail http://127.0.0.1:3000/health
+          docker logs invify-ci | tail -n 40
+          docker stop invify-ci
+          docker rm invify-ci
+
+  staging-deploy:
+    name: Staging Deploy (manual / main)
+    needs: container
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push staging image
+        uses: docker/build-push-action@v5
+        with:
+          context: invify-backend
+          file: invify-backend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+          target: runner
+
+      - name: Staging smoke (optional endpoint)
+        env:
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+        run: |
+          if [ -z "$STAGING_API_URL" ]; then
+            echo "STAGING_API_URL not configured — image pushed; external apply deferred"
+            exit 0
+          fi
+          curl --fail "$STAGING_API_URL/livez"
+          curl --fail "$STAGING_API_URL/readyz"

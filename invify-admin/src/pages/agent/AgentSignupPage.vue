@@ -9,10 +9,10 @@
       <q-form @submit="handleSignup" class="column op-gap-8 q-mt-sm">
         <q-input v-model="form.name" dark filled dense label="Full Legal Name" class="bg-panel-darker text-caption" required />
         <q-input v-model="form.email" dark filled dense type="email" label="Email Address" class="bg-panel-darker text-caption" required />
-        <q-input v-model="form.phone" dark filled dense label="Primary Phone Number" class="bg-panel-darker text-caption" required />
+        <q-input v-model="form.phone" dark filled dense type="tel" label="Primary Phone Number" class="bg-panel-darker text-caption" maxlength="13" counter required />
         
         <div class="row items-center justify-between no-wrap op-gap-8">
-          <q-input v-model="form.whatsappNumber" dark filled dense label="WhatsApp Number" class="bg-panel-darker text-caption col" :disable="sameAsPhone" required />
+          <q-input v-model="form.whatsappNumber" dark filled dense type="tel" label="WhatsApp Number" class="bg-panel-darker text-caption col" maxlength="13" counter :disable="sameAsPhone" required />
           <q-checkbox v-model="sameAsPhone" dark dense label="Same as Phone" color="cyan-3" class="text-caption text-muted" />
         </div>
         
@@ -70,7 +70,7 @@
         <q-btn type="submit" dense color="cyan-3" text-color="black" label="PROVISION AGENT & VERIFY KYC" :loading="loading" class="q-mt-md text-weight-bold full-width" />
         
         <div class="row justify-center q-mt-sm">
-          <q-btn flat color="cyan-3" label="Already have an account? Login" class="text-caption text-weight-regular" to="/agent/login" />
+          <q-btn flat color="cyan-3" label="Already have an account? Login" class="text-caption text-weight-regular" to="/institute/login" />
         </div>
       </q-form>
     </div>
@@ -176,7 +176,7 @@ const handleSignup = async () => {
     const res = await axios.post('/api/agent/register', payload)
     
     $q.notify({ type: 'positive', message: res.data.message || 'Registration submitted successfully! Please wait for approval.', position: 'top-right' })
-    router.push('/agent/success')
+    router.push('/institute/success')
   } catch (err) {
     const msg = err.response?.data?.message || err.message
     $q.notify({ type: 'negative', message: `Registration failed: ${msg}`, position: 'top-right' })

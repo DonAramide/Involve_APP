@@ -8,15 +8,15 @@ function mockReq(partial: any): any {
 }
 
 describe('Phase 4 tenant isolation regressions', () => {
-  test('resolveAuthoritativeTenantId rejects x-tenant-id spoof for tenant users', () => {
+  test('resolveAuthoritativeTenantId ignores x-tenant-id spoof and keeps the JWT tenant', () => {
     const req = mockReq({
       user: { id: 'u1', role: 'owner', tenantId: 'tenant-a' },
       headers: { 'x-tenant-id': 'tenant-b' },
       body: {},
-      query: {},
+      query: { tenantId: 'tenant-b' },
       params: {},
     });
-    expect(() => resolveAuthoritativeTenantId(req)).toThrow(/Cross-tenant/);
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
   });
 
   test('resolveAuthoritativeTenantId uses JWT tenant when no spoof', () => {
@@ -46,5 +46,62 @@ describe('Phase 4 tenant isolation regressions', () => {
       params: {},
     });
     expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('super_admin may select tenant via x-tenant-id header', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('platform admin without a merchant tenant may impersonate via x-tenant-id', () => {
+    const req = mockReq({
+      user: { id: 'ops', role: 'admin', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('merchant admin cannot switch tenants via x-tenant-id', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'admin', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
+  });
+
+  test('super_admin may select tenant via /tenants/:id path param', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: null },
+      headers: {},
+      body: {},
+      query: {},
+      params: { id: 'tenant-b' },
+      originalUrl: '/api/admin/tenants/tenant-b/details',
+      path: '/api/admin/tenants/tenant-b/details',
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('super_admin still requires a real tenant when only sentinels are present', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: 'system' },
+      headers: { 'x-tenant-id': 'global' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(() => resolveAuthoritativeTenantId(req)).toThrow(/tenantId is required/);
   });
 });

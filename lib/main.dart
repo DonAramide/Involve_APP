@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -23,6 +24,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/core/utils/bloc_observer.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/features/stock/data/repositories/item_repository_impl.dart';
 import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
@@ -75,6 +77,7 @@ import 'package:involve_app/core/sync/domain/services/finance_api_batch_handler.
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/widgets/idle_logout_guard.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/payment_ledger_test_page.dart';
 import 'package:involve_app/features/school_finance/presentation/pages/school_finance_dashboard.dart';
@@ -84,6 +87,7 @@ import 'package:involve_app/features/school/domain/services/ai_service_interface
 import 'package:involve_app/features/school/data/services/lesson_note_api_service.dart';
 import 'package:involve_app/features/school/presentation/bloc/lesson_note_bloc.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
+import 'package:involve_app/features/school/presentation/pages/attendance_dashboard_page.dart';
 
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository.dart';
 import 'package:involve_app/features/school_finance/data/repositories/finance_repository_impl.dart';
@@ -94,6 +98,8 @@ import 'package:involve_app/features/school_billing/domain/repositories/billing_
 import 'package:involve_app/features/school_billing/data/repositories/billing_repository_impl.dart';
 import 'package:involve_app/features/school_billing/presentation/bloc/billing_bloc.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/services/data/datasources/background_sync_service.dart';
+import 'package:involve_app/features/services/data/datasources/services_remote_data_source.dart';
 import 'package:involve_app/features/services/data/repositories/services_repository_impl.dart';
 import 'package:involve_app/features/services/data/services/services_backup_service.dart';
 import 'package:involve_app/features/services/domain/usecases/service_usecases.dart';
@@ -118,6 +124,7 @@ import 'package:involve_app/features/stock/presentation/pages/inventory_report_p
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
 import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
+import 'package:involve_app/features/printer/presentation/pages/nibss_cert_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/calculator_page.dart';
@@ -132,11 +139,14 @@ import 'package:involve_app/features/services/presentation/pages/customers_list_
 import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/parent_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
 import 'package:involve_app/features/school/presentation/pages/manage_subjects_page.dart';
 import 'package:involve_app/features/school/presentation/pages/result_entry_page.dart';
 import 'package:involve_app/features/school/presentation/pages/lesson_notes_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/my_id_card_page.dart';
+import 'package:involve_app/features/school/presentation/pages/gate_clock_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/about_page.dart';
 import 'package:involve_app/features/help/presentation/pages/help_page.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
@@ -155,24 +165,28 @@ void main() async {
     // Release / CI builds rely on --dart-define instead
   }
 
-  final supabaseUrl = AppConfig.supabaseUrl;
-  final supabaseAnonKey = AppConfig.supabaseAnonKey;
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    if (kReleaseMode) {
-      throw StateError('Missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY for release build');
+  try {
+    final supabaseUrl = AppConfig.supabaseUrl;
+    final supabaseAnonKey = AppConfig.supabaseAnonKey;
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      AppConfig.supabaseInitialized = false;
+      debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
+    } else {
+      debugPrint('[AppConfig] API target=${AppConfig.apiTargetName} baseUrl=${AppConfig.baseUrl} env=${AppConfig.environmentName}');
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+      );
+      AppConfig.supabaseInitialized = true;
     }
+  } catch (e) {
     AppConfig.supabaseInitialized = false;
-    debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
-  } else {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-    );
-    AppConfig.supabaseInitialized = true;
+    debugPrint('Supabase initialization warning: $e');
   }
   
   // Set up global BLoC observer
   Bloc.observer = SimpleBlocObserver();
+  await DeviceNotificationService.init();
   
   runApp(RestartWidget<AppDependencies>(
     initialize: () => AppDependencies.initialize(),
@@ -180,7 +194,33 @@ void main() async {
   ));
 }
 
+/// True when [token] is a JWT whose `exp` is still in the future (60s skew).
+bool _jwtLooksUsable(String? token) {
+  if (token == null || token.isEmpty) return false;
+  if (token == 'mock-super-admin') return !kReleaseMode;
+  final parts = token.split('.');
+  if (parts.length < 2) return false;
+  try {
+    var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+    final remainder = payload.length % 4;
+    if (remainder > 0) payload += '=' * (4 - remainder);
+    final map = jsonDecode(utf8.decode(base64.decode(payload))) as Map<String, dynamic>;
+    final exp = map['exp'];
+    if (exp is num) {
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true);
+      return expiry.isAfter(DateTime.now().toUtc().subtract(const Duration(seconds: 60)));
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Auth token for API/socket calls. Safe when Supabase was never initialized.
+///
+/// Onboarded tablets store an HS256 device JWT (`offlineToken`). A leftover or
+/// expired Supabase session must not win — that is the red-cloud
+/// "Invalid or expired token" loop.
 Future<String?> resolveAuthToken([SecurityService? security]) async {
   final svc = security ?? SecurityService();
   String? supabaseToken;
@@ -189,9 +229,24 @@ Future<String?> resolveAuthToken([SecurityService? security]) async {
       supabaseToken = Supabase.instance.client.auth.currentSession?.accessToken;
     } catch (_) {}
   }
-  return supabaseToken ??
-      await svc.getOfflineToken() ??
-      (kReleaseMode ? null : 'mock-super-admin');
+  final offline = await svc.getOfflineToken();
+  if (_jwtLooksUsable(offline)) {
+    debugPrint('[Auth] Using onboard device token');
+    return offline;
+  }
+  if (_jwtLooksUsable(supabaseToken)) {
+    debugPrint('[Auth] Using Supabase session token');
+    return supabaseToken;
+  }
+  if (offline != null && offline.isNotEmpty) {
+    debugPrint('[Auth] Onboard token present but expired; sending it anyway');
+    return offline;
+  }
+  if (supabaseToken != null && supabaseToken.isNotEmpty) {
+    debugPrint('[Auth] Supabase token present but expired; sending it anyway');
+    return supabaseToken;
+  }
+  return kReleaseMode ? null : 'mock-super-admin';
 }
 
 IFinanceRealtimeDataSource _buildFinanceRealtime() {
@@ -421,15 +476,29 @@ class AppDependencies {
     final outboxDispatcher = OutboxDispatcher();
     outboxDispatcher.register('*', FinanceApiBatchHandler(financeApiClient));
 
-    final outboxWorker = OutboxWorker(database, outboxDispatcher);
+    final outboxWorker = OutboxWorker(
+      database,
+      outboxDispatcher,
+      onFinanceAck: (commandId, ack) =>
+          invoiceRepository.applyFinanceAck(commandId: commandId, ack: ack),
+    );
 
     // Register in GetIt for legacy sl access
     final sl = GetIt.instance;
+    if (!sl.isRegistered<AppDatabase>()) {
+      sl.registerSingleton<AppDatabase>(database);
+    }
+    if (!sl.isRegistered<OutboxWorker>()) {
+      sl.registerSingleton<OutboxWorker>(outboxWorker);
+    }
     if (!sl.isRegistered<FinanceRepository>()) {
       sl.registerSingleton<FinanceRepository>(financeRepoNew);
     }
     if (!sl.isRegistered<NotificationRepository>()) {
       sl.registerSingleton<NotificationRepository>(notificationRepo);
+    }
+    if (!sl.isRegistered<StaffRepositoryImpl>()) {
+      sl.registerSingleton<StaffRepositoryImpl>(staffRepository);
     }
     if (!sl.isRegistered<FinanceApiClient>()) {
       sl.registerSingleton<FinanceApiClient>(financeApiClient);
@@ -440,6 +509,7 @@ class AppDependencies {
     CustomerWalletCreditService.instance.bind(servicesRepo);
     CustomerWalletCreditService.instance.bindSchool(schoolRepository);
     CustomerWalletCreditService.instance.bindInvoices(invoiceRepository);
+    CustomerWalletCreditService.instance.bindSettings(settingsRepository);
 
     return AppDependencies(
       database: database,
@@ -543,6 +613,7 @@ class _InvolveAppState extends State<InvolveApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   Timer? _outboxTimer;
+  BackgroundSyncService? _servicesSync;
 
   @override
   void initState() {
@@ -561,6 +632,26 @@ class _InvolveAppState extends State<InvolveApp> {
     _outboxTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       widget.dependencies.outboxWorker.triggerSync();
     });
+    _startServicesSync();
+  }
+
+  Future<void> _startServicesSync() async {
+    try {
+      final settings = await widget.dependencies.settingsRepository.getSettings();
+      final mode = settings.businessMode.toLowerCase().trim();
+      if (mode != 'services' && mode != 'service') return;
+
+      final sl = GetIt.instance;
+      if (sl.isRegistered<FinanceApiClient>()) {
+        _servicesSync = BackgroundSyncService(
+          db: widget.dependencies.database,
+          remoteDataSource: ServicesRemoteDataSource(sl<FinanceApiClient>()),
+        );
+        _servicesSync!.start();
+      }
+    } catch (e) {
+      debugPrint('[Services Sync] Failed to start: $e');
+    }
   }
   
   Future<void> _checkEmergencyLock() async {
@@ -601,7 +692,18 @@ class _InvolveAppState extends State<InvolveApp> {
       debugPrint('[Socket Initialization] Using cached config. tenantId: ${config.tenantId}, plan: ${config.plan}, type: ${config.type}');
     }
 
+    socketService.tokenProvider =
+        () => resolveAuthToken(widget.dependencies.securityService);
+
     // Attempt to connect immediately with cached or updated details
+    if (await TerminalSyncService.linkedDeviceBootstrapPending()) {
+      try {
+        await TerminalSyncService.bootstrapLinkedDeviceFromAdmin(deviceId: deviceId);
+      } catch (e) {
+        debugPrint('[Socket Initialization] linked device bootstrap failed: $e');
+      }
+    }
+
     socketService.initializeSocket(
       AppConfig.baseUrl,
       tenantId: config?.tenantId,
@@ -616,6 +718,7 @@ class _InvolveAppState extends State<InvolveApp> {
   @override
   void dispose() {
     _outboxTimer?.cancel();
+    _servicesSync?.stop();
     import_socket_service.SocketService().dispose();
     super.dispose();
   }
@@ -710,6 +813,7 @@ class _InvolveAppState extends State<InvolveApp> {
               itemRepository: dependencies.itemRepository,
               invoiceRepository: dependencies.invoiceRepository,
               financeRepository: dependencies.financeRepositoryNew,
+              settingsRepository: dependencies.settingsRepository,
             ),
           ),
           BlocProvider(
@@ -790,6 +894,7 @@ class _InvolveAppState extends State<InvolveApp> {
             ),
             darkTheme: ThemeData(
               fontFamily: kIsWeb ? 'sans-serif' : null,
+              brightness: Brightness.dark,
               colorScheme: ColorScheme.fromSeed(
                 seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3), 
                 brightness: Brightness.dark,
@@ -798,8 +903,27 @@ class _InvolveAppState extends State<InvolveApp> {
               textSelectionTheme: TextSelectionThemeData(
                 cursorColor: Color(state.settings?.primaryColor ?? 0xFF2196F3),
               ),
+              chipTheme: ChipThemeData(
+                labelStyle: const TextStyle(color: Colors.white),
+                secondaryLabelStyle: const TextStyle(color: Colors.white),
+                backgroundColor: const Color(0xFF2C2C2C),
+                selectedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3).withValues(alpha: 0.35),
+                side: const BorderSide(color: Color(0xFF8A8A8A)),
+              ),
+              listTileTheme: const ListTileThemeData(
+                textColor: Colors.white,
+                iconColor: Color(0xFFCFCFCF),
+                subtitleTextStyle: TextStyle(color: Color(0xFFC8C8C8), fontSize: 13),
+              ),
+              inputDecorationTheme: const InputDecorationTheme(
+                hintStyle: TextStyle(color: Color(0xFFB0B0B0)),
+                labelStyle: TextStyle(color: Color(0xFFE0E0E0)),
+              ),
             ),
             navigatorObservers: [AppRouteObserver(context)],
+            builder: (context, child) => IdleLogoutGuard(
+              child: child ?? const SizedBox.shrink(),
+            ),
             home: const LandingPage(),
             routes: {
               DashboardPage.routeName: (_) => const DashboardPage(),
@@ -818,6 +942,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/customer_lookup': (_) => const CustomerLookupPage(),
               '/create_invoice': (_) => const CreateInvoicePage(),
               '/printer_settings': (_) => const PrinterSettingsPage(),
+              NibssCertPage.routeName: (_) => const NibssCertPage(),
               '/stock_management': (_) => const StockManagementPage(),
               '/invoice_history': (_) => const InvoiceHistoryPage(),
               '/calculator': (_) => const CalculatorPage(),
@@ -831,12 +956,16 @@ class _InvolveAppState extends State<InvolveApp> {
               '/customers_list': (_) => const CustomersListPage(),
               '/student_analytics': (_) => const StudentAnalyticsPage(),
               '/student_list': (_) => const StudentListPage(),
+              '/parent_list': (_) => const ParentListPage(),
               '/teacher_list': (_) => const TeacherListPage(),
               '/school_setup': (_) => const SchoolSetupPage(),
               '/fee_management': (_) => const FeeManagementPage(),
               '/manage_subjects': (_) => const ManageSubjectsPage(),
               '/result_entry': (_) => const ResultEntryPage(),
+              '/attendance': (_) => const AttendanceDashboardPage(),
               '/lesson_notes_list': (_) => const LessonNotesListPage(),
+              MyIdCardPage.routeName: (_) => const MyIdCardPage(),
+              GateClockPage.routeName: (_) => const GateClockPage(),
               '/about': (_) => const AboutPage(),
               '/help': (_) => const HelpPage(),
               '/complaint': (_) => const ComplaintPage(),

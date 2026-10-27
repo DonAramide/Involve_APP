@@ -5,6 +5,7 @@ import 'package:involve_app/features/school/domain/repositories/lesson_note_repo
 import 'package:involve_app/features/school/domain/services/ai_service_interface.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/core/utils/hashing_utils.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 // --- Events ---
 abstract class LessonNoteEvent extends Equatable {
@@ -284,7 +285,12 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
 
       emit(LessonReady(newNote));
     } catch (e) {
-      emit(LessonError('Generation failed: $e'));
+      emit(LessonError(
+        friendlyApiError(
+          e,
+          fallback: 'Could not generate the lesson note. Please try again.',
+        ),
+      ));
     }
   }
 
@@ -293,7 +299,9 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
       await repository.saveLessonNote(event.note);
       add(const LoadLessonNotes()); // Reload list
     } catch (e) {
-      emit(LessonError('Failed to save lesson: $e'));
+      emit(LessonError(
+        friendlyApiError(e, fallback: 'Could not save the lesson note. Please try again.'),
+      ));
     }
   }
 
@@ -302,7 +310,9 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
       await repository.deleteLesson(event.hash);
       add(const LoadLessonNotes());
     } catch (e) {
-      emit(LessonError('Failed to delete lesson: $e'));
+      emit(LessonError(
+        friendlyApiError(e, fallback: 'Could not delete the lesson note. Please try again.'),
+      ));
     }
   }
 }

@@ -9,23 +9,29 @@ import 'package:share_plus/share_plus.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import '../../domain/entities/grading_rule.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/features/school/domain/services/result_service.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 import 'result_preview_page.dart';
+import '../../domain/entities/attendance_models.dart';
+import '../../data/services/attendance_local_storage.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/core/pos/nibss_geo.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:involve_app/core/utils/nibss_response_codes.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
@@ -48,8 +54,12 @@ class StudentProfilePage extends StatefulWidget {
 class _StudentProfilePageState extends State<StudentProfilePage> {
   bool _awaitingVaProvision = false;
   bool _awaitingPaymentSuccess = false;
+  bool _refreshingAccounts = false;
   MposTransactionData? _pendingPosTx;
   StreamSubscription<Student>? _studentCreditSub;
+  StreamSubscription<SchoolParent>? _parentCreditSub;
+  StudentAttendanceSummary? _attendanceSummary;
+  bool _isLoadingAttendance = false;
 
   @override
   void initState() {
@@ -60,19 +70,110 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       if (!mounted || student.id != widget.studentId) return;
       context.read<SchoolBloc>().add(LoadSchoolData());
       context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+      _loadStudentAttendance();
     });
+    _parentCreditSub =
+        CustomerWalletCreditService.instance.onParentCredited.listen((parent) {
+      if (!mounted) return;
+      final student = context.read<SchoolBloc>().state.students.firstWhereOrNull(
+            (s) => s.id == widget.studentId,
+          );
+      if (student?.parentId != parent.id) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStudentAttendance();
+    });
+  }
+
+  Future<void> _loadStudentAttendance() async {
+    final state = context.read<SchoolBloc>().state;
+    final student = state.students.firstWhereOrNull((s) => s.id == widget.studentId);
+    if (student == null) return;
+
+    final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+    final className = sClass?.name ?? '';
+
+    setState(() => _isLoadingAttendance = true);
+    try {
+      final summary = await AttendanceLocalStorage.getStudentSummaryOnlineOffline(
+        studentId: student.id.toString(),
+        studentName: student.fullName,
+        className: className,
+        admissionNumber: student.admissionNumber,
+      );
+      if (mounted) {
+        setState(() {
+          _attendanceSummary = summary;
+          _isLoadingAttendance = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingAttendance = false);
+      }
+    }
   }
 
   @override
   void dispose() {
     _studentCreditSub?.cancel();
+    _parentCreditSub?.cancel();
     super.dispose();
+  }
+
+  SchoolParent? _parentFor(Student student, SchoolState state) {
+    if (student.parentId == null) return null;
+    return state.parents.firstWhereOrNull((p) => p.id == student.parentId);
+  }
+
+  Future<void> _refreshInvifyAndQuasar(Student student) async {
+    if (_refreshingAccounts) return;
+    setState(() => _refreshingAccounts = true);
+    final parent = _parentFor(student, context.read<SchoolBloc>().state);
+    final va = (parent?.virtualAccountNumber ?? student.virtualAccountNumber)?.trim() ?? '';
+    try {
+      final applied = va.isNotEmpty
+          ? await PaymentCatchUpService.instance.refreshVirtualAccount(
+              accountNumber: va,
+            )
+          : await PaymentCatchUpService.instance.runCatchUp(
+              force: true,
+              lookback: const Duration(days: 30),
+              showBanner: false,
+            );
+      if (!mounted) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            applied > 0
+                ? 'Updated from Invify & Quasar · $applied payment${applied == 1 ? '' : 's'} applied'
+                : 'Accounts refreshed. No new Quasar credits found.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyApiError(e, fallback: 'Could not refresh Invify / Quasar.')),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshingAccounts = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<SchoolBloc, SchoolState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (_awaitingPaymentSuccess &&
             state.status == SchoolStatus.success &&
             state.lastPaymentReceipt != null) {
@@ -118,42 +219,19 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
         if (state.error != null && state.status == SchoolStatus.failure) {
           setState(() => _awaitingVaProvision = false);
-          final message = friendlyApiError(
-            state.error,
-            fallback: 'Could not generate virtual account. Please try again.',
-          );
-          final isTrialLock = message.toLowerCase().contains('free trial');
-          showDialog(
-            context: context,
-            builder: (c) => AlertDialog(
-              title: Text(isTrialLock ? 'Free Trial' : 'Virtual Account'),
-              content: Text(message),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(c),
-                  child: const Text('OK'),
-                ),
-                if (isTrialLock)
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ActivationPage(isExpired: false),
-                        ),
-                      );
-                    },
-                    child: const Text('Activate'),
-                  ),
-              ],
-            ),
+          await showVirtualAccountFailureDialog(
+            context,
+            state.error!,
+            subject: 'student virtual account',
           );
           return;
         }
 
         if (state.status == SchoolStatus.success && !state.isLoading) {
           final student = state.students.firstWhereOrNull((s) => s.id == widget.studentId);
+          if (student != null && _attendanceSummary == null && !_isLoadingAttendance) {
+            _loadStudentAttendance();
+          }
           if (student?.virtualAccountNumber != null) {
             setState(() => _awaitingVaProvision = false);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -192,6 +270,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Student Profile'),
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh Invify & Quasar',
+                  onPressed: _refreshingAccounts
+                      ? null
+                      : () => _refreshInvifyAndQuasar(student),
+                  icon: _refreshingAccounts
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
+              ],
               bottom: const TabBar(
                 isScrollable: true,
                 tabs: [
@@ -204,7 +297,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ),
             body: Column(
               children: [
-                _buildHeader(context, student, sClass, assignedTeacher, currency, state.studentInvoices),
+                _buildHeader(context, student, sClass, assignedTeacher, currency, state.studentInvoices, _parentFor(student, state)),
                 Expanded(
                   child: TabBarView(
                     children: [
@@ -230,6 +323,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     Teacher? assignedTeacher,
     String currency,
     List<Invoice> studentInvoices,
+    SchoolParent? parent,
   ) {
     final theme = Theme.of(context);
     // Convention: balance > 0 = debt owed. Negative balance is a sync glitch (over-applied).
@@ -330,6 +424,22 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                           ),
                         ),
                       ),
+                    if ((parent?.creditBalance ?? 0) > 0.001)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Parent credit: ${CurrencyFormatter.formatWithSymbol(parent!.creditBalance, symbol: currency)}',
+                          style: TextStyle(
+                            color: Colors.indigo.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
                     if (hasDebit)
                       TextButton.icon(
                         onPressed: () => _showPaymentDialog(context, student),
@@ -369,6 +479,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Widget _buildGeneralTab(Student student, {bool isProvisioningVa = false}) {
+    final parent = _parentFor(student, context.read<SchoolBloc>().state);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
       children: [
@@ -395,11 +506,25 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 ? Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.grey.shade500)
                 : null,
           ),
+          if (parent?.address != null && parent!.address!.trim().isNotEmpty)
+            _buildInfoRow(
+              icon: Icons.location_on_outlined,
+              label: 'Residential Address',
+              value: parent.address!.trim(),
+            ),
+          ..._siblingInfoRows(context, student),
         ]),
         const SizedBox(height: 22),
         _buildSectionLabel('Personal Details'),
         const SizedBox(height: 10),
         _buildDetailsCard([
+          _buildInfoRow(
+            icon: Icons.badge_outlined,
+            label: 'Middle Name',
+            value: student.middleName?.trim().isNotEmpty == true
+                ? student.middleName!.trim()
+                : 'Not set',
+          ),
           _buildInfoRow(
             icon: Icons.cake_outlined,
             label: 'Date of Birth',
@@ -416,6 +541,50 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             icon: Icons.event_available_outlined,
             label: 'Registered',
             value: DateFormat('dd MMM yyyy').format(student.registrationDate),
+            showDivider: false,
+          ),
+        ]),
+        if (student.notes != null && student.notes!.trim().isNotEmpty) ...[
+          const SizedBox(height: 22),
+          _buildSectionLabel('Health Condition & Special Notes'),
+          const SizedBox(height: 10),
+          _buildDetailsCard([
+            _buildInfoRow(
+              icon: Icons.health_and_safety_outlined,
+              label: 'Medical / Special Notes',
+              value: student.notes!.trim(),
+              showDivider: false,
+            ),
+          ]),
+        ],
+        const SizedBox(height: 22),
+        _buildSectionLabel('Attendance Record'),
+        const SizedBox(height: 10),
+        _buildDetailsCard([
+          _buildInfoRow(
+            icon: Icons.calendar_today_outlined,
+            label: 'Total Sessions Marked',
+            value: '${_attendanceSummary?.totalDays ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.check_circle_outline,
+            label: 'Present',
+            value: '${_attendanceSummary?.present ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.cancel_outlined,
+            label: 'Absent',
+            value: '${_attendanceSummary?.absent ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.access_time_outlined,
+            label: 'Late',
+            value: '${_attendanceSummary?.lateCount ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.pie_chart_outline_rounded,
+            label: 'Attendance Rate',
+            value: _attendanceSummary?.formattedRate ?? 'N/A',
             showDivider: false,
           ),
         ]),
@@ -445,6 +614,69 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       ),
       child: Column(children: children),
     );
+  }
+
+  List<Widget> _siblingInfoRows(BuildContext context, Student student) {
+    if (!student.hasParent) return const [];
+    final siblings = context
+        .read<SchoolBloc>()
+        .state
+        .students
+        .where((s) => s.id != student.id && s.parentKey == student.parentKey)
+        .toList()
+      ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    if (siblings.isEmpty) return const [];
+    return [
+      _buildInfoRow(
+        icon: Icons.family_restroom_outlined,
+        label: siblings.length == 1 ? 'Sibling' : 'Siblings',
+        value: siblings.map((s) => s.fullName).join(', '),
+        onTap: () {
+          if (siblings.length == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StudentProfilePage(studentId: siblings.first.id!),
+              ),
+            );
+            return;
+          }
+          showModalBottomSheet(
+            context: context,
+            builder: (ctx) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Siblings',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ...siblings.map(
+                    (s) => ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(s.fullName),
+                      subtitle: Text(s.admissionNumber),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StudentProfilePage(studentId: s.id!),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ];
   }
 
   Widget _buildInfoRow({
@@ -573,7 +805,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
   Widget _buildResultsTab(List<AcademicResult> results) {
     if (results.isEmpty) {
-      return const Center(child: Text('No academic results recorded yet'));
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          _buildAttendanceSummaryCard(_attendanceSummary),
+          const SizedBox(height: 48),
+          const Center(child: Text('No academic results recorded yet')),
+        ],
+      );
     }
 
     return BlocBuilder<SchoolBloc, SchoolState>(
@@ -587,6 +826,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           children: [
             if (state.studentAverage != null || state.studentPosition != null)
               _buildResultsSummary(state.studentAverage, state.classAverage, state.studentPosition, state.classSize),
+            _buildAttendanceSummaryCard(_attendanceSummary),
             if (filteredResults.isEmpty)
               const Expanded(child: Center(child: Text('No academic results for the current term.')))
             else
@@ -631,7 +871,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Term: ${term?.name ?? "N/A"}',
+                      'Term: ${term?.name ?? "N/A"}'
+                      '${term != null ? '  •  ${term.dateRangeLabel}' : ''}',
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     const Divider(),
@@ -643,13 +884,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                         _buildScoreItem('Total', res.totalScore.toString(), isBold: true),
                       ],
                     ),
-                    if (res.remarks != null && res.remarks!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Remarks: ${res.remarks}',
-                        style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
-                      ),
-                    ],
+                    const SizedBox(height: 10),
+                    _buildResultRemark(res, state.gradingRules),
                   ],
                 ),
               ),
@@ -674,9 +910,25 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       ),
       child: Column(
         children: [
-          const Text(
-            'ACTIVE TERM SUMMARY',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.2),
+          Builder(
+            builder: (context) {
+              final term = context.read<SchoolBloc>().state.activeTerm;
+              return Column(
+                children: [
+                  const Text(
+                    'ACTIVE TERM SUMMARY',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.2),
+                  ),
+                  if (term != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${term.name}  •  ${term.dateRangeLabel}',
+                      style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(
@@ -719,6 +971,96 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAttendanceSummaryCard(StudentAttendanceSummary? summary) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.fact_check_outlined, size: 18, color: Theme.of(context).primaryColor),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'ATTENDANCE SUMMARY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+              if (_isLoadingAttendance)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                InkWell(
+                  onTap: _loadStudentAttendance,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.refresh, size: 16, color: Colors.blueGrey),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildAttendanceItem('TOTAL', '${summary?.totalDays ?? 0}', Colors.blueGrey.shade800),
+              _buildAttendanceItem('PRESENT', '${summary?.present ?? 0}', Colors.green.shade700),
+              _buildAttendanceItem('ABSENT', '${summary?.absent ?? 0}', Colors.red.shade700),
+              _buildAttendanceItem('LATE', '${summary?.lateCount ?? 0}', Colors.orange.shade800),
+              _buildAttendanceItem('RATE', summary?.formattedRate ?? 'N/A', Colors.indigo.shade700, isBold: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceItem(String label, String value, Color color, {bool isBold = false}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
@@ -765,7 +1107,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
-                    items: schoolState.terms.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                    items: schoolState.terms
+                        .map((t) => DropdownMenuItem(value: t.id, child: Text('${t.name} (${t.dateRangeLabel})')))
+                        .toList(),
                     onChanged: (val) {
                       setState(() {
                         selectedTerm = schoolState.terms.firstWhereOrNull((t) => t.id == val);
@@ -860,6 +1204,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             classAverage: state.classAverage,
             studentPosition: state.studentPosition,
             classSize: state.classSize,
+            attendanceSummary: _attendanceSummary,
           ),
         ),
       );
@@ -890,6 +1235,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         classAverage: state.classAverage,
         studentPosition: state.studentPosition,
         classSize: state.classSize,
+        attendanceSummary: _attendanceSummary,
       );
 
       printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth));
@@ -949,6 +1295,38 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildResultRemark(AcademicResult res, List<GradingRule> rules) {
+    final typed = res.remarks?.trim();
+    String? remark = (typed != null && typed.isNotEmpty) ? typed : null;
+    if (remark == null && rules.isNotEmpty) {
+      final sorted = List<GradingRule>.from(rules)
+        ..sort((a, b) => b.minScore.compareTo(a.minScore));
+      for (final rule in sorted) {
+        if (res.totalScore >= rule.minScore) {
+          final fromRule = rule.remarks?.trim();
+          if (fromRule != null && fromRule.isNotEmpty) {
+            remark = fromRule;
+          }
+          break;
+        }
+      }
+    }
+    remark ??= 'No remark recorded';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.amber.withOpacity(0.25)),
+      ),
+      child: Text(
+        'Remark: $remark',
+        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+      ),
     );
   }
 
@@ -1498,6 +1876,33 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Future<void> _onGenerateVirtualAccountPressed(BuildContext context, Student student) async {
+    final plan = context.read<SettingsBloc>().state.userPlan;
+    if (plan == null || !plan.hasOnlineAccess) {
+      if (!context.mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Feature locked'),
+          content: const Text(
+            'Virtual accounts are available on Standard and Premium plans. Please upgrade to continue.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ActivationPage(isExpired: false)),
+                );
+              },
+              child: const Text('UPGRADE'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final orgName = context.read<SettingsBloc>().state.settings?.organizationName;
     if (await showFreeTrialVaLockedIfNeeded(context, businessName: orgName)) {
       return;
@@ -1508,10 +1913,18 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Widget _buildVirtualAccountSection(BuildContext context, Student student, {bool isProvisioningVa = false}) {
-    final hasVa = student.virtualAccountNumber != null &&
-        student.virtualAccountNumber!.trim().isNotEmpty &&
-        student.virtualAccountBank != null &&
-        student.virtualAccountBank!.trim().isNotEmpty;
+    SchoolParent? parent;
+    if (student.parentId != null) {
+      for (final p in context.read<SchoolBloc>().state.parents) {
+        if (p.id == student.parentId) {
+          parent = p;
+          break;
+        }
+      }
+    }
+    final vaNumber = (parent?.virtualAccountNumber ?? student.virtualAccountNumber)?.trim();
+    final vaBank = (parent?.virtualAccountBank ?? student.virtualAccountBank)?.trim();
+    final hasVa = vaNumber != null && vaNumber.isNotEmpty;
 
     if (!hasVa) {
       return Container(
@@ -1547,7 +1960,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Generate a dedicated account for fee payments.',
+                        'Generate a parent account. One number covers this student and their siblings.',
                         style: TextStyle(fontSize: 12, color: Colors.blueGrey),
                       ),
             ],
@@ -1583,10 +1996,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       );
     }
 
-    final accountNumber = student.virtualAccountNumber!.trim();
-    final bankName = student.virtualAccountBank!.trim();
-    final status = (student.virtualAccountStatus ?? 'ACTIVE').toUpperCase();
-    final accountName = student.fullName;
+    final accountNumber = vaNumber!;
+    final bankName = (vaBank == null || vaBank.isEmpty) ? 'Quasar' : vaBank;
+    final status = (parent?.virtualAccountStatus ?? student.virtualAccountStatus ?? 'ACTIVE').toUpperCase();
+    final accountName = parent?.virtualAccountName ?? parent?.fullName ?? student.fullName;
 
     return Container(
       width: double.infinity,
@@ -1622,7 +2035,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'DEDICATED VIRTUAL ACCOUNT',
+                  'PARENT VIRTUAL ACCOUNT',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -1631,6 +2044,28 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'Refresh Invify & Quasar',
+                onPressed: _refreshingAccounts
+                    ? null
+                    : () => _refreshInvifyAndQuasar(student),
+                icon: _refreshingAccounts
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.14),
+                  minimumSize: const Size(36, 36),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1817,11 +2252,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     String? statusMessage;
     void Function(dynamic)? socketCallback;
 
+    final canUseOnlinePay =
+        context.read<SettingsBloc>().state.userPlan?.hasOnlineAccess == true ||
+            await LicenseService.hasOnlinePlanAccess();
     final List<String> methods = ['Cash'];
-    if (isPosConfigured) {
+    if (canUseOnlinePay) {
       methods.add('POS');
+      methods.add('Transfer');
     }
-    methods.add('Transfer');
 
     if (!context.mounted) return;
 
@@ -2196,6 +2634,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                 }
                               } else {
                                 // Cash
+                                if (paymentMethod == 'Cash') {
+                                  final authorised = await requireSystemAccess(
+                                    context,
+                                    purpose:
+                                        'Cash posting requires admin System Access. Enter the password to record this payment.',
+                                  );
+                                  if (authorised != true) return;
+                                }
                                 setState(() {
                                   _awaitingPaymentSuccess = true;
                                   _pendingPosTx = null;
@@ -2243,6 +2689,15 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ? true
             : processOnDevice;
 
+    final geo = await NibssGeo.capture();
+    if (geo != null) {
+      await MposService().saveGeoCoordinates(
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        deviceType: deviceType,
+      );
+    }
+
     return ProgressDialogUtils.showUpdatableProgress(
       pageContext,
       (setMessage) async {
@@ -2253,6 +2708,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           activeHost: activeHost,
           processOnDevice: effectiveProcessOnDevice,
           deviceType: deviceType,
+          latitude: geo?.latitude,
+          longitude: geo?.longitude,
         );
 
         if (payment.status != 'payment_success' &&
@@ -2269,6 +2726,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               activeHost: secondaryHostName,
               processOnDevice: effectiveProcessOnDevice,
               deviceType: deviceType,
+              latitude: geo?.latitude,
+              longitude: geo?.longitude,
             );
           }
         }
@@ -2299,6 +2758,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 'studentId': student.id,
                 'admissionNumber': student.admissionNumber,
               },
+              if (geo != null) 'latitude': geo.latitude,
+              if (geo != null) 'longitude': geo.longitude,
+              if (geo != null) 'field120': geo.field120,
+              if (geo != null) 'geofencing': geo.toJson(),
             },
           );
           final body = posRes.data is Map

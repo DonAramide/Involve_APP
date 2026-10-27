@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.staging-xfer/
 
 # IntelliJ related
 *.iml
@@ -51,6 +52,9 @@ android/key.properties
 android/upload-keystore.jks
 *.jks
 *.keystore
+
+# Machine-local Flutter API target (LAN IP). Example file is committed.
+config/app_targets/local.json
 
 # Secret files
 .env
@@ -112,3 +116,18 @@ invify-backend/scripts/phase4_*.ts
 invify-backend/activate_vault.js
 invify-backend/audit-phase4.js
 invify-production-audit-v2.ps1
+config/app_targets/production.local.json
+config/app_targets/staging.local.json
+artifacts/
+*.tgz
+tmp-*.sh
+tmp-deploy-billing.sh
+invify-backend/COMMIT
+invify-backend/ARTIFACT_META.txt
+invify-backend/maker-checker-queue-staging.json
+invify-backend/scripts/_p*.sh
+invify-backend/scripts/_p*.ts
+invify-backend/scripts/_p*.py
+invify-backend/scripts/_p*.js
+invify-backend/scripts/_record_attendance_migration.js
+

@@ -71,7 +71,7 @@ export const useRuntimeStore = defineStore('runtime', {
       return !!(this.config.capabilities as any)[capability];
     },
     async hydrate() {
-      if (this.isReady) return; // Already hydrated
+      if (this.isReady || this.isLoading) return;
       this.isLoading = true;
       try {
         const tenantId = localStorage.getItem('tenant_id');
@@ -82,6 +82,9 @@ export const useRuntimeStore = defineStore('runtime', {
         // Keep portal tenant scope aligned with runtime
         if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
           localStorage.setItem('tenant_id', this.config.tenant.id);
+        }
+        if (this.config?.tenant?.businessMode) {
+          localStorage.setItem('tenant_type', this.config.tenant.businessMode);
         }
         this.lastHydrated = Date.now();
         this.error = null;
@@ -102,6 +105,9 @@ export const useRuntimeStore = defineStore('runtime', {
         this.config = response.data;
         if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
           localStorage.setItem('tenant_id', this.config.tenant.id);
+        }
+        if (this.config?.tenant?.businessMode) {
+          localStorage.setItem('tenant_type', this.config.tenant.businessMode);
         }
         this.lastHydrated = Date.now();
         this.error = null;

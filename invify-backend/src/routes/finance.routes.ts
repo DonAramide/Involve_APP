@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ExecutiveFinanceController } from '../controllers/finance.controller';
 import { InvoiceController } from '../controllers/invoice.controller';
+import { FinancialCommandController } from '../controllers/financial-command.controller';
 import { checkRole } from '../middleware/rbac.middleware';
 
 const router = Router();
@@ -11,8 +12,29 @@ router.get(
   checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
   ExecutiveFinanceController.getSummary,
 );
+router.post(
+  '/quasar-resync',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']),
+  ExecutiveFinanceController.resyncQuasar,
+);
 router.get('/stats/payouts', ExecutiveFinanceController.getPayoutStats);
 router.get('/settlement-phases', ExecutiveFinanceController.getSettlementPhases);
+
+router.post(
+  '/commands/parent-fund',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
+  FinancialCommandController.parentFund,
+);
+router.post(
+  '/commands/parent-allocate',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
+  FinancialCommandController.parentAllocate,
+);
+router.get(
+  '/invoices/collection-summary',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
+  ExecutiveFinanceController.getCollectionSummary,
+);
 
 // Invoices (REST Wrapper around Sync Engine)
 router.post('/invoices/bulk-sync', InvoiceController.bulkSyncInvoices);

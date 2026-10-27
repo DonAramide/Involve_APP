@@ -5,8 +5,23 @@ import { QueryCache } from '../cache/QueryCache';
 // DTO Interfaces (for documentation/typing purposes)
 export interface ExecutiveSummaryDTO {
   walletBalance: number;
+  withdrawable?: number;
   totalCollected: number;
   revenueInRange: number;
+  totalQuasarCollected?: number;
+  totalQuasarRemitted?: number;
+  pendingQuasarRemittance?: number;
+  pendingVirtualAccountFunds?: number;
+  quasarLiveBalance?: number | null;
+  invifyLoggedVa?: number;
+  quasarBalanceStatus?: 'ok' | 'quasar_ahead' | 'invify_overstated';
+  unsweptVirtualAccount?: {
+    total: number;
+    customer: number;
+    staff: number;
+    student: number;
+    unmapped: number;
+  };
   studentMetrics: { total: number; paid: number; owing: number };
   alerts: { unmatchedCount: number; failedPayoutsCount: number };
 }
@@ -50,12 +65,31 @@ export class FinanceRepository {
         const { data } = await financeApi.getExecutiveSummary();
         return {
           walletBalance: data.walletBalance || 0,
+          withdrawable: Number(data.withdrawable || 0),
           totalCollected: data.totalCollected || 0,
           revenueInRange: data.revenueInRange || 0,
+          totalQuasarCollected: data.totalQuasarCollected || 0,
+          totalQuasarRemitted: data.totalQuasarRemitted || 0,
+          pendingQuasarRemittance: data.pendingQuasarRemittance || 0,
+          pendingVirtualAccountFunds: data.pendingVirtualAccountFunds || 0,
+          quasarLiveBalance: data.quasarLiveBalance ?? null,
+          invifyLoggedVa: data.invifyLoggedVa || 0,
+          quasarBalanceStatus: data.quasarBalanceStatus || 'ok',
+          unsweptVirtualAccount: data.unsweptVirtualAccount || {
+            total: data.pendingVirtualAccountFunds || 0,
+            customer: 0,
+            staff: 0,
+            student: 0,
+            parent: 0,
+            unmapped: 0,
+          },
           salesSummary: data.salesSummary || {
             totalInvoiced: 0,
             totalCollected: 0,
+            totalPending: 0,
             card: 0,
+            vaTransfer: 0,
+            bankTransfer: 0,
             transfer: 0,
             cash: 0,
             wallet: 0,
@@ -74,6 +108,11 @@ export class FinanceRepository {
       },
       options
     );
+  }
+
+  static async getCollectionSummary(params?: { startDate?: string; endDate?: string }) {
+    const { data } = await financeApi.getCollectionSummary(params);
+    return data;
   }
 
   /**
@@ -103,15 +142,26 @@ export class FinanceRepository {
       `wallet_transactions_${tenantId}`,
       async () => {
         const { data } = await financeApi.getWalletTransactions();
-        const transactions = (data?.transactions || []).map((tx: any) => ({
-          id: tx.id || tx.reference,
-          amount: tx.amount,
-          entry_type: (tx.type || '').toUpperCase() === 'CREDIT' ? 'CREDIT' : 'DEBIT',
-          status: tx.status,
-          reference: tx.reference,
-          created_at: tx.created_at,
-          desc: tx.metadata?.description || tx.description || tx.source
-        }));
+        const transactions = (data?.transactions || []).map((tx: any) => {
+          const kind = String(tx.entry_type || tx.type || '').toUpperCase();
+          const isCredit = [
+            'CREDIT',
+            'VIRTUAL_ACCOUNT_CREDIT',
+            'DEPOSIT',
+            'INWARD',
+            'INWARD_PAYMENT',
+            'CARD_PAYMENT',
+          ].includes(kind);
+          return {
+            id: tx.id || tx.reference,
+            amount: tx.amount,
+            entry_type: isCredit ? 'CREDIT' : 'DEBIT',
+            status: tx.status,
+            reference: tx.reference,
+            created_at: tx.created_at,
+            desc: tx.metadata?.description || tx.description || tx.reference || tx.source
+          };
+        });
         return { count: transactions.length, transactions };
       },
       options
@@ -138,14 +188,45 @@ export class FinanceRepository {
   }
 
   /**
-   * GET /api/v1/finance/invoices
+   * GET /api/finance/daily-revenue
    */
+  static async getDailyRevenue(tenantId: string, days = 14, options?: { refresh?: boolean }): Promise<{ date: string; revenue: number }[]> {
+    const scopedTenant = tenantId || localStorage.getItem('tenant_id') || 'unknown';
+    return QueryCache.get(
+      `finance_daily_revenue_${scopedTenant}_${days}`,
+      async () => {
+        const { data } = await financeApi.getDailyRevenue({ days });
+        const rows = Array.isArray(data) ? data : (data?.data || []);
+        return rows.map((r: any) => ({
+          date: String(r.date || '').slice(0, 10),
+          revenue: Number(r.revenue || 0),
+        }));
+      },
+      options
+    );
+  }
+
+  /**
+   * GET /api/finance/transactions — paid invoices + VA credits
+   */
+  static async getSchoolTransactions(tenantId: string, options?: { refresh?: boolean }): Promise<any[]> {
+    const scopedTenant = tenantId || localStorage.getItem('tenant_id') || 'unknown';
+    return QueryCache.get(
+      `finance_school_tx_${scopedTenant}`,
+      async () => {
+        const { data } = await financeApi.getSchoolTransactions({ limit: 500 });
+        return Array.isArray(data) ? data : (data?.transactions || data?.data || []);
+      },
+      options
+    );
+  }
   static async getInvoices(tenantId: string, options?: { refresh?: boolean }): Promise<any[]> {
     return QueryCache.get(
       `finance_invoices_${tenantId}`,
       async () => {
         const { data } = await financeApi.getInvoices();
-        return data?.data || [];
+        const rows = data?.data ?? data?.invoices ?? data;
+        return Array.isArray(rows) ? rows : [];
       },
       options
     );

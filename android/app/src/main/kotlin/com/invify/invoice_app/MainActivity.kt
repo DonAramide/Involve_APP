@@ -83,36 +83,7 @@ class MainActivity: FlutterActivity() {
                     result.success(serialNumber)
                 }
                 "getHardwareSerial" -> {
-                    try {
-                        var serial = ""
-                        try {
-                            val c = Class.forName("android.os.SystemProperties")
-                            val get = c.getMethod("get", String::class.java)
-                            val props = arrayOf("ril.serialnumber", "ro.serialno", "ro.boot.serialno", "sys.serialnumber")
-                            for (prop in props) {
-                                serial = get.invoke(c, prop) as String
-                                if (serial.isNotEmpty() && !serial.equals("unknown", ignoreCase = true) && !serial.equals("M1AJQ", ignoreCase = true)) {
-                                    break
-                                }
-                            }
-                        } catch (ignored: Exception) {}
-
-                        if (serial.isEmpty() || serial.equals("unknown", ignoreCase = true) || serial.equals("M1AJQ", ignoreCase = true)) {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                serial = android.os.Build.getSerial()
-                            } else {
-                                @Suppress("DEPRECATION")
-                                serial = android.os.Build.SERIAL
-                            }
-                        }
-                        result.success(serial)
-                    } catch (e: SecurityException) {
-                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
-                        result.success(androidId)
-                    } catch (e: Exception) {
-                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
-                        result.success(androidId)
-                    }
+                    result.success(readHardwareSerial())
                 }
                 "loadParams" -> {
                     if (isMoreFun) {
@@ -243,15 +214,29 @@ class MainActivity: FlutterActivity() {
                             com.demo.mpossdk.open.ActiveHost.MEDUSA
                         }
                         val processOnDevice = call.argument<Boolean>("processOnDevice") ?: false
+                        val transactionType = call.argument<String>("transactionType") ?: "PURCHASE"
+                        val cashbackAmount = call.argument<Double>("cashbackAmount") ?: 0.0
+                        val originalRrn = call.argument<String>("originalRrn")
+                        val originalStan = call.argument<String>("originalStan")
+                        val latitude = call.argument<Double>("latitude")
+                        val longitude = call.argument<Double>("longitude")
+                        val sendField120 = call.argument<Boolean>("sendField120") ?: false
 
                         pendingPaymentResult = result
                         resultReplied = false
 
                         val paymentRequest = PaymentRequest(
-                            amount = amount, 
-                            terminalId = terminalId, 
+                            amount = amount,
+                            terminalId = terminalId,
                             activeHost = activeHost,
-                            processOnDevice = processOnDevice
+                            processOnDevice = processOnDevice,
+                            transactionType = transactionType,
+                            cashbackAmount = cashbackAmount,
+                            originalRrn = originalRrn,
+                            originalStan = originalStan,
+                            latitude = latitude,
+                            longitude = longitude,
+                            sendField120 = sendField120,
                         )
 
                         MposSdk.initiatePayment(this, paymentRequest) { listener ->
@@ -347,7 +332,8 @@ class MainActivity: FlutterActivity() {
                                             "stan"            to txRes.stan,
                                             "statusCode"      to txRes.statusCode,
                                             "transactionType" to txRes.transactionType,
-                                            "paymentSuccess"  to txRes.paymentSuccess()
+                                            "paymentSuccess"  to txRes.paymentSuccess(),
+                                            "balance"         to txRes.balance
                                         )
                                     }
 
@@ -395,6 +381,41 @@ class MainActivity: FlutterActivity() {
                         }
                     )
                 }
+                "saveGeoCoordinates" -> {
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    if (latitude == null || longitude == null) {
+                        result.error("invalid_geo", "latitude and longitude are required", null)
+                    } else {
+                        MposSdk.saveGeoCoordinates(latitude, longitude)
+                        result.success(
+                            mapOf(
+                                "status" to "success",
+                                "latitude" to latitude,
+                                "longitude" to longitude,
+                                "field120" to (MposSdk.geoField120() ?: ""),
+                            )
+                        )
+                    }
+                }
+                "initGeofencing" -> {
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    if (latitude != null && longitude != null) {
+                        MposSdk.saveGeoCoordinates(latitude, longitude)
+                    }
+                    MposSdk.captureLocation()
+                    val saved = MposSdk.savedGeoCoordinates()
+                    result.success(
+                        mapOf(
+                            "status" to "success",
+                            "message" to "Geofencing coordinates stored for NIBSS Field 120",
+                            "latitude" to saved["latitude"],
+                            "longitude" to saved["longitude"],
+                            "field120" to saved["field120"],
+                        )
+                    )
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -405,5 +426,56 @@ class MainActivity: FlutterActivity() {
     private fun isMoreFunDevice(deviceType: String): Boolean {
         val t = deviceType.uppercase().replace(" ", "").replace("-", "").replace("_", "")
         return t.contains("MOREFUN") || t.contains("MP63") || t == "MPOSDIRECT"
+    }
+
+    private fun isBlankSerial(value: String?): Boolean {
+        val serial = value?.trim().orEmpty()
+        return serial.isEmpty() ||
+            serial.equals("unknown", ignoreCase = true) ||
+            serial.equals("null", ignoreCase = true) ||
+            serial.equals("none", ignoreCase = true) ||
+            serial.equals("0", ignoreCase = true) ||
+            serial.equals("M1AJQ", ignoreCase = true)
+    }
+
+    /// Never returns null. Tries hardware serial, then ANDROID_ID.
+    private fun readHardwareSerial(): String {
+        var serial = ""
+        try {
+            val c = Class.forName("android.os.SystemProperties")
+            val get = c.getMethod("get", String::class.java)
+            val props = arrayOf("ril.serialnumber", "ro.serialno", "ro.boot.serialno", "sys.serialnumber")
+            for (prop in props) {
+                val value = (get.invoke(null, prop) as? String).orEmpty()
+                if (!isBlankSerial(value)) {
+                    serial = value
+                    break
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (isBlankSerial(serial)) {
+            try {
+                serial = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    android.os.Build.getSerial()
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.os.Build.SERIAL
+                }
+            } catch (_: SecurityException) {
+                serial = ""
+            } catch (_: Exception) {
+                serial = ""
+            }
+        }
+
+        if (isBlankSerial(serial)) {
+            serial = android.provider.Settings.Secure.getString(
+                contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ).orEmpty()
+        }
+
+        return serial
     }
 }

@@ -3,25 +3,8 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { AuditService } from '../services/audit.service';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { UUID_RE, toStableUuid } from '../utils/stable-uuid';
 import crypto from 'crypto';
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/** Deterministic UUID so local-1 / local-2 re-sync stably into UUID PKs. */
-function toStableUuid(tenantId: string, entityType: string, raw: string): string {
-  const key = String(raw || '').trim();
-  if (UUID_RE.test(key)) return key.toLowerCase();
-  const hash = crypto
-    .createHash('sha1')
-    .update(`invify-school:${tenantId}:${entityType}:${key || crypto.randomUUID()}`)
-    .digest();
-  const bytes = Buffer.from(hash.subarray(0, 16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x50; // version 5
-  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = bytes.toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
 
 /** execute_sql wraps input as a subquery — close early, run DDL, comment trailer. */
 function ddlInject(sql: string): string {
@@ -39,8 +22,7 @@ export class SchoolSyncController {
    */
   static async bulkSync(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }
@@ -52,6 +34,10 @@ export class SchoolSyncController {
         teachers = [],
         subjects = [],
         students = [],
+        parents = [],
+        parentVirtualAccounts = [],
+        parentPayments = [],
+        parentPaymentAllocations = [],
         results = [],
       } = req.body || {};
 
@@ -100,6 +86,31 @@ export class SchoolSyncController {
         tenantId,
         students,
         classes,
+      );
+      summary.parents = await SchoolSyncController.upsertEntities(
+        tenantId,
+        'parent',
+        parents,
+      );
+      summary.parentVirtualAccounts = await SchoolSyncController.upsertEntities(
+        tenantId,
+        'parent_virtual_account',
+        parentVirtualAccounts,
+      );
+      summary.parentPayments = await SchoolSyncController.upsertEntities(
+        tenantId,
+        'parent_payment',
+        parentPayments,
+      );
+      summary.parentPaymentAllocations = await SchoolSyncController.upsertEntities(
+        tenantId,
+        'parent_payment_allocation',
+        parentPaymentAllocations,
+      );
+      await SchoolSyncController.upsertParentCustomers(
+        tenantId,
+        parents,
+        parentVirtualAccounts,
       );
 
       const totalSynced = Object.values(summary).reduce(
@@ -170,23 +181,67 @@ export class SchoolSyncController {
         console.warn('[SchoolSync] students read:', stuErr.message);
       }
 
-      const byType = (type: string) =>
+      const byType = (type: string): any[] =>
         (entities || [])
           .filter((e: any) => e.entity_type === type)
-          .map((e: any) => ({ id: e.sync_id, ...((e.payload as object) || {}) }));
+          .map((e: any) => {
+            const payload = (e.payload as Record<string, any>) || {};
+            return {
+              ...payload,
+              localId: payload.id,
+              id: e.sync_id,
+              syncId: e.sync_id,
+            };
+          });
 
-      // Prefer students table; fall back to school_entities payloads if needed.
+      // Prefer students table; enrich from school_entities payloads so web
+      // keeps middle names, parents, and other device-only fields.
+      const entityStudents = byType('student');
       let studentRows = students || [];
       if (!studentRows.length) {
-        studentRows = byType('student').map((p: any) => ({
+        studentRows = entityStudents.map((p: any) => ({
           id: p.id || p.syncId,
           first_name: p.firstName || p.first_name,
+          middle_name: p.middleName || p.middle_name,
           last_name: p.lastName || p.last_name,
           admission_number: p.admissionNumber || p.admission_number,
           current_class: p.className || p.current_class,
           running_balance: p.balance ?? p.running_balance ?? 0,
           ...p,
         }));
+      } else {
+        const byAdmission = new Map<string, any>();
+        const byId = new Map<string, any>();
+        for (const p of entityStudents) {
+          const adm = String(p.admissionNumber || p.admission_number || '').trim().toLowerCase();
+          if (adm) byAdmission.set(adm, p);
+          if (p.syncId) byId.set(String(p.syncId), p);
+          if (p.id) byId.set(String(p.id), p);
+        }
+        studentRows = studentRows.map((row: any) => {
+          const adm = String(row.admission_number || '').trim().toLowerCase();
+          const extra = byAdmission.get(adm) || byId.get(String(row.id)) || {};
+          return {
+            ...extra,
+            ...row,
+            localId: extra.localId ?? extra.id,
+            middle_name: row.middle_name || extra.middleName || extra.middle_name || null,
+            first_name: row.first_name || extra.firstName,
+            last_name: row.last_name || extra.lastName,
+            parent_name: row.parent_name || extra.parentName || extra.parent_name,
+            parent_phone: row.parent_phone || extra.parentPhone || extra.parent_phone,
+            address: extra.address || extra.parentAddress || row.address || null,
+            notes: extra.notes || extra.health_condition || extra.healthCondition || row.notes || null,
+            health_condition: extra.notes || extra.health_condition || extra.healthCondition || row.health_condition || null,
+            gender: row.gender || extra.gender,
+            department: row.department || extra.department,
+            className: row.current_class || extra.className,
+            academicYearName: extra.academicYearName || row.academicYearName,
+            classId: row.classId || extra.classId,
+            parentSyncId: extra.parentSyncId || extra.parentId || row.parentSyncId || null,
+            parentId: extra.parentId || row.parentId || extra.parentSyncId || null,
+          };
+        });
       }
 
       // Collapse twin rows created by older syncs (same admission / name+class).
@@ -201,9 +256,82 @@ export class SchoolSyncController {
         teachers: byType('teacher'),
         subjects: byType('subject'),
         results: byType('result'),
+        parents: byType('parent'),
+        parentVirtualAccounts: byType('parent_virtual_account'),
+        parentPayments: byType('parent_payment'),
+        parentPaymentAllocations: byType('parent_payment_allocation'),
       });
     } catch (error: any) {
       console.error('[SchoolSyncController] getRoster Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/school/billing
+   * Fee catalog plus term bills already stored for this school.
+   * School fees are saved as service items, so this is not the product search.
+   */
+  static async getBilling(req: Request, res: Response) {
+    try {
+      const tenantId = resolveTenantScope(req);
+      if (!tenantId) {
+        return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
+      }
+
+      const [{ data: items, error: itemErr }, { data: invoices, error: invErr }] = await Promise.all([
+        supabaseAdmin.from('items').select('*').eq('tenant_id', tenantId).limit(2000),
+        supabaseAdmin
+          .from('invoices')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+          .limit(1000),
+      ]);
+      if (itemErr) throw new Error(itemErr.message);
+      if (invErr) throw new Error(invErr.message);
+
+      const invoiceIds = (invoices || []).map((row: any) => row.id).filter(Boolean);
+      const lines: any[] = [];
+      for (let i = 0; i < invoiceIds.length; i += 100) {
+        const batch = invoiceIds.slice(i, i + 100);
+        const { data, error } = await supabaseAdmin
+          .from('invoice_items')
+          .select('*')
+          .in('invoice_id', batch);
+        if (error) throw new Error(error.message);
+        lines.push(...(data || []));
+      }
+
+      const itemById = new Map((items || []).map((row: any) => [String(row.id), row]));
+      const linesByInvoice = new Map<string, any[]>();
+      for (const line of lines) {
+        const key = String(line.invoice_id);
+        const item = itemById.get(String(line.item_id));
+        const list = linesByInvoice.get(key) || [];
+        list.push({
+          ...line,
+          name: item?.name || 'School fee',
+          itemName: item?.name || 'School fee',
+        });
+        linesByInvoice.set(key, list);
+      }
+
+      const referenced = new Set(lines.map((line) => String(line.item_id)));
+      const fees = (items || []).filter((row: any) => {
+        if (row.is_deleted === true || row.status === 'archived') return false;
+        return row.business_mode === 'school' || row.type === 'service' || referenced.has(String(row.id));
+      });
+
+      return res.status(200).json({
+        fees,
+        invoices: (invoices || []).map((row: any) => ({
+          ...row,
+          items: linesByInvoice.get(String(row.id)) || [],
+        })),
+      });
+    } catch (error: any) {
+      console.error('[SchoolSyncController] getBilling Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -374,10 +502,11 @@ export class SchoolSyncController {
     const entityPayloads: any[] = [];
 
     for (const s of students) {
-      const raw = String(s.syncId || s.sync_id || s.id || '').trim();
+      const raw = String(s.syncId || s.sync_id || '').trim();
       const first =
         String(s.firstName || s.first_name || '').trim() ||
         String(s.name || 'Student').split(/\s+/)[0];
+      const middle = String(s.middleName || s.middle_name || '').trim();
       const last =
         String(s.lastName || s.last_name || '').trim() ||
         String(s.name || '')
@@ -388,11 +517,13 @@ export class SchoolSyncController {
       const admission = String(
         s.admissionNumber || s.admission_number || '',
       ).trim();
-      // Prefer admission number as stable identity so re-syncs don't create twin rows
-      // when the device local id / syncId changes between builds.
-      const identityKey = admission
-        ? `admission:${admission}`
-        : raw || crypto.randomUUID();
+      // Prefer the device UUID so tablet and web share the same student id.
+      // Fall back to admission so older payloads without syncId stay stable.
+      const identityKey = UUID_RE.test(raw)
+        ? raw
+        : admission
+          ? `admission:${admission}`
+          : String(s.id || '').trim() || crypto.randomUUID();
       const syncId = toStableUuid(tenantId, 'student', identityKey);
       const admissionFinal = admission || `ADM-${syncId.slice(0, 8)}`;
       const className =
@@ -406,10 +537,16 @@ export class SchoolSyncController {
         school_id: tenantId,
         tenant_id: tenantId,
         first_name: first,
+        middle_name: middle || null,
         last_name: last,
         admission_number: admissionFinal,
         current_class: className,
         running_balance: balance,
+        parent_name: s.parentName || s.parent_name || null,
+        parent_phone: s.parentPhone || s.parent_phone || null,
+        gender: s.gender || null,
+        department: s.department || null,
+        date_of_birth: s.dateOfBirth || s.date_of_birth || null,
         virtual_account_number: s.virtualAccountNumber || s.virtual_account_number || null,
         virtual_account_bank: s.virtualAccountBank || s.virtual_account_bank || null,
         virtual_account_status: s.virtualAccountStatus || s.virtual_account_status || null,
@@ -418,13 +555,18 @@ export class SchoolSyncController {
       customerRows.push({
         id: syncId,
         tenant_id: tenantId,
-        name: `${first} ${last}`.trim(),
+        name: [first, middle, last].filter(Boolean).join(' ').trim(),
         phone: s.parentPhone || s.parent_phone || s.phone || null,
         email: s.email || null,
         address: s.address || null,
         balance,
-        virtual_account_number: s.virtualAccountNumber || s.virtual_account_number || null,
-        virtual_account_bank: s.virtualAccountBank || s.virtual_account_bank || null,
+        // Linked children share the parent VA. Do not keep a child-owned customer VA.
+        virtual_account_number: (s.parentSyncId || s.parentId)
+          ? null
+          : (s.virtualAccountNumber || s.virtual_account_number || null),
+        virtual_account_bank: (s.parentSyncId || s.parentId)
+          ? null
+          : (s.virtualAccountBank || s.virtual_account_bank || null),
         virtual_account_name: `${first} ${last}`.trim(),
         updated_at: new Date().toISOString(),
         created_at: s.createdAt || s.created_at || new Date().toISOString(),
@@ -439,7 +581,16 @@ export class SchoolSyncController {
         .from('students')
         .upsert(batch, { onConflict: 'id' });
       if (error) {
-        const slim = batch.map(({ school_id, ...rest }) => rest);
+        const slim = batch.map(({
+          school_id,
+          middle_name,
+          parent_name,
+          parent_phone,
+          gender,
+          department,
+          date_of_birth,
+          ...rest
+        }) => rest);
         const retry = await supabaseAdmin.from('students').upsert(slim, { onConflict: 'id' });
         if (retry.error) {
           errors.push(`students batch ${Math.floor(i / 50) + 1}: ${error.message}`);
@@ -464,5 +615,56 @@ export class SchoolSyncController {
     await SchoolSyncController.upsertEntities(tenantId, 'student', entityPayloads);
 
     return { synced, errors };
+  }
+
+  /** Mirror parent VAs (canonical + legacy) as customers so webhooks prefer par-* ids. */
+  private static async upsertParentCustomers(
+    tenantId: string,
+    parents: any[],
+    vas: any[],
+  ) {
+    if (!Array.isArray(parents) || parents.length === 0) return;
+    const parentByLocalId = new Map<string, any>();
+    for (const p of parents) {
+      parentByLocalId.set(String(p.id ?? ''), p);
+    }
+    const rows: any[] = [];
+    const pushVa = (parent: any, accountNumber: string, bank?: string, kind = 'canonical') => {
+      const number = String(accountNumber || '').trim();
+      if (!number) return;
+      const rawSync = String(parent.syncId || parent.sync_id || parent.id || '').trim();
+      const parentKey = rawSync.startsWith('par-') ? rawSync : `par-${rawSync || number}`;
+      const id =
+        kind === 'canonical' ? parentKey : `${parentKey}-legacy-${number}`;
+      rows.push({
+        id,
+        tenant_id: tenantId,
+        name: parent.fullName || parent.name || 'Parent',
+        phone: parent.phone || null,
+        email: parent.email || null,
+        virtual_account_number: number,
+        virtual_account_bank: bank || parent.virtualAccountBank || null,
+        virtual_account_name: parent.virtualAccountName || parent.fullName || 'Parent',
+        updated_at: new Date().toISOString(),
+      });
+    };
+    for (const p of parents) {
+      if (p.virtualAccountNumber) {
+        pushVa(p, p.virtualAccountNumber, p.virtualAccountBank, 'canonical');
+      }
+    }
+    for (const v of vas || []) {
+      const parent = parentByLocalId.get(String(v.parentId ?? ''));
+      if (!parent) continue;
+      const canonical = v.isCanonical === true || v.kind === 'canonical';
+      pushVa(parent, v.accountNumber, v.bankName, canonical ? 'canonical' : 'legacy');
+    }
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await supabaseAdmin.from('customers').upsert(batch, { onConflict: 'id' });
+      if (error) {
+        console.warn('[SchoolSync] parent customers:', error.message);
+      }
+    }
   }
 }

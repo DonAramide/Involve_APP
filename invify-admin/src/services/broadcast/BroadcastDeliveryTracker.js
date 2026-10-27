@@ -2,7 +2,7 @@
  * BROADCAST DELIVERY TRACKER LAYER
  * State monitoring subsystem maintaining deterministic audits across six canonical phases.
  * Implements automated SLA timeout escalations, local durable persistence sweeps,
- * and delivery metrics histograms.
+ * and delivery metrics histograms from real dispatch events only.
  */
 
 import { operationalEventBusSingleton } from '../realtime/OperationalEventBus';
@@ -18,33 +18,29 @@ export const TrackingStates = {
 
 class BroadcastDeliveryTracker {
   constructor() {
-    // Definitive tracking ledger mapping broadcast IDs to current absolute lifecycle models
     this.trackingLedger = new Map();
-    
-    // Internal analytics aggregation buckets (Refinement 5)
-    this.analyticsHistograms = {
-      under100ms: 450,
-      under500ms: 120,
-      over1000ms: 12,
-      totalSlaMet: 570,
-      totalBreaches: 4,
-      regionalConvergence: {
-        "us-east": "99.9%",
-        "eu-west": "99.4%",
-        "ap-south": "98.7%"
-      }
-    };
 
-    // Load locally persisted unacknowledged durable banners from storage sweeps (Refinement 3)
+    this.analyticsHistograms = {
+      under100ms: 0,
+      under500ms: 0,
+      over1000ms: 0,
+      totalSlaMet: 0,
+      totalBreaches: 0,
+    };
+    this.regionStats = new Map();
+
     this.restorePersistentBanners();
-    
-    // Begin continuous operational monitoring checks
     this.startAckTimeoutEscalationSweeper();
   }
 
-  /**
-   * Initializes or mutates status indicators for an active broadcast sequence
-   */
+  recordRegionSample(regionId, ok) {
+    const key = regionId || 'unspecified';
+    const current = this.regionStats.get(key) || { ok: 0, total: 0 };
+    current.total += 1;
+    if (ok) current.ok += 1;
+    this.regionStats.set(key, current);
+  }
+
   updateTrackingState(broadcastId, newState, metaContext = {}) {
     const validStates = Object.values(TrackingStates);
     if (!validStates.includes(newState)) {
@@ -58,27 +54,33 @@ class BroadcastDeliveryTracker {
       currentState: newState,
       history: [],
       createdAt: now,
-      slaTimeoutAt: now + (metaContext.severity === "EMERGENCY" ? 30000 : 120000), // EMERGENCY expects ack in 30s
+      slaTimeoutAt: now + (metaContext.severity === "EMERGENCY" ? 30000 : 120000),
       severity: metaContext.severity || "INFO",
       tenantId: metaContext.tenantId || "global",
+      regionId: metaContext.regionId || null,
       launcherMode: metaContext.launcherMode || "toast",
       isEscalated: false
     };
 
     existing.currentState = newState;
     existing.history.push({ state: newState, timestamp: now });
-    
-    // Record deterministic latency analytics distributions
+
     if (newState === TrackingStates.DELIVERED) {
       const latency = now - existing.createdAt;
       if (latency <= 100) this.analyticsHistograms.under100ms++;
       else if (latency <= 500) this.analyticsHistograms.under500ms++;
       else this.analyticsHistograms.over1000ms++;
+      this.analyticsHistograms.totalSlaMet++;
+      this.recordRegionSample(existing.regionId || metaContext.regionId, true);
+    }
+
+    if (newState === TrackingStates.FAILED) {
+      this.analyticsHistograms.totalBreaches++;
+      this.recordRegionSample(existing.regionId || metaContext.regionId, false);
     }
 
     this.trackingLedger.set(broadcastId, existing);
 
-    // Refinement 3: Persistent banner handling. If a banner is delivered/pending, store it locally.
     if (existing.launcherMode === "banner" || existing.launcherMode === "kiosk-lock") {
       this.persistDurableBannerState(existing);
     }
@@ -87,27 +89,22 @@ class BroadcastDeliveryTracker {
     return existing;
   }
 
-  /**
-   * Refinement 2: Automated ACK timeout sweeping loops alerting SOC views natively
-   */
   startAckTimeoutEscalationSweeper() {
     setInterval(() => {
       const now = Date.now();
-      
+
       this.trackingLedger.forEach((entry, bId) => {
-        // Evaluate strictly unacknowledged high-priority targets
-        if (["EMERGENCY", "CRITICAL"].includes(entry.severity) && 
-            entry.currentState !== TrackingStates.ACKNOWLEDGED && 
+        if (["EMERGENCY", "CRITICAL"].includes(entry.severity) &&
+            entry.currentState !== TrackingStates.ACKNOWLEDGED &&
             entry.currentState !== TrackingStates.EXPIRED) {
-          
-          // Trigger automated incident escalation if target breaches time SLA limits
+
           if (now > entry.slaTimeoutAt && !entry.isEscalated) {
             entry.isEscalated = true;
             this.analyticsHistograms.totalBreaches++;
-            
-            console.error(`[DELIVERY TRACKER] ⚠️ SLA TIMEOUT ESCALATION TRIGGERED: Broadcast ID ${bId} failed to receive device acknowledgement.`);
-            
-            // Dispatch native warning payloads directly to master operational Event Bus instances
+            this.recordRegionSample(entry.regionId, false);
+
+            console.error(`[DELIVERY TRACKER] SLA TIMEOUT ESCALATION: Broadcast ID ${bId} failed to receive device acknowledgement.`);
+
             operationalEventBusSingleton.dispatchIncomingRawPayload({
               meta_id: `esc_${Date.now()}`,
               src_dev: `tracker-engine`,
@@ -120,15 +117,11 @@ class BroadcastDeliveryTracker {
           }
         }
       });
-    }, 5000); // Check sweepers execute every 5 seconds
+    }, 5000);
   }
 
-  /**
-   * Refinement 3: Preserves unacknowledged durable banner metadata across page reloads
-   */
   persistDurableBannerState(ledgerEntry) {
     if (ledgerEntry.currentState === TrackingStates.ACKNOWLEDGED || ledgerEntry.currentState === TrackingStates.EXPIRED) {
-      // Remove cleanly from offline retention maps
       const currentList = this.getDurableBanners();
       const updated = currentList.filter(item => item.broadcastId !== ledgerEntry.broadcastId);
       localStorage.setItem("invify_durable_banners", JSON.stringify(updated));
@@ -136,7 +129,7 @@ class BroadcastDeliveryTracker {
     }
 
     const currentList = this.getDurableBanners();
-    const exists = currentList.some(item => item.broadcastId !== ledgerEntry.broadcastId);
+    const exists = currentList.some(item => item.broadcastId === ledgerEntry.broadcastId);
     if (!exists) {
       currentList.push({
         broadcastId: ledgerEntry.broadcastId,
@@ -146,7 +139,6 @@ class BroadcastDeliveryTracker {
         createdAt: ledgerEntry.createdAt
       });
       localStorage.setItem("invify_durable_banners", JSON.stringify(currentList));
-      console.log(`[DELIVERY TRACKER] Committed unacknowledged banner parameters to persistent disk retention buffer.`);
     }
   }
 
@@ -164,29 +156,48 @@ class BroadcastDeliveryTracker {
     retained.forEach(banner => {
       if (!this.trackingLedger.has(banner.broadcastId)) {
         this.updateTrackingState(banner.broadcastId, TrackingStates.PENDING, banner);
-        console.log(`[DELIVERY TRACKER] Restored durable banner tracking context from offline retention stores: ID ${banner.broadcastId}`);
       }
     });
   }
 
-  /**
-   * Refinement 5: Expose analytics vectors to dashboard controllers
-   */
+  getRegionalConvergence() {
+    const out = {};
+    this.regionStats.forEach((stats, region) => {
+      const ratio = stats.total > 0 ? ((stats.ok / stats.total) * 100).toFixed(1) : '0.0';
+      out[region] = `${ratio}%`;
+    });
+    return out;
+  }
+
   getDeliveryAnalytics() {
-    const totalCount = this.trackingLedger.size || 1;
+    const totalCount = this.trackingLedger.size || 0;
     const acked = Array.from(this.trackingLedger.values()).filter(e => e.currentState === TrackingStates.ACKNOWLEDGED).length;
-    
+    const denom = this.analyticsHistograms.totalSlaMet + this.analyticsHistograms.totalBreaches;
+    const packetTotal =
+      this.analyticsHistograms.under100ms +
+      this.analyticsHistograms.under500ms +
+      this.analyticsHistograms.over1000ms;
+
     return {
       histograms: this.analyticsHistograms,
-      slaAdherencePercentage: ((this.analyticsHistograms.totalSlaMet / (this.analyticsHistograms.totalSlaMet + this.analyticsHistograms.totalBreaches)) * 100).toFixed(1),
+      packetTotal,
+      slaAdherencePercentage: denom === 0 ? '0.0' : ((this.analyticsHistograms.totalSlaMet / denom) * 100).toFixed(1),
       activeTrackedCount: this.trackingLedger.size,
       globalAcknowledgeRatio: `${acked}/${totalCount}`,
-      regionalConvergence: this.analyticsHistograms.regionalConvergence
+      regionalConvergence: this.getRegionalConvergence()
     };
   }
 
   resetLedger() {
     this.trackingLedger.clear();
+    this.analyticsHistograms = {
+      under100ms: 0,
+      under500ms: 0,
+      over1000ms: 0,
+      totalSlaMet: 0,
+      totalBreaches: 0,
+    };
+    this.regionStats.clear();
   }
 }
 

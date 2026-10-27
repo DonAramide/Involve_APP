@@ -81,7 +81,7 @@ export interface CreatePaymentIntentParams {
 }
 
 export interface CreateTransferParams {
-  amount: number;
+  amount: number | string;
   reference: string;
   currency?: string;
   destination: {
@@ -285,6 +285,11 @@ export class QuasarPaymentsClient {
   /** GET /transfers — List transfers */
   async getTransfers(opts?: RequestOptions): Promise<Transfer[]> {
     return this.client.get<Transfer[]>('/transfers', opts);
+  }
+
+  /** GET /transfers/{reference} — Poll a single transfer by Invify/Quasar reference */
+  async getTransfer(reference: string, opts?: RequestOptions): Promise<Transfer> {
+    return this.client.get<Transfer>(`/transfers/${encodeURIComponent(reference)}`, opts);
   }
 
   // ── POS / MPOS ────────────────────────────────────────────────────────────
@@ -654,6 +659,8 @@ export class QuasarPaymentsClient {
       parentId: string;
       currency: string;
       email: string;
+      /** Quasar CreateVirtualAccountDto now accepts phone (+ alias phoneNumber). */
+      phone?: string;
       firstName?: string;
       lastName?: string;
       parentShareBps?: number;
@@ -664,20 +671,149 @@ export class QuasarPaymentsClient {
     opts?: RequestOptions,
   ): Promise<any> {
     const idempotencyKey = opts?.idempotencyKey ?? `virtual-account:${params.childId}`;
+    const phone = String(params.phone || '').trim();
+    const path = `/school/students/${encodeURIComponent(params.childId)}/virtual-account`;
+    const body: Record<string, unknown> = {
+      merchantWalletOwnerId: params.parentId,
+      currency: params.currency,
+      email: params.email,
+      firstName: params.firstName || 'User',
+      lastName: params.lastName || 'Account',
+      counterpartyShareBps: params.parentShareBps ?? 0,
+      preferredBankCode: params.preferredBankCode,
+      bvn: params.bvn,
+      metadata: {
+        ...(params.metadata || {}),
+        ...(phone
+          ? { phone, phoneNumber: phone, customerPhone: phone }
+          : {}),
+      },
+    };
+    // Quasar live: top-level phone (whitelist now allows phone + phoneNumber).
+    if (phone) {
+      body.phone = phone;
+      body.phoneNumber = phone;
+    }
+
+    const safeBody = {
+      ...body,
+      // keep phone visible in logs (needed for Quasar support); never log API keys
+    };
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        tag: 'INVIFY_VA_QUASAR_REQ',
+        method: 'POST',
+        path,
+        childId: params.childId,
+        idempotencyKey,
+        body: safeBody,
+      }),
+    );
+
+    try {
+      const result = await this.client.post(path, body, { ...opts, idempotencyKey });
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          tag: 'INVIFY_VA_QUASAR_RES',
+          method: 'POST',
+          path,
+          childId: params.childId,
+          ok: true,
+          accountNumber: (result as any)?.accountNumber || (result as any)?.account_number || null,
+          bankName: (result as any)?.bankName || null,
+          reference: (result as any)?.reference || null,
+          rawKeys: result && typeof result === 'object' ? Object.keys(result as object) : [],
+        }),
+      );
+      return result;
+    } catch (err: any) {
+      const status = err?.response?.status || err?.statusCode || null;
+      const data = err?.response?.data || err?.data || null;
+      console.error(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          tag: 'INVIFY_VA_QUASAR_RES',
+          method: 'POST',
+          path,
+          childId: params.childId,
+          ok: false,
+          status,
+          message: err?.message || String(err),
+          responseBody: data,
+        }),
+      );
+      throw err;
+    }
+  }
+
+  /** GET /school/students/{childId}/virtual-account — fetch an already-provisioned VA. */
+  async getVirtualAccount(childId: string, opts?: RequestOptions): Promise<any> {
+    const path = `/school/students/${encodeURIComponent(childId)}/virtual-account`;
+    return this.client.get(path, opts);
+  }
+
+  /**
+   * POST /payments/intents/{reference}/refunds
+   * Existing payment-intent refund. Amount is kobo.
+   */
+  async createIntentRefund(
+    reference: string,
+    params: { amount: number; reason?: string },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const idempotencyKey = opts?.idempotencyKey ?? `intent-refund:${reference}:${params.amount}`;
     return this.client.post(
-      `/school/students/${encodeURIComponent(params.childId)}/virtual-account`,
+      `/payments/intents/${encodeURIComponent(reference)}/refunds`,
+      { amount: Math.round(params.amount), reason: params.reason },
+      { ...opts, idempotencyKey },
+    );
+  }
+
+  /**
+   * POST /disputes/debits — Maker-checker chargeback / manual tenant debit.
+   * Invify only calls this after a distinct checker has approved the case.
+   * Amount is kobo. Idempotency-Key is required.
+   */
+  async createDisputeDebit(
+    params: {
+      invifyTenantId: string;
+      quasarTenantId?: string | null;
+      invifyCaseId: string;
+      amount: number;
+      currency?: string;
+      type: 'REFUND' | 'CHARGEBACK' | 'MANUAL_DEBIT';
+      reason: string;
+      originalPaymentReference?: string;
+      makerEmail: string;
+      checkerEmail: string;
+      metadata?: Record<string, any>;
+    },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const idempotencyKey = opts?.idempotencyKey ?? `dispute-debit:${params.invifyCaseId}`;
+    return this.client.post(
+      '/disputes/debits',
       {
-        merchantWalletOwnerId: params.parentId,
-        currency: params.currency,
-        email: params.email,
-        firstName: params.firstName || 'User',
-        lastName: params.lastName || 'Account',
-        counterpartyShareBps: params.parentShareBps ?? 0,
-        preferredBankCode: params.preferredBankCode,
-        bvn: params.bvn,
-        metadata: params.metadata,
+        invifyTenantId: params.invifyTenantId,
+        quasarTenantId: params.quasarTenantId || undefined,
+        invifyCaseId: params.invifyCaseId,
+        amount: Math.round(params.amount),
+        currency: params.currency ?? 'NGN',
+        type: params.type,
+        reason: params.reason,
+        originalPaymentReference: params.originalPaymentReference,
+        makerEmail: params.makerEmail,
+        checkerEmail: params.checkerEmail,
+        metadata: params.metadata || {},
       },
       { ...opts, idempotencyKey },
     );
+  }
+
+  /** GET /disputes/debits/{id} */
+  async getDisputeDebit(debitId: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/disputes/debits/${encodeURIComponent(debitId)}`, opts);
   }
 }

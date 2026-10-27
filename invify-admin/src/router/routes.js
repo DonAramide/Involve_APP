@@ -45,7 +45,7 @@ const routes = [
   {
     path: '/mfa/challenge',
     component: () => import('pages/governance/MFAChallengePage.vue'),
-    meta: { requiresAuth: true, isMfaPendingAllowed: true, title: 'Multi-Factor Gateway' }
+    meta: { isMfaPendingAllowed: true, title: 'Multi-Factor Gateway' }
   },
   {
     path: '/onboarding',
@@ -64,18 +64,23 @@ const routes = [
   },
 
   // ==========================================
-  // AGENT PORTAL WORKSPACE
+  // INSTITUTE PORTAL WORKSPACE
+  // Canonical public path is /institute/*. /agent/* redirects here.
   // ==========================================
   {
-    path: '/agent',
+    path: '/institute',
     component: () => import('layouts/AgentLayout.vue'),
     children: [
-      { path: '', redirect: '/agent/dashboard' },
-      { path: 'login', component: () => import('pages/agent/AgentLoginPage.vue') },
-      { path: 'signup', component: () => import('pages/agent/AgentSignupPage.vue') },
+      { path: '', redirect: '/institute/dashboard' },
+      { path: 'login', component: () => import('pages/agent/AgentLoginPage.vue'), meta: { isGuest: true, title: 'Institute Login' } },
+      { path: 'signup', component: () => import('pages/agent/AgentSignupPage.vue'), meta: { isGuest: true } },
+      { path: 'reset-password', component: () => import('pages/agent/AgentResetPasswordPage.vue'), meta: { isGuest: true } },
       { path: 'success', component: () => import('pages/agent/AgentSuccessPage.vue') },
       { path: 'dashboard', component: () => import('pages/agent/AgentDashboardPage.vue') },
       { path: 'coming-soon/:module', component: () => import('pages/agent/ComingSoonPage.vue') },
+      { path: 'assign-device', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
+      { path: 'assign-terminal', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
+      { path: 'hmo/:section', component: () => import('pages/agent/InstituteHmoWorkspace.vue') },
       { path: 'notifications', component: () => import('pages/agent-portal/AgentNotificationsPage.vue') },
       { path: 'profile', component: () => import('pages/agent-portal/AgentProfilePage.vue') },
       { path: 'leads', component: () => import('pages/agent-portal/leads/LeadKanbanPage.vue') },
@@ -86,8 +91,26 @@ const routes = [
       { path: 'training', component: () => import('pages/agent-portal/AgentTrainingPage.vue') },
       { path: 'certifications', component: () => import('pages/agent-portal/AgentCertificationsPage.vue') },
       { path: 'reputation', component: () => import('pages/agent-portal/AgentReputationPage.vue') },
-      { path: 'analytics', component: () => import('pages/agent-portal/AgentAnalyticsPage.vue') }
+      { path: 'analytics', component: () => import('pages/agent-portal/AgentAnalyticsPage.vue') },
+      { path: 'developer', component: () => import('pages/agent-portal/AgentDeveloperPage.vue') }
     ]
+  },
+  {
+    path: '/agent',
+    redirect: '/institute/dashboard',
+  },
+  {
+    path: '/agent/:pathMatch(.*)*',
+    redirect: (to) => {
+      const rest = Array.isArray(to.params.pathMatch)
+        ? to.params.pathMatch.join('/')
+        : String(to.params.pathMatch || '')
+      return {
+        path: rest ? `/institute/${rest}` : '/institute/dashboard',
+        query: to.query,
+        hash: to.hash,
+      }
+    }
   },
 
   // ==========================================
@@ -128,7 +151,7 @@ const routes = [
       { 
         path: 'admin/agents', 
         component: () => import('pages/admin/AgentOnboardingPage.vue'),
-        meta: { title: 'Agent Governance', workspace: 'admin', permission: 'admin_agent_management', requiresAuth: true }
+        meta: { title: 'Institute Governance', workspace: 'admin', permission: 'admin_agent_management', requiresAuth: true }
       },
       { 
         path: 'admin/certifications', 
@@ -202,7 +225,7 @@ const routes = [
       { 
         path: 'governance/agents', 
         component: () => import('pages/admin/AgentGovernanceCenterPage.vue'),
-        meta: { title: 'Agent Governance Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
+        meta: { title: 'Institute Governance Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
         path: 'governance/rbac-roles', 
@@ -295,7 +318,7 @@ const routes = [
         meta: { title: 'SLA Command Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
-        path: 'automation/workflows', 
+        path: 'governance/workflows', 
         component: () => import('pages/governance/WorkflowAutomationCenter.vue'),
         meta: { title: 'Workflow Automation', workspace: 'governance', permission: 'admin_deploy', requiresAuth: true }
       },
@@ -338,6 +361,11 @@ const routes = [
         component: () => import('pages/DashboardPage.vue'),
         meta: { title: 'Ingestion Pipelines', workspace: 'observability', permission: 'read_streams', requiresAuth: true }
       },
+      { 
+        path: 'observability/system-health', 
+        component: () => import('../pages/observability/StagingObservabilityPage.vue'),
+        meta: { title: 'Staging System Health', workspace: 'observability', permission: 'read_observability_staging', requiresAuth: true }
+      },
 
       // ==========================================
       // PRIORITY WORKSPACE 4: AI OPERATIONAL INTELLIGENCE
@@ -353,25 +381,39 @@ const routes = [
       // ==========================================
       { path: 'deployments/rollouts', component: () => import('pages/deployments/RolloutControlCenterPage.vue'), meta: { workspace: 'deployments', title: 'Rollout Control Center', permission: 'admin_deploy', requiresAuth: true, keywords: ['stabilization', 'canary', 'releases', 'versions', 'deployment'] } },
       { path: 'deployments/channels', component: () => import('pages/deployments/ReleaseChannelsPage.vue'), meta: { workspace: 'deployments', title: 'Release Channels', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/transactions', component: () => import('pages/finance/TransactionInvestigationCenterPage.vue'), meta: { workspace: 'finance', title: 'Transaction Investigation', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/ledger', component: () => import('pages/finance/GlobalLedgerPage.vue'), meta: { workspace: 'finance', title: 'Financial Ledger', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/reconciliation', component: () => import('pages/finance/ReconciliationWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Reconciliation Engine', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/settlements', component: () => import('pages/finance/SettlementWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Settlement Engine', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/audit', component: () => import('pages/finance/AuditWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Audit Engine', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/wallets', component: () => import('pages/finance/WalletOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Wallet Operations', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/cards', component: () => import('pages/finance/CardOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Card Operations', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/terminals', component: () => import('pages/finance/TerminalOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Terminal Operations', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/revenue', component: () => import('pages/finance/RevenueOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Revenue Operations', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/fraud', component: () => import('pages/finance/FraudMonitoringCenterPage.vue'), meta: { workspace: 'finance', title: 'Fraud Monitoring', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/tenant-health', component: () => import('pages/finance/TenantFinancialHealthCenterPage.vue'), meta: { workspace: 'finance', title: 'Tenant Financial Health', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'finance/compliance', component: () => import('pages/finance/ComplianceCenterPage.vue'), meta: { workspace: 'finance', title: 'Compliance Center', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'finance/tenant-billing', component: () => import('pages/finance/TenantBillingCollectionsPage.vue'), meta: { workspace: 'finance', title: 'Tenant Billing & Collections', permission: 'billing.view', requiresAuth: true, keywords: ['invify box', 'installment', 'subscription billing', 'collections'] } },
+      { path: 'finance/transactions', component: () => import('pages/finance/TransactionInvestigationCenterPage.vue'), meta: { workspace: 'finance', title: 'Transaction Investigation', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/ledger', component: () => import('pages/finance/GlobalLedgerPage.vue'), meta: { workspace: 'finance', title: 'Financial Ledger', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/reconciliation', component: () => import('pages/finance/ReconciliationWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Reconciliation Engine', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/settlements', component: () => import('pages/finance/SettlementWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Settlement Engine', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/payables', component: () => import('pages/finance/TenantPayablesPage.vue'), meta: { workspace: 'finance', title: 'Tenant Payables', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/virtual-accounts', component: () => import('pages/finance/VirtualAccountsPage.vue'), meta: { workspace: 'finance', title: 'Virtual Accounts', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/audit', component: () => import('pages/finance/AuditWorkspacePage.vue'), meta: { workspace: 'finance', title: 'Audit Engine', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/wallets', component: () => import('pages/finance/WalletOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Wallet Operations', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/cards', component: () => import('pages/finance/CardOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Card Operations', permission: 'read_finance', requiresAuth: true } },
+      {
+        path: 'finance/refunds-chargebacks',
+        component: () => import('pages/finance/RefundsChargebacksPage.vue'),
+        meta: {
+          workspace: 'finance',
+          title: 'Refunds & Chargebacks',
+          permission: 'read_finance',
+          requiresAuth: true,
+          keywords: ['refund', 'chargeback', 'manual debit', 'quasar', 'maker checker', 'dispute'],
+        },
+      },
+      { path: 'finance/terminals', component: () => import('pages/finance/TerminalOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Terminal Operations', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/revenue', component: () => import('pages/finance/RevenueOperationsCenterPage.vue'), meta: { workspace: 'finance', title: 'Revenue Operations', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/fraud', component: () => import('pages/finance/FraudMonitoringCenterPage.vue'), meta: { workspace: 'finance', title: 'Fraud Monitoring', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/tenant-health', component: () => import('pages/finance/TenantFinancialHealthCenterPage.vue'), meta: { workspace: 'finance', title: 'Tenant Financial Health', permission: 'read_finance', requiresAuth: true } },
+      { path: 'finance/compliance', component: () => import('pages/finance/ComplianceCenterPage.vue'), meta: { workspace: 'finance', title: 'Compliance Center', permission: 'read_finance', requiresAuth: true } },
       {
         path: 'finance/school-payments',
         component: () => import('pages/school/SchoolPaymentsPage.vue'),
         meta: {
           workspace: 'finance',
           title: 'School Payments & Disputes',
-          permission: 'admin_deploy',
+          permission: 'read_finance',
           requiresAuth: true,
           platformScope: true,
           keywords: ['school', 'payments', 'disputes', 'cash', 'pos', 'student fees'],
@@ -389,13 +431,33 @@ const routes = [
       { path: 'apps/sideload', component: () => import('pages/applications/SideloadIntegrityPage.vue'), meta: { workspace: 'apps', title: 'Sideload & Integrity', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'incidents/active', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'incidents', title: 'Active Incidents', permission: 'admin_deploy', requiresAuth: true, keywords: ['stabilization', 'alerts', 'outage', 'downtime', 'status', 'decay'] } },
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/kyc-pending', component: () => import('pages/admin/KycPendingDocumentsPage.vue'), meta: { workspace: 'admin', title: 'Pending KYC Documents', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/settings', component: () => import('pages/admin/PlatformOverviewPage.vue'), meta: { workspace: 'admin', title: 'Platform Overview', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/config', component: () => import('pages/admin/PlatformConfigPage.vue'), meta: { workspace: 'admin', title: 'Platform Configuration', permission: 'admin_deploy', requiresAuth: true, keywords: ['maintenance', 'maintenance mode', 'maintenance mode controls', 'system lockout', 'lockout'] } },
       { path: 'admin/vault', component: () => import('pages/admin/IntegrationVaultPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Integration Vault', permission: 'admin_deploy', requiresAuth: true, keywords: ['vault', 'integrations', 'secrets', 'api keys', 'certificates', 'webhook', 'signing secret', 'quasar webhook', 'x-quasar-signature', 'QUASAR_WEBHOOK_SIGNING_SECRET'] } },
       { path: 'admin/ecs-workspace', component: () => import('pages/admin/EnterpriseConfigurationWorkspace.vue'), meta: { workspace: 'admin', title: 'Enterprise Configuration Workspace', permission: 'admin_deploy', requiresAuth: true, keywords: ['ecs', 'configuration', 'workspace', 'providers'] } },
       { path: 'admin/settings/authentication', component: () => import('pages/admin/AuthenticationSettingsPage.vue'), meta: { workspace: 'admin', title: 'Authentication Settings', permission: 'admin_deploy', requiresAuth: true, keywords: ['settings', 'authentication', 'onboarding', 'verification'] } },
+      { path: 'admin/settings/verification-log', component: () => import('pages/admin/VerificationLogPage.vue'), meta: { workspace: 'admin', title: 'Verification Log', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['otp', 'email', 'verification', 'code', 'onboarding', 'whatsapp'] } },
+      { path: 'admin/production-env', component: () => import('pages/admin/ProductionEnvGovernancePage.vue'), meta: { workspace: 'admin', title: 'Production Env Governance', permission: 'admin_deploy', requiresAuth: true, superAdminOnly: true, keywords: ['production env', 'feature flags', 'real money payouts', 'maker checker'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/health-insurance', component: () => import('pages/admin/HealthInsuranceGovernancePage.vue'), meta: { workspace: 'admin', title: 'Health & Wellness Governance', permission: 'admin_deploy', requiresAuth: true, keywords: ['health', 'insurance', 'wellness', 'hmo', 'governance', 'grants'] } },
+      { path: 'hmo', redirect: '/hmo/overview', meta: { workspace: 'hmo', title: 'HMO', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/overview', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Overview', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'health', 'overview'] } },
+      { path: 'hmo/registry', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Registry', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'registry'] } },
+      { path: 'hmo/providers', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Provider Network', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'providers'] } },
+      { path: 'hmo/plans', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Health Plans', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'plans', 'catalogue'] } },
+      { path: 'hmo/coverage', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Benefits and Coverage', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/enrolment', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Member Enrolment', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/members', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Members and Dependants', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/claims', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Claims and Authorisations', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/billing', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Premiums and Billing', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/payments', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Payments and Reconciliation', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/reports', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Reports and Analytics', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/telemetry', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Integrations and Telemetry', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/audit', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Audit Trail', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/settings', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Organisation Settings', permission: 'hmo.workspace', requiresAuth: true } },
+      { path: 'hmo/governance', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Platform Governance', permission: 'hmo.workspace', requiresAuth: true } },
 
       // ==========================================
       // QUASAR FINANCIAL SANDBOX (QFS)
@@ -405,8 +467,19 @@ const routes = [
       { path: 'sandbox/keys', component: () => import('pages/sandbox/ApiKeyManagementPage.vue'), meta: { workspace: 'sandbox', title: 'API Keys', permission: 'admin_deploy', requiresAuth: true } },
 
 
-      { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'admin/agents/commissions', component: () => import('pages/admin/AgentCommissionsPage.vue'), meta: { workspace: 'admin', title: 'Agent Commissions & Billing', keywords: ['commission', 'bill', 'payout', 'agent fee'], permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true, keywords: ['subscription', 'plans'] } },
+      { path: 'admin/platform-fees', component: () => import('pages/admin/PlatformFeeProfilesPage.vue'), meta: { workspace: 'finance', title: 'Platform Fee Orchestration', permission: 'read_finance', requiresAuth: true, keywords: ['platform fees', 'fee profiles', 'pos withdrawal', 'orchestration'] } },
+      { path: 'admin/platform-fees/assessments', component: () => import('pages/admin/PlatformFeeAssessmentsPage.vue'), meta: { workspace: 'finance', title: 'Fee Assessments', permission: 'read_finance', requiresAuth: true, keywords: ['fee assessments', 'shadow', 'reconciliation'] } },
+      { path: 'admin/platform-fees/assessments/:assessmentId', component: () => import('pages/admin/PlatformFeeAssessmentDetailPage.vue'), meta: { workspace: 'finance', title: 'Fee Assessment Detail', permission: 'read_finance', requiresAuth: true } },
+      { path: 'admin/platform-fees/distribution', component: () => import('pages/admin/PlatformFeeDistributionPage.vue'), meta: { workspace: 'finance', title: 'Fee Distribution', permission: 'read_finance', requiresAuth: true, keywords: ['fee distribution', 'stakeholders', 'shadow'] } },
+      { path: 'admin/platform-fees/stakeholders', component: () => import('pages/admin/PlatformFeeStakeholdersPage.vue'), meta: { workspace: 'admin', title: 'Fee Stakeholders', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/platform-fees/stakeholders/:stakeholderId', component: () => import('pages/admin/PlatformFeeStakeholderDetailPage.vue'), meta: { workspace: 'admin', title: 'Fee Stakeholder Detail', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/platform-fees/withdrawals', component: () => import('pages/admin/PlatformFeeWithdrawalsPage.vue'), meta: { workspace: 'admin', title: 'Fee Withdrawals', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/platform-fees/withdrawals/:withdrawalId', component: () => import('pages/admin/PlatformFeeWithdrawalDetailPage.vue'), meta: { workspace: 'admin', title: 'Fee Withdrawal Detail', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/agent-webhooks', component: () => import('pages/admin/AgentWebhooksPage.vue'), meta: { workspace: 'admin', title: 'Institute Webhooks', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/payment-alerts', component: () => import('pages/admin/PaymentAlertsPage.vue'), meta: { workspace: 'admin', title: 'Payment Alerts', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/platform-fees/:transactionType', component: () => import('pages/admin/PlatformFeeProfileDetailPage.vue'), meta: { workspace: 'finance', title: 'Fee Profile Details', permission: 'read_finance', requiresAuth: true } },
+      { path: 'admin/agents/commissions', component: () => import('pages/admin/AgentCommissionsPage.vue'), meta: { workspace: 'finance', title: 'Institute Commissions & Billing', keywords: ['commission', 'bill', 'payout', 'agent fee'], permission: 'read_finance', requiresAuth: true } },
       { path: 'admin/pos-gateway', component: () => import('pages/PosGatewayPage.vue'), meta: { workspace: 'admin', title: 'EMV POS Gateway', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'automation/policy', component: () => import('pages/automation/PolicyIntelligencePage.vue'), meta: { workspace: 'automation', title: 'Policy Intelligence', permission: 'write_policies', requiresAuth: true } },
       { path: 'automation/workflows', component: () => import('pages/automation/WorkflowExecutionCenterPage.vue'), meta: { workspace: 'automation', title: 'Workflow Execution & Audit', permission: 'write_policies', requiresAuth: true } },
@@ -443,7 +516,8 @@ const routes = [
     component: () => import('layouts/TenantLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true, permission: 'tenant.dashboard.view' } },
+      { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true } },
+      { path: 'services/jobs', component: () => import('src/domains/tenant/services/pages/TenantServiceJobsPage.vue'), meta: { title: 'Service Jobs', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'transactions', component: () => import('src/domains/tenant/transactions/pages/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'retail/inventory', component: () => import('src/domains/tenant/inventory/pages/TenantInventoryPage.vue'), meta: { title: 'Inventory Stock Matrix', requiresAuth: true, permission: 'tenant.inventory.view' } },
       { path: 'retail/invoices', component: () => import('src/domains/tenant/transactions/pages/TenantInvoicesPage.vue'), meta: { title: 'Billing Invoices', requiresAuth: true, permission: 'tenant.transaction.view' } },
@@ -478,7 +552,11 @@ const routes = [
 
       // School roster synced from Flutter Web Sync
       { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
+      { path: 'parent-messages', component: () => import('pages/school/ParentBroadcastPage.vue'), meta: { title: 'Message parents', requiresAuth: true } },
+      { path: 'id-cards', component: () => import('pages/school/IdCardManagementPage.vue'), meta: { title: 'ID Card Management', requiresAuth: true } },
+      { path: 'entry-exit', component: () => import('pages/school/EntryExitPage.vue'), meta: { title: 'Entry and Exit', requiresAuth: true } },
       { path: 'school-payments', component: () => import('pages/school/SchoolPaymentsPage.vue'), meta: { title: 'School Payments', requiresAuth: true } },
+      { path: 'health-insurance', component: () => import('src/domains/tenant/health-insurance/pages/HealthInsuranceDashboardPage.vue'), meta: { title: 'Health & Wellness', requiresAuth: true } },
       
       // Dynamic School Mode Routes nested under Tenant Layout namespace
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },

@@ -19,19 +19,22 @@ class FinanceSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final displayColor = isDark ? Color.lerp(color, Colors.white, 0.45)! : color;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.05),
+            color: isDark ? Colors.black26 : color.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: color.withOpacity(0.1)),
+        border: Border.all(color: isDark ? theme.dividerColor : color.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,7 +47,7 @@ class FinanceSummaryCard extends StatelessWidget {
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: color, size: 18),
+                child: Icon(icon, color: displayColor, size: 18),
               ),
               const SizedBox(width: 8),
               Text(
@@ -52,7 +55,7 @@ class FinanceSummaryCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade600,
                 ),
               ),
             ],
@@ -63,7 +66,7 @@ class FinanceSummaryCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: displayColor,
             ),
           ),
           if (subtitle != null) ...[
@@ -72,7 +75,7 @@ class FinanceSummaryCard extends StatelessWidget {
               subtitle!,
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey.shade400,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
               ),
             ),
           ],

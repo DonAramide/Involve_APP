@@ -58,7 +58,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
                     .toList();
                 final assignedClass = classNames.isNotEmpty ? classNames.join(', ') : 'No Class';
                 final teacherSubjects = state.subjects
-                    .where((s) => s.teacherId == teacher.id)
+                    .where((s) => s.isTaughtBy(teacher.id))
                     .map((s) => s.name)
                     .toList();
                 final subjectsText = teacherSubjects.isNotEmpty

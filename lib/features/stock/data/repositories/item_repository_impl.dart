@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
@@ -99,9 +100,19 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<void> increaseStock(int itemId, int quantity, String? remarks) async {
-    final now = DateTime.now();
+  Future<void> increaseStock(
+    int itemId,
+    int quantity,
+    String? remarks, {
+    String? supplierName,
+    String? receiptNumber,
+    String? trackingNumber,
+    DateTime? receivedAt,
+    List<int>? receiptImage,
+  }) async {
+    final now = receivedAt ?? DateTime.now();
     final syncId = 'STK-${now.millisecondsSinceEpoch}';
+    final imageBytes = receiptImage == null ? null : Uint8List.fromList(receiptImage);
 
     await db.transaction(() async {
       // 1. Get current stock qty
@@ -122,7 +133,11 @@ class ItemRepositoryImpl implements ItemRepository {
               quantityAdded: quantity,
               quantityBefore: Value(before),
               quantityAfter: Value(after),
-              remarks: Value(remarks),
+              remarks: Value(_emptyToNull(remarks)),
+              supplierName: Value(_emptyToNull(supplierName)),
+              receiptNumber: Value(_emptyToNull(receiptNumber)),
+              trackingNumber: Value(_emptyToNull(trackingNumber)),
+              receiptImage: Value(imageBytes),
               dateAdded: Value(now),
               syncId: Value(syncId),
               updatedAt: Value(now),
@@ -130,6 +145,12 @@ class ItemRepositoryImpl implements ItemRepository {
             ),
           );
     });
+  }
+
+  String? _emptyToNull(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
   }
 
   @override
@@ -144,6 +165,10 @@ class ItemRepositoryImpl implements ItemRepository {
       quantityAfter: row.quantityAfter,
       dateAdded: row.dateAdded,
       remarks: row.remarks,
+      supplierName: row.supplierName,
+      receiptNumber: row.receiptNumber,
+      trackingNumber: row.trackingNumber,
+      receiptImage: row.receiptImage,
     )).toList();
   }
 

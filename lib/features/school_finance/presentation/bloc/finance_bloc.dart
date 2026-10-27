@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -21,7 +22,13 @@ import '../../domain/entities/virtual_account.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
+import 'package:involve_app/features/school_finance/domain/services/quasar_withdrawable.dart';
 
 part 'finance_event.dart';
 part 'finance_state.dart';
@@ -52,7 +59,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   }
 
   Future<void> _onLoadStudentProfile(LoadStudentProfile event, Emitter<FinanceState> emit) async {
-    emit(FinanceLoading());
+    // Keep the school dashboard in memory so Back / Withdraw still work.
+    if (state is! FinanceLoading) {
+      emit(FinanceLoading());
+    }
     try {
       // Fetch in parallel for performance
       final results = await Future.wait([
@@ -77,8 +87,9 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         try {
           final studentInvoices = await invoiceRepository!.getInvoicesByStudentId(studentIdInt);
           
-          double totalPaid = studentInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
-          double outstandingBalance = studentInvoices.fold(0.0, (sum, i) => sum + i.balanceAmount);
+          final period = salesPeriodTotals(studentInvoices);
+          double totalPaid = period.collected;
+          double outstandingBalance = period.pending;
           double totalFees = totalPaid + outstandingBalance;
 
           final summary = StudentFinancialSummary(
@@ -255,177 +266,130 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   Future<void> _onLoadDashboard(LoadSchoolDashboard event, Emitter<FinanceState> emit) async {
     debugPrint('📊 FinanceBloc: Loading School Dashboard');
     emit(FinanceLoading());
-    try {
-      final summary = await repository.getSchoolSummary();
-      final chartData = await repository.getDailyRevenue(days: 7); // Default to last 7 days
-      final transactions = await repository.getGlobalTransactions(limit: 50);
 
-      // Start Global Real-time listener
-      _realtimeSubscription?.cancel();
+    SchoolFinancialSummary? remoteSummary;
+    List<DailyRevenue> chartData = const [];
+    List<FinancialTransaction> remoteTx = const [];
+
+    try {
+      remoteSummary = await repository.getSchoolSummary();
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: School summary unavailable: $e');
+    }
+    try {
+      chartData = await repository.getDailyRevenue(days: 7);
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Daily revenue unavailable: $e');
+    }
+    try {
+      remoteTx = await repository.getGlobalTransactions(limit: 50);
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Live transactions unavailable: $e');
+    }
+
+    List<Invoice> invoices = const [];
+    List<int> studentIds = const [];
+    if (invoiceRepository != null) {
+      try {
+        invoices = await invoiceRepository!.getAllInvoices();
+      } catch (e) {
+        debugPrint('⚠️ FinanceBloc: Local invoices unavailable: $e');
+      }
+    }
+    if (schoolRepository != null) {
+      try {
+        studentIds = (await schoolRepository!.getStudents())
+            .map((s) => s.id)
+            .whereType<int>()
+            .toList();
+      } catch (_) {}
+    }
+
+    final payments = await _loadParentPayments();
+    final localSummary = _summaryFromInvoices(
+      invoices,
+      studentIds,
+      payments,
+    );
+    final localTx = _transactionsFromInvoices(invoices);
+    var summary = remoteSummary != null
+        ? _mergeRails(remoteSummary, localSummary)
+        : localSummary;
+    summary = await _publishWithdrawable(invoices, payments, summary);
+    if (chartData.isEmpty) {
+      chartData = _chartFromInvoices(invoices, days: 7);
+    }
+    final transactions = _mergeTransactions(remoteTx, localTx);
+
+    _realtimeSubscription?.cancel();
+    try {
       _realtimeSubscription = repository.watchGlobalEvents().listen((rtEvent) {
         debugPrint('🌍 FinanceBloc: Global Payment Event Received');
         add(RefreshDashboardSummary());
       });
-
-      emit(FinanceDashboardLoaded(
-        summary: summary,
-        chartData: chartData,
-        transactions: transactions,
-      ));
     } catch (e) {
-      debugPrint('❌ FinanceBloc Dashboard Error: $e. Trying offline fallback...');
-      if (invoiceRepository != null && schoolRepository != null) {
-        try {
-          final invoices = await invoiceRepository!.getAllInvoices();
-          final students = await schoolRepository!.getStudents();
-          
-          double totalRevenue = invoices.fold(0.0, (sum, inv) => sum + inv.amountPaid);
-          double outstandingFees = invoices.fold(0.0, (sum, inv) => sum + inv.balanceAmount);
-          int paidCount = 0;
-          int owingCount = 0;
-          final studentInvoices = <int, List<Invoice>>{};
-          for (final inv in invoices) {
-            if (inv.studentId != null) {
-              studentInvoices.putIfAbsent(inv.studentId!, () => []).add(inv);
-            }
-          }
-          for (final entry in studentInvoices.entries) {
-            final totalBalance = entry.value.fold(0.0, (sum, i) => sum + i.balanceAmount);
-            if (totalBalance > 0) {
-              owingCount++;
-            } else {
-              paidCount++;
-            }
-          }
-          
-          final summary = SchoolFinancialSummary(
-            totalRevenue: totalRevenue,
-            outstandingFees: outstandingFees,
-            paidStudentsCount: paidCount,
-            owingStudentsCount: owingCount,
-            totalStudents: students.length,
-            lastUpdated: DateTime.now(),
-          );
-
-          final List<DailyRevenue> offlineChart = [];
-          final now = DateTime.now();
-          for (int i = 6; i >= 0; i--) {
-            final targetDate = now.subtract(Duration(days: i));
-            final dateStr = "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}";
-            final dayRevenue = invoices.where((inv) {
-              final created = inv.dateCreated;
-              return created.year == targetDate.year &&
-                     created.month == targetDate.month &&
-                     created.day == targetDate.day;
-            }).fold(0.0, (sum, inv) => sum + inv.amountPaid);
-            offlineChart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
-          }
-
-          final List<FinancialTransaction> offlineTx = [];
-          for (final inv in invoices) {
-            offlineTx.add(FinancialTransaction(
-              id: inv.id.toString(),
-              walletId: 'local',
-              amount: inv.totalAmount,
-              type: TransactionType.credit,
-              reference: inv.invoiceNumber,
-              description: 'Fee Payment #${inv.invoiceNumber} for ${inv.customerName}',
-              balanceAfter: 0.0,
-              channel: inv.paymentMethod ?? 'Cash',
-              createdAt: inv.dateCreated,
-            ));
-          }
-          offlineTx.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          final recentOfflineTx = offlineTx.take(50).toList();
-
-          emit(FinanceDashboardLoaded(
-            summary: summary,
-            chartData: offlineChart,
-            transactions: recentOfflineTx,
-          ));
-        } catch (ex) {
-          debugPrint('❌ FinanceBloc Dashboard Offline Fallback Failed: $ex');
-          emit(FinanceError(e.toString()));
-        }
-      } else {
-        emit(FinanceError(e.toString()));
-      }
+      debugPrint('⚠️ FinanceBloc: Realtime listener unavailable: $e');
     }
+
+    emit(FinanceDashboardLoaded(
+      summary: summary,
+      chartData: chartData,
+      transactions: transactions,
+    ));
   }
 
   Future<void> _onRefreshDashboard(RefreshDashboardSummary event, Emitter<FinanceState> emit) async {
-    if (state is! FinanceDashboardLoaded) return;
+    if (state is! FinanceDashboardLoaded) {
+      await _onLoadDashboard(LoadSchoolDashboard(), emit);
+      return;
+    }
     final currentState = state as FinanceDashboardLoaded;
 
+    SchoolFinancialSummary? remoteSummary;
+    List<FinancialTransaction> remoteTx = const [];
     try {
-      final summary = await repository.getSchoolSummary();
-      final transactions = await repository.getGlobalTransactions(limit: 50);
-      
-      emit(currentState.copyWith(
-        summary: summary,
-        transactions: transactions,
-      ));
+      remoteSummary = await repository.getSchoolSummary();
     } catch (e) {
-      debugPrint('⚠️ FinanceBloc: Dashboard refresh failed, trying offline fallback: $e');
-      if (invoiceRepository != null && schoolRepository != null) {
-        try {
-          final invoices = await invoiceRepository!.getAllInvoices();
-          final students = await schoolRepository!.getStudents();
-          
-          double totalRevenue = invoices.fold(0.0, (sum, inv) => sum + inv.amountPaid);
-          double outstandingFees = invoices.fold(0.0, (sum, inv) => sum + inv.balanceAmount);
-          int paidCount = 0;
-          int owingCount = 0;
-          final studentInvoices = <int, List<Invoice>>{};
-          for (final inv in invoices) {
-            if (inv.studentId != null) {
-              studentInvoices.putIfAbsent(inv.studentId!, () => []).add(inv);
-            }
-          }
-          for (final entry in studentInvoices.entries) {
-            final totalBalance = entry.value.fold(0.0, (sum, i) => sum + i.balanceAmount);
-            if (totalBalance > 0) {
-              owingCount++;
-            } else {
-              paidCount++;
-            }
-          }
-          
-          final summary = SchoolFinancialSummary(
-            totalRevenue: totalRevenue,
-            outstandingFees: outstandingFees,
-            paidStudentsCount: paidCount,
-            owingStudentsCount: owingCount,
-            totalStudents: students.length,
-            lastUpdated: DateTime.now(),
-          );
-
-          final List<FinancialTransaction> offlineTx = [];
-          for (final inv in invoices) {
-            offlineTx.add(FinancialTransaction(
-              id: inv.id.toString(),
-              walletId: 'local',
-              amount: inv.totalAmount,
-              type: TransactionType.credit,
-              reference: inv.invoiceNumber,
-              description: 'Fee Payment #${inv.invoiceNumber} for ${inv.customerName}',
-              balanceAfter: 0.0,
-              channel: inv.paymentMethod ?? 'Cash',
-              createdAt: inv.dateCreated,
-            ));
-          }
-          offlineTx.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          final recentOfflineTx = offlineTx.take(50).toList();
-
-          emit(currentState.copyWith(
-            summary: summary,
-            transactions: recentOfflineTx,
-          ));
-        } catch (ex) {
-          debugPrint('⚠️ FinanceBloc: Offline refresh fallback failed: $ex');
-        }
-      }
+      debugPrint('⚠️ FinanceBloc: Dashboard summary refresh failed: $e');
     }
+    try {
+      remoteTx = await repository.getGlobalTransactions(limit: 50);
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Dashboard tx refresh failed: $e');
+    }
+
+    List<Invoice> invoices = const [];
+    List<int> studentIds = const [];
+    if (invoiceRepository != null) {
+      try {
+        invoices = await invoiceRepository!.getAllInvoices();
+      } catch (_) {}
+    }
+    if (schoolRepository != null) {
+      try {
+        studentIds = (await schoolRepository!.getStudents())
+            .map((s) => s.id)
+            .whereType<int>()
+            .toList();
+      } catch (_) {}
+    }
+
+    final payments = await _loadParentPayments();
+    final localSummary = _summaryFromInvoices(
+      invoices,
+      studentIds,
+      payments,
+    );
+    var summary = remoteSummary != null
+        ? _mergeRails(remoteSummary, localSummary)
+        : localSummary;
+    summary = await _publishWithdrawable(invoices, payments, summary);
+    final transactions = _mergeTransactions(remoteTx, _transactionsFromInvoices(invoices));
+
+    emit(currentState.copyWith(
+      summary: summary,
+      transactions: transactions,
+    ));
   }
 
   Future<void> _onLoadChartData(LoadChartData event, Emitter<FinanceState> emit) async {
@@ -441,20 +405,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       if (invoiceRepository != null) {
         try {
           final invoices = await invoiceRepository!.getAllInvoices();
-          final List<DailyRevenue> offlineChart = [];
-          final now = DateTime.now();
-          for (int i = event.days - 1; i >= 0; i--) {
-            final targetDate = now.subtract(Duration(days: i));
-            final dateStr = "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}";
-            final dayRevenue = invoices.where((inv) {
-              final created = inv.dateCreated;
-              return created.year == targetDate.year &&
-                     created.month == targetDate.month &&
-                     created.day == targetDate.day;
-            }).fold(0.0, (sum, inv) => sum + inv.amountPaid);
-            offlineChart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
-          }
-          emit(currentState.copyWith(chartData: offlineChart, isRefreshing: false));
+          emit(currentState.copyWith(
+            chartData: _chartFromInvoices(invoices, days: event.days),
+            isRefreshing: false,
+          ));
         } catch (ex) {
           emit(currentState.copyWith(isRefreshing: false));
         }
@@ -464,6 +418,256 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
   }
 
+
+  Future<SchoolFinancialSummary> _publishWithdrawable(
+    List<Invoice> invoices,
+    List<ParentPaymentRecord> payments,
+    SchoolFinancialSummary summary,
+  ) async {
+    final localSettleable = QuasarWithdrawable.calculate(
+      invoices: invoices,
+      payments: payments,
+    );
+    try {
+      final lines = QuasarWithdrawable.lines(invoices: invoices, payments: payments);
+      final shared = await repository.syncWithdrawableCredits(
+        lines
+            .map((line) => {
+                  'reference': line.reference,
+                  'amount': line.amount,
+                  'rail': line.rail,
+                  'paidAt': line.at.toUtc().toIso8601String(),
+                })
+            .toList(),
+      );
+      if (shared == null) {
+        return summary.withSharedWithdrawable(
+          _preferredWithdrawable(
+            localSettleable: localSettleable,
+            shared: 0,
+            remitted: summary.quasarRemitted,
+            sharedOk: false,
+          ),
+        );
+      }
+      return summary.withSharedWithdrawable(
+        _preferredWithdrawable(
+          localSettleable: localSettleable,
+          shared: shared,
+          remitted: summary.quasarRemitted,
+          sharedOk: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Withdrawable sync skipped: $e');
+      return summary.withSharedWithdrawable(
+        _preferredWithdrawable(
+          localSettleable: localSettleable,
+          shared: summary.withdrawable,
+          remitted: summary.quasarRemitted,
+          sharedOk: summary.sharedWithdrawable,
+        ),
+      );
+    }
+  }
+
+  /// When the server pool was loaded, it is the ceiling. A missing server
+  /// figure falls back to the device calculation.
+  double _preferredWithdrawable({
+    required double localSettleable,
+    required double shared,
+    required double remitted,
+    required bool sharedOk,
+  }) {
+    final localNet = math.max(0.0, localSettleable - math.max(0.0, remitted));
+    if (!sharedOk) return localNet;
+    // The server reservation is the ceiling. The tablet must not offer more.
+    return math.min(localNet, math.max(0.0, shared));
+  }
+
+  Future<List<ParentPaymentRecord>> _loadParentPayments() async {
+    final school = schoolRepository;
+    if (school == null) return const [];
+    try {
+      final parents = await school.getParents();
+      final payments = <ParentPaymentRecord>[];
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) continue;
+        payments.addAll(await school.getParentPayments(id));
+      }
+      return payments;
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Parent payments unavailable: $e');
+      return const [];
+    }
+  }
+
+  SchoolFinancialSummary _summaryFromInvoices(
+    List<Invoice> invoices,
+    List<int> studentIds,
+    List<ParentPaymentRecord> payments,
+  ) {
+    final origin = QuasarWithdrawable.originRailByInvoiceNumber(
+      invoices: invoices,
+      payments: payments,
+    );
+    final period = salesPeriodTotals(invoices);
+    final rails = salesRailTotals(invoices, originRails: origin);
+    final totalRevenue = period.collected;
+    final outstandingFees = period.pending;
+    final parts = ParentCreditParts.fromPayments(
+      quasarBalance: 0,
+      payments: payments,
+    );
+    // Card bills plus card money paid onto a parent account.
+    // Transfer is school/staff VA used on a bill plus the gross parent
+    // virtual-account deposit. Parent-wallet bills stay off this row.
+    final card = rails.card + parts.card;
+    final va = rails.vaTransfer + ParentCreditParts.grossVirtualAccount(payments);
+    final cash = rails.cash;
+
+    final billedStudentIds = invoices
+        .where((inv) => inv.countsTowardSales && inv.studentId != null)
+        .map((inv) => inv.studentId!)
+        .toSet();
+    final idsForStatus = billedStudentIds.isNotEmpty ? billedStudentIds : studentIds.toSet();
+    final payStatus = countStudentPayStatus(studentIds: idsForStatus, invoices: invoices);
+
+    return SchoolFinancialSummary(
+      totalRevenue: totalRevenue,
+      outstandingFees: outstandingFees,
+      paidStudentsCount: payStatus.paid,
+      owingStudentsCount: payStatus.owing,
+      totalStudents: studentIds.isNotEmpty ? studentIds.length : idsForStatus.length,
+      lastUpdated: DateTime.now(),
+      cardCollected: card,
+      vaTransferCollected: va,
+      cashCollected: cash,
+      quasarCollected: card + va,
+      withdrawable: QuasarWithdrawable.calculate(
+        invoices: invoices,
+        payments: payments,
+      ),
+      quasarLiveBalance: ParentCreditParts.grossVirtualAccount(payments),
+    );
+  }
+
+  SchoolFinancialSummary _mergeRails(
+    SchoolFinancialSummary remote,
+    SchoolFinancialSummary local,
+  ) {
+    final card = math.max(remote.cardCollected, local.cardCollected);
+    final va = math.max(local.vaTransferCollected, 0.0);
+    final cash = math.max(remote.cashCollected, local.cashCollected);
+    final quasar = card + va;
+    final remoteLive = remote.quasarLiveBalance ?? 0;
+    final localLive = local.quasarLiveBalance ?? 0;
+    final gross = localLive > remoteLive ? localLive : remoteLive;
+    final afterPayout = gross - remote.quasarRemitted;
+    final quasarHeld = afterPayout > 0 ? afterPayout : 0.0;
+    return SchoolFinancialSummary(
+      totalRevenue: local.totalRevenue,
+      outstandingFees: local.outstandingFees,
+      paidStudentsCount: local.paidStudentsCount,
+      owingStudentsCount: local.owingStudentsCount,
+      totalStudents: local.totalStudents > 0 ? local.totalStudents : remote.totalStudents,
+      lastUpdated: remote.lastUpdated,
+      cardCollected: card,
+      vaTransferCollected: va,
+      cashCollected: cash,
+      quasarCollected: quasar,
+      quasarLiveBalance: quasarHeld > 0 ? quasarHeld : remote.quasarLiveBalance,
+      invifyLoggedVa: remote.invifyLoggedVa,
+      quasarBalanceStatus: remote.quasarBalanceStatus,
+      quasarRemitted: remote.quasarRemitted,
+      withdrawable: _preferredWithdrawable(
+        localSettleable: local.withdrawable,
+        shared: remote.withdrawable,
+        remitted: remote.quasarRemitted,
+        sharedOk: remote.sharedWithdrawable,
+      ),
+      sharedWithdrawable: remote.sharedWithdrawable,
+    );
+  }
+
+  List<FinancialTransaction> _transactionsFromInvoices(List<Invoice> invoices) {
+    final txs = <FinancialTransaction>[];
+    for (final inv in invoices) {
+      if (!inv.countsTowardSales || inv.isRolledForward) continue;
+      final collected = inv.collectedAmount;
+      if (collected <= 0) continue;
+      txs.add(FinancialTransaction(
+        id: inv.id.toString(),
+        walletId: inv.studentId?.toString() ?? 'local',
+        amount: collected,
+        type: TransactionType.credit,
+        reference: inv.invoiceNumber,
+        description: 'Fee Payment #${inv.invoiceNumber} for ${inv.customerName ?? 'Customer'}',
+        balanceAfter: 0.0,
+        channel: paymentRailChannelLabel(inv.paymentMethod),
+        createdAt: inv.dateCreated,
+        metadata: {
+          'student_id': inv.studentId?.toString() ?? '',
+          'student_name': inv.customerName,
+          'payment_method': inv.paymentMethod,
+        },
+      ));
+    }
+    txs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return txs.take(50).toList();
+  }
+
+  List<FinancialTransaction> _mergeTransactions(
+    List<FinancialTransaction> remote,
+    List<FinancialTransaction> local,
+  ) {
+    final seen = <String>{};
+    final merged = <FinancialTransaction>[];
+    for (final tx in [...remote, ...local]) {
+      final keys = _transactionDedupeKeys(tx);
+      if (keys.any(seen.contains)) continue;
+      seen.addAll(keys);
+      merged.add(tx);
+    }
+    merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return merged.take(50).toList();
+  }
+
+  List<String> _transactionDedupeKeys(FinancialTransaction tx) {
+    final ref = tx.reference.trim();
+    final va = '${tx.metadata['virtualAccountNumber'] ?? tx.metadata['accountNumber'] ?? ''}'
+        .trim();
+    final bucket = tx.createdAt.millisecondsSinceEpoch ~/ 120000;
+    final amount = tx.amount.toStringAsFixed(2);
+    return [
+      if (ref.isNotEmpty) 'ref:$ref',
+      'fuzzy:${va.isEmpty ? 'NOVA' : va}:${tx.type.name}:$amount:$bucket',
+    ];
+  }
+
+  List<DailyRevenue> _chartFromInvoices(List<Invoice> invoices, {required int days}) {
+    final now = DateTime.now();
+    final chart = <DailyRevenue>[];
+    for (int i = days - 1; i >= 0; i--) {
+      final targetDate = now.subtract(Duration(days: i));
+      final dateStr =
+          '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+      final dayRevenue = invoices.where((inv) {
+        if (!inv.countsTowardSales || inv.isRolledForward) return false;
+        final created = inv.dateCreated;
+        return created.year == targetDate.year &&
+            created.month == targetDate.month &&
+            created.day == targetDate.day;
+      }).fold(0.0, (sum, inv) {
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final got = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        return sum + got;
+      });
+      chart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
+    }
+    return chart;
+  }
 
   @override
   Future<void> close() {

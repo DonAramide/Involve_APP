@@ -4,6 +4,7 @@ import { ActivationLockProvider } from '../infrastructure/ActivationLockProvider
 import { RotationSaga } from '../orchestration/RotationSaga';
 import { ObservabilityContext } from '../domain/Types';
 import { supabaseAdmin as supabase } from '../../../utils/db';
+import { resolveQuasarTenantKeyEnvironment } from '../../../integrations/quasar/quasar-tenant-key-environment';
 
 export class FinancialPlatformRotationService {
   constructor(
@@ -38,11 +39,13 @@ export class FinancialPlatformRotationService {
 
       const vaultUrn = `quasarTenant/${tenantId}`;
       await this.rotationSaga.execute(tenantId, connection.quasar_tenant_id, vaultUrn, context);
+      const environment = resolveQuasarTenantKeyEnvironment();
 
       return {
         message: 'Credentials successfully rotated and verified.',
         status: 'ACTIVE',
-        quasar_tenant_id: connection.quasar_tenant_id
+        quasar_tenant_id: connection.quasar_tenant_id,
+        environment,
       };
     } finally {
       await this.lockProvider.releaseLock(tenantId);

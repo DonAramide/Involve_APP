@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:collection/collection.dart';
@@ -863,18 +864,19 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
 
   Widget _buildSummaryCard(double totalSpent, String currency) {
     final totalReceived = _totalFundsReceived;
-    final walletBalance = _currentCustomer.balance;
-    final walletAbs = walletBalance.abs();
-    final walletTitle = walletBalance > 0
-        ? 'CURRENT OWING'
-        : walletBalance < 0
-            ? 'WALLET CREDIT'
-            : 'WALLET BALANCE';
-    final walletHint = walletBalance > 0
-        ? 'Customer still owes this amount'
-        : walletBalance < 0
-            ? 'Available credit after auto-debit'
-            : 'Fully settled';
+    // Net position from this card's totals: received − spent.
+    final creditBalance = totalReceived - totalSpent;
+    final displayAmount = creditBalance.abs();
+    final walletTitle = creditBalance > 0
+        ? 'WALLET CREDIT BALANCE'
+        : creditBalance < 0
+            ? 'CURRENT OWING'
+            : 'WALLET CREDIT BALANCE';
+    final walletHint = creditBalance > 0
+        ? 'Total received minus total spent'
+        : creditBalance < 0
+            ? 'Spent exceeds amount received'
+            : 'Received equals spent';
 
     return Container(
       width: double.infinity,
@@ -932,11 +934,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
           ),
           const SizedBox(height: 6),
           Text(
-            CurrencyFormatter.formatWithSymbol(walletAbs, symbol: currency),
+            CurrencyFormatter.formatWithSymbol(displayAmount, symbol: currency),
             style: TextStyle(
-              color: walletBalance > 0
+              color: creditBalance < 0
                   ? Colors.redAccent.shade100
-                  : walletBalance < 0
+                  : creditBalance > 0
                       ? Colors.lightGreenAccent.shade100
                       : Colors.white,
               fontSize: 28,
@@ -1635,11 +1637,13 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
                     hintText: 'e.g. 08012345678',
                   ),
                   keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Phone number is required';
                     final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                    if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                      return 'Phone must be 11 to 15 digits';
+                    if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                      return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
                     }
                     return null;
                   },

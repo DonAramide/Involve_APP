@@ -105,7 +105,7 @@ export class OnboardingController {
       
       // Send Welcome Email
       const { emailService } = require('../services/email.service');
-      await emailService.sendWelcomeEmail(email);
+      await emailService.sendWelcomeEmail(email, { businessMode: req.body?.industry || req.body?.businessMode });
 
       res.status(201).json({ success: true, message: 'Account created successfully.' });
     } catch (error: any) {

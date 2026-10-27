@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 import 'package:involve_app/features/school_finance/data/models/finance_models.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/features/services/domain/entities/service_job.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/presentation/templates/service_pdf_generator.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 class TransactionAuditPage extends StatefulWidget {
@@ -20,8 +25,9 @@ class TransactionAuditPage extends StatefulWidget {
 class _TxRow {
   final TransactionAuditModel audit;
   final Invoice? invoice;
+  final ServiceJob? serviceJob;
 
-  const _TxRow({required this.audit, this.invoice});
+  const _TxRow({required this.audit, this.invoice, this.serviceJob});
 }
 
 class _TransactionAuditPageState extends State<TransactionAuditPage> {
@@ -34,12 +40,16 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   int _page = 1;
   static const int _pageSize = 25;
+  DateTime? _fromDateTime;
+  DateTime? _toDateTime;
+  String _datePreset = 'All';
 
   static const _methodFilters = [
     'All',
     'Cash',
     'POS',
     'Transfer',
+    'VA Transfer',
     'Wallet',
     'Credit',
   ];
@@ -49,6 +59,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     'Paid',
     'Unsettled',
     'Pending',
+    'Payment Pending',
+    'Customer Debit',
     'Failed',
   ];
 
@@ -71,9 +83,17 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   }
 
   String _normalizeMethod(String? raw) {
-    final m = (raw ?? 'Cash').trim().toLowerCase();
+    final m = (raw ?? '').trim().toLowerCase();
+    if (m == 'unpaid' || m == 'none' || m == '—') return 'Unpaid';
     if (m.contains('pos') || m.contains('card') || m.contains('emv')) return 'POS';
-    if (m.contains('transfer') || m.contains('virtual')) return 'Transfer';
+    if (m.contains('virtual') ||
+        m.contains('va transfer') ||
+        m == 'va' ||
+        m.startsWith('va ') ||
+        m.contains('quasar')) {
+      return 'VA Transfer';
+    }
+    if (m.contains('transfer')) return 'Transfer';
     if (m.contains('wallet')) return 'Wallet';
     if (m.contains('credit') || m == 'clear') return 'Credit';
     if (m.contains('cash')) return 'Cash';
@@ -81,8 +101,17 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     return raw?.trim().isNotEmpty == true ? raw!.trim() : 'Cash';
   }
 
+  bool _isCommittedOnAccount(String? methodRaw) {
+    final m = (methodRaw ?? '').trim().toLowerCase();
+    return m.contains('credit') ||
+        m.contains('pay later') ||
+        m.contains('paylater') ||
+        m == 'clear';
+  }
+
   String _normalizeStatus(String? raw) {
     final s = (raw ?? '').trim().toLowerCase();
+    if (s.isEmpty) return 'Pending';
     if (s.contains('fail') ||
         s.contains('declin') ||
         s.contains('abort') ||
@@ -90,14 +119,28 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       return 'Failed';
     }
     if (s.contains('unsettled')) return 'Unsettled';
+    if (s.contains('payment pending') ||
+        s == 'unpaid' ||
+        s.contains('unpaid') ||
+        s.contains('owing')) {
+      return 'Payment Pending';
+    }
+    if (s.contains('debit') ||
+        s == 'deferred' ||
+        s.contains('pay later') ||
+        s.contains('paylater')) {
+      return 'Customer Debit';
+    }
+    if (s.contains('partial')) return 'Pending';
     if (s.contains('pend') || s.contains('await')) return 'Pending';
     if (s.contains('settled') && !s.contains('unsettled')) return 'Paid';
-    if (s.contains('paid') ||
-        s.contains('approv') ||
+    if (s == 'paid' ||
+        s.startsWith('paid ') ||
+        s.contains('approved') ||
         s.contains('success')) {
       return 'Paid';
     }
-    return raw?.trim().isNotEmpty == true ? raw!.trim() : 'Pending';
+    return raw!.trim();
   }
 
   IconData _methodIcon(String method) {
@@ -106,12 +149,16 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         return Icons.credit_card;
       case 'Transfer':
         return Icons.account_balance;
+      case 'VA Transfer':
+        return Icons.account_balance_outlined;
       case 'Wallet':
         return Icons.account_balance_wallet;
       case 'Credit':
         return Icons.savings_outlined;
       case 'Pay Later':
         return Icons.schedule;
+      case 'Unpaid':
+        return Icons.hourglass_empty;
       default:
         return Icons.payments;
     }
@@ -124,7 +171,10 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       case 'Unsettled':
         return const Color(0xFFF9A825); // amber / yellow
       case 'Pending':
+      case 'Payment Pending':
         return Colors.orange;
+      case 'Customer Debit':
+        return const Color(0xFF0277BD);
       case 'Failed':
         return Colors.red;
       default:
@@ -142,7 +192,22 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
   String _displayStatus(TransactionAuditModel tx) {
     if (tx.isCardUnsettled) return 'Approved (unsettled)';
     if (tx.isCardSettled) return 'Settled';
+    if (_effectiveStatus(tx) == 'Payment Pending') return 'Payment Pending';
     return tx.status;
+  }
+
+  String _rowMethodStatus(TransactionAuditModel tx) {
+    if (_effectiveStatus(tx) == 'Payment Pending') return 'Payment Pending';
+    return '${_normalizeMethod(tx.paymentMethod)} · ${_displayStatus(tx)}';
+  }
+
+  String _customerLine(_TxRow row, String customerLabel) {
+    final name = row.audit.customerName.trim().isNotEmpty
+        ? row.audit.customerName
+        : customerLabel;
+    final studentId = (row.invoice?.admissionNumber ?? '').trim();
+    if (studentId.isEmpty) return name;
+    return '$name · ID $studentId';
   }
 
   Color _rowBackground(TransactionAuditModel tx) {
@@ -150,6 +215,36 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       return const Color(0xFFFFF8E1); // light yellow
     }
     return Colors.transparent;
+  }
+
+  List<Map<String, dynamic>> _jobItemMaps(ServiceJob job) {
+    if (job.items.isNotEmpty) {
+      return job.items
+          .map((i) => {'name': i.name, 'quantity': i.quantity.toInt()})
+          .toList();
+    }
+    return [
+      {'name': job.title, 'quantity': 1}
+    ];
+  }
+
+  _TxRow _pendingPaymentJobRow(ServiceJob job) {
+    final owing = job.balance > 1e-9 ? job.balance : job.totalAmount;
+    return _TxRow(
+      serviceJob: job,
+      audit: TransactionAuditModel(
+        id: 'pending-${job.id}',
+        type: 'SERVICE',
+        paymentMethod: 'Unpaid',
+        amount: owing,
+        status: 'Payment Pending',
+        staffName: 'Staff',
+        date: job.createdAt,
+        items: _jobItemMaps(job),
+        customerName: job.customerName ?? 'Client',
+        reference: job.jobId,
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -166,41 +261,83 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       invoices.sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
 
       final Map<String, _TxRow> byKey = {};
+      final skippedRefs = <String>{};
 
       for (final inv in invoices.take(300)) {
-        final method = _normalizeMethod(inv.paymentMethod);
-        final status = _normalizeStatus(inv.paymentStatus);
-        final amount = inv.amountPaid > 0 ? inv.amountPaid : inv.totalAmount;
-        final key = 'inv:${inv.id ?? inv.invoiceNumber}';
-        byKey[key] = _TxRow(
-          invoice: inv,
-          audit: TransactionAuditModel(
-            id: inv.id?.toString() ?? inv.invoiceNumber,
-            type: 'INVOICE',
-            paymentMethod: method,
-            amount: amount,
-            status: status,
-            staffName: inv.staffName ?? 'System',
-            date: inv.dateCreated,
-            items: inv.items
-                .map((i) => {
-                      'name': i.item.name,
-                      'quantity': i.quantity,
-                    })
-                .toList(),
-            customerName: inv.customerName ??
-                (inv.admissionNumber != null
-                    ? 'Student ${inv.admissionNumber}'
-                    : 'Walk-in'),
-            reference: inv.invoiceNumber,
-          ),
-        );
+        // Service jobs are mirrored into getAllInvoices(). List them from
+        // real payments / outstanding balance below so a new unpaid job is
+        // not shown as Cash · Paid.
+        if (inv.invoiceNumber.startsWith('INV-SRV')) continue;
+        if (inv.isRolledForward || inv.isPaymentSlip || !inv.countsTowardSales) {
+          skippedRefs.add(inv.invoiceNumber.trim());
+          continue;
+        }
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final collected = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        final pending = billed - collected;
+        if (collected <= 1e-9 && pending <= 1e-9) continue;
+
+        final methodRaw = (inv.paymentMethod ?? '').trim();
+        final statusRaw = (inv.paymentStatus ?? '').trim().toLowerCase();
+        final awaitingTransfer = methodRaw.toLowerCase().contains('transfer') ||
+            methodRaw.toLowerCase().contains('virtual') ||
+            statusRaw.contains('pend') ||
+            statusRaw.contains('await');
+        final items = inv.items
+            .map((i) => {
+                  'name': i.item.name,
+                  'quantity': i.quantity,
+                })
+            .toList();
+        final customerName = inv.customerName ??
+            (inv.admissionNumber != null
+                ? 'Student ${inv.admissionNumber}'
+                : 'Walk-in');
+
+        void addSlice(String suffix, double amount, String method, String status) {
+          if (amount <= 1e-9) return;
+          final key = 'inv:${inv.id ?? inv.invoiceNumber}:$suffix';
+          byKey[key] = _TxRow(
+            invoice: inv,
+            audit: TransactionAuditModel(
+              id: '${inv.id ?? inv.invoiceNumber}:$suffix',
+              type: 'INVOICE',
+              paymentMethod: method,
+              amount: amount,
+              status: status,
+              staffName: inv.staffName ?? 'System',
+              date: inv.dateCreated,
+              items: items,
+              customerName: customerName,
+              reference: inv.invoiceNumber,
+            ),
+          );
+        }
+
+        if (collected > 1e-9) {
+          addSlice('paid', collected, _normalizeMethod(inv.paymentMethod), 'Paid');
+        }
+        if (pending > 1e-9) {
+          if (collected <= 1e-9 && awaitingTransfer) {
+            addSlice('due', pending, _normalizeMethod(methodRaw), 'Pending');
+          } else if (collected <= 1e-9 && _isCommittedOnAccount(methodRaw)) {
+            addSlice('due', pending, 'Credit', 'Customer Debit');
+          } else {
+            addSlice(
+              'due',
+              pending,
+              methodRaw.isEmpty ? 'Unpaid' : _normalizeMethod(methodRaw),
+              'Payment Pending',
+            );
+          }
+        }
       }
 
       try {
         final remote = await financeRepo.getTransactionAuditLedger();
         for (final tx in remote) {
           final ref = tx.reference.trim();
+          if (skippedRefs.contains(ref)) continue;
           final already = byKey.values.any((row) {
             final r = row.audit.reference.trim();
             return (ref.isNotEmpty && r == ref) ||
@@ -227,6 +364,81 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         // Local invoices are enough when remote audit is unavailable.
       }
 
+      // Load Service Jobs and Payments
+      try {
+        final servicesRepo = context.read<IServicesRepository>();
+        final serviceJobs = await servicesRepo.getJobs();
+        for (final job in serviceJobs) {
+          final payments = await servicesRepo.getJobPayments(job.id);
+          if (payments.isNotEmpty) {
+            for (final pmt in payments) {
+              final ref = pmt.reference?.isNotEmpty == true ? pmt.reference! : job.jobId;
+              final key = 'srv_pmt:${pmt.id}';
+              byKey[key] = _TxRow(
+                serviceJob: job,
+                audit: TransactionAuditModel(
+                  id: pmt.id,
+                  type: 'SERVICE',
+                  paymentMethod: _normalizeMethod(pmt.method),
+                  amount: pmt.amount,
+                  status: 'Paid',
+                  staffName: 'Staff',
+                  date: pmt.createdAt,
+                  items: _jobItemMaps(job),
+                  customerName: job.customerName ?? 'Client',
+                  reference: ref,
+                ),
+              );
+            }
+          } else if (job.amountPaid > 1e-9) {
+            final key = 'srv_job:${job.id}';
+            byKey[key] = _TxRow(
+              serviceJob: job,
+              audit: TransactionAuditModel(
+                id: job.id,
+                type: 'SERVICE',
+                paymentMethod: 'Cash',
+                amount: job.amountPaid,
+                status: 'Paid',
+                staffName: 'Staff',
+                date: job.createdAt,
+                items: _jobItemMaps(job),
+                customerName: job.customerName ?? 'Client',
+                reference: job.jobId,
+              ),
+            );
+          }
+
+          if (job.status.toLowerCase() != 'cancelled' && job.balance > 1e-9) {
+            byKey['srv_pending:${job.id}'] = _pendingPaymentJobRow(job);
+          }
+        }
+      } catch (_) {}
+
+      try {
+        final schoolRepo = context.read<SchoolRepository>();
+        final cache = <int, String>{};
+        for (final key in byKey.keys.toList()) {
+          final row = byKey[key]!;
+          final inv = row.invoice;
+          if (inv == null || (inv.admissionNumber ?? '').trim().isNotEmpty) continue;
+          final sid = inv.studentId;
+          if (sid == null) continue;
+          var admission = cache[sid];
+          if (admission == null) {
+            final student = await schoolRepo.getStudentById(sid);
+            admission = student?.admissionNumber.trim() ?? '';
+            cache[sid] = admission;
+          }
+          if (admission.isEmpty) continue;
+          byKey[key] = _TxRow(
+            invoice: inv.copyWith(admissionNumber: admission),
+            audit: row.audit,
+            serviceJob: row.serviceJob,
+          );
+        }
+      } catch (_) {}
+
       final merged = byKey.values.toList()
         ..sort((a, b) => b.audit.date.compareTo(a.audit.date));
 
@@ -251,6 +463,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
 
       if (_methodFilter != 'All' && method != _methodFilter) return false;
       if (_statusFilter != 'All' && status != _statusFilter) return false;
+      if (_fromDateTime != null && tx.date.isBefore(_fromDateTime!)) return false;
+      if (_toDateTime != null && tx.date.isAfter(_toDateTime!)) return false;
 
       if (q.isEmpty) return true;
       final hay = [
@@ -280,9 +494,118 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
     return ((n + _pageSize - 1) / _pageSize).floor();
   }
 
+  double get _filteredTotal =>
+      _filtered.fold<double>(0, (sum, row) => sum + row.audit.amount);
+
+  double get _filteredCollected => _filtered.fold<double>(0, (sum, row) {
+        final status = _effectiveStatus(row.audit);
+        if (status == 'Failed' ||
+            status == 'Payment Pending' ||
+            status == 'Pending' ||
+            status == 'Unsettled' ||
+            status == 'Customer Debit') {
+          return sum;
+        }
+        return sum + row.audit.amount;
+      });
+
+  void _applyDatePreset(String preset) {
+    final now = DateTime.now();
+    setState(() {
+      _datePreset = preset;
+      _page = 1;
+      switch (preset) {
+        case 'Today':
+          _fromDateTime = DateTime(now.year, now.month, now.day);
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case '7D':
+          _fromDateTime = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case 'Month':
+          _fromDateTime = DateTime(now.year, now.month, 1);
+          _toDateTime = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+          break;
+        case 'Custom':
+          break;
+        default:
+          _fromDateTime = null;
+          _toDateTime = null;
+      }
+    });
+  }
+
+  Future<DateTime?> _pickDateTime({
+    required DateTime initial,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (date == null || !mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return date;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _pickFrom() async {
+    final now = DateTime.now();
+    final picked = await _pickDateTime(
+      initial: _fromDateTime ?? DateTime(now.year, now.month, now.day),
+      firstDate: DateTime(now.year - 5),
+      lastDate: _toDateTime ?? now,
+    );
+    if (picked == null) return;
+    setState(() {
+      _datePreset = 'Custom';
+      _fromDateTime = picked;
+      _page = 1;
+      if (_toDateTime != null && _toDateTime!.isBefore(picked)) {
+        _toDateTime = picked.add(const Duration(hours: 1));
+      }
+    });
+  }
+
+  Future<void> _pickTo() async {
+    final now = DateTime.now();
+    final picked = await _pickDateTime(
+      initial: _toDateTime ?? now,
+      firstDate: _fromDateTime ?? DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 1),
+    );
+    if (picked == null) return;
+    setState(() {
+      _datePreset = 'Custom';
+      _toDateTime = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        picked.hour,
+        picked.minute,
+        59,
+        999,
+      );
+      _page = 1;
+    });
+  }
+
+  String _rangeLabel(DateTime? value, {required bool isEnd}) {
+    if (value == null) return isEnd ? 'To date & time' : 'From date & time';
+    return DateFormat('dd MMM yyyy · HH:mm').format(value);
+  }
+
   void _showDetails(_TxRow row) {
     final tx = row.audit;
     final invoice = row.invoice;
+    final serviceJob = row.serviceJob;
     final theme = Theme.of(context);
 
     showModalBottomSheet(
@@ -334,7 +657,10 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                   ),
                 const SizedBox(height: 16),
                 _detailLine('Reference', tx.reference.isNotEmpty ? tx.reference : '—'),
+                _detailLine('Payment method', _normalizeMethod(tx.paymentMethod)),
                 _detailLine('Customer', tx.customerName.isNotEmpty ? tx.customerName : '—'),
+                if ((invoice?.admissionNumber ?? '').trim().isNotEmpty)
+                  _detailLine('Student ID', invoice!.admissionNumber!.trim()),
                 _detailLine('Staff', tx.staffName),
                 _detailLine(
                   'Date',
@@ -355,6 +681,21 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                     _detailLine(
                       'Balance',
                       CurrencyFormatter.format(invoice.balanceAmount),
+                    ),
+                ] else if (serviceJob != null) ...[
+                  _detailLine(
+                    'Job total',
+                    CurrencyFormatter.format(serviceJob.totalAmount),
+                  ),
+                  if (serviceJob.amountPaid > 0)
+                    _detailLine(
+                      'Amount paid',
+                      CurrencyFormatter.format(serviceJob.amountPaid),
+                    ),
+                  if (serviceJob.balance != 0)
+                    _detailLine(
+                      'Remaining balance',
+                      CurrencyFormatter.format(serviceJob.balance),
                     ),
                 ],
                 if (tx.items.isNotEmpty) ...[
@@ -377,7 +718,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    if (invoice != null)
+                    if (invoice != null) ...[
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
@@ -393,7 +734,26 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                           label: const Text('Receipt'),
                         ),
                       ),
-                    if (invoice != null) const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ] else if (serviceJob != null) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            final settings = context.read<SettingsBloc>().state.settings;
+                            final payments = await context.read<IServicesRepository>().getJobPayments(serviceJob.id);
+                            await ServiceJobPdfGenerator.generateAndShow(
+                              job: serviceJob,
+                              payments: payments,
+                              settings: settings,
+                            );
+                          },
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('Receipt'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(ctx),
@@ -402,6 +762,56 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                     ),
                   ],
                 ),
+                if (serviceJob != null &&
+                    _effectiveStatus(tx) == 'Payment Pending' &&
+                    serviceJob.status.toLowerCase() != 'cancelled' &&
+                    serviceJob.amountPaid <= 1e-9) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (dCtx) => AlertDialog(
+                            title: const Text('Cancel this job?'),
+                            content: Text(
+                              'No payment has been recorded for "${serviceJob.title}". '
+                              'Cancelling removes it from Payment Pending.',
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Keep job')),
+                              TextButton(
+                                onPressed: () => Navigator.pop(dCtx, true),
+                                child: const Text('Cancel job', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !context.mounted) return;
+                        try {
+                          await context.read<IServicesRepository>().updateJobStatus(serviceJob.id, 'cancelled');
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Job cancelled. No payment is due.')),
+                          );
+                          await _load();
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString().replaceAll('Exception: ', '')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                      label: const Text('Cancel job', style: TextStyle(color: Colors.red)),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -422,6 +832,61 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
           ),
           Expanded(
             child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalsBar(int count) {
+    final theme = Theme.of(context);
+    final collected = _filteredCollected;
+    final totalAmount = _filteredTotal;
+    final pending = totalAmount - collected;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            CurrencyFormatter.formatWithSymbol(totalAmount),
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            count == 0
+                ? 'No payments in this range'
+                : '$count payment${count == 1 ? '' : 's'} in the selected range',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Collected ${CurrencyFormatter.formatWithSymbol(collected)}',
+                  style: TextStyle(
+                    color: Colors.green.shade800,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              Text(
+                'Pending ${CurrencyFormatter.formatWithSymbol(pending < 0 ? 0 : pending)}',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -508,6 +973,60 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                       child: _chipRow(
+                        options: const ['All', 'Today', '7D', 'Month', 'Custom'],
+                        selected: _datePreset,
+                        onSelected: (v) {
+                          if (v == 'Custom') {
+                            _pickFrom();
+                          } else {
+                            _applyDatePreset(v);
+                          }
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickFrom,
+                              icon: const Icon(Icons.event, size: 16),
+                              label: Text(
+                                _rangeLabel(_fromDateTime, isEnd: false),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickTo,
+                              icon: const Icon(Icons.schedule, size: 16),
+                              label: Text(
+                                _rangeLabel(_toDateTime, isEnd: true),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ),
+                          if (_fromDateTime != null || _toDateTime != null)
+                            IconButton(
+                              tooltip: 'Clear dates',
+                              onPressed: () => _applyDatePreset('All'),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: _buildTotalsBar(total),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: _chipRow(
                         options: _methodFilters,
                         selected: _methodFilter,
                         onSelected: (v) => setState(() {
@@ -581,14 +1100,12 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            tx.customerName.isNotEmpty
-                                                ? tx.customerName
-                                                : customerLabel,
+                                            _customerLine(row, customerLabel),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           Text(
-                                            '${tx.paymentMethod} · ${_displayStatus(tx)}',
+                                            _rowMethodStatus(tx),
                                             style: TextStyle(
                                               color: statusColor,
                                               fontWeight: FontWeight.w600,

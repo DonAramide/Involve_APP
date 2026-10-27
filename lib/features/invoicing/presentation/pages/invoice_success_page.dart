@@ -14,6 +14,7 @@ import 'package:involve_app/features/invoicing/domain/templates/invoice_template
 import 'package:involve_app/features/invoicing/domain/templates/concrete_templates.dart';
 import 'package:involve_app/features/invoicing/domain/templates/pos_receipt_commands.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import 'package:involve_app/services/mpos_service.dart';
@@ -194,8 +195,17 @@ class _InvoiceSuccessPageState extends State<InvoiceSuccessPage>
   Future<({Uint8List bytes, String fileName, String caption})> _buildSharePayload(
     AppSettings settings,
   ) async {
+    var invoice = widget.invoice;
+    if ((invoice.admissionNumber ?? '').trim().isEmpty && invoice.studentId != null) {
+      try {
+        final student = await context.read<SchoolRepository>().getStudentById(invoice.studentId!);
+        if (student != null && student.admissionNumber.trim().isNotEmpty) {
+          invoice = invoice.copyWith(admissionNumber: student.admissionNumber);
+        }
+      } catch (_) {}
+    }
     final bytes = await ReceiptService().generateReceiptPdf(
-      widget.invoice,
+      invoice,
       settings,
       receiptTitle: 'PAYMENT RECEIPT',
       userPlan: context.read<SettingsBloc>().state.userPlan,
@@ -446,19 +456,26 @@ class _InvoiceSuccessPageState extends State<InvoiceSuccessPage>
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            color: Colors.green.shade500,
+                            color: widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                ? Colors.amber.shade700
+                                : Colors.green.shade500,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green.shade500.withOpacity(0.4),
+                                color: (widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                        ? Colors.amber.shade700
+                                        : Colors.green.shade500)
+                                    .withOpacity(0.4),
                                 blurRadius: 24,
                                 spreadRadius: 4,
                                 offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.check,
+                          child: Icon(
+                            widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                ? Icons.hourglass_top_rounded
+                                : Icons.check,
                             color: Colors.white,
                             size: 56,
                           ),
@@ -472,7 +489,9 @@ class _InvoiceSuccessPageState extends State<InvoiceSuccessPage>
                         children: [
                           Text(
                             widget.successTitle ??
-                                'Invoice Created Successfully!',
+                                (widget.invoice.paymentStatus.toLowerCase() == 'pending'
+                                    ? 'Invoice Created (Awaiting Payment)'
+                                    : 'Invoice Created Successfully!'),
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w900,

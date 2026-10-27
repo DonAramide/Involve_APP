@@ -51,6 +51,49 @@ class LicenseService {
     }
   }
 
+  static String normalizePlanName(String? raw, {int? planIndex}) {
+    if (planIndex != null) {
+      // Legacy index 3 was enterprise — treat as premium.
+      const names = ['basic', 'standard', 'premium', 'premium'];
+      if (planIndex >= 0 && planIndex < names.length) return names[planIndex];
+    }
+    final n = (raw ?? 'basic').toLowerCase().trim();
+    if (n.contains('enterprise') || n.contains('lifetime')) return 'premium';
+    if (n.contains('premium')) return 'premium';
+    if (n.contains('standard') || n == 'pro') return 'standard';
+    if (n.contains('trial') || n == 'free') return 'basic';
+    return n.contains('basic') ? 'basic' : (n.isEmpty ? 'basic' : n);
+  }
+
+  /// Persists a server-redeemed activation (admin QR) so the dashboard
+  /// leaves free trial even when the code is not an HMAC license blob.
+  static Future<LicenseModel> applyServerActivation({
+    required String businessName,
+    required String activationCode,
+    required String planType,
+    required DateTime expiryDate,
+  }) async {
+    final normalized = normalizePlanName(planType);
+    final planEnum = PlanType.values.firstWhere(
+      (p) => p.name == normalized,
+      orElse: () => PlanType.basic,
+    );
+    final license = LicenseModel(
+      businessName: businessName,
+      expiryDate: expiryDate,
+      planType: planEnum,
+      licenseId: 0,
+    );
+    await StorageService.saveServerActivatedPlan(
+      planType: normalized,
+      expiryDate: expiryDate,
+    );
+    await StorageService.saveLastOpenedDate(DateTime.now());
+    await StorageService.setBusinessNameLocked(true);
+    await saveLicenseRecord(license, activationCode, isActivated: true);
+    return license;
+  }
+
   static Future<LicenseModel?> getActiveLicense(String? businessName) async {
     final code = await StorageService.getLicense();
     if (code == null || businessName == null) return null;
@@ -65,11 +108,26 @@ class LicenseService {
       return true;
     }
 
-    // 2. Check for Lifetime status
+    // 2. Check for Server Activated Plan (QR activation, portal activation, device validation)
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      final p = serverPlan.planType.toLowerCase().trim();
+      if (p != 'free_trial' && p != 'trial' && p != 'free') {
+        return true;
+      }
+    }
+
+    // 3. Check for Device Access Granted from Portal
+    final accessGranted = await StorageService.isDeviceAccessGranted();
+    if (accessGranted && serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      return true;
+    }
+
+    // 4. Check for Lifetime status
     await StorageService.isBusinessNameLocked(); // Simplistic check for now, can be improved
     // Note: isDeviceAuthorized is better for lifetime, but it's in SecurityService
 
-    // 3. Check for Activation Code License
+    // 5. Check for Activation Code License
     final license = await getActiveLicense(currentBusinessName);
     if (license == null) return false;
     
@@ -91,6 +149,8 @@ class LicenseService {
 
     return true;
   }
+
+  static Future<bool> isProActive(String? currentBusinessName) => isActivated(currentBusinessName);
 
   static Future<bool> isDateTampered() async {
     final lastOpened = await StorageService.getLastOpenedDate();
@@ -119,6 +179,25 @@ class LicenseService {
     
     final trialExpiry = trialStart.add(const Duration(days: 3));
     return DateTime.now().isBefore(trialExpiry);
+  }
+
+  /// Standard, Premium, or legacy Pro / lifetime — required for VA and card/POS.
+  static Future<bool> hasOnlinePlanAccess({String? businessName}) async {
+    if (await isOnFreeTrialOnly(businessName: businessName)) return false;
+    final serverPlan = await StorageService.getServerActivatedPlan();
+    if (serverPlan != null && DateTime.now().isBefore(serverPlan.expiryDate)) {
+      final p = serverPlan.planType.toLowerCase().trim();
+      return p == 'standard' ||
+          p == 'pro' ||
+          p == 'premium' ||
+          p == 'enterprise' ||
+          p == 'lifetime';
+    }
+    final license = await getActiveLicense(businessName);
+    if (license == null || DateTime.now().isAfter(license.expiryDate)) return false;
+    return license.planType == PlanType.standard ||
+        license.planType == PlanType.premium ||
+        license.planType == PlanType.enterprise;
   }
 
   /// True when on free 3-day trial only (no Pro / lifetime / activation license).

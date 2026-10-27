@@ -1,12 +1,27 @@
 import { Request, Response } from 'express';
-import { supabase } from '../../../db/supabase';
+import { supabase, supabaseAdmin } from '../../../db/supabase';
 import { activationService } from '../services/activation.service';
+import { institutionClassificationService } from '../../health-insurance/services/institution-classification.service';
 
 export class TerminalController {
   static async assign(req: Request, res: Response) {
     try {
       const authUserId = (req as any).user?.id;
+      const authEmail = (req as any).user?.email;
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+      const instCtx = await institutionClassificationService
+        .resolveForAgentOrUser({ authUserId, email: authEmail })
+        .catch(() => null);
+      if (instCtx?.institutionType === 'HMO' || instCtx?.institutionType === 'HOSPITAL') {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'BANK_ENDPOINT_FORBIDDEN_FOR_HMO',
+            message: `POS terminal assignment is restricted to Bank/Aggregator institutions and is forbidden for ${instCtx.institutionType} institutions.`,
+          },
+        });
+      }
 
       const { agent_tenant_id, terminal_id, assigned_device_id } = req.body;
 
@@ -15,7 +30,7 @@ export class TerminalController {
       }
 
       // 1. Fetch agent
-      const { data: agent, error: agentErr } = await supabase
+      const { data: agent, error: agentErr } = await supabaseAdmin
         .from('agents')
         .select('id')
         .eq('auth_user_id', authUserId)

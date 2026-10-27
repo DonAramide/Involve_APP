@@ -362,18 +362,7 @@ const pageParams = computed(() => {
 })
 
 // 3. Sorted Multi-Tenant Compliance Performance array
-const tenantRankings = computed(() => {
-  const base = [
-    { tenantId: 'tenant-alpha', tenantName: 'Alpha Kiosk Logistics', complianceRatio: 99.8, driftCount: 1, criticalNodes: 0 },
-    { tenantId: 'global', tenantName: 'Master Core Management', complianceRatio: 100.0, driftCount: 0, criticalNodes: 0 },
-    { tenantId: 'tenant-beta', tenantName: 'Beta Fintech Subsystems', complianceRatio: 96.4, driftCount: 3, criticalNodes: 0 },
-    { tenantId: 'tenant-omega', tenantName: 'Omega Retail Point Terminals', complianceRatio: 88.2, driftCount: 8, criticalNodes: 1 },
-    { tenantId: 'tenant-gamma', tenantName: 'Gamma Healthcare Scanners', complianceRatio: 74.5, driftCount: 14, criticalNodes: 3 }
-  ]
-
-  // Recalculate dynamic order mapping backend ingestion properties
-  return base.map((t, idx) => ({ ...t, rank: `#${idx + 1}` }))
-})
+const tenantRankings = computed(() => [])
 
 const getRatioBarColor = (ratio) => {
   if (ratio > 98) return 'green-4'
@@ -387,11 +376,7 @@ const drilldownToTenant = (id) => {
 }
 
 // 4. Policy Drift Structural array
-const driftAnalysisRecords = ref([
-  { id: 'drift-01', policyKey: 'SECURE_BOOT_STRICT', targetScope: 'tenant-omega', expectedVal: 'true', actualVal: 'false', impactFactor: 2.5, durationStr: '42m ago' },
-  { id: 'drift-02', policyKey: 'KERNEL_MODULE_LOCK', targetScope: 'tenant-gamma', expectedVal: 'enforcing', actualVal: 'permissive', impactFactor: 4.0, durationStr: '3h ago' },
-  { id: 'drift-03', policyKey: 'USB_DEBUGGING_RESTRICT', targetScope: 'tenant-beta', expectedVal: 'blocked', actualVal: 'enabled', impactFactor: 1.2, durationStr: '1d ago' }
-])
+const driftAnalysisRecords = ref([])
 
 const remediateDrift = (id) => {
   const target = driftAnalysisRecords.value.find(d => d.id === id)
@@ -410,33 +395,14 @@ const recurringViolations = computed(() => {
   if (activeHorizon.value === '90d') baseBreaches = 142
 
   if (govSubMode.value === 'drift') {
-    return [
-      { vectorId: 'vec-01', ruleName: 'Config drift: USB debug state mismatched', occurrences: baseBreaches, primaryEndpoint: 'pos-term-omega-14', lastObserved: '14m ago', slaPenalty: 0.4 },
-      { vectorId: 'vec-02', ruleName: 'Policy drift: Root module locking disabled', occurrences: Math.round(baseBreaches * 0.6), primaryEndpoint: 'kiosk-alpha-02', lastObserved: '2h ago', slaPenalty: 0.1 },
-      { vectorId: 'vec-03', ruleName: 'Signature drift: Cryptographic key missing', occurrences: Math.round(baseBreaches * 0.3), primaryEndpoint: 'scanner-gamma-09', lastObserved: '1d ago', slaPenalty: 0.2 }
-    ]
+    return []
   }
 
-  return [
-    { vectorId: 'vec-01', ruleName: 'Unauthorized Android kernel modules loaded', occurrences: baseBreaches, primaryEndpoint: 'pos-term-omega-14', lastObserved: '14m ago', slaPenalty: 0.4 },
-    { vectorId: 'vec-02', ruleName: 'Missing local storage encryption passphrase keys', occurrences: Math.round(baseBreaches * 0.6), primaryEndpoint: 'kiosk-alpha-02', lastObserved: '2h ago', slaPenalty: 0.1 },
-    { vectorId: 'vec-03', ruleName: 'Stale OTA rollout step validation timing window', occurrences: Math.round(baseBreaches * 0.3), primaryEndpoint: 'scanner-gamma-09', lastObserved: '1d ago', slaPenalty: 0.2 }
-  ]
+  return []
 })
 
 // 6. Trend Trajectory points
-const trendChartData = computed(() => {
-  // Return varying mathematical sample curves adapting to retention boundaries
-  const baseline = activeHorizon.value === '24h' ? 99 : 96
-  return [
-    { label: 'T-5', value: baseline + 1.2 },
-    { label: 'T-4', value: baseline + 0.8 },
-    { label: 'T-3', value: baseline + 1.5 },
-    { label: 'T-2', value: baseline + 2.1 },
-    { label: 'T-1', value: baseline + 2.8 },
-    { label: 'Live', value: baseline + 3.4 }
-  ]
-})
+const trendChartData = computed(() => [])
 </script>
 
 <style scoped>

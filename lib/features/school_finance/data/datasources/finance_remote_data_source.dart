@@ -32,6 +32,8 @@ abstract class IFinanceRemoteDataSource {
   /// GET /api/analytics  (school-level dashboard)
   Future<Map<String, dynamic>> getSchoolSummary();
 
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits);
+
   /// GET /api/finance/daily-revenue?days=
   Future<List<Map<String, dynamic>>> getDailyRevenue(int days);
 
@@ -125,8 +127,26 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> getSchoolSummary() async {
-    final response = await client.get('/api/analytics');
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await client.get('/api/finance/school-dashboard');
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      final response = await client.get('/api/finance/executive-summary');
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+  }
+
+  @override
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits) async {
+    final response = await client.post(
+      '/api/finance/withdrawable/sync',
+      data: {'credits': credits},
+    );
+    final body = response.data;
+    if (body is Map && body['withdrawable'] != null) {
+      return double.tryParse('${body['withdrawable']}');
+    }
+    return null;
   }
 
   @override
@@ -154,8 +174,30 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> getStudentSummary(String studentId) async {
-    final response = await client.get('/api/finance/student/$studentId/summary');
-    return response.data as Map<String, dynamic>;
+    final id = studentId.trim();
+    if (id.isEmpty) {
+      return {
+        'totalFees': 0,
+        'totalPaid': 0,
+        'outstandingBalance': 0,
+        'currentBalance': 0,
+      };
+    }
+    try {
+      final response = await client.get('/api/finance/student/$id/summary');
+      return response.data as Map<String, dynamic>;
+    } on FinanceApiException catch (e) {
+      // Older backends may not expose this route yet — keep ledger usable offline.
+      if (e.statusCode == 404) {
+        return {
+          'totalFees': 0,
+          'totalPaid': 0,
+          'outstandingBalance': 0,
+          'currentBalance': 0,
+        };
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -176,11 +218,18 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
     int limit,
     int offset,
   ) async {
-    final response = await client.get(
-      '/api/finance/student/$studentId/transactions',
-      queryParameters: {'limit': limit, 'offset': offset},
-    );
-    return _parseTransactionList(response.data);
+    final id = studentId.trim();
+    if (id.isEmpty) return [];
+    try {
+      final response = await client.get(
+        '/api/finance/student/$id/transactions',
+        queryParameters: {'limit': limit, 'offset': offset},
+      );
+      return _parseTransactionList(response.data);
+    } on FinanceApiException catch (e) {
+      if (e.statusCode == 404) return [];
+      rethrow;
+    }
   }
 
   @override
@@ -212,8 +261,11 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
 
   List<TransactionModel> _parseTransactionList(dynamic data) {
     if (data == null) return [];
-    return (data as List)
-        .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+    final raw = data is Map ? data['data'] ?? data['transactions'] : data;
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 }

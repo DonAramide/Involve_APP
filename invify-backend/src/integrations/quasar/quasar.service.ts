@@ -1,6 +1,49 @@
 // src/integrations/quasar/quasar.service.ts
 import { QuasarPaymentsClient } from './quasar-payments.client';
+import { QuasarIntegrationStore } from './quasar-integration.store';
 import * as crypto from 'crypto';
+
+const TRANSFER_TENANT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The live Quasar API key is bound to quasar_integrations.quasar_tenant_id.
+ * metadata.tenantId must be that id, not the Invify school id.
+ */
+async function quasarContextTenantId(invifyTenantId: string): Promise<string> {
+  try {
+    const row = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
+    const quasarTenantId = String(row?.quasar_tenant_id || '').trim();
+    if (TRANSFER_TENANT_UUID.test(quasarTenantId)) return quasarTenantId;
+  } catch (error: any) {
+    console.warn('[QuasarSDK] Quasar tenant lookup failed:', error?.message || error);
+  }
+  return String(invifyTenantId || '').trim();
+}
+
+/** Quasar POST /transfers expects naira as a 4-decimal string, e.g. "1000.0000". */
+function transferAmountNaira(amount: number): string {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('Transfer amount must be greater than zero');
+  }
+  return value.toFixed(4);
+}
+
+/**
+ * Quasar POST /transfers metadata must include tenantId and schoolId as UUIDs.
+ * Extra keys such as `type` are rejected ("metadata.property type should not exist").
+ */
+function plainTransferMetadata(input: Record<string, any> | null | undefined): { tenantId: string; schoolId: string } {
+  const tenantId = String(input?.tenantId || '').trim();
+  const schoolId = String(input?.schoolId || input?.tenantId || '').trim();
+  if (!TRANSFER_TENANT_UUID.test(tenantId)) {
+    throw new Error('metadata.tenantId must be a UUID');
+  }
+  if (!TRANSFER_TENANT_UUID.test(schoolId)) {
+    throw new Error('metadata.schoolId must be a UUID');
+  }
+  return { tenantId, schoolId };
+}
 
 /**
  * QuasarService acts as a clean abstraction over the official Quasar API.
@@ -23,7 +66,7 @@ export class QuasarService {
    * Sends MPOS transaction backup to Quasar for device-processed transactions.
    */
   async sendMposBackup(payload: any): Promise<{ id: string; reference: string; status: string; replayed: boolean }> {
-    const baseUrl = process.env.QUASAR_API_URL || 'https://api-quasar.iips.app';
+    const baseUrl = process.env.QUASAR_API_URL || 'https://api-quasar.invify.org';
     const res = await fetch(`${baseUrl}/api/v1/pos/transactionFromMpos`, {
       method: "POST",
       headers: {
@@ -91,6 +134,8 @@ export class QuasarService {
     childId: string;
     parentId: string;
     email: string;
+    /** Forwarded to Quasar as phoneNumber + metadata (not as `phone`). */
+    phone?: string;
     firstName?: string;
     lastName?: string;
     parentShareBps?: number;
@@ -98,6 +143,10 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Provisioning virtual account for child: ${params.childId}`);
+      const phone =
+        QuasarService.normalizeCustomerPhone(params.phone) ||
+        QuasarService.normalizeCustomerPhone(params.metadata?.phone) ||
+        QuasarService.normalizeCustomerPhone(params.metadata?.phoneNumber);
       if (this.apiKey.startsWith('sk_test_')) {
         console.log('[QuasarSDK] Test API key detected. Routing to sandbox account generator...');
         const sandboxAccounts = await this.client.generateSandboxAccounts({
@@ -118,9 +167,10 @@ export class QuasarService {
 
       return await this.client.createVirtualAccount({
         ...params,
+        phone: phone || undefined,
         firstName: params.firstName || 'User',
         lastName: params.lastName || 'Account',
-        currency: 'NGN' // Defaulting to NGN for virtual accounts
+        currency: 'NGN'
       });
     } catch (error: any) {
       console.error('[QuasarSDK] createVirtualAccount failed:', error.message);
@@ -128,8 +178,34 @@ export class QuasarService {
     }
   }
 
+  async getVirtualAccount(childId: string) {
+    return this.client.getVirtualAccount(childId);
+  }
+
+  /** Normalize to +234… for Nigerian mobiles when possible. */
+  static normalizeCustomerPhone(raw: string | null | undefined): string {
+    const digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('234') && digits.length >= 13) return `+${digits}`;
+    if (digits.length === 11 && digits.startsWith('0')) return `+234${digits.slice(1)}`;
+    if (digits.length === 10 && /^[789]/.test(digits)) return `+234${digits}`;
+    if (raw && String(raw).trim().startsWith('+')) return `+${digits}`;
+    return digits.length >= 10 ? `+${digits}` : digits;
+  }
+
+  /** GET /transfers/{reference} — polling fallback when approve does not webhook. */
+  async getTransfer(reference: string) {
+    try {
+      return await this.client.getTransfer(String(reference || '').trim());
+    } catch (error: any) {
+      console.error('[QuasarSDK] getTransfer failed:', error.message);
+      throw error;
+    }
+  }
+
   /**
    * Initiates a fund transfer (payout) to an external bank.
+   * Quasar rejects the call unless metadata is a plain object.
    */
   async initiateTransfer(params: {
     amount: number;
@@ -146,17 +222,24 @@ export class QuasarService {
     };
   }) {
     try {
-      console.log(`[QuasarSDK] Initiating payout for tenant: ${params.metadata.tenantId}`);
-      if (this.apiKey.startsWith('sk_test_')) {
-        console.log('[QuasarSDK] Test API key detected. Routing to sandbox transfers...');
-        return await this.client.createSandboxTransfer({
-          ...params,
-          currency: 'NGN'
-        });
-      }
+      const contextTenantId = await quasarContextTenantId(params.metadata.tenantId);
+      const schoolId = String(params.metadata.schoolId || params.metadata.tenantId || '').trim();
+      console.log(`[QuasarSDK] Initiating payout for tenant context …${contextTenantId.slice(-6)}`);
+      // Bank payouts use POST /transfers. The sandbox transfer route is virtual-account
+      // to virtual-account and rejects a bank `destination` ("property destination should not exist").
       return await this.client.createTransfer({
-        ...params,
-        currency: 'NGN'
+        amount: transferAmountNaira(params.amount),
+        reference: params.reference,
+        currency: 'NGN',
+        destination: {
+          account_number: String(params.destination.account_number),
+          bank_code: String(params.destination.bank_code),
+          account_name: String(params.destination.account_name),
+        },
+        metadata: plainTransferMetadata({
+          tenantId: contextTenantId,
+          schoolId,
+        }),
       });
     } catch (error: any) {
       console.error('[QuasarSDK] initiateTransfer failed:', error.message);
@@ -248,7 +331,9 @@ export class QuasarService {
   /**
    * Primary Invify → Quasar card path (iso_tcp).
    * 1) encrypt + submit ICC → icc_token
-   * 2) POST /pos/card-transaction with ISO fields (no 55) + transport
+   * 2) POST /pos/card-transaction. When packed_iso_hex is set, Quasar forwards
+   * those bytes unchanged (field 55 and the MAC stay in). Loose fields are
+   * omitted so Quasar does not rebuild the message and drop the MAC.
    */
   async executeIsoCardTransaction(params: {
     quasarTenantId: string;
@@ -303,6 +388,7 @@ export class QuasarService {
     console.log(
       `[QuasarSDK] ICC token received; executing Quasar card-transaction iso_tcp → ${params.transport.host}:${params.transport.port}`,
     );
+    const packedIsoHex = params.packedIsoHex?.replace(/\s/g, '') || '';
     return this.client.executeCardTransaction({
       tenant_id: params.quasarTenantId,
       reference: params.reference,
@@ -310,10 +396,11 @@ export class QuasarService {
       device_id: params.deviceId,
       icc_token: String(iccToken),
       transport: params.transport,
-      fields: params.fields,
-      ...(params.packedIsoHex
-        ? { packed_iso_hex: params.packedIsoHex.replace(/\s/g, '') }
-        : {}),
+      // packed_iso_hex is the message the host receives. Sending fields as well
+      // makes Quasar rebuild and drop field 128/64.
+      ...(packedIsoHex
+        ? { packed_iso_hex: packedIsoHex }
+        : { fields: params.fields }),
     });
   }
 }

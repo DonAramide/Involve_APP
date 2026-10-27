@@ -1,8 +1,9 @@
 import { supabase } from '../../../db/supabase';
+import { isAgentPayoutExecutionEnabled, loadAgentFeeReadModel, loadAttributedTenantIds } from '../../agent-portal/services/agent-fee-read-model';
 
 export class WalletService {
   async getWalletKPIs(authUserId: string) {
-    const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+    const { data: agent } = await supabase.from('agents').select('id, agent_code').eq('auth_user_id', authUserId).single();
     if (!agent) throw new Error('Agent not found');
 
     const { data: wallet, error } = await supabase.from('agent_wallets').select('*').eq('agent_id', agent.id).single();
@@ -41,6 +42,9 @@ export class WalletService {
     const timeseriesCategories = Array.from(timeseriesMap.keys());
     const timeseriesData = Array.from(timeseriesMap.values());
 
+    const attributed = await loadAttributedTenantIds(agent.id, String(agent.agent_code || ''));
+    const feeOrchestration = await loadAgentFeeReadModel(String(agent.agent_code || ''), attributed.tenantIds, agent.id);
+
     return {
       availableBalance: w.available_balance,
       pendingEarnings: w.pending_earnings,
@@ -48,6 +52,8 @@ export class WalletService {
       totalWithdrawn: w.total_withdrawn,
       pendingWithdrawals: w.pending_withdrawals,
       thisMonthEarnings: thisMonth,
+      payout_execution_enabled: isAgentPayoutExecutionEnabled(),
+      feeOrchestration,
       timeseries: {
         categories: timeseriesCategories,
         data: timeseriesData
@@ -81,52 +87,41 @@ export class WalletService {
   }
 
   async requestWithdrawal(authUserId: string, payload: any) {
-    const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+    const { data: agent } = await supabase.from('agents').select('id, agent_code, status').eq('auth_user_id', authUserId).single();
     if (!agent) throw new Error('Agent not found');
+    if (agent.status && agent.status !== 'ACTIVE') {
+      const err: any = new Error('Agent is not ACTIVE');
+      err.code = 'AGENT_NOT_ACTIVE';
+      throw err;
+    }
 
     const amount = Number(payload.amount);
-    if (amount <= 0) throw new Error('Withdrawal amount must be greater than 0');
-
-    // Verify available_balance
-    const { data: wallet } = await supabase.from('agent_wallets').select('available_balance, pending_balance').eq('agent_id', agent.id).single();
-    
-    if (!wallet || wallet.available_balance < amount) {
-      throw new Error('Insufficient available balance');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      const err: any = new Error('Withdrawal amount must be greater than 0');
+      err.code = 'INVALID_AMOUNT';
+      throw err;
     }
 
-    // Deduct amount from available_balance and add to pending_balance
-    const newAvailable = wallet.available_balance - amount;
-    const newPending = (wallet.pending_balance || 0) + amount;
+    const attributed = await loadAttributedTenantIds(agent.id, String(agent.agent_code || ''));
+    const fee = await loadAgentFeeReadModel(String(agent.agent_code || ''), attributed.tenantIds, agent.id) as any;
+    const availableKobo = Number(fee?.available_kobo || 0);
+    const amountKobo = Math.round(amount > 100000 ? amount : amount * 100);
+    // payload.amount historically used naira in the wallet UI; treat values >= 100000 as already kobo
+    const requestKobo = Number.isInteger(payload.amount_kobo) ? Number(payload.amount_kobo) : amountKobo;
 
-    await supabase.from('agent_wallets').update({ 
-      available_balance: newAvailable, 
-      pending_balance: newPending 
-    }).eq('agent_id', agent.id);
-
-    // Insert DEBIT_WITHDRAWAL into wallet_ledger
-    await supabase.from('wallet_ledger').insert({
-      agent_id: agent.id,
-      amount: amount,
-      transaction_type: 'DEBIT_WITHDRAWAL',
-      description: payload.remarks || 'Withdrawal request',
-      balance_after: newAvailable
-    });
-
-    // Insert into agent_withdrawal_requests
-    const { data, error } = await supabase.from('agent_withdrawal_requests').insert({
-      agent_id: agent.id,
-      amount: amount,
-      bank_name: payload.bank_name,
-      account_number: payload.account_number,
-      account_name: payload.account_name,
-      status: 'PENDING'
-    }).select().single();
-
-    if (error) {
-      throw new Error(error.message || 'Failed to process withdrawal');
+    if (requestKobo > availableKobo) {
+      const err: any = new Error('INSUFFICIENT_AVAILABLE: shadow/assessed commission is not withdrawable.');
+      err.code = 'INSUFFICIENT_AVAILABLE';
+      throw err;
     }
 
-    return data;
+    if (!isAgentPayoutExecutionEnabled()) {
+      const err: any = new Error('PAYOUT_DISABLED: real-money payouts are not enabled for this environment.');
+      err.code = 'PAYOUT_DISABLED';
+      throw err;
+    }
+
+    throw Object.assign(new Error('PAYOUT_DISABLED: settlement completion is blocked.'), { code: 'PAYOUT_DISABLED' });
   }
 
   async getWithdrawals(authUserId: string) {

@@ -51,12 +51,6 @@
               <q-item clickable v-close-popup @click="setTenantScope('global')" class="hover-bg">
                 <q-item-section :class="prefs.isDarkMode ? 'text-white' : 'text-main'">Global Master Array</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-alpha')" class="hover-bg">
-                <q-item-section class="text-cyan-3">Tenant Alpha Scope</q-item-section>
-              </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-omega')" class="hover-bg">
-                <q-item-section class="text-purple-3">Tenant Omega Scope</q-item-section>
-              </q-item>
             </q-list>
           </q-btn-dropdown>
         </div>
@@ -290,9 +284,12 @@
               clickable
               v-ripple
               :to="item.path"
+              exact
+              :active="route.path === item.path"
               active-class="sidebar-item-active"
               class="q-mx-xs rounded-borders text-secondary nav-item column justify-center"
               style="min-height: 30px; padding: 2px 10px;"
+              @click="navigateSidebar(item.path)"
             >
               <div class="row items-center justify-between fit no-wrap">
                 <div class="row items-center op-gap-8 no-wrap overflow-hidden">
@@ -329,6 +326,7 @@
                 anchor="center right" 
                 self="center left" 
                 :offset="[10, 0]"
+                :delay="500"
                 class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24"
                 style="max-width: 260px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;"
               >
@@ -453,11 +451,12 @@
         />
       </div>
 
-      <router-view v-slot="{ Component }">
-        <transition appear enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-          <component :is="Component" :key="$route.path" />
-        </transition>
-      </router-view>
+      <div v-if="pageError" class="q-pa-xl column flex-center" style="min-height: 360px;">
+        <div class="text-h6 text-main q-mb-sm">This workspace page failed to open</div>
+        <div class="text-caption text-muted font-mono q-mb-md">{{ pageError }}</div>
+        <q-btn unelevated color="cyan-4" text-color="dark" label="Retry" @click="retryPage" />
+      </div>
+      <router-view v-else :key="route.fullPath + ':' + pageEpoch" />
     </q-page-container>
 
     <!-- Persistent Right-Side Operational Knowledge Base Drawer -->
@@ -540,7 +539,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, provide, onMounted, onUnmounted, onErrorCaptured } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useTelemetryStream } from '../composables/useTelemetryStream'
@@ -628,7 +627,7 @@ const {
   stopWalkthrough
 } = useContextualIntelligence()
 
-const operatorEmail = ref(localStorage.getItem('operator_email') || 'sysadmin@IIPS.app')
+const operatorEmail = ref(localStorage.getItem('operator_email') || 'sysadmin@invify.org')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'SUPER_ADMIN')
 
 const operatorRolesArray = computed(() => {
@@ -711,6 +710,11 @@ const workspaces = computed(() => {
   
   // 2. Finance & Audit (accessible to all)
   list.push({ id: 'finance', label: 'Finance & Audit', priority: true })
+
+  // HMO is a top-level workspace, not a child of Administration.
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_DEPLOY'])) {
+    list.push({ id: 'hmo', label: 'HMO', priority: true })
+  }
 
   // 3. Governance (accessible to platform staff)
   if (isPlatformStaff) {
@@ -795,31 +799,65 @@ const activeWorkspaceObj = computed(() => {
   return workspaces.value.find(w => w.id === prefs.value.activeWorkspace) || workspaces.value[0]
 })
 
-const switchWorkspace = (id) => {
-  if (prefs.value.activeWorkspace === id) return
-  setActiveWorkspace(id)
+const workspaceHome = {
+  fleet: '/fleet/overview',
+  finance: '/finance/reconciliation',
+  hmo: '/hmo/overview',
+  governance: '/governance/compliance',
+  observability: '/observability/streams',
+  ai: '/ai/copilot',
+  deployments: '/deployments/rollouts',
+  apps: '/apps/installed',
+  incidents: '/incidents/active',
+  automation: '/automation/policy',
+  communications: '/communications/broadcast-center',
+  admin: '/admin/settings'
 }
 
-// Watch for workspace changes to handle routing (Single Source of Truth)
-watch(() => prefs.value.activeWorkspace, (newId) => {
-  const targetMap = {
-    fleet: '/fleet/overview',
-    finance: '/finance/reconciliation',
-    governance: '/governance/compliance',
-    observability: '/observability/streams',
-    ai: '/ai/copilot',
-    deployments: '/deployments/rollouts',
-    apps: '/apps/installed',
-    incidents: '/incidents/active',
-    automation: '/automation/policy',
-    communications: '/communications/broadcast-center',
-    admin: '/admin/settings'
-  }
-  
-  if (targetMap[newId]) {
-    router.push(targetMap[newId]).catch(() => {})
+const pageError = ref(null)
+const pageEpoch = ref(0)
+
+watch(() => route.fullPath, () => {
+  pageError.value = null
+  if (route.query._retry != null) {
+    const query = { ...route.query }
+    delete query._retry
+    router.replace({ path: route.path, query }).catch(() => {})
   }
 })
+
+onErrorCaptured((err) => {
+  const message = err?.message || String(err || 'Unknown page render error')
+  console.error('[MainLayout] workspace page failed', err)
+  pageError.value = message
+  return false
+})
+
+const retryPage = () => {
+  pageError.value = null
+  pageEpoch.value += 1
+}
+
+const navigateSidebar = (path) => {
+  if (!path) return
+  pageError.value = null
+  if (route.path === path) {
+    pageEpoch.value += 1
+    return
+  }
+  router.push(path).catch(() => {})
+}
+
+const switchWorkspace = (id) => {
+  if (prefs.value.activeWorkspace !== id) {
+    setActiveWorkspace(id)
+  }
+  const target = workspaceHome[id]
+  if (target && route.path !== target) {
+    pageError.value = null
+    router.push(target).catch(() => {})
+  }
+}
 
 /**
  * FINAL REFINEMENT #4: Stream-Throttled Counter Mechanisms.
@@ -865,7 +903,9 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'Fleet Overview', path: '/fleet/overview', icon: 'speed', color: 'cyan-4', count: `${throttledCounters.value.fleetDevices}/18`, hasStream: true },
         // Tenant scope-aware routing construction mapping natively to the router profiles
-        { label: 'Device Explorer', path: `${tScope}/fleet/devices`, icon: 'devices', color: 'cyan-3', badge: `${throttledCounters.value.fleetDevices} Edge`, badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        // Always use the MainLayout fleet route. Tenant-scoped `/tenant/:id/fleet/devices`
+        // collides with TenantLayout isolation for platform staff and appears "dead" on click.
+        { label: 'Device Explorer', path: '/fleet/devices', icon: 'devices', color: 'cyan-3', badge: `${throttledCounters.value.fleetDevices} Edge`, badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
         { label: 'Terminal Management', path: '/fleet/terminals', icon: 'point_of_sale', color: 'teal-3', badge: 'POS', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Device Activation Hub', path: '/devices', icon: 'vpn_key', color: 'amber-4', badge: 'ACTIVATOR', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Live Presence Map', path: '/fleet/presence', icon: 'radar', color: 'cyan-4', hasStream: true },
@@ -877,12 +917,20 @@ const activeNavigationTree = computed(() => {
       
     case 'finance':
       return [
+        { label: 'Billing & Collections', path: '/finance/tenant-billing', icon: 'receipt_long', color: 'amber-4', badge: 'AR', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Transactions', path: '/finance/transactions', icon: 'sync_alt', color: 'cyan-4', badge: 'INVESTIGATE', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
         { label: 'Financial Ledger', path: '/finance/ledger', icon: 'account_balance_wallet', color: 'amber-4', badge: 'SOURCE', badgeBg: 'amber-10', badgeColor: 'amber-3' },
         { label: 'Reconciliation', path: '/finance/reconciliation', icon: 'fact_check', color: 'green-4' },
         { label: 'Settlements', path: '/finance/settlements', icon: 'payments', color: 'indigo-4' },
+        { label: 'Tenant Payables', path: '/finance/payables', icon: 'account_balance', color: 'green-4', badge: 'SETTLE', badgeBg: 'green-10', badgeColor: 'green-3' },
+        { label: 'Virtual Accounts', path: '/finance/virtual-accounts', icon: 'pin', color: 'cyan-4', badge: 'NUBAN', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
+        { label: 'Refunds & Chargebacks', path: '/finance/refunds-chargebacks', icon: 'gavel', color: 'red-4', badge: '4-EYES', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'School Payments', path: '/finance/school-payments', icon: 'school', color: 'teal-4', badge: 'DISPUTES', badgeBg: 'teal-10', badgeColor: 'teal-2' },
-        { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' }
+        { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' },
+        { label: 'Institute Commissions & Billing', path: '/admin/agents/commissions', icon: 'account_balance_wallet', color: 'green-4' },
+        { label: 'Platform Fee Orchestration', path: '/admin/platform-fees', icon: 'request_quote', color: 'teal-4', badge: 'Fees', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Fee Assessments (read-only)', path: '/admin/platform-fees/assessments', icon: 'fact_check', color: 'teal-3' },
+        { label: 'Fee Distribution', path: '/admin/platform-fees/distribution', icon: 'account_tree', color: 'teal-3' }
       ]
     
     case 'governance':
@@ -891,7 +939,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Operator Governance', path: '/governance/operators', icon: 'manage_accounts', color: 'blue-4' },
         { label: 'RBAC Capabilities & Matrix', path: '/governance/rbac-roles', icon: 'admin_panel_settings', color: 'amber-4' },
         { label: 'Approval Engine', path: '/governance/approvals', icon: 'fact_check', color: 'purple-4', badge: 'Queue', badgeBg: 'purple-10', badgeColor: 'purple-3' },
-        { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4', badge: '99.8%', badgeBg: 'green-10', badgeColor: 'green-3' },
+        { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4' },
         { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },
         { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
         { label: 'Enterprise Support Desk', path: '/governance/support', icon: 'headset_mic', color: 'amber-4', badge: 'TICKETS', badgeBg: 'amber-10', badgeColor: 'amber-2' },
@@ -906,6 +954,7 @@ const activeNavigationTree = computed(() => {
     
     case 'observability':
       return [
+        { label: 'Staging System Health', path: '/observability/system-health', icon: 'monitor_heart', color: 'teal-4', badge: 'LIVE', badgeBg: 'green-10', badgeColor: 'green-2' },
         { label: 'Live Event Streams', path: '/observability/streams', icon: 'stream', color: 'green-4', hasStream: true },
         { label: 'Telemetry Metrics', path: '/observability/metrics', icon: 'analytics', color: 'cyan-3' },
         { label: 'Queue Health Maps', path: '/observability/queues', icon: 'toc', color: 'grey-4' },
@@ -955,19 +1004,45 @@ const activeNavigationTree = computed(() => {
         { label: 'Lineage Hash Audits', path: '/communications/broadcast-center?tab=audits', icon: 'receipt_long', color: 'indigo-3' }
       ]
 
+    case 'hmo':
+      return [
+        { label: 'Overview', path: '/hmo/overview', icon: 'dashboard', color: 'teal-3' },
+        { label: 'HMO Registry', path: '/hmo/registry', icon: 'corporate_fare', color: 'teal-3' },
+        { label: 'Provider Network', path: '/hmo/providers', icon: 'local_hospital', color: 'teal-4' },
+        { label: 'Health Plans', path: '/hmo/plans', icon: 'inventory_2', color: 'teal-3', badge: 'Catalogue', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Benefits and Coverage', path: '/hmo/coverage', icon: 'verified_user', color: 'cyan-3' },
+        { label: 'Member Enrolment', path: '/hmo/enrolment', icon: 'how_to_reg', color: 'grey-4' },
+        { label: 'Members and Dependants', path: '/hmo/members', icon: 'groups', color: 'grey-4' },
+        { label: 'Claims and Authorisations', path: '/hmo/claims', icon: 'assignment', color: 'grey-4' },
+        { label: 'Premiums and Billing', path: '/hmo/billing', icon: 'receipt_long', color: 'amber-4' },
+        { label: 'Payments and Reconciliation', path: '/hmo/payments', icon: 'payments', color: 'amber-4' },
+        { label: 'Reports and Analytics', path: '/hmo/reports', icon: 'insights', color: 'cyan-3' },
+        { label: 'Integrations and Telemetry', path: '/hmo/telemetry', icon: 'hub', color: 'teal-3' },
+        { label: 'Audit Trail', path: '/hmo/audit', icon: 'history', color: 'indigo-3' },
+        { label: 'HMO Organisation Settings', path: '/hmo/settings', icon: 'tune', color: 'grey-4' },
+        { label: 'Platform Governance', path: '/hmo/governance', icon: 'admin_panel_settings', color: 'amber-4', badge: 'Session', badgeBg: 'amber-10', badgeColor: 'amber-2' }
+      ]
+
     case 'admin':
     default:
       return [
         { label: 'Platform Overview', path: '/admin/settings', icon: 'dashboard', color: 'cyan-4' },
         { label: 'Platform Configuration', path: '/admin/config', icon: 'tune', color: 'cyan-4' },
         { label: 'Authentication Settings', path: '/admin/settings/authentication', icon: 'security', color: 'indigo-4', badge: 'Onboarding', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
+        { label: 'Verification Log', path: '/admin/settings/verification-log', icon: 'mark_email_unread', color: 'indigo-3', badge: 'OTP', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
+        { label: 'Production Env', path: '/admin/production-env', icon: 'vpn_key', color: 'red-4', badge: 'Governor', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'Integration Vault', path: '/admin/vault', icon: 'lock', color: 'orange-4', badge: 'Secrets', badgeBg: 'orange-10', badgeColor: 'orange-2' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
+        { label: 'Health & Wellness Governance', path: '/admin/health-insurance', icon: 'health_and_safety', color: 'teal-3', badge: 'Grants', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Pending KYC Documents', path: '/admin/kyc-pending', icon: 'pending_actions', color: 'amber-4', badge: 'Review', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
-        { label: 'Agent Governance & Onboarding', path: '/admin/agents', icon: 'support_agent', color: 'amber-4', badge: 'Field Ops', badgeBg: 'amber-10', badgeColor: 'amber-2' },
-        { label: 'Agent Commissions & Billing', path: '/admin/agents/commissions', icon: 'account_balance_wallet', color: 'green-4' },
-        { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Institute Governance & Onboarding', path: '/admin/agents', icon: 'support_agent', color: 'amber-4', badge: 'Field Ops', badgeBg: 'amber-10', badgeColor: 'amber-2' },
+        { label: 'Fee Stakeholders', path: '/admin/platform-fees/stakeholders', icon: 'groups', color: 'teal-3' },
+        { label: 'Fee Withdrawals (readiness)', path: '/admin/platform-fees/withdrawals', icon: 'outbox', color: 'teal-3' },
+        { label: 'Institute Webhooks', path: '/admin/agent-webhooks', icon: 'webhook', color: 'teal-3' },
+        { label: 'Payment Alerts', path: '/admin/payment-alerts', icon: 'notifications_active', color: 'orange-4' },
+        { label: 'Enterprise Billing (subscriptions)', path: '/admin/billing', icon: 'payments', color: 'grey-5' },
         { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' },
         { label: 'Contact Maintenance', path: '/admin/contact', icon: 'contact_phone', color: 'grey-4' }
       ]
@@ -997,6 +1072,7 @@ const getMenuDescription = (label) => {
     'Drift Analysis': 'Trace operational variance, undocumented local configurations, and policy changes to prevent baseline corruption.',
 
     // Observability
+    'Staging System Health': 'Real-time infrastructure operations cockpit monitoring backend service vitals, health probes, traffic telemetry, auth events, and live sanitized application logs.',
     'Live Event Streams': 'Analyze real-time event logs, system operations, and telemetry streams arriving from edge layers globally.',
     'Telemetry Metrics': 'Render aggregated statistical dashboards of general platform capacity, processing speeds, and success rates.',
     'Queue Health Maps': 'Monitor transit brokers, message pipeline loads, and pending task structures to identify operational bottlenecks.',
@@ -1005,10 +1081,13 @@ const getMenuDescription = (label) => {
     'Ingestion Pipelines': 'Configure event collectors, stream mapping logic, log indexing parameters, and downstream storage routing profiles.',
 
     // Finance
+    'Billing & Collections': 'Invify Box installments, subscriptions, and commercial AR. Separate from POS/VA/withdrawal fee orchestration.',
     'Transactions': 'Cross-channel transaction investigation, ledger mapping, and fraud anomaly traces.',
     'Financial Ledger': 'Double-entry ledger chart of accounts, immutable journal explorer, and posting parity checks.',
     'Reconciliation': 'Settlement matching, exception queue management, and cross-ledger reconciliation rules.',
     'Settlements': 'Batch settlement orchestration, processing queues, and bank gateway clearing status.',
+    'Tenant Payables': 'Live list of every tenant and the amount Invify/Quasar currently holds to settle them.',
+    'Virtual Accounts': 'Every generated Quasar NUBAN by tenant, with account details and the transactions on that account.',
     'Audit Engine': 'Immutable financial action tracing, compliance checks, and operational audit logs.',
 
     // Deployments
@@ -1043,14 +1122,33 @@ const getMenuDescription = (label) => {
     'Platform Overview': 'Single-pane-of-glass administrative command center aggregating ecosystem health, security, operations, and telemetry.',
     'Platform Configuration': 'Configure core platform parameters, localization & currency systems, session security policies, and whitelabel branding.',
     'Authentication Settings': 'Manage onboarding verification channels, SMS integrations, and security rules for new tenants.',
+    'Verification Log': 'See the latest email and WhatsApp verification sends per recipient, including the OTP, time, and status.',
     'Contact Maintenance': 'Update support contact numbers and dispatch real-time emergency notifications to active devices.',
     'Global Setup & RBAC': 'Configure core platform parameters, primary currency defaults, global variables, and roles & permissions.',
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',
+    'Health & Wellness Governance': 'Platform-level governance of HMO providers, tenant insurance participation, operator access grants, and audit events. Plan operations live in the HMO workspace.',
+    'Overview': 'HMO workspace home. Separates platform governance from HMO, school, and provider work.',
+    'HMO Registry': 'HMO organisations recorded in hw_providers. Empty means no registry rows, after the plans grant is present.',
+    'Provider Network': 'Provider integration identity. Facilities are registered by the owning HMO, not invented here.',
+    'Health Plans': 'Create and move health plans through draft, publish, and activate. A draft is not offered for enrolment.',
+    'Benefits and Coverage': 'Coverage terms are stored on plan versions. Contribution splits are tenant offers.',
+    'Member Enrolment': 'Enrolment stays in the school tenant or the owning HMO portal.',
+    'Members and Dependants': 'Member directories stay inside the tenant that owns them.',
+    'Claims and Authorisations': 'Claims adjudication stays in the owning HMO portal.',
+    'Premiums and Billing': 'Premium invoices use the existing tenant health billing API.',
+    'Payments and Reconciliation': 'Payment confirmation stays on the existing billing endpoints. Real-money payouts remain off.',
+    'Reports and Analytics': 'Cross-tenant aggregates are on Health & Wellness Governance and require an operational grant.',
+    'Integrations and Telemetry': 'Reads hw_providers when an integration grant is active, and separates empty, denied, and failed responses.',
+    'Audit Trail': 'Plan lifecycle audit events are written to hw_audit_events and reviewed in governance.',
+    'HMO Organisation Settings': 'An HMO edits its own profile in the institute portal.',
+    'Platform Governance': 'Entry to operational sessions, access grants, and lineage audit. It does not replace those controls.',
+    'Pending KYC Documents': 'Review every CAC certificate and valid ID card waiting for operator approval.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
     'Tenant Orchestration': 'Authoritatively manage backend feature flags, reactive JSON branding tokens, and tier consumption limits.',
-    'Agent Governance & Onboarding': 'Provision field agents, monitor commissions, and manage terminal onboarding delegation credentials.',
-    'Agent Commissions & Billing': 'Configure Revenue Sharing and Onboarding Fees for Agents across the platform.',
-    'Enterprise Billing & Fees': 'Govern subscription plans, transaction processing fees, settlement splits, and live treasury logs.',
+    'Institute Governance & Onboarding': 'Provision institutes, monitor commissions, and manage terminal onboarding delegation credentials.',
+    'Institute Commissions & Billing': 'Configure Revenue Sharing and Onboarding Fees for Institutes across the platform.',
+    'Platform Fee Orchestration': 'Persisted platform transaction fee profiles, draft versions, and publish control. Not school billing.',
+    'Enterprise Billing (subscriptions)': 'Subscription plan mock. Not the platform fee orchestration catalog.',
     'EMV POS Gateway': 'Live switchboard for routing EMV card transactions between Cpoint-Kimono (HTTPS REST), Medusa (ISO8583 TCP), and NIBSS — with real-time failover, terminal key cache management, and a full transaction log.'
   }
   return descriptions[label] || 'Access and govern this administrative module.'
@@ -1115,6 +1213,11 @@ onUnmounted(() => {
 
 .workspace-tabs {
   height: 100%;
+}
+
+.q-page-container > *:not(.watermark-bg) {
+  position: relative;
+  z-index: 1;
 }
 
 .watermark-bg {

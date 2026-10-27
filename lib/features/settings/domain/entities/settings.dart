@@ -72,7 +72,36 @@ class AppSettings extends Equatable {
   final bool warrantyEnabled;
   final bool allowGiveChange;
   final bool showNetworkIndicator;
+  /// When true, Create Job can include a materials / parts breakdown.
+  final bool servicesMaterialsEnabled;
+  /// When true, Create Job can include a workmanship / labor fee.
+  final bool servicesLaborEnabled;
+  /// When true, Create Job shows Add category / description format tables.
+  final bool servicesDescriptionFormatEnabled;
+  /// School parent-payment split: auto_share, lowest_to_highest,
+  /// highest_to_lowest, first_match_amount, management_decide.
+  final String parentPaymentShareMode;
+  /// Dashboard menu IDs hidden from the home grid (Admin Control).
+  final List<String> hiddenDashboardIcons;
 
+  /// Seed/demo values that must never be shown as a real business address.
+  static bool isPlaceholderAddress(String? value) {
+    final a = (value ?? '').trim().toLowerCase();
+    return a.isEmpty ||
+        a == '123 street' ||
+        a == 'please re-adjust settings';
+  }
+
+  /// Seed/demo phones (000-000, 000000) that must not block onboarding contact.
+  static bool isPlaceholderPhone(String? value) {
+    final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+    return digits.isEmpty || RegExp(r'^0+$').hasMatch(digits);
+  }
+
+  static bool isPlaceholderEmail(String? value) {
+    final e = (value ?? '').trim();
+    return e.isEmpty || !e.contains('@');
+  }
 
   const AppSettings({
     this.id,
@@ -136,6 +165,11 @@ class AppSettings extends Equatable {
     this.warrantyEnabled = false,
     this.allowGiveChange = false,
     this.showNetworkIndicator = true,
+    this.servicesMaterialsEnabled = true,
+    this.servicesLaborEnabled = true,
+    this.servicesDescriptionFormatEnabled = true,
+    this.parentPaymentShareMode = 'auto_share',
+    this.hiddenDashboardIcons = const [],
   });
 
   AppSettings copyWith({
@@ -200,6 +234,11 @@ class AppSettings extends Equatable {
     bool? warrantyEnabled,
     bool? allowGiveChange,
     bool? showNetworkIndicator,
+    bool? servicesMaterialsEnabled,
+    bool? servicesLaborEnabled,
+    bool? servicesDescriptionFormatEnabled,
+    String? parentPaymentShareMode,
+    List<String>? hiddenDashboardIcons,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -263,7 +302,48 @@ class AppSettings extends Equatable {
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
       allowGiveChange: allowGiveChange ?? this.allowGiveChange,
       showNetworkIndicator: showNetworkIndicator ?? this.showNetworkIndicator,
+      servicesMaterialsEnabled:
+          servicesMaterialsEnabled ?? this.servicesMaterialsEnabled,
+      servicesLaborEnabled: servicesLaborEnabled ?? this.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled: servicesDescriptionFormatEnabled ??
+          this.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode:
+          parentPaymentShareMode ?? this.parentPaymentShareMode,
+      hiddenDashboardIcons:
+          hiddenDashboardIcons ?? this.hiddenDashboardIcons,
     );
+  }
+
+  String get normalizedBusinessMode {
+    final mode = businessMode.toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (mode == 'service' || mode == 'hospitality' || mode == 'invify_services') return 'services';
+    if (mode == 'education' || mode == 'invify_school') return 'school';
+    if (mode == 'invify_retail') return 'retail';
+    return mode;
+  }
+
+  bool get isServicesMode => normalizedBusinessMode == 'services';
+  bool get isSchoolMode => normalizedBusinessMode == 'school';
+
+  static String modeFromOnboarding(String? raw) {
+    final mode = (raw ?? '').toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (mode == 'service' || mode == 'hospitality' || mode == 'invify_services' || mode == 'services') {
+      return 'services';
+    }
+    if (mode == 'school' || mode == 'education' || mode == 'invify_school') {
+      return 'school';
+    }
+    return 'retail';
+  }
+
+  static int? colorFromHex(String? hex) {
+    var clean = (hex ?? '').trim();
+    if (clean.isEmpty) return null;
+    if (clean.startsWith('#')) clean = clean.substring(1);
+    if (clean.toLowerCase().startsWith('0x')) clean = clean.substring(2);
+    if (clean.length == 6) clean = 'FF$clean';
+    if (clean.length != 8) return null;
+    return int.tryParse(clean, radix: 16);
   }
 
   @override
@@ -327,5 +407,10 @@ class AppSettings extends Equatable {
         warrantyEnabled,
         allowGiveChange,
         showNetworkIndicator,
+        servicesMaterialsEnabled,
+        servicesLaborEnabled,
+        servicesDescriptionFormatEnabled,
+        parentPaymentShareMode,
+        hiddenDashboardIcons,
       ];
 }

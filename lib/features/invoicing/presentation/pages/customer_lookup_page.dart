@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_history_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -219,66 +220,119 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Register New Customer'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Customer Name (Required)'),
-                textCapitalization: TextCapitalization.words,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          String? phoneError;
+
+          return AlertDialog(
+            title: const Text('Register New Customer'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Customer Name (Required)',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                      labelText: 'Phone Number',
+                      prefixIcon: const Icon(Icons.phone),
+                      errorText: phoneError,
+                    ),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: PhoneNumberInput.formatters,
+                    maxLength: PhoneNumberInput.maxDigits,
+                    onChanged: (_) {
+                      if (phoneError != null) {
+                        setDialogState(() => phoneError = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address',
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Address',
+                      prefixIcon: Icon(Icons.location_on),
+                    ),
+                  ),
+                ],
               ),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone Number'),
-                keyboardType: TextInputType.phone,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Cancel'),
               ),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email Address'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = nameController.text.trim();
+                  final phone = phoneController.text.trim();
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Customer name is required')),
+                    );
+                    return;
+                  }
+
+                  final repo = context.read<IServicesRepository>();
+
+                  if (phone.isNotEmpty) {
+                    final existing = await repo.getCustomerByPhone(phone);
+                    if (existing != null) {
+                      setDialogState(() {
+                        phoneError = 'Phone already used by ${existing.name}';
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('A customer with phone number "$phone" already exists (${existing.name}).'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                  }
+
+                  try {
+                    await repo.createCustomer(
+                      name: name,
+                      phone: phone.isEmpty ? null : phone,
+                      email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+                      address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+                    );
+                    if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                    _loadCustomers();
+                  } catch (e) {
+                    final msg = e.toString().replaceAll('Exception: ', '').trim();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(msg.isNotEmpty ? msg : 'Could not save customer.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Save'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Customer name is required')),
-                );
-                return;
-              }
-              try {
-                final repo = context.read<IServicesRepository>();
-                await repo.createCustomer(
-                  name: nameController.text.trim(),
-                  phone: phoneController.text.trim(),
-                  email: emailController.text.trim(),
-                  address: addressController.text.trim(),
-                );
-                Navigator.pop(context);
-                _loadCustomers();
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not save customer.'))),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

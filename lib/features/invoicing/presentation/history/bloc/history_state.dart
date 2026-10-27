@@ -68,6 +68,7 @@ class HistoryLoaded extends HistoryState {
   final List<Invoice> invoices;
   final double totalSales;
   final double totalInvoiced;
+  final double totalPending;
   final String? query;
   final double? amount;
   final String? paymentMethod;
@@ -76,10 +77,10 @@ class HistoryLoaded extends HistoryState {
   final int? classId;
   final String? customerName;
 
-  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.totalInvoiced = 0.0, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId, this.classId, this.customerName});
+  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.totalInvoiced = 0.0, this.totalPending = 0.0, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId, this.classId, this.customerName});
 
   @override
-  List<Object?> get props => [invoices, totalSales, totalInvoiced, query, amount, paymentMethod, paymentStatus, staffId, classId, customerName];
+  List<Object?> get props => [invoices, totalSales, totalInvoiced, totalPending, query, amount, paymentMethod, paymentStatus, staffId, classId, customerName];
 }
 class HistoryError extends HistoryState {
   final String message;

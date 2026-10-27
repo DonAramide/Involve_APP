@@ -27,7 +27,7 @@ export class OTPController {
 
   /**
    * POST /public/otp/verify
-   * Validates the provided code.
+   * Validates the provided code with brute-force lockout protection.
    */
   static async verifyOTP(req: Request, res: Response) {
     try {
@@ -36,10 +36,13 @@ export class OTPController {
         return res.status(400).json({ error: 'Phone and code are required' });
       }
 
-      const isValid = await OTPService.verifyOTP(phone, code);
+      const result = await OTPService.verifyOTPDetailed(phone, code);
       
-      if (!isValid) {
-        return res.status(400).json({ error: 'Invalid or expired verification code' });
+      if (!result.ok) {
+        if (result.locked) {
+          return res.status(429).json({ error: result.error });
+        }
+        return res.status(400).json({ error: result.error || 'Invalid or expired verification code' });
       }
 
       return res.status(200).json({ 

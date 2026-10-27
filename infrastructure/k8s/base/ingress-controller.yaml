@@ -44,7 +44,7 @@ spec:
     - hosts:
         - api.invify.org
         - app.invify.org
-        - stream.IIPS.app
+        - stream.invify.org
       secretName: invify-production-tls-cert
   rules:
     # 1. Primary API Gateway routing
@@ -72,7 +72,7 @@ spec:
                   number: 80
                   
     # 3. High-Throughput Realtime WebSocket Edge Subsystem
-    - host: stream.IIPS.app
+    - host: stream.invify.org
       http:
         paths:
           - path: /ws

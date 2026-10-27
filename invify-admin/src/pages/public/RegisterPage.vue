@@ -134,6 +134,8 @@
                   type="tel"
                   outlined
                   :dark="isDarkMode"
+                  maxlength="13"
+                  counter
                   lazy-rules
                   :rules="[() => phoneRule(countryDial, nationalPhone)]"
                   hint="Local number without the country code"

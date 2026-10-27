@@ -7,6 +7,7 @@ import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
+import 'package:involve_app/core/services/device_notification_service.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 
@@ -53,10 +54,15 @@ class PaymentCatchUpService {
   }
 
   /// Fetch missed payments and credit/notify. Safe to call on every connect.
-  Future<int> runCatchUp({bool showBanner = true}) async {
+  Future<int> runCatchUp({
+    bool showBanner = true,
+    bool force = false,
+    Duration? lookback,
+  }) async {
     if (_running) return 0;
     // Debounce: skip if we just ran within 8 seconds (connect storms).
-    if (_lastRunAt != null &&
+    if (!force &&
+        _lastRunAt != null &&
         DateTime.now().difference(_lastRunAt!) < const Duration(seconds: 8)) {
       return 0;
     }
@@ -69,7 +75,9 @@ class PaymentCatchUpService {
         return 0;
       }
       final client = GetIt.instance<FinanceApiClient>();
-      final since = await getLastSeen();
+      final since = force
+          ? DateTime.now().toUtc().subtract(lookback ?? const Duration(days: 30))
+          : await getLastSeen();
       // Slight overlap so borderline timestamps are not missed.
       final sinceQuery =
           since.subtract(const Duration(seconds: 5)).toIso8601String();
@@ -108,18 +116,6 @@ class PaymentCatchUpService {
           newest = created;
         }
 
-        final amount = map['amount'] is num
-            ? (map['amount'] as num).toDouble()
-            : double.tryParse('${map['amount']}') ?? 0;
-        final reference = '${map['reference'] ?? ''}'.trim();
-        if (amount <= 0 || reference.isEmpty) continue;
-
-        // Already processed while online or on a prior catch-up.
-        if (await CustomerWalletCreditService.instance
-            .hasProcessedReference(reference)) {
-          continue;
-        }
-
         Map<String, dynamic> metadata = {};
         final metadataRaw = map['metadata'];
         if (metadataRaw is Map) {
@@ -133,6 +129,10 @@ class PaymentCatchUpService {
           } catch (_) {}
         }
 
+        final amount = _nairaFromRow(map, metadata);
+        final reference = '${map['reference'] ?? ''}'.trim();
+        if (amount <= 0 || reference.isEmpty) continue;
+
         final payload = {
           'type': 'payment.success',
           'reference': reference,
@@ -143,25 +143,34 @@ class PaymentCatchUpService {
           'metadata': metadata,
         };
 
+        // Claim before the ledger write. Otherwise the new row looks like a
+        // duplicate and the tablet stays silent.
+        final shouldNotify =
+            await CustomerWalletCreditService.instance.claimPaymentNotification(reference);
         final credited =
             await CustomerWalletCreditService.instance.applyPaymentSuccess(payload);
+        if (!shouldNotify) {
+          debugPrint('[PaymentCatchUp] Skip re-notify for $reference');
+          continue;
+        }
 
         final sender = (metadata['senderName'] ??
                 metadata['studentName'] ??
                 'a payer')
             .toString();
         final formatted = amount.toStringAsFixed(2);
-        await NotificationInbox.add(
+        await NotificationInbox.removeReceivedPayment(
+          reference: reference,
+          message: '₦$formatted received from $sender',
+        );
+
+        unawaited(DeviceNotificationService.showPayment(
+          title: credited ? 'Payment received' : 'Payment while offline',
           message: credited
               ? '₦$formatted received from $sender (synced)'
               : '₦$formatted payment while offline · $sender',
-          type: 'payment',
-          extra: {
-            'reference': reference,
-            'amount': amount,
-            'catchUp': true,
-          },
-        );
+          reference: reference,
+        ));
 
         if (!credited) {
           await CustomerWalletCreditService.instance.markReferenceNotified(
@@ -208,5 +217,89 @@ class PaymentCatchUpService {
     } finally {
       _running = false;
     }
+  }
+
+  /// Refresh this VA from Invify (missed payments + VA ledger) and apply locally.
+  Future<int> refreshVirtualAccount({
+    required String accountNumber,
+    bool showBanner = false,
+  }) async {
+    var applied = await runCatchUp(
+      showBanner: false,
+      force: true,
+      lookback: const Duration(days: 30),
+    );
+    applied += await _applyAccountTransactions(accountNumber);
+    return applied;
+  }
+
+  Future<int> _applyAccountTransactions(String accountNumber) async {
+    if (!GetIt.instance.isRegistered<FinanceApiClient>()) return 0;
+    final va = accountNumber.trim();
+    if (va.isEmpty) return 0;
+    try {
+      final client = GetIt.instance<FinanceApiClient>();
+      final response = await client.get(
+        '/api/finance/virtual-accounts/$va/transactions',
+      );
+      final body = response.data;
+      final rows = body is List
+          ? body
+          : (body is Map && body['data'] is List ? body['data'] as List : const []);
+      var applied = 0;
+      var quasarBalance = 0.0;
+      for (final raw in rows) {
+        if (raw is! Map) continue;
+        final map = Map<String, dynamic>.from(raw);
+        Map<String, dynamic> metadata = {};
+        final metadataRaw = map['metadata'];
+        if (metadataRaw is Map) {
+          metadata = Map<String, dynamic>.from(metadataRaw);
+        }
+        final amount = _nairaFromRow(map, metadata);
+        final reference = '${map['reference'] ?? ''}'.trim();
+        if (amount <= 0 || reference.isEmpty) continue;
+        if (reference.contains(':reconcile:')) continue;
+        metadata['virtualAccountNumber'] ??= va;
+        metadata['accountNumber'] ??= va;
+        final credited = await CustomerWalletCreditService.instance.applyPaymentSuccess({
+          'type': 'payment.success',
+          'reference': reference,
+          'amount': amount,
+          'customerId': map['customerId'] ?? metadata['customerId'],
+          'createdAt': map['createdAt'] ?? map['created_at'],
+          'metadata': metadata,
+        });
+        if (credited) applied++;
+        final live = metadata['liveBalance'];
+        if (live is num && live.toDouble() > quasarBalance) {
+          quasarBalance = live.toDouble();
+        }
+      }
+      if (quasarBalance > 0) {
+        final aligned = await CustomerWalletCreditService.instance.recalculateParentCredit(
+          accountNumber: va,
+          quasarBalance: quasarBalance,
+        );
+        if (aligned) applied++;
+      }
+      return applied;
+    } catch (e) {
+      debugPrint('[PaymentCatchUp] VA transaction refresh failed: $e');
+      return 0;
+    }
+  }
+
+  double _nairaFromRow(Map map, Map metadata) {
+    for (final raw in [
+      metadata['amountNaira'],
+      metadata['amount_naira'],
+      metadata['amountRaw'],
+      map['amount'],
+    ]) {
+      final n = raw is num ? raw.toDouble() : double.tryParse('$raw');
+      if (n != null && n > 0) return (n * 100).round() / 100.0;
+    }
+    return 0;
   }
 }

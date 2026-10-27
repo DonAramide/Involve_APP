@@ -5,8 +5,14 @@ import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
-import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
+import { WalletService } from '../services/wallet.service';
+import { creditsSchoolWallet, loadVirtualAccountKind } from '../services/virtual-account-ownership';
+import { rejectIfVaBlocked } from '../utils/free-trial-guard';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
+import { roundNaira, sandboxBalanceToNaira, transactionAmountNaira } from '../utils/virtual-account-funds';
+import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
+import { collectedInvoiceAmount } from '../utils/invoice-collection';
 
 function tenantFromRequest(req: Request, res: Response): string | null {
   try {
@@ -31,7 +37,7 @@ export class CustomerController {
 
       if (!customerId) return res.status(400).json({ error: "Customer ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
 
       if (!name || name.trim().split(/\s+/).length < 2) {
         return res.status(400).json({ error: "Customer's full name (first and last name) is required to provision a virtual account." });
@@ -66,6 +72,7 @@ export class CustomerController {
         childId: customerId, 
         parentId: tenantId,  
         email: email || `customer-${customerId.substring(0, 8)}@invify.com`,
+        phone: String(phone).trim(),
         firstName: name?.split(' ')[0] || 'Valued',
         lastName: name?.split(' ').slice(1).join(' ') || 'Customer',
         metadata: { source: 'customer_provisioning', phone: phone }
@@ -111,7 +118,7 @@ export class CustomerController {
 
       const options = {
         page: parseInt(req.query.page as string) || 1,
-        pageSize: parseInt(req.query.pageSize as string) || 50,
+        pageSize: parseInt(req.query.pageSize as string) || 500,
         search: req.query.search as string,
         sort: req.query.sort as string,
         direction: req.query.direction as 'asc' | 'desc',
@@ -213,7 +220,7 @@ export class CustomerController {
 
       if (!userId) return res.status(400).json({ error: "Staff User ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
-      if (await rejectIfFreeTrialVa(res, tenantId)) return;
+      if (await rejectIfVaBlocked(res, tenantId)) return;
       if (!customLastName || customLastName.trim() === '') {
         return res.status(400).json({ error: "Custom second name is required" });
       }
@@ -252,17 +259,22 @@ export class CustomerController {
       const quasar = await getQuasarService(tenantId);
       const platformId = 'platform-admin-owner-id';
 
+      const staffPhone = String(phone || defaultPhone || '').trim();
+      if (!staffPhone) {
+        return res.status(400).json({ error: 'Customer phone number is required' });
+      }
       const quasarAccount = await quasar.createVirtualAccount({
         childId: userId,
         parentId: platformId,
         email: email || defaultEmail,
+        phone: staffPhone,
         firstName: companyName,
         lastName: customLastName,
         parentShareBps: 0,
         metadata: { 
           type: 'staff_account', 
           tenantId: tenantId, 
-          phone: phone || defaultPhone || undefined 
+          phone: staffPhone 
         }
       });
 
@@ -335,12 +347,70 @@ export class CustomerController {
       }
 
       const pendingByVa = computePendingFundsByVa(txns || []);
+      const appliedByVa = new Map<string, number>();
+      try {
+        const [{ data: roster }, { data: invoices, error: invErr }] = await Promise.all([
+          supabaseAdmin
+            .from('students')
+            .select('id, parent_id, virtual_account_number')
+            .or(`tenant_id.eq.${tenantId},school_id.eq.${tenantId}`),
+          supabaseAdmin
+            .from('invoices')
+            .select('customer_id, student_id, amount_paid, payment_method, payment_status, invoice_number, total_amount')
+            .eq('tenant_id', tenantId),
+        ]);
+        if (invErr) {
+          console.warn('[CustomerController] invoice allocation query failed:', invErr.message);
+        }
+        const vaByStudentId = new Map<string, string>();
+        const vasByParentId = new Map<string, Set<string>>();
+        const vaByCustomerId = new Map<string, string>();
+        for (const c of customers || []) {
+          const va = String(c.virtual_account_number || '').trim();
+          if (!va) continue;
+          vaByCustomerId.set(String(c.id), va);
+          const rawId = String(c.id || '');
+          const parentKey = rawId.toLowerCase().startsWith('par-') ? rawId.slice(4) : rawId;
+          if (!vasByParentId.has(parentKey)) vasByParentId.set(parentKey, new Set());
+          vasByParentId.get(parentKey)!.add(va);
+        }
+        for (const st of roster || []) {
+          const va = String(st.virtual_account_number || '').trim();
+          if (va) vaByStudentId.set(String(st.id), va);
+          const parentKey = String(st.parent_id || '').trim();
+          if (!parentKey) continue;
+          if (!vasByParentId.has(parentKey)) vasByParentId.set(parentKey, new Set());
+          if (va) vasByParentId.get(parentKey)!.add(va);
+        }
+        for (const inv of invoices || []) {
+          if (String(inv.invoice_number || '').startsWith('PMT-')) continue;
+          if (classifyInvoicePaymentMethod(inv.payment_method) !== 'wallet') continue;
+          const collected = collectedInvoiceAmount(inv);
+          if (!(collected > 0)) continue;
+          const targets = new Set<string>();
+          const studentVa = vaByStudentId.get(String(inv.student_id || ''));
+          if (studentVa) targets.add(studentVa);
+          const student = (roster || []).find((s: any) => String(s.id) === String(inv.student_id || ''));
+          const parentKey = String(student?.parent_id || '').trim();
+          for (const va of vasByParentId.get(parentKey) || []) targets.add(va);
+          const customerVa = vaByCustomerId.get(String(inv.customer_id || ''));
+          if (customerVa) targets.add(customerVa);
+          for (const va of targets) {
+            appliedByVa.set(va, roundNaira((appliedByVa.get(va) || 0) + collected));
+          }
+        }
+      } catch (err: any) {
+        console.warn('[CustomerController] invoice allocation threw:', err?.message || err);
+      }
+
+      const leftover = (va: string) =>
+        roundNaira(Math.max(0, (pendingByVa.get(va) || 0) - (appliedByVa.get(va) || 0)));
 
       const list = [];
 
       for (const c of (customers || [])) {
         const va = String(c.virtual_account_number || '').trim();
-        const pendingBalance = pendingByVa.get(va) ?? 0;
+        const pendingBalance = leftover(va);
 
         list.push({
           id: c.id,
@@ -386,7 +456,7 @@ export class CustomerController {
           for (const st of (students || [])) {
             const va = String(st.virtual_account_number || '').trim();
             if (!va || list.some((row) => row.accountNumber === va)) continue;
-            const pendingBalance = pendingByVa.get(va) ?? 0;
+            const pendingBalance = leftover(va);
             const name = `${st.first_name || ''} ${st.last_name || ''}`.trim() || st.admission_number || 'Student';
             list.push({
               id: st.id,
@@ -436,7 +506,18 @@ export class CustomerController {
         return res.status(500).json({ error: "Failed to fetch transactions" });
       }
 
-      return res.status(200).json(WebHookFormatVaTxns(txns || [], va));
+      const rows = WebHookFormatVaTxns(txns || [], va);
+      const quasarBalance = await lookupQuasarVaBalanceNaira(tenantId, va);
+      for (const row of rows) {
+        row.metadata = {
+          ...(row.metadata || {}),
+          liveBalance: quasarBalance,
+        };
+      }
+      if (Number.isFinite(quasarBalance) && quasarBalance >= 0) {
+        await syncParentCreditToVaNet(tenantId, va, quasarBalance);
+      }
+      return res.status(200).json(rows);
     } catch (error: any) {
       console.error('[CustomerController] getVirtualAccountTransactions Error:', error.message);
       return res.status(500).json({ error: "Failed to fetch virtual account transactions" });
@@ -452,6 +533,17 @@ export class CustomerController {
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid sweep amount" });
 
+      const va = String(accountNumber).trim();
+      const ownership = await loadVirtualAccountKind(va, { tenantId });
+      if (!creditsSchoolWallet(ownership.kind)) {
+        return res.status(409).json({
+          error:
+            ownership.kind === 'parent'
+              ? 'This virtual account belongs to a parent. Those funds are not swept into the school wallet.'
+              : 'This virtual account is not a proven school or staff account. Those funds were not swept into the school wallet.',
+        });
+      }
+
       const { data: wallet, error: walletErr } = await supabaseAdmin
         .from('wallets')
         .select('*')
@@ -462,60 +554,76 @@ export class CustomerController {
         return res.status(404).json({ error: "Tenant wallet not found" });
       }
 
-      const newBalance = Number(wallet.balance) + Number(amount);
+      const { data: inbound } = await supabaseAdmin
+        .from('transactions_log')
+        .select('type, metadata')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'SUCCESS')
+        .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
+        .limit(500);
+      const alreadyInWallet = (inbound || []).some(
+        (tx: any) => extractVaFromMetadata(tx.metadata) === va,
+      );
 
-      const { error: updateErr } = await supabaseAdmin
-        .from('wallets')
-        .update({
-          balance: newBalance,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', wallet.id);
-
-      if (updateErr) throw updateErr;
-
-      const idempotencyKey = crypto.randomUUID();
-      const reference = `SWEEP-VA-${accountNumber.substring(0, 6)}`;
-      const entries = [
-        {
-          account: 'USER_WALLET',
-          type: 'CREDIT',
-          amount: Math.round(Number(amount))
-        },
-        {
-          account: 'EXTERNAL_BANK',
-          type: 'DEBIT',
-          amount: Math.round(Number(amount))
+      let newBalance = Number(wallet.balance);
+      if (!alreadyInWallet) {
+        const idempotencyKey = `sweep-va:${tenantId}:${va}`;
+        const ledgerRef = `SWEEP-VA-${va.substring(0, 6)}`;
+        const posted = await supabaseAdmin.rpc('process_ledger_double_entry_text', {
+          p_tenant_id: tenantId,
+          p_idempotency_key: idempotencyKey,
+          p_reference: ledgerRef,
+          p_entries: [
+            { account: 'USER_WALLET', type: 'CREDIT', amount: roundNaira(Number(amount)) },
+            { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: roundNaira(Number(amount)) },
+          ],
+          p_metadata: { source: 'virtual_account_sweep', accountNumber: va }
+        });
+        if (posted.error && !String(posted.error.message || '').toLowerCase().includes('duplicate')) {
+          throw new Error(posted.error.message || 'sweep ledger failed');
         }
-      ];
+        const derived = await WalletService.getBalance(tenantId);
+        newBalance = Number(derived?.balance || 0);
+        await supabaseAdmin
+          .from('wallets')
+          .update({
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', wallet.id);
+      }
 
-      await supabaseAdmin.rpc('process_ledger_double_entry', {
-        p_tenant_id: tenantId,
-        p_idempotency_key: idempotencyKey,
-        p_reference: reference,
-        p_entries: entries,
-        p_metadata: { source: 'virtual_account_sweep', accountNumber }
-      });
-
-      // Persist sweep against this VA so pending funds can be reduced accurately
-      await supabaseAdmin.from('transactions_log').insert({
-        reference,
-        tenant_id: tenantId,
-        wallet_id: wallet.id,
-        amount: Math.round(Number(amount)),
-        type: 'SWEEP',
-        provider: 'quasar',
-        status: 'SUCCESS',
-        metadata: {
-          virtualAccountNumber: accountNumber,
-          accountNumber,
-          source: 'virtual_account_sweep',
-        },
-      });
+      const reference = `SWEEP-VA-${va}`;
+      const { data: existingSweep } = await supabaseAdmin
+        .from('transactions_log')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('reference', reference)
+        .limit(1);
+      if (!existingSweep?.length) {
+        await supabaseAdmin.from('transactions_log').insert({
+          reference,
+          tenant_id: tenantId,
+          wallet_id: wallet.id,
+          amount: Number(amount),
+          type: 'SWEEP',
+          provider: 'quasar',
+          status: 'SUCCESS',
+          metadata: {
+            virtualAccountNumber: va,
+            accountNumber: va,
+            source: 'virtual_account_sweep',
+            amountNaira: Number(amount),
+            alreadyInWallet,
+          },
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: `Successfully swept ₦${amount.toFixed(2)} to internal wallet`,
+        message: alreadyInWallet
+          ? `Cleared ₦${Number(amount).toFixed(2)} from this virtual account. Those funds were already in the school wallet when the parent paid in.`
+          : `Successfully swept ₦${Number(amount).toFixed(2)} to internal wallet`,
         newBalance
       });
     } catch (error: any) {
@@ -523,6 +631,116 @@ export class CustomerController {
       return res.status(500).json({ error: "Failed to sweep virtual account funds" });
     }
   }
+}
+
+async function lookupQuasarVaBalanceNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const recorded = await recordedParentVaNetNaira(tenantId, accountNumber);
+  const spentOnBills = await schoolWalletBillNaira(tenantId, accountNumber);
+  const net = roundNaira(Math.max(0, recorded - spentOnBills));
+  try {
+    const accounts = await QfsQuasarBridgeService.listAccounts(tenantId);
+    const want = String(accountNumber).replace(/\D/g, '');
+    const match = (accounts || []).find((row: any) => {
+      const got = String(row?.account_number || row?.accountNumber || '').replace(/\D/g, '');
+      return got.length >= 8 && got === want;
+    });
+    if (match) return sandboxBalanceToNaira(match);
+  } catch (err: any) {
+    console.warn('[CustomerController] Quasar VA balance lookup failed:', err?.message || err);
+  }
+  return net;
+}
+
+/** Bills already moved from this parent into the school wallet. Not part of parent credit. */
+async function schoolWalletBillNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8) return 0;
+  const { data, error } = await supabaseAdmin
+    .from('school_entities')
+    .select('payload')
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va)
+    .limit(1);
+  if (error || !data?.length) return 0;
+  const stored = Number(data[0].payload?.schoolWalletBillNaira);
+  const storedNaira = Number.isFinite(stored) && stored > 0 ? stored : 0;
+  const parentId = data[0].payload?.id;
+  let mapped = 0;
+  try {
+    const { data: pays } = await supabaseAdmin
+      .from('school_entities')
+      .select('payload')
+      .eq('tenant_id', tenantId)
+      .eq('entity_type', 'parent_payment')
+      .limit(500);
+    for (const row of pays || []) {
+      const p = row.payload || {};
+      const sameParent = parentId != null && String(p.parentId) === String(parentId);
+      const payVa = String(p.virtualAccountNumber || '').replace(/\D/g, '');
+      const sameVa = payVa.length >= 8 && payVa === va;
+      if (!sameParent && !sameVa) continue;
+      if (String(p.source || '') !== 'credit_map') continue;
+      const amt = Number(p.appliedToDebt != null ? p.appliedToDebt : p.amount);
+      if (Number.isFinite(amt) && amt > 0) mapped += amt;
+    }
+  } catch (err: any) {
+    console.warn('[CustomerController] mapped credit lookup failed:', err?.message || err);
+  }
+  return roundNaira(Math.max(storedNaira, mapped));
+}
+
+/** Save parent credit as virtual-account receipts minus bills already moved to the school wallet. */
+async function syncParentCreditToVaNet(tenantId: string, accountNumber: string, balance: number): Promise<void> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8 || !Number.isFinite(Number(balance))) return;
+  const { data, error } = await supabaseAdmin
+    .from('school_entities')
+    .select('payload')
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va)
+    .limit(1);
+  if (error || !data?.length) return;
+  const current = Number(data[0].payload?.creditBalance) || 0;
+  const gross = await recordedParentVaNetNaira(tenantId, accountNumber);
+  const spent = await schoolWalletBillNaira(tenantId, accountNumber);
+  const remaining = roundNaira(Math.max(0, Number(balance || 0) - spent));
+  const wrongGross = gross > 0 && Math.abs(current - gross) <= 0.009;
+  if (Math.abs(current - remaining) <= 0.009) return;
+  // A mapped bill payment lowers local credit. Do not write the live VA
+  // balance back over that debit unless the stored figure is still the gross VA in.
+  if (current + 0.009 < remaining && !wrongGross) return;
+  const payload = {
+    ...(data[0].payload || {}),
+    creditBalance: remaining,
+    schoolWalletBillNaira: spent,
+  };
+  await supabaseAdmin
+    .from('school_entities')
+    .update({ payload, updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va);
+}
+
+/** Credits already logged for this virtual account, minus sweeps. Used when Quasar will not return the live balance. */
+async function recordedParentVaNetNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8) return 0;
+  const { data, error } = await supabaseAdmin
+    .from('transactions_log')
+    .select('id, type, amount, reference, metadata, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'SUCCESS')
+    .or(`metadata->>accountNumber.eq.${va},metadata->>virtualAccountNumber.eq.${va}`)
+    .limit(500);
+  if (error || !data) return 0;
+  const pending = computePendingFundsByVa(data);
+  for (const [key, value] of pending) {
+    if (String(key).replace(/\D/g, '') === va) return roundNaira(value);
+  }
+  return 0;
 }
 
 /** Match SUCCESS txs to a staff VA number across Quasar metadata key variants. */
@@ -562,7 +780,7 @@ function computePendingFundsByVa(txns: any[]): Map<string, number> {
   for (const tx of txns || []) {
     const va = extractVaFromMetadata(tx.metadata);
     if (!va) continue;
-    const amount = Number(tx.amount) || 0;
+    const amount = Number(tx.metadata?.amountNaira ?? tx.metadata?.amount_naira ?? tx.amount) || 0;
     if (!Number.isFinite(amount) || amount <= 0) continue;
     const type = String(tx.type || '').toUpperCase();
     const ref = String(tx.reference || tx.id || '').trim();
@@ -597,6 +815,8 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
     if (!inboundTypes.has(rawType)) return false;
 
     const meta = tx.metadata || {};
+    const digits = (value: any) => String(value || '').replace(/\D/g, '');
+    const want = digits(va);
     const candidates = [
       meta.virtualAccountNumber,
       meta.accountNumber,
@@ -607,7 +827,7 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
     ]
       .filter(Boolean)
       .map((v: any) => String(v).trim());
-    return candidates.includes(va);
+    return candidates.includes(va) || (want.length >= 8 && candidates.some((c) => digits(c) === want));
   });
 
   return matched.map((tx) => {
@@ -618,7 +838,7 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
         : rawType;
     return {
       id: tx.id,
-      amount: Number(tx.amount),
+      amount: transactionAmountNaira(tx),
       type: normalizedType,
       reference: tx.reference,
       status: tx.status,

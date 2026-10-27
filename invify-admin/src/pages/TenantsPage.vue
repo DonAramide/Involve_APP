@@ -18,7 +18,24 @@
           <q-badge color="indigo-7" class="q-ml-sm">{{ rows.length }} Total</q-badge>
         </div>
       </div>
-      <div class="col-auto">
+      <div class="col-auto q-gutter-sm">
+        <q-btn
+          outline
+          color="amber-4"
+          icon="pending_actions"
+          label="Pending Documents"
+          class="q-px-md"
+          to="/admin/kyc-pending"
+        />
+        <q-btn 
+          outline
+          color="cyan-4" 
+          icon="sensors" 
+          label="Ping Missing Devices" 
+          class="q-px-md"
+          :loading="pingingMissing"
+          @click="pingMissingDevices"
+        />
         <q-btn 
           color="indigo-7" 
           icon="add" 
@@ -43,7 +60,7 @@
         <div class="col-12 col-md-3">
           <q-select 
             v-model="filter.type" 
-            :options="['all', 'school', 'retail', 'service']" 
+            :options="['all', 'school', 'retail', 'services']" 
             label="Type" 
             :dark="prefs.isDarkMode" filled dense 
             emit-value
@@ -86,10 +103,18 @@
 
       <template v-slot:body-cell-agent_code="props">
         <q-td :props="props" class="text-center">
-          <span v-if="props.row.agent_code" class="text-weight-bold" style="font-family: monospace; font-size: 12px; color: #34d399;">
-            {{ props.row.agent_code }}
-          </span>
-          <span v-else class="text-grey-6" style="font-size: 11px;">N/A</span>
+          <div v-if="props.row.institute_code || props.row.agent_code" class="text-weight-bold" style="font-family: monospace; font-size: 12px; color: #34d399;">
+            {{ props.row.institute_code || props.row.agent_code }}
+          </div>
+          <div v-else class="text-grey-6" style="font-size: 11px;">AAA000 DEFAULT</div>
+          <q-badge
+            v-if="props.row.institute_port_pending"
+            color="amber-8"
+            text-color="black"
+            label="PORT PENDING"
+            class="q-mt-xs"
+            style="font-size: 9px;"
+          />
         </q-td>
       </template>
 
@@ -143,6 +168,16 @@
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-x-sm">
+          <q-btn
+            v-if="needsIdentityPing(props.row)"
+            flat round dense
+            icon="sensors"
+            color="amber-4"
+            :loading="pingingId === props.row.id"
+            @click="pingTenant(props.row)"
+          >
+            <q-tooltip>Ping tablet for device ID and GPS</q-tooltip>
+          </q-btn>
           <q-btn flat round dense icon="visibility" color="cyan-4" @click="viewDetails(props.row.id)">
             <q-tooltip>View Details</q-tooltip>
           </q-btn>
@@ -188,6 +223,8 @@ const $q = useQuasar()
 const $router = useRouter()
 
 const loading = ref(false)
+const pingingMissing = ref(false)
+const pingingId = ref(null)
 const rows = ref([])
 const filter = ref({ name: '', type: 'all', status: 'all' })
 const pagination = ref({ sortBy: 'created_at', descending: true, rowsPerPage: 15 })
@@ -197,7 +234,7 @@ const columns = [
   { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
   { name: 'device_serial', label: 'DEVICE ID', field: row => row.device_id || 'UNASSIGNED', align: 'left', sortable: true },
   { name: 'device_count', label: 'DEVICES', field: row => row.device_count || 1, align: 'center', sortable: true },
-  { name: 'agent_code', label: 'AGENT CODE', field: row => row.agent_code || 'N/A', align: 'center', sortable: true },
+  { name: 'agent_code', label: 'INSTITUTE', field: row => row.institute_code || row.agent_code || 'AAA000', align: 'center', sortable: true },
   { name: 'location', label: 'LOCATION', field: row => row.location || 'N/A', align: 'left', sortable: true },
   { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
   { name: 'plan_expires_at', label: 'EXPIRY DATE', field: row => row.plan_expires_at || null, align: 'center', sortable: true },
@@ -226,9 +263,13 @@ const openCreateModal = () => {
     component: TenantModal,
     componentProps: { isEdit: false }
   }).onOk(async (formData) => {
-    await adminApi.createTenant(formData)
-    $q.notify({ type: 'positive', message: 'Tenant registered successfully' })
-    fetchTenants()
+    try {
+      await adminApi.createTenant(formData)
+      $q.notify({ type: 'positive', message: 'Tenant registered successfully' })
+      fetchTenants()
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to create tenant' })
+    }
   })
 }
 
@@ -237,21 +278,63 @@ const openEditModal = (row) => {
     component: TenantModal,
     componentProps: { isEdit: true, tenant: row }
   }).onOk(async (formData) => {
-    await adminApi.updateTenant(row.id, formData)
-    $q.notify({ type: 'positive', message: 'Tenant updated successfully' })
-    fetchTenants()
+    try {
+      await adminApi.updateTenant(row.id, formData)
+      $q.notify({ type: 'positive', message: 'Tenant updated successfully' })
+      fetchTenants()
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to update tenant' })
+    }
   })
 }
 
 const toggleStatus = async (row) => {
   const newStatus = row.status === 'active' ? 'suspended' : 'active'
-  await adminApi.updateTenant(row.id, { status: newStatus })
-  $q.notify({ type: 'positive', message: `Tenant ${newStatus}` })
-  fetchTenants()
+  try {
+    await adminApi.updateTenant(row.id, { status: newStatus })
+    $q.notify({ type: 'positive', message: `Tenant ${newStatus}` })
+    fetchTenants()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || `Failed to ${newStatus === 'suspended' ? 'suspend' : 'activate'} tenant` })
+  }
 }
 
 const viewDetails = (id) => {
   $router.push(`/tenants/${id}`)
+}
+
+const needsIdentityPing = (row) => !row.device_id || !row.location
+
+const pingTenant = async (row) => {
+  pingingId.value = row.id
+  try {
+    const { data } = await adminApi.pingTenantIdentity(row.id)
+    $q.notify({
+      type: data?.onlineSockets > 0 ? 'positive' : 'warning',
+      message: data?.message || 'Ping sent',
+    })
+    setTimeout(() => fetchTenants(true), 4000)
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to ping device' })
+  } finally {
+    pingingId.value = null
+  }
+}
+
+const pingMissingDevices = async () => {
+  pingingMissing.value = true
+  try {
+    const { data } = await adminApi.pingMissingTenantIdentities()
+    $q.notify({
+      type: data?.onlineTenants > 0 ? 'positive' : 'warning',
+      message: data?.message || 'Ping sent',
+    })
+    setTimeout(() => fetchTenants(true), 4000)
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Failed to ping missing devices' })
+  } finally {
+    pingingMissing.value = false
+  }
 }
 
 let syncInterval

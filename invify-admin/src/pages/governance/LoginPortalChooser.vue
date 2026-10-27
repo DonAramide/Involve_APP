@@ -39,10 +39,19 @@
             icon="storefront"
             to="/tenant/login"
           />
+          <q-btn
+            outline
+            color="amber-5"
+            class="full-width text-weight-bold q-py-md"
+            label="Institute Login"
+            icon="account_balance"
+            to="/institute/login"
+          />
         </div>
 
         <div class="border-top q-pt-md text-center text-metric-sm text-muted">
-          Operators use Admin. School / business owners use Tenant.
+          Operators use Admin. School / business owners use Tenant. Institutes use Institute Login
+          (<span class="text-amber-4 text-weight-medium">/institute/login</span>).
         </div>
       </div>
     </q-page-container>

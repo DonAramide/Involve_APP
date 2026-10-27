@@ -42,12 +42,18 @@ class _AuditLogsPageState extends State<AuditLogsPage> {
                 context.read<AdminBloc>().add(LoadAuditLogs());
               },
               child: ListView(
-                children: const [
-                  SizedBox(height: 100),
+                children: [
+                  const SizedBox(height: 100),
                   Center(
-                    child: Text(
-                      'No audit logs found.',
-                      style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        state.error != null
+                            ? 'Could not load audit logs.\n${state.error}'
+                            : 'No audit logs found for this school yet.\nPayments, virtual accounts, and admin actions will appear here.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                      ),
                     ),
                   ),
                 ],

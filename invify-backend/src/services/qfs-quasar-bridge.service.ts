@@ -416,14 +416,20 @@ export class QfsQuasarBridgeService {
     }
   }
 
-  static async getLedger(tenantId: string, accountId: string, limit = 50, offset = 0) {
+  static async getLedger(
+    tenantId: string,
+    accountId: string,
+    limit = 50,
+    offset = 0,
+    opts?: { noRetry?: boolean; timeoutMs?: number },
+  ) {
     if (!useQuasarBackend()) return QfsSandboxService.getLedger(tenantId, accountId, limit, offset);
     try {
       const page = Math.floor(offset / Math.max(limit, 1)) + 1;
       const result = await (await quasarClient(tenantId)).getSandboxLedger(accountId, {
         page,
         limit,
-      });
+      }, opts);
       return result?.items ?? result?.entries ?? result ?? [];
     } catch (err) {
       rethrowQuasar(err);

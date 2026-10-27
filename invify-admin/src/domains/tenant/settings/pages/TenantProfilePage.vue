@@ -139,8 +139,11 @@
                   <q-input
                     v-model="profile.phone"
                     dark outlined dense
+                    type="tel"
                     label="Phone Number"
                     placeholder="+234 800 000 0000"
+                    maxlength="13"
+                    counter
                     class="profile-input"
                   >
                     <template v-slot:prepend><q-icon name="phone" color="indigo-4" size="xs" /></template>
@@ -223,7 +226,7 @@
                 <q-icon name="lock_reset" color="amber-4" size="sm" />
                 <div class="text-h6 text-weight-bold text-white">Change Password</div>
               </div>
-              <div class="text-caption text-grey-5 q-mb-lg">Use a strong password with at least 8 characters, uppercase letters, and numbers.</div>
+              <div class="text-caption text-grey-5 q-mb-lg">Use a strong password with at least 9 characters, uppercase, lowercase, a number, and a symbol.</div>
 
               <div class="column q-gutter-y-md">
                 <q-input
@@ -252,11 +255,8 @@
                   </template>
                 </q-input>
 
-                <!-- Password strength meter -->
                 <div v-if="security.newPassword">
-                  <div class="text-metric-sm text-grey-5 q-mb-xs">Password Strength</div>
-                  <q-linear-progress :value="passwordStrength.score / 4" :color="passwordStrength.color" dark class="rounded-borders" style="height: 6px;" />
-                  <div class="text-metric-sm q-mt-xs" :class="`text-${passwordStrength.color}`">{{ passwordStrength.label }}</div>
+                  <PasswordStrengthHints :password="security.newPassword" :email="profile.email" :current-password="security.currentPassword" />
                 </div>
 
                 <q-input
@@ -643,6 +643,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { api, adminApi } from '../../../../api';
+import { evaluatePasswordPolicy } from '../../../../utils/passwordPolicy';
+import { promptCheckerMfa } from '../../../../utils/promptCheckerMfa';
+import PasswordStrengthHints from '../../../../components/PasswordStrengthHints.vue';
 
 const $q = useQuasar();
 const activeTab = ref('profile');
@@ -760,33 +763,45 @@ const security = ref({
   mfaEnabled: localStorage.getItem('mfa_status_verified') !== 'false',
 });
 
-const passwordStrength = computed(() => {
-  const p = security.value.newPassword;
-  let score = 0;
-  if (p.length >= 8) score++;
-  if (/[A-Z]/.test(p)) score++;
-  if (/[0-9]/.test(p)) score++;
-  if (/[^A-Za-z0-9]/.test(p)) score++;
-  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-  const colors = ['', 'red-4', 'amber-4', 'light-blue-4', 'green-4'];
-  return { score, label: labels[score] || 'Too short', color: colors[score] || 'grey-5' };
-});
+const passwordPolicy = computed(() =>
+  evaluatePasswordPolicy(security.value.newPassword, {
+    email: profile.value.email,
+    currentPassword: security.value.currentPassword,
+  })
+);
 
 const canChangePassword = computed(() =>
-  security.value.currentPassword &&
-  security.value.newPassword &&
+  !!security.value.currentPassword &&
+  !!security.value.newPassword &&
   security.value.newPassword === security.value.confirmPassword &&
-  security.value.newPassword.length >= 8
+  passwordPolicy.value.ok
 );
 
 const changePassword = async () => {
+  if (!canChangePassword.value) return;
   saving.value.password = true;
-  await new Promise(r => setTimeout(r, 1100));
-  saving.value.password = false;
-  security.value.currentPassword = '';
-  security.value.newPassword = '';
-  security.value.confirmPassword = '';
-  $q.notify({ type: 'positive', message: 'Password changed successfully. Please log in again on other devices.', icon: 'lock' });
+  try {
+    await adminApi.changePassword({
+      currentPassword: security.value.currentPassword,
+      newPassword: security.value.newPassword,
+    });
+    security.value.currentPassword = '';
+    security.value.newPassword = '';
+    security.value.confirmPassword = '';
+    $q.notify({
+      type: 'positive',
+      message: 'Password changed successfully. Please log in again on other devices.',
+      icon: 'lock',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error || 'Failed to change password.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.password = false;
+  }
 };
 
 const toggleMfa = (val) => {
@@ -914,7 +929,7 @@ const notifications = ref(
     acc[item.key + '_sms'] = false;
     acc[item.key + '_push'] = true;
     return acc;
-  }, { digestFrequency: 'daily' })
+  }, { digestFrequency: 'realtime' })
 );
 
 const digestOptions = [
@@ -926,9 +941,24 @@ const digestOptions = [
 
 const saveNotifications = async () => {
   saving.value.notifications = true;
-  await new Promise(r => setTimeout(r, 800));
-  saving.value.notifications = false;
-  $q.notify({ type: 'positive', message: 'Notification preferences saved.', icon: 'notifications' });
+  try {
+    const { data } = await api.put('/api/notifications/preferences', { prefs: notifications.value });
+    if (data?.prefs) Object.assign(notifications.value, data.prefs);
+    localStorage.setItem('tenant_notification_prefs', JSON.stringify(notifications.value));
+    $q.notify({
+      type: 'positive',
+      message: 'Notification preferences saved. A confirmation email was sent to ' + (profile.value.email || 'your account email') + '.',
+      icon: 'notifications',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Could not save notification preferences.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.notifications = false;
+  }
 };
 
 // ── Bank account state ─────────────────────────────────
@@ -958,6 +988,89 @@ const bank = ref({
   resolving: false,
   savedAccount: savedRaw ? JSON.parse(savedRaw) : null,
 });
+
+const applySavedBank = (row) => {
+  if (!row) return;
+  const accountNumber = String(row.accountNumber || row.account_number || '').trim();
+  if (!accountNumber) return;
+  const saved = {
+    bankName: row.bankName || row.bank_name || '',
+    accountNumber,
+    accountName: row.accountName || row.account_name || '',
+    bankCode: row.bankCode || row.bank_code || '',
+  };
+  bank.value.savedAccount = saved;
+  bank.value.bankName = saved.bankName;
+  bank.value.accountNumber = saved.accountNumber;
+  bank.value.accountName = saved.accountName;
+  localStorage.setItem('tenant_bank_account', JSON.stringify(saved));
+};
+
+const persistBankToApi = async (saved, otp) => {
+  const res = await adminApi.saveTenantPayoutSettings({
+    account_number: saved.accountNumber,
+    bank_name: saved.bankName,
+    account_name: saved.accountName,
+    bank_code: saved.bankCode || undefined,
+    otp,
+  });
+  const row = res.data?.settings || res.data;
+  if (row?.account_number || row?.accountNumber) applySavedBank(row);
+};
+
+const loadBankAccount = async () => {
+  try {
+    const { data } = await adminApi.getTenantPayoutSettings();
+    const row = data?.settings || data;
+    if (row?.account_number || row?.accountNumber) {
+      applySavedBank(row);
+      return;
+    }
+  } catch {
+    /* fall through to browser copy */
+  }
+  if (bank.value.savedAccount?.accountNumber) {
+    try {
+      await persistBankToApi(bank.value.savedAccount);
+    } catch {
+      /* keep local copy until API is reachable */
+    }
+  }
+};
+
+const saveBankAccount = async () => {
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: '2FA required',
+    message: 'Enter the 6-digit code from your authenticator app to save the corporate bank account used for dispatches.',
+    okLabel: 'Verify & save',
+  });
+  if (!otp) {
+    $q.notify({ type: 'warning', message: 'Bank details were not saved. A 2FA code is required.' });
+    return;
+  }
+  saving.value.bank = true;
+  try {
+    const saved = {
+      bankName: bank.value.bankName,
+      accountNumber: bank.value.accountNumber,
+      accountName: bank.value.accountName,
+    };
+    await persistBankToApi(saved, otp);
+    $q.notify({
+      type: 'positive',
+      message: 'Bank account saved. The school app can use this account for withdrawals.',
+      icon: 'account_balance',
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.message || err.response?.data?.error || 'Could not save bank account.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.bank = false;
+  }
+};
 
 let resolveTimer = null;
 const resolveAccountName = (val) => {
@@ -991,19 +1104,6 @@ const resolveAccountName = (val) => {
   }
 };
 
-const saveBankAccount = async () => {
-  saving.value.bank = true;
-  await new Promise(r => setTimeout(r, 1000));
-  bank.value.savedAccount = {
-    bankName: bank.value.bankName,
-    accountNumber: bank.value.accountNumber,
-    accountName: bank.value.accountName,
-  };
-  localStorage.setItem('tenant_bank_account', JSON.stringify(bank.value.savedAccount));
-  saving.value.bank = false;
-  $q.notify({ type: 'positive', message: 'Bank account saved. Payout verification will begin within 24 hours.', icon: 'account_balance' });
-};
-
 const clearBankForm = () => {
   bank.value.bankName = '';
   bank.value.accountNumber = '';
@@ -1011,13 +1111,13 @@ const clearBankForm = () => {
   bank.value.bvn = '';
 };
 
-const payoutInfo = [
-  { label: 'Payout Cycle', value: 'Daily (T+1)' },
-  { label: 'Minimum Payout', value: '₦5,000' },
-  { label: 'Processing Fee', value: '0% (Enterprise plan)' },
-  { label: 'Next Scheduled Payout', value: new Date(Date.now() + 86400000).toLocaleDateString('en-NG'), valueClass: 'text-green-3' },
-  { label: 'Account Status', value: bank.value.savedAccount ? 'Verified ✓' : 'Not Configured', valueClass: bank.value.savedAccount ? 'text-green-3' : 'text-amber-3' },
-];
+const payoutInfo = computed(() => [
+  { label: 'Payout Cycle', value: '—' },
+  { label: 'Minimum Payout', value: '—' },
+  { label: 'Processing Fee', value: '—' },
+  { label: 'Next Scheduled Payout', value: '—', valueClass: 'text-grey-5' },
+  { label: 'Account Status', value: bank.value.savedAccount ? 'Saved' : 'Not Configured', valueClass: bank.value.savedAccount ? 'text-green-3' : 'text-amber-3' },
+]);
 
 const notifyComingSoon = (feature) => {
   $q.notify({ type: 'info', message: `${feature} — Coming soon.`, icon: 'schedule' });
@@ -1025,11 +1125,16 @@ const notifyComingSoon = (feature) => {
 
 onMounted(async () => {
   await loadProfile();
+  await loadBankAccount();
 
-  // Load saved notification prefs from localStorage
-  const saved = localStorage.getItem('tenant_notification_prefs');
-  if (saved) {
-    try { Object.assign(notifications.value, JSON.parse(saved)); } catch {}
+  try {
+    const { data } = await api.get('/api/notifications/preferences');
+    if (data?.prefs) Object.assign(notifications.value, data.prefs);
+  } catch {
+    const saved = localStorage.getItem('tenant_notification_prefs');
+    if (saved) {
+      try { Object.assign(notifications.value, JSON.parse(saved)); } catch {}
+    }
   }
 
   // Load real login history from backend audit logs

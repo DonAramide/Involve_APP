@@ -1,10 +1,23 @@
 import { ref } from 'vue'
 
-const currentCurrency = ref(JSON.parse(localStorage.getItem('platform_currency')) || {
+const NAIRA = {
   name: 'Naira',
   code: 'NGN',
   symbol: '₦'
-})
+}
+
+function readStoredCurrency() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('platform_currency') || 'null')
+    if (stored?.code === 'USD' || stored?.symbol === '$') return { ...NAIRA }
+    if (stored?.code && stored?.symbol) return stored
+  } catch {
+    /* ignore */
+  }
+  return { ...NAIRA }
+}
+
+const currentCurrency = ref(readStoredCurrency())
 
 export function useCurrency() {
   const setCurrency = (currency) => {

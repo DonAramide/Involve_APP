@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../db/supabase';
+import { FeeShadowIntegration } from './fee-shadow-integration';
 
 export class QuasarEventGatewayService {
   /**
@@ -86,5 +87,11 @@ export class QuasarEventGatewayService {
     if (postErr) {
       throw new Error(`Quasar failed to process inbound credit: ${postErr.message}`);
     }
+
+    await FeeShadowIntegration.afterVaInwardResult(true, {
+      tenantId: params.tenantId,
+      amountNaira: params.amount,
+      reference: params.reference,
+    });
   }
 }

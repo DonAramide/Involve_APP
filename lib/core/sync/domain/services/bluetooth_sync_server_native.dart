@@ -14,13 +14,14 @@ class BluetoothSyncServer {
 
   BluetoothSyncServer({required this.syncRepository, required this.deviceId});
 
-  Future<void> start() async {
+  Future<void> start({String? confirmId}) async {
     if (kIsWeb) return;
     if (_isRunning) return;
 
+    final code = (confirmId ?? '').trim().toUpperCase();
     final advertiseData = AdvertiseData(
       serviceUuid: BluetoothSyncConstants.serviceUuid,
-      localName: 'Device $deviceId',
+      localName: code.isEmpty ? 'Device $deviceId' : 'IV-$code',
     );
 
     await _peripheral.start(advertiseData: advertiseData);

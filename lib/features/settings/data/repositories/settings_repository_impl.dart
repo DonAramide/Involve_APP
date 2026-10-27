@@ -17,7 +17,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       if (result == null) {
         return const AppSettings(
           organizationName: 'My Business',
-          address: '123 Street',
+          address: '',
           phone: '000-000',
           currency: '₦',
         );
@@ -25,10 +25,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
       final bSettings = await db.select(db.businessSettings).getSingleOrNull();
       final entity = _toEntity(result, bSettings?.businessMode ?? 'retail');
       // Auto-normalize legacy currency
-      if (entity.currency == 'NGN') {
-        return entity.copyWith(currency: '₦');
+      var normalized = entity;
+      if (normalized.currency == 'NGN') {
+        normalized = normalized.copyWith(currency: '₦');
       }
-      return entity;
+      if (AppSettings.isPlaceholderAddress(normalized.address) &&
+          normalized.address.isNotEmpty) {
+        normalized = normalized.copyWith(address: '');
+      }
+      return normalized;
     } catch (e) {
       // Handle "Row too big" or other DB errors gracefully
       // by returning default settings. This allows the user
@@ -105,6 +110,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showAdminSignature: Value(settings.showAdminSignature),
       warrantyEnabled: Value(settings.warrantyEnabled),
       allowGiveChange: Value(settings.allowGiveChange),
+      servicesMaterialsEnabled: Value(settings.servicesMaterialsEnabled),
+      servicesLaborEnabled: Value(settings.servicesLaborEnabled),
+      servicesDescriptionFormatEnabled: Value(settings.servicesDescriptionFormatEnabled),
+      parentPaymentShareMode: Value(settings.parentPaymentShareMode),
+      hiddenDashboardIcons: Value(jsonEncode(settings.hiddenDashboardIcons)),
     );
 
     if (existing == null) {
@@ -144,6 +154,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
         menuOrder = (jsonDecode(row.menuOrder!) as List).cast<String>();
       } catch (e) {
         menuOrder = [];
+      }
+    }
+
+    List<String> hiddenDashboardIcons = [];
+    if (row.hiddenDashboardIcons != null && row.hiddenDashboardIcons!.isNotEmpty) {
+      try {
+        hiddenDashboardIcons =
+            (jsonDecode(row.hiddenDashboardIcons!) as List).cast<String>();
+      } catch (e) {
+        hiddenDashboardIcons = [];
       }
     }
 
@@ -207,6 +227,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showAdminSignature: row.showAdminSignature,
       warrantyEnabled: row.warrantyEnabled,
       allowGiveChange: row.allowGiveChange,
+      servicesMaterialsEnabled: row.servicesMaterialsEnabled,
+      servicesLaborEnabled: row.servicesLaborEnabled,
+      servicesDescriptionFormatEnabled: row.servicesDescriptionFormatEnabled,
+      parentPaymentShareMode: row.parentPaymentShareMode,
+      hiddenDashboardIcons: hiddenDashboardIcons,
     );
   }
 }

@@ -26,7 +26,7 @@
       <div class="bg-subpanel border-main q-pa-xs rounded-borders row items-center op-gap-12 no-wrap text-caption">
         <div class="column items-end q-px-xs">
           <span class="text-muted" style="font-size: 9px;">Global Reproducibility SLA</span>
-          <span class="text-metric-mono text-green-4 text-weight-bold">99.4% PASSED</span>
+          <span class="text-metric-mono text-green-4 text-weight-bold">—</span>
         </div>
         <q-btn dense flat size="xs" color="blue-5" label="RUN REPLAY PIPELINE" @click="executeReplayValidation" class="bg-panel q-px-xs text-metric-sm" />
       </div>

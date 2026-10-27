@@ -81,6 +81,70 @@ function isTimeoutError(err: any): boolean {
   );
 }
 
+function deviceOwnerFromJwt(jwtPayload: any, userId: string, userEmail: string): {
+  id: string;
+  email: string;
+  role: string;
+  tenantId: string;
+} | null {
+  let decodedTenantId =
+    jwtPayload?.tenantId ||
+    jwtPayload?.tenant_id ||
+    jwtPayload?.app_metadata?.tenantId ||
+    jwtPayload?.user_metadata?.tenantId ||
+    null;
+  if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
+  const claimRole = String(jwtPayload?.role || 'owner').toLowerCase();
+  if (!decodedTenantId || !['owner', 'tenant_admin', 'staff'].includes(claimRole)) {
+    return null;
+  }
+  return {
+    id: userId,
+    email: userEmail,
+    role: claimRole,
+    tenantId: String(decodedTenantId),
+  };
+}
+
+async function loadAgentForJwt(userId: string, userEmail: string): Promise<{
+  id: string;
+  email: string;
+  auth_user_id: string | null;
+  status: string | null;
+} | null> {
+  try {
+    const byAuth = await withTimeout(
+      supabaseAdmin
+        .from('agents')
+        .select('id, email, auth_user_id, status')
+        .eq('auth_user_id', userId)
+        .is('deleted_at', null)
+        .maybeSingle(),
+      DB_TIMEOUT_MS,
+      'agents.byAuth',
+    );
+    if (byAuth.data) return byAuth.data;
+    if (userEmail) {
+      const byEmail = await withTimeout(
+        supabaseAdmin
+          .from('agents')
+          .select('id, email, auth_user_id, status')
+          .ilike('email', userEmail.trim())
+          .is('deleted_at', null)
+          .maybeSingle(),
+        DB_TIMEOUT_MS,
+        'agents.byEmail',
+      );
+      if (byEmail.data) return byEmail.data;
+    }
+  } catch (err: any) {
+    if (!isTimeoutError(err)) {
+      console.warn('[AuthMiddleware] Agent profile lookup failed:', err?.message || err);
+    }
+  }
+  return null;
+}
+
 function requiresVerifiedJwt(): boolean {
   if (
     process.env.NODE_ENV === 'production' ||
@@ -148,13 +212,29 @@ async function verifyBearerToken(token: string): Promise<any> {
       }
       return verifySupabaseAccessToken(token);
     } else {
-      if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
-        const err: any = new Error('Authentication misconfigured: SUPABASE_JWT_SECRET required');
+      if ((!supabaseJwtSecret || supabaseJwtSecret.length < 16) &&
+          (!localJwtSecret || localJwtSecret.length < 16)) {
+        const err: any = new Error('Authentication misconfigured: JWT verification secret not configured');
         err.status = 503;
         err.code = 'JWT_SECRET_MISSING';
         throw err;
       }
-      return verifySupabaseAccessToken(token);
+      try {
+        return await verifySupabaseAccessToken(token);
+      } catch (primary: any) {
+        if (primary?.code === 'JWT_SECRET_MISSING' || primary?.code === 'JWT_JWKS_URL_MISSING') {
+          if (!localJwtSecret || localJwtSecret.length < 16) throw primary;
+        }
+        const secrets = [localJwtSecret, supabaseJwtSecret].filter(
+          (s) => typeof s === 'string' && s.length >= 16,
+        ) as string[];
+        if (secrets.length === 0) throw primary;
+        try {
+          return verifyWithSharedSecrets(token, secrets);
+        } catch {
+          throw primary;
+        }
+      }
     }
   }
 
@@ -358,12 +438,30 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
         if (profileError.code !== 'PGRST116' && !profileError.message?.includes('No rows found')) {
           console.error('[AuthMiddleware] Supabase users query failed:', profileError);
+          const deviceOwner = deviceOwnerFromJwt(jwtPayload, userId, userEmail);
+          if (deviceOwner) {
+            (req as any).user = deviceOwner;
+            return next();
+          }
           return res.status(403).json({ error: 'User profile not found in Invify' });
         }
       }
 
       // Missing profile: NEVER auto-create as super_admin. Reject or create least-privilege owner.
       if (!profile) {
+        const agentRow = await loadAgentForJwt(userId, userEmail);
+        const agentStatus = String(agentRow?.status || '').toUpperCase();
+        if (agentRow && agentStatus !== 'TERMINATED' && agentStatus !== 'SUSPENDED') {
+          (req as any).user = {
+            id: String(agentRow.auth_user_id || userId),
+            email: String(agentRow.email || userEmail || ''),
+            role: 'agent',
+            tenantId: null,
+            agentId: String(agentRow.id),
+          };
+          return next();
+        }
+
         const leastRole = 'owner';
         let decodedTenantId =
           jwtPayload.tenantId ||
@@ -373,8 +471,15 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           null;
         if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
 
-        // Staging/prod: require explicit provisioning — do not auto-insert privileged users
+        // Staging/prod: onboarded device JWTs carry tenantId+owner and may have
+        // no users row (token `id` is not a Supabase auth uid). Accept the
+        // verified claims the same way Socket.io does — do not auto-insert.
         if (requiresVerifiedJwt()) {
+          const deviceOwner = deviceOwnerFromJwt(jwtPayload, userId, userEmail);
+          if (deviceOwner) {
+            (req as any).user = deviceOwner;
+            return next();
+          }
           return res.status(403).json({
             error: 'User profile not provisioned in Invify. Contact an administrator.',
             code: 'PROFILE_NOT_PROVISIONED',

@@ -2,7 +2,7 @@
   <q-page padding class="q-pa-lg">
     <div class="row items-center q-mb-xl">
       <div>
-        <h4 class="text-h4 text-weight-bold q-my-none">Agent Governance Center</h4>
+        <h4 class="text-h4 text-weight-bold q-my-none">Institute Governance Center</h4>
         <div class="text-subtitle1 text-grey-7">Enterprise Distribution & Commission Orchestration Command</div>
       </div>
       <q-space />
@@ -20,7 +20,7 @@
       <div class="col-12 col-md-3">
         <q-card flat bordered class="bg-primary text-white">
           <q-card-section>
-            <div class="text-subtitle2 text-weight-bold text-uppercase opacity-70">Total Active Agents</div>
+            <div class="text-subtitle2 text-weight-bold text-uppercase opacity-70">Total Active Institutes</div>
             <div class="text-h3 text-weight-bold q-mt-sm">1,248</div>
             <div class="text-caption q-mt-sm row items-center">
               <q-icon name="trending_up" class="q-mr-xs" />
@@ -219,7 +219,7 @@
     <q-dialog v-model="showCreateAgentDialog">
       <q-card style="width: 500px; max-width: 80vw;">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Provision New Agent</div>
+          <div class="text-h6">Provision New Institute</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
@@ -265,7 +265,7 @@ const heatmapData = ref([
 ]);
 
 const agentColumns = [
-  { name: 'agentCode', required: true, label: 'Agent Code', align: 'left', field: 'agentCode', sortable: true },
+  { name: 'agentCode', required: true, label: 'Institute Code', align: 'left', field: 'agentCode', sortable: true },
   { name: 'identity', label: 'Business Identity', align: 'left', field: 'identity', sortable: true },
   { name: 'sector', label: 'Sector', align: 'left', field: 'sector' },
   { name: 'status', label: 'State', align: 'center', field: 'status' },

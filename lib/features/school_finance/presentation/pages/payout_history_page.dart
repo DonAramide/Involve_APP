@@ -71,13 +71,21 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F9),
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF4F7F9),
       appBar: AppBar(
-        title: const Text('Payout History', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(
+          'Payout History',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
       ),
       body: RefreshIndicator(
         onRefresh: () => _fetchHistory(refresh: true),
@@ -99,6 +107,8 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
   }
 
   Widget _buildPayoutCard(Map<String, dynamic> item) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final date = DateTime.parse(item['created_at']);
     final status = item['status'] as String;
@@ -111,10 +121,14 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -127,35 +141,53 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
                 children: [
                   Text(
                     'Fund Sweep',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.blue.shade900),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: isDark ? Colors.blue.shade300 : Colors.blue.shade900,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     DateFormat('MMM dd, yyyy • hh:mm a').format(date),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey,
+                    ),
                   ),
                 ],
               ),
               Text(
                 currencyFormat.format(item['amount']),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1A1C1E)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+                ),
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: Color(0xFFF1F3F5)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(
+              height: 1,
+              color: isDark ? theme.dividerColor : const Color(0xFFF1F3F5),
+            ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(Icons.account_balance, size: 14, color: Colors.grey.shade400),
+                  Icon(Icons.account_balance, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade400),
                   const SizedBox(width: 8),
                   Text(
                     item['metadata']?['bank_details'] ?? 'Saved Bank Account',
-                    style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),

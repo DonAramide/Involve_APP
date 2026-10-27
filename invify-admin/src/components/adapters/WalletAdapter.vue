@@ -5,7 +5,7 @@
     </div>
     <div class="column justify-between h-full z-index-1">
       <div class="row items-center justify-between q-mb-xs">
-        <span class="text-overline text-indigo-3 letter-spacing-1" style="font-size: 8.5px; letter-spacing: 1.5px;">TOTAL AVAILABLE BALANCE</span>
+        <span class="text-overline text-indigo-3 letter-spacing-1" style="font-size: 8.5px; letter-spacing: 1.5px;">AVAILABLE TO WITHDRAW</span>
         <q-btn flat round dense size="xs" color="indigo-3" icon="refresh" :loading="financeStore.isLoading" @click="fetchData(true)" />
       </div>
       
@@ -14,8 +14,10 @@
       </div>
 
       <div class="row items-center justify-between q-mt-xs">
-        <span class="text-indigo-2 text-caption text-weight-bold">Available Funds</span>
-        <span class="text-cyan-3 text-caption text-weight-bold">Active Wallet</span>
+        <span class="text-indigo-2 text-caption text-weight-bold">Tenant wallet ready for payout</span>
+        <router-link to="/tenant/wallet" class="text-cyan-3 text-caption text-weight-bold" style="text-decoration: none;">
+          Withdraw
+        </router-link>
       </div>
     </div>
   </q-card>

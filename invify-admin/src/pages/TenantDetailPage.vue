@@ -1,6 +1,14 @@
 <template>
   <q-page class="q-pa-lg bg-dark text-white">
-    <div v-if="tenant">
+    <div v-if="loadError && !tenant" class="q-pa-xl text-center">
+      <q-icon name="error_outline" size="64px" color="red-5" class="q-mb-md" />
+      <div class="text-h6 q-mb-sm">Could not load tenant</div>
+      <div class="text-grey-5 q-mb-lg" style="max-width: 480px; margin: 0 auto;">{{ loadError }}</div>
+      <q-btn color="indigo-5" icon="refresh" label="Retry" unelevated @click="fetchDetails" />
+      <q-btn flat color="grey-5" label="Back to Tenants" class="q-ml-sm" to="/tenants" />
+    </div>
+
+    <div v-else-if="tenant">
       <!-- Breadcrumbs & Header -->
       <div class="q-mb-md">
         <q-breadcrumbs class="text-grey-6" gutter="sm">
@@ -10,54 +18,120 @@
         </q-breadcrumbs>
       </div>
 
-      <div class="row items-center q-mb-xl">
-        <q-avatar size="72px" font-size="36px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2" />
-        <div class="col">
-          <div class="row items-center q-gutter-sm">
-            <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
-            <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="md">
-              {{ tenant.status?.toUpperCase() }}
-            </q-chip>
+      <div class="row items-center justify-between q-col-gutter-md q-mb-lg">
+        <!-- Tenant Identity -->
+        <div class="col-12 col-xl-auto row items-center no-wrap">
+          <q-avatar size="64px" font-size="32px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2 flex-shrink-0" />
+          <div>
+            <div class="row items-center q-gutter-sm no-wrap">
+              <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
+              <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="sm" class="text-weight-bold">
+                {{ tenant.status?.toUpperCase() }}
+              </q-chip>
+            </div>
+            <div class="text-grey-5 text-caption q-mt-xs row items-center q-gutter-xs no-wrap">
+              <span>{{ tenant.type?.toUpperCase() }}</span>
+              <span>•</span>
+              <span>Plan: <span class="text-weight-bold text-grey-3">{{ tenant.plan?.toUpperCase() }}</span></span>
+              <span>•</span>
+              <span class="font-mono">ID: {{ tenant.id }}</span>
+            </div>
           </div>
-          <div class="text-grey-5">{{ tenant.type?.toUpperCase() }} • Plan: {{ tenant.plan?.toUpperCase() }} • ID: {{ tenant.id }}</div>
         </div>
-        <div class="col-auto">
+
+        <!-- Action Buttons -->
+        <div class="col-12 col-xl-auto row items-center q-gutter-sm">
           <q-btn 
-          color="amber-8" 
-          text-color="black"
-          icon="vpn_key" 
-          label="Generate Activation Code" 
-          @click="openActivationShortcut" 
-          class="q-mr-sm text-weight-bold animate-pulse-amber" 
-        >
-          <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
-        </q-btn>
-        <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" class="q-mr-sm" />
-        <q-btn 
-          outline 
-          :color="tenant.status === 'active' ? 'orange-8' : 'green-6'" 
-          :icon="tenant.status === 'active' ? 'block' : 'check_circle'" 
-          :label="tenant.status === 'active' ? 'Suspend' : 'Activate'" 
-          @click="toggleStatus" 
-          class="q-mr-sm text-weight-bold" 
-        />
-        <q-btn outline color="red-5" icon="lock_reset" label="Generate System Password" @click="resetPassword" class="q-mr-sm text-weight-bold">
-          <q-tooltip>Generate a recovery password for device System Access when the local password is forgotten</q-tooltip>
-        </q-btn>
-        <q-btn 
-          color="red-10" 
-          icon="lock" 
-          label="Emergency Lock" 
-          @click="triggerEmergencyLock" 
-          class="q-mr-sm text-weight-bold animate-pulse-amber" 
-        />
-        <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
-        <div v-if="tenant?.is_emergency_locked" class="q-ml-sm q-px-sm q-py-xs bg-red-1 text-red-10 rounded-borders text-caption text-weight-bold row items-center">
-          <q-icon name="lock" size="xs" class="q-mr-xs" />
-          CODE: {{ tenant.emergency_lock_code }}
+            color="amber-8" 
+            text-color="black"
+            icon="vpn_key" 
+            label="Generate Activation Code" 
+            @click="openActivationShortcut" 
+            class="text-weight-bold animate-pulse-amber" 
+            unelevated
+          >
+            <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
+          </q-btn>
+          <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" />
+          <q-btn 
+            outline 
+            :color="tenant.status === 'active' ? 'orange-8' : 'green-6'" 
+            :icon="tenant.status === 'active' ? 'block' : 'check_circle'" 
+            :label="tenant.status === 'active' ? 'Suspend' : 'Activate'" 
+            @click="toggleStatus" 
+            class="text-weight-bold" 
+          />
+          <q-btn outline color="red-5" icon="lock_reset" label="Generate System Password" @click="resetPassword" class="text-weight-bold">
+            <q-tooltip>Generate a recovery password for device System Access when the local password is forgotten</q-tooltip>
+          </q-btn>
+          <q-btn 
+            color="red-10" 
+            icon="lock" 
+            label="Emergency Lock" 
+            @click="triggerEmergencyLock" 
+            class="text-weight-bold animate-pulse-amber" 
+            unelevated
+          />
+          <q-btn flat round color="grey-6" icon="refresh" @click="fetchDetails">
+            <q-tooltip>Refresh Details</q-tooltip>
+          </q-btn>
+          <div v-if="tenant?.is_emergency_locked" class="q-px-sm q-py-xs bg-red-1 text-red-10 rounded-borders text-caption text-weight-bold row items-center">
+            <q-icon name="lock" size="xs" class="q-mr-xs" />
+            CODE: {{ tenant.emergency_lock_code }}
+          </div>
         </div>
       </div>
-    </div>
+
+      <div
+        v-if="activationGate?.proposal?.status === 'pending'"
+        class="q-mb-md q-pa-md rounded-borders"
+        style="background:#5d3a00;border:2px solid #ffb300"
+      >
+        <div class="text-subtitle1 text-weight-bold">Second admin: approve this tenant</div>
+        <div class="text-body2 q-mt-xs">
+          {{ activationGate.proposal.makerEmail }} already completed the first step and proposed activation.
+          <template v-if="viewerIsProposalMaker">
+            You are signed in as that same admin ({{ operatorEmail() }}). Sign out, then sign in as a different admin and open this tenant. The Approve button appears here.
+          </template>
+          <template v-else>
+            You are signed in as {{ operatorEmail() || 'another admin' }}. Click Approve & activate and enter your authenticator code.
+          </template>
+        </div>
+        <q-btn
+          v-if="!viewerIsProposalMaker"
+          class="q-mt-sm text-weight-bold"
+          color="cyan-6"
+          text-color="black"
+          icon="flash_on"
+          label="Approve & activate"
+          unelevated
+          :loading="activatingPlatform"
+          :disable="!allFpChecksPassed"
+          @click="activateFinancialPlatform"
+        />
+      </div>
+      <div
+        v-else-if="pendingCheckerKeys.length"
+        class="q-mb-md q-pa-md rounded-borders"
+        style="background:#5d3a00;border:2px solid #ffb300"
+      >
+        <div class="text-subtitle1 text-weight-bold">Second admin: checker-approve these checks</div>
+        <div class="text-body2 q-mt-xs">
+          The first admin recorded the checks. A different admin must press Checker approve on each one before anyone can propose activation.
+        </div>
+        <div class="row q-gutter-sm q-mt-sm">
+          <q-btn
+            v-for="key in pendingCheckerKeys"
+            :key="key"
+            unelevated
+            color="cyan-7"
+            :label="`Checker approve ${checkerKeyLabel(key)}`"
+            :disable="!canCheckerApproveCheck(key)"
+            :loading="checkBusy===key"
+            @click="approveFpCheck(key)"
+          />
+        </div>
+      </div>
 
     <!-- Tabbed Content -->
     <q-card class="bg-blue-grey-10 shadow-2 overflow-hidden">
@@ -71,7 +145,12 @@
         narrow-indicator
       >
         <q-tab name="overview" label="Overview" icon="analytics" />
-        <q-tab name="financial" label="Financial Platform" icon="account_balance" />
+        <q-tab name="financial" icon="account_balance">
+          <div class="row items-center no-wrap">
+            <span>Financial Platform</span>
+            <q-badge v-if="activationGate?.proposal?.status === 'pending' || pendingCheckerKeys.length" color="amber-9" text-color="black" class="q-ml-xs">Approve</q-badge>
+          </div>
+        </q-tab>
         <q-tab name="kyc" label="KYC & Compliance" icon="verified_user" />
         <q-tab name="users" label="Users" icon="person" />
         <q-tab name="wallet" label="Wallet & Transactions" icon="wallet" />
@@ -117,6 +196,92 @@
                   </q-item-section>
                 </q-item>
               </q-list>
+
+              <div class="q-mt-lg">
+                <div class="text-subtitle1 text-indigo-3 q-mb-sm row items-center">
+                  <q-icon name="account_balance" class="q-mr-sm" size="sm" />
+                  Institute assignment
+                  <q-badge
+                    v-if="institutePort?.proposal?.status === 'pending'"
+                    color="amber-8"
+                    text-color="black"
+                    label="PENDING CHECKER"
+                    class="q-ml-sm text-weight-bold"
+                  />
+                </div>
+                <q-card class="bg-blue-grey-9 q-pa-md rounded-borders" flat bordered>
+                  <div class="text-caption text-grey-5">Current Institute</div>
+                  <div class="text-weight-bold q-mb-md">
+                    {{ instituteLabel(institutePort?.current) }}
+                  </div>
+
+                  <div v-if="institutePort?.proposal?.status === 'pending'" class="text-caption text-amber-4 q-mb-md">
+                    Port requested by {{ institutePort.proposal.makerEmail }}:
+                    {{ instituteLabel(institutePort.proposal.from) }}
+                    →
+                    {{ instituteLabel(institutePort.proposal.to) }}.
+                    A different admin must approve with 2FA.
+                  </div>
+
+                  <q-select
+                    v-model="portTargetId"
+                    :options="instituteOptions"
+                    option-value="id"
+                    option-label="label"
+                    emit-value
+                    map-options
+                    filled
+                    dark
+                    dense
+                    label="Port to Institute"
+                    class="q-mb-sm"
+                    :disable="institutePort?.proposal?.status === 'pending'"
+                  />
+                  <q-input
+                    v-model="portReason"
+                    filled
+                    dark
+                    dense
+                    label="Reason (optional)"
+                    class="q-mb-md"
+                    :disable="institutePort?.proposal?.status === 'pending'"
+                  />
+                  <div class="row q-gutter-sm">
+                    <q-btn
+                      unelevated
+                      color="indigo-6"
+                      label="Propose port"
+                      icon="swap_horiz"
+                      :loading="proposingPort"
+                      :disable="institutePort?.proposal?.status === 'pending' || !portTargetId"
+                      @click="proposeInstitutePort"
+                    />
+                    <q-btn
+                      v-if="institutePort?.proposal?.status === 'pending'"
+                      unelevated
+                      color="cyan-6"
+                      text-color="black"
+                      label="Approve port"
+                      icon="verified"
+                      :loading="approvingPort"
+                      :disable="!canCheckerPort"
+                      @click="approveInstitutePort"
+                    />
+                    <q-btn
+                      v-if="institutePort?.proposal?.status === 'pending'"
+                      outline
+                      color="red-4"
+                      label="Reject"
+                      :loading="rejectingPort"
+                      :disable="!canCheckerPort"
+                      @click="rejectInstitutePort"
+                    />
+                  </div>
+                  <div v-if="institutePort?.proposal?.status === 'pending' && !canCheckerPort" class="text-caption text-grey-5 q-mt-sm">
+                    Sign in as a different super-admin to checker-approve this port.
+                  </div>
+                </q-card>
+              </div>
 
               <!-- Registered Devices Section -->
               <div class="q-mt-lg" v-if="registeredDevices.length > 0">
@@ -204,6 +369,14 @@
                 <div class="text-h2 text-weight-bolder text-cyan-4">{{ currentCurrency.symbol }}{{ (wallet.balance || 0).toLocaleString() }}</div>
                 <div class="text-caption text-grey-6 q-mt-xs">
                   {{ wallet.updated_at ? `Last updated ${new Date(wallet.updated_at).toLocaleTimeString()}` : 'No balance history yet' }}
+                </div>
+                <div v-if="Number(wallet.quasarHeld) > 0" class="text-caption text-amber-4 q-mt-sm">
+                  Quasar is holding {{ currentCurrency.symbol }}{{ Number(wallet.quasarHeld).toLocaleString() }}.
+                  That amount is not in this Invify wallet until the payment webhook is recorded.
+                </div>
+                <div v-if="pendingPaymentAlerts.length" class="text-caption text-amber-4 q-mt-sm">
+                  {{ pendingPaymentAlerts.length }} payment alert{{ pendingPaymentAlerts.length === 1 ? '' : 's' }} waiting for a device.
+                  Invify resends the socket until that device acknowledges it.
                 </div>
               </div>
             </div>
@@ -293,11 +466,16 @@
                 label="Request Virtual Account" 
                 @click="requestVirtualAccount" 
                 :loading="isRequestingVA" 
+                :disable="!checkerApproved"
                 rounded
                 unelevated
                 size="md"
               />
-              <div class="text-caption text-grey-6 q-mt-sm">No virtual account has been provisioned via Quasar SDK yet.</div>
+              <div class="text-caption text-grey-6 q-mt-sm">
+                {{ checkerApproved
+                  ? 'No virtual account has been provisioned via Quasar SDK yet.'
+                  : 'Locked until a maker proposes activation and a different admin approves with their authenticator code.' }}
+              </div>
             </div>
           </div>
         </q-tab-panel>
@@ -323,16 +501,132 @@
                   </div>
                 </div>
 
+                <div class="q-mt-lg text-left">
+                  <div class="text-overline text-cyan-3 q-mb-sm">Manual verification (required)</div>
+                  <div class="text-caption text-grey-5 q-mb-sm">
+                    Recording a check does not approve it. A different admin must checker-approve CAC, the phone call, and the address. Then the maker proposes activation, and another admin approves with an authenticator code.
+                  </div>
+                  <q-list dark bordered separator class="rounded-borders">
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>CAC certificate</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.hasCac ? 'Document on file — review then confirm' : 'Ask the tenant to upload CAC on Compliance or the mobile app' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-btn
+                          v-if="activationEvidence.cacUrl"
+                          flat dense color="cyan-4" icon="launch" tag="a" target="_blank" :href="activationEvidence.cacUrl"
+                        />
+                        <q-chip v-if="gateCheck('cac')" color="green-9" text-color="white" size="sm">CONFIRMED</q-chip>
+                        <q-btn v-else-if="canCheckerApproveCheck('cac')" unelevated dense color="cyan-7" size="sm" label="Checker approve" :loading="checkBusy==='cac'" @click="approveFpCheck('cac')" />
+                        <q-chip v-else-if="checkPending('cac')" color="amber-9" text-color="white" size="sm">AWAITING CHECKER</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Record CAC" :disable="!activationEvidence.hasCac" :loading="checkBusy==='cac'" @click="recordFpCheck('cac')" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Valid ID card</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.hasId ? 'ID on file' : 'Ask the tenant to upload NIN, National ID, driver’s licence, or passport' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-btn
+                          v-if="activationEvidence.idUrl"
+                          flat dense color="cyan-4" icon="launch" tag="a" target="_blank" :href="activationEvidence.idUrl"
+                        />
+                        <q-chip v-if="activationEvidence.hasId" color="green-9" text-color="white" size="sm">ON FILE</q-chip>
+                        <q-chip v-else color="orange-9" text-color="white" size="sm">MISSING</q-chip>
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Phone — direct call</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.phone || 'No phone on file' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-chip v-if="gateCheck('phone_call')" color="green-9" text-color="white" size="sm">CALLED</q-chip>
+                        <q-btn v-else-if="canCheckerApproveCheck('phone_call')" unelevated dense color="cyan-7" size="sm" label="Checker approve" :loading="checkBusy==='phone_call'" @click="approveFpCheck('phone_call')" />
+                        <q-chip v-else-if="checkPending('phone_call')" color="amber-9" text-color="white" size="sm">AWAITING CHECKER</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Record call" :disable="!activationEvidence.phone" :loading="checkBusy==='phone_call'" @click="recordFpCheck('phone_call')" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>
+                        <q-item-label>Address validation</q-item-label>
+                        <q-item-label caption class="text-grey-5">
+                          {{ activationEvidence.address || 'No address on file' }}
+                        </q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-chip v-if="gateCheck('address')" color="green-9" text-color="white" size="sm">VALIDATED</q-chip>
+                        <q-btn v-else-if="canCheckerApproveCheck('address')" unelevated dense color="cyan-7" size="sm" label="Checker approve" :loading="checkBusy==='address'" @click="approveFpCheck('address')" />
+                        <q-chip v-else-if="checkPending('address')" color="amber-9" text-color="white" size="sm">AWAITING CHECKER</q-chip>
+                        <q-btn v-else unelevated dense color="cyan-7" size="sm" label="Record address" :disable="!activationEvidence.address" :loading="checkBusy==='address'" @click="recordFpCheck('address')" />
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                  <div v-if="activationGate?.proposal?.status === 'pending'" class="q-pa-md q-mt-sm rounded-borders bg-amber-10 text-white">
+                    <div class="text-subtitle2 text-weight-bold">Checker step for a different admin</div>
+                    <div class="text-caption q-mt-xs">
+                      Proposed by {{ activationGate.proposal.makerEmail }}.
+                      <template v-if="canCheckerActivate">
+                        You are signed in as {{ operatorEmail() || 'another admin' }}. Click Approve & activate in this box and enter your authenticator code.
+                      </template>
+                      <template v-else>
+                        You are signed in as the maker. Sign in as a different admin. That person will see Approve & activate here.
+                      </template>
+                    </div>
+                    <q-btn
+                      v-if="canCheckerActivate"
+                      class="q-mt-sm text-weight-bold"
+                      color="cyan-6"
+                      text-color="black"
+                      icon="flash_on"
+                      label="Approve & activate"
+                      :loading="activatingPlatform"
+                      @click="activateFinancialPlatform"
+                    />
+                  </div>
+                  <div v-else-if="allFpChecksPassed && activationGate?.proposal?.status !== 'approved'" class="text-caption text-amber-4 q-mt-sm">
+                    Document checks are recorded. The maker must click Propose activation. A different admin then sees Approve & activate on this page.
+                  </div>
+                </div>
+
                 <div class="row q-gutter-sm justify-center">
                   <q-btn 
-                    v-if="!financialHealth || financialHealth?.platformStatus === 'UNPROVISIONED'"
+                    v-if="showMakerCheckerActions"
+                    color="indigo-6" 
+                    text-color="white"
+                    icon="how_to_reg" 
+                    label="Propose activation" 
+                    @click="proposeFinancialPlatform" 
+                    :loading="proposingPlatform"
+                    :disable="!allFpChecksPassed || activationGate?.proposal?.status === 'pending'"
+                    class="text-weight-bold" 
+                  />
+                  <q-btn 
+                    v-if="showMakerCheckerActions && activationGate?.proposal?.status !== 'pending'"
                     color="cyan-6" 
                     text-color="black"
                     icon="flash_on" 
-                    label="Activate Platform" 
+                    label="Approve & activate" 
                     @click="activateFinancialPlatform" 
                     :loading="activatingPlatform"
+                    :disable="!canCheckerActivate"
                     class="text-weight-bold" 
+                  />
+                  <q-btn
+                    v-if="activationGate?.proposal?.status === 'pending'"
+                    outline
+                    color="red-4"
+                    label="Reject proposal"
+                    :loading="rejectingPlatform"
+                    @click="rejectFinancialPlatform"
                   />
                   <q-btn 
                     v-if="financialHealth?.platformStatus === 'ACTIVE' || financialHealth?.platformStatus === 'DEGRADED'"
@@ -635,11 +929,13 @@
               { name: 'deviceId', label: 'DEVICE ID', field: 'deviceId', align: 'left' },
               { name: 'plan', label: 'PLAN', field: 'plan', align: 'center' },
               { name: 'duration', label: 'DURATION', field: 'duration', align: 'center' },
+              { name: 'createdBy', label: 'GENERATED BY', field: 'createdBy', align: 'left' },
+              { name: 'emailedTo', label: 'EMAILED TO', field: 'emailedTo', align: 'left' },
               { name: 'status', label: 'STATUS', field: 'status', align: 'center' },
               { name: 'expiry', label: 'EXPIRY DATE', field: 'expiry', align: 'right' },
               { name: 'actions', label: '', field: 'actions', align: 'right' }
             ]"
-            row-key="code"
+            row-key="id"
             flat
             dark
             class="bg-blue-grey-10"
@@ -662,22 +958,58 @@
                 </q-chip>
               </q-td>
             </template>
+            <template v-slot:body-cell-createdBy="props">
+              <q-td :props="props">
+                <div class="row items-center no-wrap q-gutter-x-xs">
+                  <q-icon name="person" color="indigo-3" size="xs" />
+                  <span class="text-caption text-grey-4 font-mono">{{ props.row.createdBy || '—' }}</span>
+                </div>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-emailedTo="props">
+              <q-td :props="props">
+                <div v-if="props.row.emailedTo" class="text-caption text-grey-3">
+                  {{ props.row.emailedTo }}
+                  <div v-if="props.row.emailedAt" class="text-grey-6" style="font-size: 10px;">
+                    {{ new Date(props.row.emailedAt).toLocaleString() }}
+                  </div>
+                </div>
+                <span v-else class="text-caption text-grey-6">Not emailed</span>
+              </q-td>
+            </template>
             <template v-slot:body-cell-status="props">
               <q-td :props="props">
-                <q-chip :color="props.row.status === 'ACTIVE' ? 'green-9' : 'red-9'" text-color="white" size="xs" dense>
+                <q-chip
+                  :color="props.row.status === 'ACTIVE' ? 'green-9' : props.row.status === 'AWAITING APPROVAL' ? 'orange-9' : 'red-9'"
+                  text-color="white" size="xs" dense
+                >
                   {{ props.row.status }}
                 </q-chip>
               </q-td>
             </template>
             <template v-slot:body-cell-code="props">
               <q-td :props="props" class="text-amber-3 text-weight-bold" style="font-family: monospace;">
-                {{ props.row.code }}
+                {{ props.row.code || 'Hidden until approved' }}
               </q-td>
             </template>
             <template v-slot:body-cell-actions="props">
               <q-td :props="props">
-                <q-btn flat dense round icon="visibility" color="cyan-4" @click="reviewCertificate(props.row)" size="sm">
+                <q-btn v-if="props.row.canApprove" flat dense color="green-4" label="Approve" :loading="reviewingActivationId === props.row.id" @click="approveTenantActivation(props.row)" size="sm" />
+                <q-btn v-if="props.row.canApprove" flat dense color="red-4" label="Reject" :loading="reviewingActivationId === props.row.id" @click="rejectTenantActivation(props.row)" size="sm" />
+                <q-btn v-if="props.row.code" flat dense round icon="visibility" color="cyan-4" @click="reviewCertificate(props.row)" size="sm">
                   <q-tooltip>Review Certificate</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="props.row.code"
+                  flat dense
+                  color="amber-4"
+                  icon="forward_to_inbox"
+                  label="Resend"
+                  :loading="resendingActivationId === props.row.id"
+                  @click="resendTenantActivation(props.row)"
+                  size="sm"
+                >
+                  <q-tooltip>Email this activation file to the tenant again</q-tooltip>
                 </q-btn>
                 <q-btn v-if="isSuperAdmin && props.row.status === 'USED'" flat dense round icon="restore" color="orange-4" @click="resetActivationKey(props.row)" size="sm" class="q-ml-xs">
                   <q-tooltip>Reset Activation Key (Reuse)</q-tooltip>
@@ -753,13 +1085,27 @@
                   <q-list dark separator class="q-mt-sm">
                     <q-item v-for="doc in kycDocuments" :key="doc.id">
                       <q-item-section>
-                        <q-item-label class="text-weight-bold">{{ doc.document_type.replace('_', ' ') }}</q-item-label>
+                        <q-item-label class="text-weight-bold">{{ (doc.document_type || 'DOCUMENT').replace(/_/g, ' ') }}</q-item-label>
                         <q-item-label caption class="text-grey-5">{{ new Date(doc.created_at).toLocaleDateString() }}</q-item-label>
+                        <q-item-label v-if="String(doc.status).toUpperCase() === 'REJECTED'" caption class="text-red-4">
+                          Rejected — tenant must re-upload. {{ doc.rejection_reason || doc.rejectionReason || '' }}
+                        </q-item-label>
                       </q-item-section>
                       <q-item-section side>
                         <div class="row items-center no-wrap">
-                          <q-btn flat dense icon="launch" label="View" type="a" target="_blank" :href="doc.document_url" color="cyan-4" size="sm" class="q-mr-sm" />
-                          <q-chip :color="doc.status === 'VERIFIED' ? 'green-9' : 'orange-9'" text-color="white" size="sm" icon="check_circle">
+                          <q-btn flat dense icon="launch" label="View" type="a" target="_blank" :href="doc.document_url || doc.url" color="cyan-4" size="sm" class="q-mr-sm" />
+                          <q-btn
+                            v-if="String(doc.status).toUpperCase() !== 'APPROVED'"
+                            unelevated dense color="green-8" size="sm" label="Approve" class="q-mr-xs"
+                            :loading="reviewingDoc === doc.id"
+                            @click="reviewTenantDoc(doc, 'APPROVED')"
+                          />
+                          <q-btn
+                            unelevated dense color="red-8" size="sm" label="Reject"
+                            :loading="reviewingDoc === doc.id"
+                            @click="rejectTenantDoc(doc)"
+                          />
+                          <q-chip :color="doc.status === 'APPROVED' || doc.status === 'VERIFIED' ? 'green-9' : (doc.status === 'REJECTED' ? 'red-9' : 'orange-9')" text-color="white" size="sm" class="q-ml-sm">
                             {{ doc.status }}
                           </q-chip>
                         </div>
@@ -854,7 +1200,7 @@
             <q-icon name="vpn_key" color="amber-8" />
             <span>Generate Terminal Activation</span>
           </div>
-          <div class="text-caption text-indigo-3 q-mt-xs">Instantly authorize a new POS/mobile terminal for {{ tenant.name }}</div>
+          <div class="text-caption text-indigo-3 q-mt-xs">This sends a request. support@iips.app must approve it before the code appears and can be used on a terminal for {{ tenant.name }}.</div>
         </q-card-section>
 
         <q-card-section class="q-pt-lg q-px-lg">
@@ -960,7 +1306,7 @@
           </div>
           
           <div class="q-mt-xl text-caption text-weight-bold text-amber-2 letter-spacing-3 opacity-8">
-            Powered by www.invify.iips.app
+            Powered by www.invify.org
           </div>
         </q-card-section>
 
@@ -1118,6 +1464,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import { adminApi, deviceApi } from '../api'
+import { promptCheckerMfa } from '../utils/promptCheckerMfa'
 import logo from '../assets/logo_transparent.png'
 
 const $q = useQuasar()
@@ -1125,7 +1472,14 @@ const $route = useRoute()
 
 const tab = ref('overview')
 const loading = ref(true)
+const loadError = ref('')
 const tenant = ref(null)
+const institutePort = ref(null)
+const portTargetId = ref('default')
+const portReason = ref('')
+const proposingPort = ref(false)
+const approvingPort = ref(false)
+const rejectingPort = ref(false)
 const users = ref([])
 const wallet = ref({ 
   balance: 0, 
@@ -1139,6 +1493,7 @@ const certificates = ref([])
 const registeredDevices = ref([])
 const auditRecords = ref([])
 const kycDocuments = ref([])
+const reviewingDoc = ref('')
 
 const showResetDialog = ref(false)
 const resetDialogKey = ref('')
@@ -1159,15 +1514,23 @@ const ownerUser = computed(() => {
 const ownerProfile = computed(() => {
   const fromSettings = tenant.value?.settings?.owner_profile || {}
   const owner = ownerUser.value
+  const device = (registeredDevices.value || [])[0] || {}
+  const firstText = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || '').trim()
+      if (s) return s
+    }
+    return ''
+  }
   return {
-    firstName: fromSettings.firstName || '',
-    lastName: fromSettings.lastName || '',
-    email: fromSettings.email || owner?.email || '',
-    phone: fromSettings.phone || tenant.value?.phone || owner?.phone || '',
-    businessName: fromSettings.businessName || tenant.value?.name || '',
-    city: fromSettings.city || tenant.value?.lga || '',
-    country: fromSettings.country || tenant.value?.country || '',
-    name: owner?.name || '',
+    firstName: firstText(fromSettings.firstName),
+    lastName: firstText(fromSettings.lastName),
+    email: firstText(fromSettings.email, tenant.value?.owner_email, owner?.email, device.ownerEmail),
+    phone: firstText(fromSettings.phone, tenant.value?.phone, owner?.phone),
+    businessName: firstText(fromSettings.businessName, tenant.value?.name),
+    city: firstText(fromSettings.city, tenant.value?.lga),
+    country: firstText(fromSettings.country, tenant.value?.country),
+    name: firstText(fromSettings.name, tenant.value?.owner_name, owner?.name),
   }
 })
 
@@ -1186,6 +1549,19 @@ const isSuperAdmin = computed(() => {
 const financialHealth = ref(null)
 const financialAudit = ref([])
 const activatingPlatform = ref(false)
+const proposingPlatform = ref(false)
+const rejectingPlatform = ref(false)
+const checkBusy = ref('')
+const activationGate = ref(null)
+const activationEvidence = ref({
+  hasCac: false,
+  hasId: false,
+  cacUrl: null,
+  idUrl: null,
+  phone: null,
+  address: null,
+  kycStatus: null,
+})
 const rotatingPlatform = ref(false)
 const changingVertical = ref(false)
 const showChangeVerticalDialog = ref(false)
@@ -1262,8 +1638,63 @@ const deviceOptions = computed(() => {
     })
 })
 
+const reviewingActivationId = ref(null)
+const resendingActivationId = ref(null)
+
+const resendTenantActivation = async (row) => {
+  resendingActivationId.value = row.id
+  try {
+    const { data } = await deviceApi.resendActivationEmail(row.id)
+    $q.notify({
+      type: 'positive',
+      message: `Activation file emailed to ${data?.emailedTo}.`,
+      timeout: 6000,
+    })
+    await fetchDetails()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.emailError || err?.response?.data?.error || 'Could not resend the activation email',
+    })
+  } finally {
+    resendingActivationId.value = null
+  }
+}
+
+const approveTenantActivation = async (row) => {
+  reviewingActivationId.value = row.id
+  try {
+    const { data } = await deviceApi.approveActivation(row.id)
+    $q.notify({
+      type: data?.emailSent ? 'positive' : 'warning',
+      message: data?.emailSent
+        ? `Activation approved. The file was emailed to ${data.emailedTo}.`
+        : `Activation approved. ${data?.emailError || 'The activation file was not emailed.'}`,
+      timeout: 6000,
+    })
+    await fetchDetails()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Approval failed' })
+  } finally {
+    reviewingActivationId.value = null
+  }
+}
+
+const rejectTenantActivation = async (row) => {
+  reviewingActivationId.value = row.id
+  try {
+    await deviceApi.rejectActivation(row.id)
+    $q.notify({ type: 'warning', message: 'Activation rejected. The code cannot be used.' })
+    await fetchDetails()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error || 'Rejection failed' })
+  } finally {
+    reviewingActivationId.value = null
+  }
+}
+
 const reviewCertificate = (cert) => {
-  if (!tenant.value) return
+  if (!tenant.value || !cert?.code) return
   certificateData.value = {
     businessName: tenant.value.name,
     mode: tenant.value.type ? tenant.value.type.toUpperCase() : 'RETAIL',
@@ -1395,20 +1826,20 @@ const generateShortcutCode = async () => {
       })()
     }
 
+    showShortcutDialog.value = false
+    if (data?.status === 'awaiting_approval' || !data?.activation_code) {
+      $q.notify({
+        type: 'info',
+        message: 'Request sent. support@iips.app must approve it before the code can be used. You can follow it under Licenses and Device Activation Hub.',
+        timeout: 6000,
+      })
+      fetchDetails()
+      return
+    }
+
     lastGeneratedCode.value = data.activation_code
 
-    certificates.value.unshift({
-      code: data.activation_code,
-      deviceId: certificateData.value.deviceId,
-      plan: certificateData.value.plan,
-      duration: certificateData.value.duration,
-      expiry: certificateData.value.expiry,
-      status: 'ACTIVE'
-    })
-
-    showShortcutDialog.value = false
     showSuccessDialog.value = true
-    
     fetchDetails()
   } catch (err) {
     console.error('Shortcut activation generation failed:', err)
@@ -1519,6 +1950,14 @@ const printShortcutCertificate = () => {
 const isRequestingVA = ref(false)
 
 const requestVirtualAccount = async () => {
+  if (!checkerApproved.value) {
+    $q.notify({
+      color: 'negative',
+      message: 'A maker must propose activation, then a different admin must Approve & activate with their authenticator code, before a virtual account can be generated.',
+      icon: 'warning',
+    })
+    return
+  }
   try {
     isRequestingVA.value = true
     const { data } = await adminApi.provisionVirtualAccount($route.params.id)
@@ -1611,11 +2050,58 @@ const copyTempPassword = () => {
   });
 };
 
+const reviewTenantDoc = async (doc, status, reason = '') => {
+  if (!doc?.id) return
+  reviewingDoc.value = doc.id
+  try {
+    await adminApi.reviewKycDocument(doc.id, { status, reason })
+    $q.notify({
+      type: status === 'REJECTED' ? 'warning' : 'positive',
+      message: status === 'REJECTED'
+        ? 'Rejected. The tenant can re-upload this file.'
+        : `Document ${status.toLowerCase()}`,
+    })
+    const kycRes = await adminApi.getTenantKyc(tenant.value.id)
+    const payload = kycRes.data
+    kycDocuments.value = Array.isArray(payload) ? payload : (payload?.data || [])
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e?.response?.data?.message || 'Review failed' })
+  } finally {
+    reviewingDoc.value = ''
+  }
+}
+
+const rejectTenantDoc = (doc) => {
+  $q.dialog({
+    title: 'Reject document',
+    message: `Ask the tenant to re-upload ${(doc.document_type || 'this file').replace(/_/g, ' ')}. Add a short reason.`,
+    prompt: {
+      model: 'Please re-upload a clear, valid copy.',
+      type: 'textarea',
+    },
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Reject & request re-upload', color: 'red-8' },
+  }).onOk((reason) => {
+    reviewTenantDoc(doc, 'REJECTED', reason)
+  })
+}
+
 const fetchDetails = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const { data } = await adminApi.getTenantDetails($route.params.id)
     tenant.value = data.tenant
+    institutePort.value = data.institutePort || null
+    if (!institutePort.value) {
+      try {
+        const portRes = await adminApi.getTenantInstitutePort($route.params.id)
+        institutePort.value = portRes.data?.data || portRes.data || null
+      } catch (e) {
+        console.warn('Failed to load Institute port snapshot:', e)
+      }
+    }
     users.value = data.users || []
     wallet.value = {
       balance: 0,
@@ -1641,7 +2127,8 @@ const fetchDetails = async () => {
 
     try {
       const kycRes = await adminApi.getTenantKyc(tenant.value.id)
-      kycDocuments.value = kycRes.data?.data || []
+      const payload = kycRes.data
+      kycDocuments.value = Array.isArray(payload) ? payload : (payload?.data || [])
     } catch (e) {
       console.error('Failed to fetch KYC documents:', e)
     }
@@ -1655,6 +2142,8 @@ const fetchDetails = async () => {
       financialHealth.value = null
     }
 
+    await loadActivationGate()
+
     // Fetch Financial Platform Audit
     try {
       const auditRes = await adminApi.getFinancialPlatformAudit(tenant.value.id)
@@ -1664,33 +2153,353 @@ const fetchDetails = async () => {
       financialAudit.value = []
     }
 
+  } catch (e) {
+    console.error('Failed to fetch tenant details:', e)
+    tenant.value = null
+    loadError.value =
+      e?.response?.data?.error ||
+      e?.message ||
+      `Failed to load tenant (${e?.response?.status || 'error'})`
+    $q.notify({ type: 'negative', message: loadError.value })
   } finally {
     loading.value = false
   }
 }
 
-const activateFinancialPlatform = async () => {
+const operatorEmail = () => {
+  const stored = String(localStorage.getItem('operator_email') || '').trim().toLowerCase()
+  try {
+    const token = localStorage.getItem('invify_token') || localStorage.getItem('invify_access_token') || ''
+    const part = token.split('.')[1]
+    if (part) {
+      const json = JSON.parse(decodeURIComponent(atob(part.replace(/-/g, '+').replace(/_/g, '/')).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')))
+      const fromToken = String(
+        json.email || json.user_email || json.user_metadata?.email || json.preferred_username || '',
+      ).trim().toLowerCase()
+      if (fromToken) return fromToken
+    }
+  } catch (_) { /* use stored email */ }
+  return stored
+}
+
+const gateCheck = (key) => {
+  const row = activationGate.value?.checks?.[key]
+  if (!row?.passed) return false
+  const maker = String(row.email || '').trim().toLowerCase()
+  const checker = String(row.checkerEmail || '').trim().toLowerCase()
+  return Boolean(checker) && checker !== maker
+}
+
+const checkPending = (key) => {
+  const row = activationGate.value?.checks?.[key]
+  return Boolean(row?.email) && !gateCheck(key)
+}
+
+const canCheckerApproveCheck = (key) => {
+  if (!checkPending(key)) return false
+  const maker = String(activationGate.value?.checks?.[key]?.email || '').trim().toLowerCase()
+  const me = operatorEmail()
+  if (!me) return true
+  return me !== maker
+}
+
+const allFpChecksPassed = computed(() =>
+  ['cac', 'phone_call', 'address'].every((k) => gateCheck(k)),
+)
+
+const checkerKeyLabel = (key) => ({ cac: 'CAC', phone_call: 'phone', address: 'address' }[key] || key)
+
+const pendingCheckerKeys = computed(() =>
+  ['cac', 'phone_call', 'address'].filter((key) => checkPending(key)),
+)
+
+const viewerIsProposalMaker = computed(() => {
+  const maker = String(activationGate.value?.proposal?.makerEmail || '').trim().toLowerCase()
+  const me = operatorEmail()
+  return Boolean(maker) && Boolean(me) && me === maker
+})
+
+const canCheckerActivate = computed(() => {
+  const proposal = activationGate.value?.proposal
+  if (!proposal || proposal.status !== 'pending') return false
+  if (!allFpChecksPassed.value) return false
+  const maker = String(proposal.makerEmail || '').trim().toLowerCase()
+  const me = operatorEmail()
+  if (!me) return true
+  return me !== maker
+})
+
+const checkerApproved = computed(() => activationGate.value?.proposal?.status === 'approved')
+
+const pendingPaymentAlerts = computed(() =>
+  (wallet.value?.paymentAlerts || []).filter((row) => row?.status === 'pending'),
+)
+
+const showMakerCheckerActions = computed(() => activationGate.value?.proposal?.status !== 'approved')
+
+const instituteLabel = (row) => {
+  if (!row) return 'Platform default (AAA000)'
+  const code = row.agent_code || (row.isDefault ? 'AAA000' : 'UNASSIGNED')
+  const name = row.name || (row.isDefault ? 'Platform default' : 'Institute')
+  return `${code} — ${name}`
+}
+
+const instituteOptions = computed(() => {
+  const rows = institutePort.value?.institutes || []
+  const options = rows.map((row) => ({
+    id: row.isDefault ? 'default' : row.id,
+    label: instituteLabel(row),
+  }))
+  if (!options.some((row) => row.id === 'default')) {
+    options.unshift({ id: 'default', label: 'AAA000 — Platform default' })
+  }
+  return options
+})
+
+const canCheckerPort = computed(() => {
+  const proposal = institutePort.value?.proposal
+  if (!proposal || proposal.status !== 'pending') return false
+  const maker = String(proposal.makerEmail || '').trim().toLowerCase()
+  const me = operatorEmail()
+  return Boolean(me) && me !== maker
+})
+
+const applyInstitutePort = (payload) => {
+  institutePort.value = payload?.data || payload || institutePort.value
+}
+
+const proposeInstitutePort = async () => {
+  if (!tenant.value) return
+  proposingPort.value = true
+  try {
+    const res = await adminApi.proposeTenantInstitutePort(tenant.value.id, {
+      toAgentId: portTargetId.value,
+      reason: portReason.value,
+    })
+    applyInstitutePort(res.data)
+    $q.notify({ type: 'positive', message: 'Institute port proposed. A second admin must approve with 2FA.' })
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.error || 'Failed to propose Institute port', timeout: 8000 })
+  } finally {
+    proposingPort.value = false
+  }
+}
+
+const approveInstitutePort = async () => {
+  if (!tenant.value) return
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: 'Approve Institute port',
+    message: 'Enter your authenticator code to checker-approve this Institute reassignment.',
+    okLabel: 'Verify & port',
+  })
+  if (!otp) return
+  approvingPort.value = true
+  try {
+    const res = await adminApi.approveTenantInstitutePort(tenant.value.id, {
+      mfaToken: otp,
+      totpCode: otp,
+      otp,
+    })
+    applyInstitutePort(res.data)
+    $q.notify({ type: 'positive', message: 'Tenant ported to the new Institute.' })
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.error || err.response?.data?.message || 'Failed to approve Institute port', timeout: 8000 })
+  } finally {
+    approvingPort.value = false
+  }
+}
+
+const rejectInstitutePort = async () => {
+  if (!tenant.value) return
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: 'Reject Institute port',
+    message: 'Enter your authenticator code to reject this request.',
+    okLabel: 'Verify & reject',
+    okColor: 'red-6',
+  })
+  if (!otp) return
+  rejectingPort.value = true
+  try {
+    const res = await adminApi.rejectTenantInstitutePort(tenant.value.id, {
+      mfaToken: otp,
+      totpCode: otp,
+      otp,
+    })
+    applyInstitutePort(res.data)
+    $q.notify({ type: 'info', message: 'Institute port request rejected.' })
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.error || err.response?.data?.message || 'Failed to reject Institute port', timeout: 8000 })
+  } finally {
+    rejectingPort.value = false
+  }
+}
+
+const applyActivationPayload = (payload) => {
+  if (payload?.gate) activationGate.value = payload.gate
+  if (payload?.evidence) activationEvidence.value = { ...activationEvidence.value, ...payload.evidence }
+}
+
+const loadActivationGate = async () => {
+  if (!tenant.value?.id) return
+  try {
+    const res = await adminApi.getFinancialPlatformActivationGate(tenant.value.id)
+    applyActivationPayload(res.data || {})
+  } catch (e) {
+    const fromHealth = financialHealth.value?.activationGate
+    if (fromHealth && !fromHealth.error) {
+      activationGate.value = {
+        checks: fromHealth.checks,
+        proposal: fromHealth.proposal,
+      }
+      if (fromHealth.evidence) {
+        activationEvidence.value = { ...activationEvidence.value, ...fromHealth.evidence }
+      }
+    }
+    console.warn('Failed to load financial platform activation gate:', e)
+  }
+}
+
+const recordFpCheck = async (key) => {
+  if (!tenant.value) return
+  checkBusy.value = key
+  try {
+    const res = await adminApi.recordFinancialPlatformManualCheck(tenant.value.id, { key, passed: true })
+    if (res.data?.gate) activationGate.value = res.data.gate
+    $q.notify({ type: 'positive', message: 'Recorded. A different admin must checker-approve this check.' })
+    await loadActivationGate()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Failed to record check',
+      timeout: 8000,
+    })
+  } finally {
+    checkBusy.value = ''
+  }
+}
+
+const approveFpCheck = async (key) => {
+  if (!tenant.value) return
+  checkBusy.value = key
+  try {
+    const res = await adminApi.recordFinancialPlatformManualCheck(tenant.value.id, { key, action: 'checker_approve' })
+    if (res.data?.gate) activationGate.value = res.data.gate
+    $q.notify({ type: 'positive', message: 'Check approved by checker' })
+    await loadActivationGate()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'A different admin must approve this check',
+      timeout: 8000,
+    })
+  } finally {
+    checkBusy.value = ''
+  }
+}
+
+const proposeFinancialPlatform = async () => {
   if (!tenant.value) return
   $q.dialog({
-    title: 'Activate Financial Platform',
-    message: `Are you sure you want to provision Quasar financial capabilities for ${tenant.value.name}? This will allocate real-world ledger accounts.`,
+    title: 'Propose activation',
+    message: `This records you as maker for ${tenant.value.name}. A different admin must checker-approve before the platform is provisioned.`,
     cancel: true,
     persistent: true,
     dark: true,
-    color: 'cyan-6'
+    color: 'indigo-6',
   }).onOk(async () => {
-    activatingPlatform.value = true
+    proposingPlatform.value = true
     try {
-      await adminApi.activateFinancialPlatform(tenant.value.id)
-      $q.notify({ type: 'positive', message: 'Financial Platform Activated Successfully' })
-      await fetchDetails()
+      const res = await adminApi.proposeFinancialPlatformActivation(tenant.value.id)
+      if (res.data?.gate) activationGate.value = res.data.gate
+      $q.notify({ type: 'positive', message: 'Activation proposed. A second admin must approve.' })
     } catch (err) {
-      console.error('Activation failed:', err)
-      $q.notify({ type: 'negative', message: err.response?.data?.error || 'Failed to activate financial platform' })
+      $q.notify({
+        type: 'negative',
+        message: err.response?.data?.error || 'Failed to propose activation',
+        timeout: 8000,
+      })
     } finally {
-      activatingPlatform.value = false
+      proposingPlatform.value = false
     }
   })
+}
+
+const rejectFinancialPlatform = async () => {
+  if (!tenant.value) return
+  $q.dialog({
+    title: 'Reject activation proposal',
+    message: 'Reject this pending Activate Platform request?',
+    prompt: { model: '', type: 'text', label: 'Reason (optional)' },
+    cancel: true,
+    persistent: true,
+    dark: true,
+    color: 'red-5',
+  }).onOk(async (reason) => {
+    const otp = await promptCheckerMfa($q.dialog, {
+      title: 'Checker 2FA required',
+      message: 'Enter your authenticator code to reject this activation request.',
+      okLabel: 'Verify & reject',
+      okColor: 'red-6',
+    })
+    if (!otp) {
+      $q.notify({ type: 'warning', message: 'Rejection cancelled. 2FA code is required.' })
+      return
+    }
+    rejectingPlatform.value = true
+    try {
+      const res = await adminApi.rejectFinancialPlatformActivation(tenant.value.id, { reason, otp })
+      if (res.data?.gate) activationGate.value = res.data.gate
+      $q.notify({ type: 'warning', message: 'Activation proposal rejected' })
+    } catch (err) {
+      $q.notify({
+        type: 'negative',
+        message: err.response?.data?.message || err.response?.data?.error || 'Failed to reject proposal',
+      })
+    } finally {
+      rejectingPlatform.value = false
+    }
+  })
+}
+
+const activateFinancialPlatform = async () => {
+  if (!tenant.value) return
+  if (!canCheckerActivate.value) {
+    $q.notify({
+      type: 'warning',
+      message: 'Complete CAC, direct-call phone, and address checks, then have a second admin approve.',
+      timeout: 7000,
+    })
+    return
+  }
+  const otp = await promptCheckerMfa($q.dialog, {
+    title: 'Checker-approve activation',
+    message: `You are the checker. This will provision Quasar financial capabilities for ${tenant.value.name}. Enter your 2FA authenticator code to continue.`,
+    okLabel: 'Verify & activate',
+    okColor: 'cyan-6',
+  })
+  if (!otp) {
+    $q.notify({ type: 'warning', message: 'Activation cancelled. 2FA code is required.' })
+    return
+  }
+  activatingPlatform.value = true
+  try {
+    await adminApi.activateFinancialPlatform(tenant.value.id, { otp })
+    $q.notify({ type: 'positive', message: 'Financial Platform Activated Successfully' })
+    await fetchDetails()
+  } catch (err) {
+    console.error('Activation failed:', err)
+    $q.notify({
+      type: 'negative',
+      message:
+        err.response?.data?.message ||
+        err.response?.data?.details ||
+        err.response?.data?.error ||
+        'Failed to activate financial platform',
+      timeout: 8000,
+    })
+  } finally {
+    activatingPlatform.value = false
+  }
 }
 
 const rotateFinancialPlatform = async () => {
@@ -1772,6 +2581,7 @@ watch(
     if (newId && newId !== oldId) {
       // Reset state before fetching new tenant
       tenant.value = null
+      loadError.value = ''
       users.value = []
       wallet.value = { balance: 0, subAccount: null, virtualAccounts: [], transactions: [], allWallets: [] }
       recentUsage.value = []

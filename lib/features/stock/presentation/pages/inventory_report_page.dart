@@ -46,11 +46,21 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
   }
 
   Future<void> _selectDateRange() async {
+    final theme = Theme.of(context);
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
       initialDateRange: _dateRange,
+      builder: (context, child) {
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme,
+            dialogBackgroundColor: theme.colorScheme.surface,
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() => _dateRange = picked);
@@ -94,83 +104,142 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
       appBar: AppBar(
         title: Text(settings?.businessMode == 'school' ? 'Fee Analysis' : 'Inventory Report'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: 'Export CSV',
-            onPressed: () => _exportReport(context),
+          Tooltip(
+            message: 'Export CSV',
+            child: InkWell(
+              onTap: () => _exportReport(context),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.share, size: 20),
+                    SizedBox(height: 2),
+                    Text('Export', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Thermal Print',
-            onPressed: () {
-              final state = context.read<StockBloc>().state;
-              final settingsState = context.read<SettingsBloc>().state;
-              
-              if (state is InventoryReportLoaded && settingsState.settings != null) {
-                final commands = ReportGenerator.buildInventoryThermalCommands(
-                  reportData: state.report,
-                  settings: settingsState.settings!,
-                  dateRange: _dateRange != null 
-                    ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
-                    : null,
-                );
+          Tooltip(
+            message: 'Thermal Print',
+            child: InkWell(
+              onTap: () {
+                final state = context.read<StockBloc>().state;
+                final settingsState = context.read<SettingsBloc>().state;
                 
-                context.read<PrinterBloc>().add(PrintCommandsEvent(
-                  commands, 
-                  settingsState.settings!.paperWidth
-                ));
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sent to printer...')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please wait for data to load.')),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: 'Print PDF',
-            onPressed: () async {
-              final state = context.read<StockBloc>().state;
-              final settingsState = context.read<SettingsBloc>().state;
-              if (state is InventoryReportLoaded && settingsState.settings != null) {
-                try {
-                  await ReportGenerator.generateInventoryReport(
+                if (state is InventoryReportLoaded && settingsState.settings != null) {
+                  final commands = ReportGenerator.buildInventoryThermalCommands(
                     reportData: state.report,
                     settings: settingsState.settings!,
                     dateRange: _dateRange != null 
                       ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
                       : null,
                   );
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Print failed: ${e.toString()}')),
-                    );
-                  }
+                  
+                  context.read<PrinterBloc>().add(PrintCommandsEvent(
+                    commands, 
+                    settingsState.settings!.paperWidth
+                  ));
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sent to printer...')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please wait for data to load.')),
+                  );
                 }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please wait for data to load.')),
-                );
-              }
-            },
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.print_outlined, size: 20),
+                    SizedBox(height: 2),
+                    Text('Print', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.date_range),
-            onPressed: _selectDateRange,
+          Tooltip(
+            message: 'Print PDF',
+            child: InkWell(
+              onTap: () async {
+                final state = context.read<StockBloc>().state;
+                final settingsState = context.read<SettingsBloc>().state;
+                if (state is InventoryReportLoaded && settingsState.settings != null) {
+                  try {
+                    await ReportGenerator.generateInventoryReport(
+                      reportData: state.report,
+                      settings: settingsState.settings!,
+                      dateRange: _dateRange != null 
+                        ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
+                        : null,
+                    );
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Print failed: ${e.toString()}')),
+                      );
+                    }
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please wait for data to load.')),
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.picture_as_pdf, size: 20),
+                    SizedBox(height: 2),
+                    Text('PDF', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Tooltip(
+            message: 'Date Range',
+            child: InkWell(
+              onTap: _selectDateRange,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.date_range, size: 20),
+                    SizedBox(height: 2),
+                    Text('Date', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
           if (_dateRange != null)
             IconButton(
               icon: const Icon(Icons.clear),
+              tooltip: 'Clear Date Filter',
               onPressed: () {
                 setState(() => _dateRange = null);
                 _loadReport();
               },
             ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -178,12 +247,17 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
           if (_dateRange != null)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2C2C2E)
+                  : Theme.of(context).primaryColor.withOpacity(0.1),
               width: double.infinity,
               child: Text(
                 'Range: ${DateFormat('MMM dd').format(_dateRange!.start)} - ${DateFormat('MMM dd').format(_dateRange!.end)}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
           Expanded(
@@ -192,6 +266,20 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                 if (state is StockLoading) {
                   return const InvifyLoadingIndicator(message: 'CALCULATING INVENTORY METRICS...');
                 } else if (state is InventoryReportLoaded) {
+                  if (state.report.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          settings?.businessMode == 'school'
+                              ? 'No fees recorded in this date range.'
+                              : 'No inventory activity in this date range.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                        ),
+                      ),
+                    );
+                  }
                   return SingleChildScrollView(
                     child: Column(
                       children: [
@@ -204,14 +292,19 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                           const SizedBox(height: 16),
                         ],
                         const SizedBox(height: 16),
-                        _buildTable(state.report, currencySymbol, settings),
+                        _buildTable(context, state.report, currencySymbol, settings),
                       ],
                     ),
                   );
                 } else if (state is StockError) {
                   return Center(child: Text(state.message));
                 }
-                return const Center(child: Text('Select date range to view inventory metrics'));
+                return Center(
+                  child: Text(
+                    'Select a date range to view metrics',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                  ),
+                );
               },
             ),
           ),
@@ -220,47 +313,56 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
     );
   }
 
-  Widget _buildTable(List<Map<String, dynamic>> report, String currency, AppSettings? settings) {
+  Widget _buildTable(BuildContext context, List<Map<String, dynamic>> report, String currency, AppSettings? settings) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final headerBg = isDark ? const Color(0xFF2C2C2E) : Colors.grey.shade200;
+    final evenRow = isDark ? const Color(0xFF121212) : Colors.white;
+    final oddRow = isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade50;
+    final border = isDark ? cs.outline.withOpacity(0.25) : Colors.grey.shade300;
+    final headerStyle = TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface);
+    final cellStyle = TextStyle(color: cs.onSurface);
+    final mutedStyle = TextStyle(color: cs.onSurface.withOpacity(0.75));
+
     return Column(
       children: [
-        // Header
         Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
-            border: Border(bottom: BorderSide(color: Colors.grey[300]!, width: 1)),
+            color: headerBg,
+            border: Border(bottom: BorderSide(color: border, width: 1)),
           ),
           child: Row(
             children: [
-              Expanded(flex: 3, child: Text(settings?.productLabel ?? 'Product', style: const TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text(settings?.businessMode == 'school' ? 'Amount' : 'Price', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              Expanded(flex: 3, child: Text(settings?.productLabel ?? 'Product', style: headerStyle)),
+              Expanded(flex: 2, child: Text(settings?.businessMode == 'school' ? 'Amount' : 'Price', style: headerStyle, textAlign: TextAlign.right)),
               if (settings?.businessMode != 'school')
-                Expanded(flex: 2, child: Text('Stock', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Sold', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Revenue', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text('Stock', style: headerStyle, textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text('Sold', style: headerStyle, textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text('Revenue', style: headerStyle, textAlign: TextAlign.right)),
             ],
           ),
         ),
-        // Rows
         ...report.mapIndexed((index, item) {
           return Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
-              color: index % 2 == 0 ? Colors.white : Colors.grey[50],
-              border: Border(bottom: BorderSide(color: Colors.grey[100]!, width: 1)),
+              color: index % 2 == 0 ? evenRow : oddRow,
+              border: Border(bottom: BorderSide(color: border, width: 1)),
             ),
             child: Row(
               children: [
-                Expanded(flex: 3, child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w500))),
-                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currency), textAlign: TextAlign.right)),
+                Expanded(flex: 3, child: Text(item['name'], style: cellStyle.copyWith(fontWeight: FontWeight.w500))),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currency), textAlign: TextAlign.right, style: mutedStyle)),
                 if (settings?.businessMode != 'school')
-                  Expanded(flex: 2, child: Text(item['stockQty'] >= 999999 ? 'N/A' : item['stockQty'].toString(), textAlign: TextAlign.right)),
-                Expanded(flex: 2, child: Text(item['totalSold'].toString(), textAlign: TextAlign.right)),
-                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currency), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 2, child: Text(item['stockQty'] >= 999999 ? 'N/A' : item['stockQty'].toString(), textAlign: TextAlign.right, style: mutedStyle)),
+                Expanded(flex: 2, child: Text(item['totalSold'].toString(), textAlign: TextAlign.right, style: mutedStyle)),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currency), textAlign: TextAlign.right, style: cellStyle.copyWith(fontWeight: FontWeight.bold))),
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -272,14 +374,24 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
     final top5 = topSelling.take(5).toList();
     if (top5.isEmpty) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final titleStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: cs.onSurface);
+    final axisStyle = TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.75));
+
     return Container(
       height: 250,
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        border: Border.all(color: cs.outline.withOpacity(isDark ? 0.25 : 0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.08), blurRadius: 4),
+        ],
       ),
       child: Column(
         children: [
@@ -287,7 +399,7 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
             context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
               ? 'Top Revenue Fees/Items' 
               : 'Top Selling Items (Quantity)', 
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+            style: titleStyle,
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -323,7 +435,7 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                         final name = top5[idx]['name'] as String;
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(name.length > 8 ? '${name.substring(0, 5)}...' : name, style: const TextStyle(fontSize: 10)),
+                          child: Text(name.length > 8 ? '${name.substring(0, 5)}...' : name, style: axisStyle),
                         );
                       },
                     ),
@@ -356,16 +468,25 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
   }
 
   Widget _buildStockValueChart(BuildContext context, List<Map<String, dynamic>> report, String currencySymbol) {
-    // Top 5 by Value (Stock * Price)
-    final withValue = report.map((i) => {
-      ...i,
-      'stockValue': (i['stockQty'] as num) * (i['price'] as num)
-    }).toList()..sort((a, b) => (b['stockValue'] as num).compareTo(a['stockValue'] as num));
+    final isSchool = context.read<SettingsBloc>().state.settings?.businessMode == 'school';
+    final withValue = report.map((i) {
+      final value = isSchool
+          ? (i['totalRevenue'] as num? ?? 0)
+          : (i['stockQty'] as num) * (i['price'] as num);
+      return {...i, 'stockValue': value};
+    }).toList()
+      ..sort((a, b) => (b['stockValue'] as num).compareTo(a['stockValue'] as num));
 
-    final top5 = withValue.take(5).toList();
+    final top5 = withValue.where((i) => (i['stockValue'] as num) > 0).take(5).toList();
     if (top5.isEmpty) return const SizedBox.shrink();
 
     final totalValue = top5.fold<double>(0, (sum, item) => sum + (item['stockValue'] as num).toDouble());
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final labelStyle = TextStyle(fontSize: 10, color: cs.onSurface);
+    final titleStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface);
 
     final colors = [
       Colors.blue,
@@ -380,9 +501,12 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        border: Border.all(color: cs.outline.withOpacity(isDark ? 0.25 : 0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.08), blurRadius: 4),
+        ],
       ),
       child: Row(
         children: [
@@ -414,10 +538,8 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
-                    ? 'Revenue Analysis' 
-                    : 'Stock Value Analysis', 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)
+                  isSchool ? 'Revenue Analysis' : 'Stock Value Analysis',
+                  style: titleStyle,
                 ),
                 const SizedBox(height: 10),
                 ...top5.asMap().entries.map((e) => Padding(
@@ -426,10 +548,10 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                     children: [
                       Container(width: 8, height: 8, color: colors[e.key % colors.length]),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(e.value['name'], style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)),
+                      Expanded(child: Text(e.value['name'], style: labelStyle, overflow: TextOverflow.ellipsis)),
                       Text(
-                        CurrencyFormatter.formatWithSymbol(e.value['stockValue'], symbol: currencySymbol), 
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)
+                        CurrencyFormatter.formatWithSymbol(e.value['stockValue'], symbol: currencySymbol),
+                        style: labelStyle.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),

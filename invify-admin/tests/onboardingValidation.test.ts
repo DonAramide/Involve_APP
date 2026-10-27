@@ -25,9 +25,9 @@ describe('onboardingValidation', () => {
     expect(buildE164('+234', '08012345678')).toBe('+2348012345678');
   });
 
-  test('password must be at least 6 characters', () => {
+  test('password must be at least 9 characters with complexity', () => {
     expect(passwordRule('12345')).not.toBe(true);
-    expect(passwordRule('123456')).toBe(true);
+    expect(passwordRule('Password123!')).toBe(true);
   });
 
   test('emailRule surfaces a useful message', () => {

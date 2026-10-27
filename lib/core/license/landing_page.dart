@@ -9,6 +9,8 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/required_location.dart';
+import 'package:involve_app/core/widgets/location_required_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -51,43 +53,58 @@ class _LandingPageState extends State<LandingPage> {
 
     final hasAccess = await LicenseService.canAccess(businessName);
     if (hasAccess) {
-      if (mounted) {
-        // 1. Always establish Dashboard as the root of the navigation stack
-        if (settings?.skipSplash == true) {
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              settings: const RouteSettings(name: DashboardPage.routeName),
-              pageBuilder: (context, animation1, animation2) => const DashboardPage(),
-              transitionDuration: Duration.zero,
-              reverseTransitionDuration: Duration.zero,
-            ),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              settings: const RouteSettings(name: DashboardPage.routeName),
-              builder: (_) => const DashboardPage(),
-            ),
-          );
-        }
-        
-        // 2. If restoreLastState is true, stack the last route on top of the dashboard
-        if (settings?.restoreLastState == true && 
-            settings?.lastRoute != null && 
-            settings!.lastRoute!.isNotEmpty && 
-            settings.lastRoute != DashboardPage.routeName && 
-            settings.lastRoute != '/') {
-          
-          Navigator.of(context).pushNamed(settings.lastRoute!);
-        }
-      }
-    } else {
-      final isExpired = await LicenseService.isExpired(businessName);
-      if (mounted) {
+      if (!mounted) return;
+      final location = await RequiredLocation.capture();
+      if (!mounted) return;
+      if (!location.ok) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => ActivationPage(isExpired: isExpired)),
+          MaterialPageRoute(
+            builder: (_) => LocationRequiredPage(
+              onGranted: (navContext) {
+                _openDashboardFrom(navContext, settings);
+              },
+            ),
+          ),
         );
+        return;
       }
+      _openDashboardFrom(context, settings);
+      return;
+    }
+
+    final isExpired = await LicenseService.isExpired(businessName);
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ActivationPage(isExpired: isExpired)),
+      );
+    }
+  }
+
+  void _openDashboardFrom(BuildContext navContext, AppSettings? settings) {
+    if (settings?.skipSplash == true) {
+      Navigator.of(navContext).pushReplacement(
+        PageRouteBuilder(
+          settings: const RouteSettings(name: DashboardPage.routeName),
+          pageBuilder: (context, animation1, animation2) => const DashboardPage(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
+      );
+    } else {
+      Navigator.of(navContext).pushReplacement(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: DashboardPage.routeName),
+          builder: (_) => const DashboardPage(),
+        ),
+      );
+    }
+
+    if (settings?.restoreLastState == true &&
+        settings?.lastRoute != null &&
+        settings!.lastRoute!.isNotEmpty &&
+        settings.lastRoute != DashboardPage.routeName &&
+        settings.lastRoute != '/') {
+      Navigator.of(navContext).pushNamed(settings.lastRoute!);
     }
   }
 

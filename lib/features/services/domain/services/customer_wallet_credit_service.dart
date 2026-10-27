@@ -7,7 +7,10 @@ import 'package:involve_app/features/services/domain/entities/service_customer.d
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
+import 'package:involve_app/features/school/domain/services/parent_payment_allocator.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
 
 /// Applies VA deposit socket events to local customer wallets and school students.
 class CustomerWalletCreditService {
@@ -16,18 +19,24 @@ class CustomerWalletCreditService {
       CustomerWalletCreditService._();
 
   static const String prefsKey = 'customer_fund_ledger';
+  static const String notifiedRefsPrefsKey = 'payment_notified_refs';
   static const int maxItems = 500;
+  static const int maxNotifiedRefs = 500;
 
   IServicesRepository? _repository;
   SchoolRepository? _schoolRepository;
   InvoiceRepository? _invoiceRepository;
+  SettingsRepository? _settingsRepository;
   final StreamController<ServiceCustomer> _credits =
       StreamController<ServiceCustomer>.broadcast();
   final StreamController<Student> _studentCredits =
       StreamController<Student>.broadcast();
+  final StreamController<SchoolParent> _parentCredits =
+      StreamController<SchoolParent>.broadcast();
 
   Stream<ServiceCustomer> get onWalletCredited => _credits.stream;
   Stream<Student> get onStudentCredited => _studentCredits.stream;
+  Stream<SchoolParent> get onParentCredited => _parentCredits.stream;
 
   void bind(IServicesRepository repository) {
     _repository = repository;
@@ -39,6 +48,10 @@ class CustomerWalletCreditService {
 
   void bindInvoices(InvoiceRepository repository) {
     _invoiceRepository = repository;
+  }
+
+  void bindSettings(SettingsRepository repository) {
+    _settingsRepository = repository;
   }
 
   /// Pay open student bills with [amount]; returns unapplied remainder (credit).
@@ -77,7 +90,7 @@ class CustomerWalletCreditService {
           amountPaid: newPaid,
           balanceAmount: newBalance,
           paymentStatus: newBalance <= 0.001 ? 'Paid' : 'Partial',
-          paymentMethod: 'Transfer',
+          paymentMethod: 'Parent Credit',
         ),
       );
       remaining -= pay;
@@ -118,13 +131,139 @@ class CustomerWalletCreditService {
         .toList();
   }
 
-  Future<bool> hasProcessedReference(String reference) async {
+  Future<double> recordedNairaForVirtualAccount(String accountNumber) async {
+    final va = accountNumber.trim();
+    if (va.isEmpty) return 0;
     final ledger = await loadLedger();
-    // notify-only entries never updated a local balance — allow a real credit retry
-    return ledger.any((e) {
-      if (e['reference']?.toString() != reference) return false;
-      return e['source']?.toString() != 'catchup_notify_only';
+    var sum = 0.0;
+    for (final e in ledger) {
+      if (e['source']?.toString() == 'catchup_notify_only') continue;
+      final meta = e['metadata'] is Map
+          ? Map<String, dynamic>.from(e['metadata'] as Map)
+          : <String, dynamic>{};
+      final rowVa = (meta['virtualAccountNumber'] ??
+              meta['accountNumber'] ??
+              e['virtualAccountNumber'] ??
+              '')
+          .toString()
+          .trim();
+      if (rowVa != va) continue;
+      final n = e['amount'] is num
+          ? (e['amount'] as num).toDouble()
+          : double.tryParse('${e['amount']}') ?? 0;
+      sum += n;
+    }
+    return _roundNaira(sum);
+  }
+
+  /// Display-only. Never overwrite stored parent credit from mixed local rails.
+  Future<bool> recalculateParentCredit({
+    required String accountNumber,
+    required double quasarBalance,
+  }) async {
+    return false;
+  }
+
+  /// Display-only. Server-confirmed credits replace caches after command sync.
+  Future<bool> alignParentCreditToQuasar({
+    required String accountNumber,
+    required double quasarBalance,
+  }) async {
+    return false;
+  }
+
+  Future<int> applyQuasarBalanceGap({
+    required String accountNumber,
+    required double quasarBalance,
+  }) async {
+    final recorded = await recordedNairaForVirtualAccount(accountNumber);
+    final gap = _roundNaira(quasarBalance - recorded);
+    if (gap <= 0.009) return 0;
+    final ok = await applyPaymentSuccess({
+      'type': 'payment.success',
+      'reference':
+          'qfs:${accountNumber.trim()}:reconcile:${quasarBalance.toStringAsFixed(2)}',
+      'amount': gap,
+      'metadata': {
+        'virtualAccountNumber': accountNumber.trim(),
+        'accountNumber': accountNumber.trim(),
+        'amountNaira': gap,
+        'paidVia': 'parent_account',
+        'reconcile': true,
+        'senderName': 'Quasar',
+      },
     });
+    return ok ? 1 : 0;
+  }
+
+  Future<bool> hasProcessedReference(String reference) async {
+    return (await _processedAmount(reference)) > 0.009;
+  }
+
+  /// True if any ledger row exists for [reference] (including notify-only).
+  Future<bool> hasLedgerEntry(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final ledger = await loadLedger();
+    return ledger.any((e) => e['reference']?.toString() == ref);
+  }
+
+  /// Claim a one-time UI/device notification for this payment reference.
+  /// Returns true only the first time; later calls for the same ref return false.
+  Future<bool> claimPaymentNotification(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getStringList(notifiedRefsPrefsKey) ?? <String>[];
+    if (existing.contains(ref)) return false;
+
+    // Already in local ledger (including prior "notify only" catch-ups) →
+    // seed the claim list and do not show another notification.
+    final alreadyInLedger = await hasLedgerEntry(ref);
+    existing.insert(0, ref);
+    while (existing.length > maxNotifiedRefs) {
+      existing.removeLast();
+    }
+    await prefs.setStringList(notifiedRefsPrefsKey, existing);
+    if (alreadyInLedger) return false;
+    return true;
+  }
+
+  Future<bool> hasNotifiedReference(String reference) async {
+    final ref = reference.trim();
+    if (ref.isEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getStringList(notifiedRefsPrefsKey) ?? <String>[];
+    return existing.contains(ref);
+  }
+
+  double _roundNaira(double value) => (value * 100).round() / 100.0;
+
+  double _nairaFromPayload(Map map, Map metadata) {
+    for (final raw in [
+      metadata['amountNaira'],
+      metadata['amount_naira'],
+      metadata['amountRaw'],
+      map['amount'],
+    ]) {
+      final n = raw is num ? raw.toDouble() : double.tryParse('$raw');
+      if (n != null && n > 0) return _roundNaira(n);
+    }
+    return 0;
+  }
+
+  Future<double> _processedAmount(String reference) async {
+    final ledger = await loadLedger();
+    var sum = 0.0;
+    for (final e in ledger) {
+      if (e['reference']?.toString() != reference) continue;
+      if (e['source']?.toString() == 'catchup_notify_only') continue;
+      final n = e['amount'] is num
+          ? (e['amount'] as num).toDouble()
+          : double.tryParse('${e['amount']}') ?? 0;
+      sum += n;
+    }
+    return _roundNaira(sum);
   }
 
   Future<void> _recordLedgerEntry({
@@ -138,7 +277,8 @@ class CustomerWalletCreditService {
     String? createdAt,
     String source = 'live',
   }) async {
-    if (await hasProcessedReference(reference)) return;
+    // Deduplicate including catchup_notify_only so reconnects never re-insert.
+    if (await hasLedgerEntry(reference)) return;
     final ledger = await loadLedger();
     ledger.insert(0, {
       'id': reference,
@@ -184,18 +324,35 @@ class CustomerWalletCreditService {
       final map = data is Map
           ? Map<String, dynamic>.from(data as Map)
           : <String, dynamic>{};
-      final amountRaw = map['amount'];
-      final amount = amountRaw is num
-          ? amountRaw.toDouble()
-          : double.tryParse('$amountRaw') ?? 0;
+      Map<String, dynamic> metadataPreview = {};
+      final previewRaw = map['metadata'];
+      if (previewRaw is Map) {
+        metadataPreview = Map<String, dynamic>.from(previewRaw);
+      }
+      final amount = _nairaFromPayload(map, metadataPreview);
       if (amount <= 0) return false;
 
       final reference = (map['reference'] ?? '').toString().trim();
       if (reference.isEmpty) return false;
 
-      if (await hasProcessedReference(reference)) {
-        debugPrint('[CustomerWalletCredit] Duplicate ignored: $reference');
-        return false;
+      final already = await _processedAmount(reference);
+      if (already > 0) {
+        final gap = _roundNaira(amount - already);
+        if (gap <= 0.009) {
+          debugPrint('[CustomerWalletCredit] Duplicate ignored: $reference');
+          return false;
+        }
+        return applyPaymentSuccess({
+          ...map,
+          'reference': '$reference:topup:${gap.toStringAsFixed(2)}',
+          'amount': gap,
+          'metadata': {
+            ...metadataPreview,
+            'amountNaira': gap,
+            'paidVia': metadataPreview['paidVia'] ?? 'parent_account',
+            'reconcile': true,
+          },
+        });
       }
 
       Map<String, dynamic> metadata = {};
@@ -233,58 +390,69 @@ class CustomerWalletCreditService {
           .toString();
       final senderBank =
           (metadata['senderBank'] ?? metadata['bankName'] ?? '').toString();
+      final parentKey = (metadata['parentKey'] ?? '').toString().trim();
+      final paidVia = (metadata['paidVia'] ?? '').toString();
+      final looksLikeParentDeposit = paidVia == 'parent_account' ||
+          (customerId ?? '').startsWith('par-') ||
+          parentKey.startsWith('par-');
 
-      // 1) Retail / service customer wallet
-      final repo = _repository;
-      if (repo != null) {
-        final updated = await repo.creditCustomerWalletFromDeposit(
-          amount: amount,
-          reference: reference,
-          customerId: customerId,
-          virtualAccountNumber: va,
-          senderName: senderName,
-          senderBank: senderBank,
-        );
-
-        if (updated != null) {
-          _credits.add(updated);
-          debugPrint(
-            '[CustomerWalletCredit] Credited ${updated.name} ₦$amount '
-            '(ref=$reference, balance=${updated.balance})',
-          );
-          return true;
-        }
-      } else {
-        debugPrint('[CustomerWalletCredit] Services repository not bound yet');
-      }
-
-      // 2) School student VA credit — pay open bills first, remainder → creditBalance
       final schoolRepo = _schoolRepository;
       if (schoolRepo != null) {
+        SchoolParent? parent;
+        if (va != null && va.isNotEmpty) {
+          parent = await schoolRepo.findParentByVirtualAccount(va);
+        }
+        if (parent == null) {
+          for (final key in [customerId, parentKey]) {
+            if (key == null || key.trim().isEmpty) continue;
+            parent = await schoolRepo.findParentByExternalKey(key.trim());
+            if (parent != null) break;
+          }
+        }
+
         Student? matched;
         if (va != null && va.isNotEmpty) {
           matched = await schoolRepo.getStudentByVirtualAccount(va);
         }
         if (matched == null &&
             admissionNumber != null &&
-            admissionNumber.trim().isNotEmpty) {
+            admissionNumber.trim().isNotEmpty &&
+            !admissionNumber.trim().startsWith('par-')) {
           matched =
               await schoolRepo.getStudentByAdmissionNumber(admissionNumber.trim());
         }
         if (matched == null && studentId != null && studentId.trim().isNotEmpty) {
           final key = studentId.trim();
-          if (key.startsWith('stu-')) {
+          if (key.startsWith('par-')) {
+            // Parent-key payload — ignore as student match.
+          } else if (key.startsWith('stu-')) {
             matched = await schoolRepo.getStudentByAdmissionNumber(key.substring(4));
           } else {
             matched = await schoolRepo.getStudentByAdmissionNumber(key);
           }
         }
+        if (parent == null && matched?.parentId != null) {
+          parent = await schoolRepo.getParentById(matched!.parentId!);
+        }
+
+        if (parent != null) {
+          final ok = await _applyParentDeposit(
+            parent: parent,
+            amount: amount,
+            reference: reference,
+            va: va,
+            senderName: senderName,
+            metadata: metadata,
+            customerId: customerId,
+          );
+          if (ok) return true;
+        }
 
         Student? student;
-        if (matched?.id != null) {
-          // Bills drive the red "Balance" on the Students list — update them first.
+        final unlinked = matched;
+        if (unlinked != null && unlinked.id != null && unlinked.parentId == null) {
           final leftover = await _applyDepositToStudentInvoices(
-            studentId: matched!.id!,
+            studentId: unlinked.id!,
             amount: amount,
             reference: reference,
           );
@@ -293,13 +461,12 @@ class CustomerWalletCreditService {
           final invoiceRepo = _invoiceRepository;
           if (invoiceRepo != null) {
             final invoices =
-                await invoiceRepo.getInvoicesByStudentId(matched.id!);
+                await invoiceRepo.getInvoicesByStudentId(unlinked.id!);
             invoiceDebt = invoices.fold<double>(0, (sum, inv) {
               final owing = inv.totalAmount - inv.amountPaid;
               return sum + (owing > 0 ? owing : 0);
             });
           } else {
-            // Fallback: old path against students.balance only
             student = await schoolRepo.creditStudentFromDeposit(
               amount: amount,
               reference: reference,
@@ -310,13 +477,13 @@ class CustomerWalletCreditService {
           }
 
           if (student == null) {
-            student = matched.copyWith(
+            student = unlinked.copyWith(
               balance: invoiceDebt,
-              creditBalance: matched.creditBalance + leftover,
+              creditBalance: unlinked.creditBalance + leftover,
             );
             await schoolRepo.updateStudent(student);
           }
-        } else {
+        } else if (!looksLikeParentDeposit && matched?.parentId == null) {
           student = await schoolRepo.creditStudentFromDeposit(
             amount: amount,
             reference: reference,
@@ -327,7 +494,6 @@ class CustomerWalletCreditService {
         }
 
         if (student != null) {
-          // Drop any prior notify-only stub so a real credit can be recorded.
           final ledger = await loadLedger();
           ledger.removeWhere(
             (e) =>
@@ -361,10 +527,170 @@ class CustomerWalletCreditService {
         debugPrint('[CustomerWalletCredit] School repository not bound yet');
       }
 
+      if (!looksLikeParentDeposit) {
+        final repo = _repository;
+        if (repo != null) {
+          final updated = await repo.creditCustomerWalletFromDeposit(
+            amount: amount,
+            reference: reference,
+            customerId: customerId,
+            virtualAccountNumber: va,
+            senderName: senderName,
+            senderBank: senderBank,
+          );
+
+          if (updated != null) {
+            _credits.add(updated);
+            debugPrint(
+              '[CustomerWalletCredit] Credited ${updated.name} ₦$amount '
+              '(ref=$reference, balance=${updated.balance})',
+            );
+            return true;
+          }
+        } else {
+          debugPrint('[CustomerWalletCredit] Services repository not bound yet');
+        }
+      }
+
       return false;
     } catch (e, st) {
       debugPrint('[CustomerWalletCredit] apply failed: $e\n$st');
       return false;
     }
+  }
+
+  Future<bool> _applyParentDeposit({
+    required SchoolParent parent,
+    required double amount,
+    required String reference,
+    String? va,
+    required String senderName,
+    required Map<String, dynamic> metadata,
+    String? customerId,
+  }) async {
+    final schoolRepo = _schoolRepository;
+    if (schoolRepo == null || parent.id == null) return false;
+    if (await schoolRepo.parentPaymentExists(reference)) {
+      debugPrint('[CustomerWalletCredit] Parent duplicate ignored: $reference');
+      return true;
+    }
+
+    final children =
+        (await schoolRepo.getStudents()).where((s) => s.parentId == parent.id).toList();
+
+    Future<double> outstandingOf(Student s) async {
+      final invoiceRepo = _invoiceRepository;
+      if (invoiceRepo != null && s.id != null) {
+        final invoices = await invoiceRepo.getInvoicesByStudentId(s.id!);
+        var debt = 0.0;
+        for (final inv in invoices) {
+          if (inv.invoiceNumber.startsWith('PMT-')) continue;
+          final owing = inv.totalAmount - inv.amountPaid;
+          if (owing > 0) debt += owing;
+        }
+        if (debt > 0.001) return debt;
+      }
+      return s.balance > 0 ? s.balance : 0.0;
+    }
+
+    final debts = <ChildOutstanding>[];
+    for (final child in children) {
+      debts.add(ChildOutstanding(
+        studentId: child.id!,
+        outstandingNaira: await outstandingOf(child),
+      ));
+    }
+
+    ParentPaymentShareMode shareMode = ParentPaymentShareMode.autoShare;
+    if (metadata['reconcile'] == true) {
+      // Quasar-balance top-up must land on parent credit, not be re-split onto bills.
+      shareMode = ParentPaymentShareMode.managementDecide;
+    } else {
+      try {
+        shareMode = ParentPaymentShareModeX.fromStorage(
+          (await _settingsRepository?.getSettings())?.parentPaymentShareMode,
+        );
+      } catch (_) {
+        shareMode = ParentPaymentShareMode.autoShare;
+      }
+    }
+    final result = ParentPaymentAllocator.allocate(
+      paymentNaira: amount,
+      children: debts,
+      mode: shareMode,
+    );
+
+    for (final alloc in result.allocations) {
+      if (alloc.allocatedKobo <= 0) continue;
+      await _applyDepositToStudentInvoices(
+        studentId: alloc.studentId,
+        amount: alloc.allocatedNaira,
+        reference: reference,
+      );
+      final child = children.firstWhere((s) => s.id == alloc.studentId);
+      await schoolRepo.updateStudent(
+        child.copyWith(balance: alloc.outstandingAfterNaira),
+      );
+      _studentCredits.add(child.copyWith(balance: alloc.outstandingAfterNaira));
+    }
+
+    await schoolRepo.recordParentPayment(
+      ParentPaymentRecord(
+        parentId: parent.id!,
+        reference: reference,
+        amount: result.paymentNaira,
+        appliedToDebt: result.appliedNaira,
+        toCredit: result.creditNaira,
+        parentOutstandingBefore: result.parentOutstandingBeforeNaira,
+        parentOutstandingAfter: result.parentOutstandingAfterNaira,
+        parentCreditBefore: parent.creditBalance,
+        parentCreditAfter: parent.creditBalance + result.creditNaira,
+        virtualAccountNumber: va,
+        source: 'va_deposit',
+        createdAt: DateTime.now(),
+        allocations: result.allocations
+            .map(
+              (a) => ParentPaymentAllocationRecord(
+                studentId: a.studentId,
+                outstandingBefore: a.outstandingBeforeNaira,
+                allocated: a.allocatedNaira,
+                outstandingAfter: a.outstandingAfterNaira,
+              ),
+            )
+            .toList(),
+      ),
+    );
+
+    final ledger = await loadLedger();
+    ledger.removeWhere(
+      (e) =>
+          e['reference']?.toString() == reference &&
+          e['source']?.toString() == 'catchup_notify_only',
+    );
+    await _saveLedger(ledger);
+    await _recordLedgerEntry(
+      reference: reference,
+      amount: amount,
+      customerId: customerId,
+      senderName: senderName,
+      metadata: {
+        ...metadata,
+        'parentId': parent.id,
+        'parentName': parent.fullName,
+        'paidVia': 'parent_account',
+        'appliedToDebt': result.appliedNaira,
+        'parentCredit': result.creditNaira,
+      },
+      source: 'parent_wallet',
+    );
+    final updated = await schoolRepo.getParentById(parent.id!) ?? parent.copyWith(
+      creditBalance: parent.creditBalance + result.creditNaira,
+    );
+    _parentCredits.add(updated);
+    debugPrint(
+      '[CustomerWalletCredit] Parent ${updated.fullName} ₦$amount '
+      '(applied=${result.appliedNaira}, credit=${result.creditNaira}, ref=$reference)',
+    );
+    return true;
   }
 }

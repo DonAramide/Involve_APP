@@ -460,7 +460,7 @@ const columns = [
 async function fetchData() {
   loading.value = true
   try {
-    const configRes = await api.get('/admin/pos/routing')
+    const configRes = await api.get('/api/admin/pos/routing')
     if(configRes.data) {
       routingConfig.value = configRes.data
     }
@@ -480,7 +480,7 @@ async function fetchData() {
 async function saveConfig() {
   saving.value = true
   try {
-    await api.post('/admin/pos/routing', routingConfig.value)
+    await api.post('/api/admin/pos/routing', routingConfig.value)
     $q.notify({ type: 'positive', message: 'Routing configuration updated successfully' })
   } catch (e) {
     console.error(e)

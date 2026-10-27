@@ -16,15 +16,15 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Recon Health:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.8%</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">{{ summaryStats.reconciliationRate }}%</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Status:</span>
-            <q-badge color="green-10" text-color="green-3">Healthy</q-badge>
+            <q-badge color="green-10" text-color="green-3">{{ summaryStats.issues ? 'Exceptions' : 'Healthy' }}</q-badge>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Active Alerts:</span>
-            <span class="text-amber-4 text-weight-bold">3</span>
+            <span class="text-amber-4 text-weight-bold">{{ summaryStats.issues }}</span>
           </div>
           <q-icon name="monitor_heart" color="green-4" size="sm" />
         </div>
@@ -32,7 +32,7 @@
 
       <!-- Command Bar Actions -->
       <div class="row items-center op-gap-8 no-wrap">
-        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" />
+        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" @click="loadData" />
         <q-btn outline size="xs" color="grey-6" icon="rule" label="Rule Center" class="text-caption text-weight-bold" @click="activeWorkspaceTab = 'rules'" />
         <q-btn-dropdown size="xs" color="amber-4" icon="download" label="Export" class="text-caption text-weight-bold text-black" split>
           <q-list dark class="bg-panel font-mono text-caption border-muted">
@@ -68,7 +68,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Mismatch Amount</div>
-          <div class="text-h5 text-metric-mono text-red-4">{{ currentCurrency.symbol }}{{ summaryStats.mismatchAmount.toLocaleString() }}</div>
+          <div class="text-h5 text-metric-mono text-red-4">{{ currentCurrency.symbol }}{{ Number(summaryStats.mismatchAmount || 0).toLocaleString() }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -115,22 +115,21 @@
         <q-tab-panel name="queues" class="q-pa-none column no-wrap">
           <div class="bg-subpanel border-bottom">
             <q-tabs v-model="activeQueueTab" dense class="text-grey-5 font-mono text-caption" active-color="cyan-4" align="left" no-caps>
-              <q-tab name="matched" label="Matched (1.2M)" />
-              <q-tab name="pending" label="Pending (4.3K)" />
-              <q-tab name="mismatch" label="Mismatch (42)" />
-              <q-tab name="failed" label="Failed (15)" />
-              <q-tab name="investigations" label="Investigations (8)" />
+              <q-tab name="matched" :label="`Matched (${queueCounts.matched})`" />
+              <q-tab name="pending" :label="`Pending (${queueCounts.pending})`" />
+              <q-tab name="mismatch" :label="`Mismatch (${queueCounts.mismatch})`" />
+              <q-tab name="failed" :label="`Failed (${queueCounts.failed})`" />
+              <q-tab name="investigations" :label="`Investigations (${queueCounts.investigations})`" />
             </q-tabs>
           </div>
           
           <q-table
             class="bg-transparent text-main flex-grow-1 transaction-table"
             flat
-            :rows="reconRecords"
+            :rows="filteredReconRecords"
             :columns="reconCols"
             row-key="id"
             dense
-            virtual-scroll
             style="height: 100%;"
             selection="multiple"
             v-model:selected="selectedRecords"
@@ -222,7 +221,8 @@
     </div>
 
     <!-- RECONCILIATION DETAIL DRAWER -->
-    <q-drawer v-model="drawerOpen" side="right" overlay bordered class="bg-panel border-left drawer-shadow" :width="800">
+    <q-dialog v-model="drawerOpen" position="right" full-height>
+      <q-card class="bg-panel text-main column no-wrap" style="width: 800px; max-width: 96vw; height: 100%;">
       <div v-if="selectedRecon" class="column full-height">
         
         <!-- Drawer Header & Action Center -->
@@ -236,7 +236,7 @@
               </div>
               <div class="text-caption text-muted font-mono">Created: {{ selectedRecon.createdDate }}</div>
             </div>
-            <q-btn flat dense round icon="close" v-close-popup />
+            <q-btn flat dense round icon="close" @click="drawerOpen = false" />
           </div>
 
           <!-- Operational Action Center -->
@@ -418,7 +418,8 @@
           </q-tab-panels>
         </q-scroll-area>
       </div>
-    </q-drawer>
+      </q-card>
+    </q-dialog>
 
   </q-page>
 </template>
@@ -428,12 +429,13 @@ import { ref, onMounted, computed } from 'vue'
 import { useCurrency } from '../../composables/useCurrency';
 import { reconciliationApi } from '../../api';
 import { useQuasar } from 'quasar';
+import { userFacingApiError } from '../../utils/userFacingApiError';
 
 const { currentCurrency } = useCurrency();
 const $q = useQuasar();
 
 const activeWorkspaceTab = ref('queues')
-const activeQueueTab = ref('mismatch')
+const activeQueueTab = ref('matched')
 const searchQuery = ref('')
 const selectedRecords = ref([])
 
@@ -483,21 +485,60 @@ const summaryStats = ref({
   reconciliationRate: 0
 });
 
+const queueCounts = computed(() => {
+  const rows = Array.isArray(reconRecords.value) ? reconRecords.value : []
+  return {
+    matched: rows.filter((r) => r.status === 'MATCHED').length,
+    pending: rows.filter((r) => r.status === 'PENDING').length,
+    mismatch: rows.filter((r) => r.status === 'MISMATCH').length,
+    failed: rows.filter((r) => r.status === 'FAILED').length,
+    investigations: rows.filter((r) => r.status === 'INVESTIGATING').length
+  }
+})
+
+const filteredReconRecords = computed(() => {
+  const rows = Array.isArray(reconRecords.value) ? reconRecords.value : []
+  const statusMap = {
+    matched: 'MATCHED',
+    pending: 'PENDING',
+    mismatch: 'MISMATCH',
+    failed: 'FAILED',
+    investigations: 'INVESTIGATING'
+  }
+  const status = statusMap[activeQueueTab.value]
+  const q = searchQuery.value.trim().toLowerCase()
+  return rows.filter((r) => {
+    if (status && r.status !== status) return false
+    if (!q) return true
+    return [r.id, r.txnId, r.ledgerBatchId, r.settlementBatchId, r.walletId, r.reference]
+      .join(' ')
+      .toLowerCase()
+      .includes(q)
+  })
+})
+
 const loadData = async () => {
   try {
     const res = await reconciliationApi.getReport({ status: 'all' });
-    reconRecords.value = res.data.data || [];
-    summaryStats.value = res.data.summary || summaryStats.value;
+    const payload = res?.data
+    const rows = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : [])
+    reconRecords.value = rows
+    summaryStats.value = {
+      ...summaryStats.value,
+      ...(payload?.summary && typeof payload.summary === 'object' ? payload.summary : {})
+    }
     
-    exceptions.value = reconRecords.value.filter(r => ['MISMATCH', 'FAILED', 'ESCALATED'].includes(r.status)).map(r => ({
-      id: `EXC-${r.id.split('-').pop()}`,
+    exceptions.value = rows.filter(r => ['MISMATCH', 'FAILED', 'ESCALATED'].includes(r.status)).map(r => ({
+      id: `EXC-${String(r.id || '').split('-').pop()}`,
       type: r.status === 'FAILED' ? 'Bank Failure' : 'Amount Mismatch',
       description: `Discrepancy detected for transaction ${r.txnId}. Difference: ${r.difference}`,
       reconRecord: r
     }));
   } catch (error) {
     console.error('Failed to load reconciliation data', error);
-    $q.notify({ color: 'negative', message: 'Failed to load reconciliation data' });
+    reconRecords.value = []
+    exceptions.value = []
+    $q.notify({ color: 'negative', message: userFacingApiError(error, 'Failed to load reconciliation data') });
   }
 };
 

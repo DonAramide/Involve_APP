@@ -7,6 +7,7 @@ abstract class IAdminRepository {
   Future<void> revokeApiKey(String keyId);
   Future<List<Map<String, dynamic>>> getAuditLogs();
   Future<Map<String, dynamic>> getDashboardStats();
+  Future<List<Map<String, dynamic>>> getInternalWalletLedger();
 }
 
 class AdminRepositoryImpl implements IAdminRepository {
@@ -42,17 +43,32 @@ class AdminRepositoryImpl implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getAuditLogs() async {
-    try {
-      final response = await client.get('/api/admin/audit-logs');
-      final dataList = response.data['data'] as List? ?? [];
-      return dataList.map((log) => {
-        'action': log['action_type'] ?? 'System Event',
-        'timestamp': log['created_at'] != null ? _formatDate(log['created_at']) : 'N/A',
-        ...Map<String, dynamic>.from(log),
-      }).toList();
-    } catch (_) {
-      return [];
+    final response = await client.get('/api/admin/audit-logs', queryParameters: {
+      'limit': 100,
+      'page': 1,
+    });
+    final raw = response.data;
+    List dataList = const [];
+    if (raw is List) {
+      dataList = raw;
+    } else if (raw is Map) {
+      dataList = (raw['data'] as List?) ??
+          (raw['logs'] as List?) ??
+          (raw['items'] as List?) ??
+          const [];
     }
+    return dataList.map((log) {
+      final map = Map<String, dynamic>.from(log as Map);
+      final created = map['created_at'] ?? map['timestamp'];
+      return {
+        ...map,
+        'action': map['action'] ?? map['action_type'] ?? map['event_type'] ?? 'System Event',
+        'timestamp': created != null ? _formatDate(created.toString()) : 'N/A',
+        'details': map['details'] ?? map['metadata'] ?? map['payload'],
+        'terminal_id': map['terminal_id'] ?? map['target'],
+        'status': map['status'] ?? 'SUCCESS',
+      };
+    }).toList();
   }
 
   String _formatDate(String isoString) {
@@ -76,5 +92,16 @@ class AdminRepositoryImpl implements IAdminRepository {
         'monthly_revenue': 0.0,
       };
     }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getInternalWalletLedger() async {
+    final response = await client.get('/api/v1/wallet/transactions');
+    final raw = response.data;
+    final list = raw is Map ? (raw['transactions'] as List? ?? const []) : const [];
+    return list
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
   }
 }

@@ -1,0 +1,28 @@
+{
+  "decision": "RESOLVED",
+  "serviceType": "PAYMENTS",
+  "operationType": "CHECKOUT",
+  "quasarTenantId": "c3d11b8b-e85d-4f2b-8a8f-2872bc900382",
+  "provider": "flutterwave",
+  "allowedProviders": [
+    "paystack",
+    "flutterwave"
+  ],
+  "precedenceTier": "CIRCUIT_BREAKER",
+  "institutionId": "11111111-2222-3333-4444-555555555555",
+  "institutionCode": "PROV01",
+  "institutionName": "Providus Bank Institution Portal",
+  "decisionTraceId": "trc_failover_12345678",
+  "policyVersion": 1,
+  "evaluatedAt": "2026-10-20T00:16:00.000Z",
+  "expiresAt": "2026-10-20T00:17:00.000Z",
+  "circuitBreakerDetails": {
+    "primaryProvider": "paystack",
+    "primaryStatus": "CIRCUIT_OPEN",
+    "failoverReason": "Primary provider consecutive 5xx threshold breached; routed to secondary approved provider",
+    "allowedProvidersConsidered": [
+      "paystack",
+      "flutterwave"
+    ]
+  }
+}

@@ -19,9 +19,13 @@ class VerifyWhatsappPage extends StatefulWidget {
 class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendCooldownMixin {
   bool _isVerifying = false;
   bool _isResending = false;
+  bool _verifyLock = false;
   String _currentPin = '';
 
   static const _accent = Color(0xFF10B981);
+
+  String get _whatsappPhone =>
+      (widget.payload['whatsapp'] ?? widget.payload['phone'] ?? '').toString();
 
   @override
   void initState() {
@@ -30,14 +34,32 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
     startResendCooldown();
   }
 
+  bool get _whatsappAlreadyVerified =>
+      ((widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ?? [])
+          .contains('WHATSAPP');
+
   Future<void> _verifyOtpAndCompleteOnboarding([String? pinOverride]) async {
-    if (_isVerifying || _isResending) return;
+    if (_verifyLock || _isVerifying || _isResending) return;
+    _verifyLock = true;
+
+    if (_whatsappAlreadyVerified) {
+      setState(() => _isVerifying = true);
+      await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _verifyLock = false;
+        });
+      }
+      return;
+    }
 
     final pin = (pinOverride ?? _currentPin).trim();
     if (pin.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter the 6-digit OTP.')),
       );
+      _verifyLock = false;
       return;
     }
 
@@ -48,10 +70,11 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
 
     try {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
         validateStatus: (status) => status != null && status < 500,
       ));
-      final phone = widget.payload['phone'];
+      final phone = _whatsappPhone;
 
       final verifyUrls = [
         '${AppConfig.baseUrl}/auth/verify-whatsapp-otp',
@@ -63,7 +86,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
         try {
           final response = await dio.post(
             url,
-            data: {'phone': phone, 'code': pin, 'otp': pin},
+            data: {'phone': phone, 'code': pin, 'otp': pin, 'purpose': 'SIGNUP'},
           );
           if (response.statusCode == 200 && (response.data?['success'] != false)) {
             otpVerified = true;
@@ -88,14 +111,24 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
       final existingChannels =
           (widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ??
               [];
-      widget.payload['completedChannels'] = <String>[...existingChannels, 'WHATSAPP'];
+      if (!existingChannels.contains('WHATSAPP')) {
+        widget.payload['completedChannels'] = <String>[...existingChannels, 'WHATSAPP'];
+      }
 
       // Keep progress bar visible until navigation completes.
       await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
-      if (mounted) setState(() => _isVerifying = false);
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+          _verifyLock = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isVerifying = false);
+      setState(() {
+        _isVerifying = false;
+        _verifyLock = false;
+      });
       showFriendlyErrorSnackBar(
         context,
         e,
@@ -105,11 +138,14 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
   }
 
   Future<void> _resendOtp() async {
-    if (_isVerifying || _isResending || !canResendOtp) return;
+    if (_verifyLock || _isVerifying || _isResending || !canResendOtp) return;
     setState(() => _isResending = true);
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
-      final phone = widget.payload['phone'];
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ));
+      final phone = _whatsappPhone;
       final urls = [
         '${AppConfig.baseUrl}/auth/send-whatsapp-otp',
       ];
@@ -118,7 +154,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
       String? lastError;
       for (final url in urls) {
         try {
-          await dio.post(url, data: {'phone': phone});
+          await dio.post(url, data: {'phone': phone, 'purpose': 'SIGNUP', 'resend': true});
           otpSent = true;
           break;
         } catch (e) {
@@ -182,7 +218,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
               ),
               const SizedBox(height: 8),
               Text(
-                'We sent a 6-digit code to your WhatsApp ${widget.payload['phone']}.',
+                'We sent a 6-digit code to your WhatsApp $_whatsappPhone.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[400], fontSize: 14),
               ),

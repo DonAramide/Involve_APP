@@ -700,8 +700,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                     quantityAdded: row['quantity_added'] as int,
                     quantityBefore: Value(row['quantity_before'] as int),
                     quantityAfter: Value(row['quantity_after'] as int),
-                    dateAdded: Value(_getDateTime(row['date_added']) ?? DateTime.now()),
                     remarks: Value(_getString(row['remarks'])),
+                    supplierName: Value(_getString(row['supplier_name'])),
+                    receiptNumber: Value(_getString(row['receipt_number'])),
+                    trackingNumber: Value(_getString(row['tracking_number'])),
+                    dateAdded: Value(_getDateTime(row['date_added']) ?? DateTime.now()),
                     syncId: Value(syncId),
                     createdAt: Value(_getDateTime(row['created_at'])),
                     updatedAt: Value(_getDateTime(row['updated_at'])),
@@ -723,15 +726,16 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
              final query = database.select(database.businessSettings)..limit(1);
              final existing = await query.getSingleOrNull();
              
+             // Importing a backup is explicit: its business mode always wins.
+             // Local updated_at is bumped on every settings save, so a
+             // timestamp comparison would almost always keep the device's mode.
              if (existing != null) {
-               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
-                 await (database.update(database.businessSettings)..where((s) => s.id.equals(existing!.id))).write(
-                   BusinessSettingsCompanion(
-                     businessMode: Value(businessMode),
-                     updatedAt: Value(incomingUpdate),
-                   )
-                 );
-               }
+               await (database.update(database.businessSettings)..where((s) => s.id.equals(existing.id))).write(
+                 BusinessSettingsCompanion(
+                   businessMode: Value(businessMode),
+                   updatedAt: Value(DateTime.now()),
+                 )
+               );
              } else {
                await database.into(database.businessSettings).insert(
                  BusinessSettingsCompanion.insert(

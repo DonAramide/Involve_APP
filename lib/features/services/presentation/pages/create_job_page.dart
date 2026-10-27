@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,9 +10,18 @@ import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
 import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
-import '../../domain/entities/service_material.dart';
+import '../../domain/entities/service_description_format.dart';
+import '../../domain/utils/job_description_codec.dart';
+import '../../domain/repositories/services_repository.dart';
+import '../utils/create_job_draft_store.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
+import '../utils/job_staff_store.dart';
 
 class CreateJobPage extends StatefulWidget {
   const CreateJobPage({super.key});
@@ -23,6 +34,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedCustomerId;
   String? _selectedCustomerName;
+  Staff? _selectedStaff;
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _amountController = TextEditingController();
@@ -32,8 +44,18 @@ class _CreateJobPageState extends State<CreateJobPage> {
   String? _warrantyDuration;
 
   List<String> _jobTitlePresets = [];
-  bool _showDetailedBilling = false;
+  bool _showLaborBilling = false;
+  bool _showMaterialsBilling = false;
+  bool _projectPhotoExpanded = false;
   final List<ServiceJobItem> _selectedItems = [];
+  Key _titleFieldKey = UniqueKey();
+  Timer? _draftSaveTimer;
+  bool _draftReady = false;
+
+  List<ServiceDescriptionFormatBundle> _descriptionBundles = [];
+  final Set<int> _selectedDescriptionCategoryIds = {};
+  final Map<int, TextEditingController> _descriptionTextControllers = {};
+  final Map<int, bool> _descriptionCheckboxValues = {};
 
   @override
   void initState() {
@@ -41,14 +63,64 @@ class _CreateJobPageState extends State<CreateJobPage> {
     context.read<ServicesBloc>().add(const SearchServiceCustomers());
     context.read<ServicesBloc>().add(const LoadServicePresets());
     context.read<ServicesBloc>().add(const LoadLaborPresets());
+    context.read<StaffBloc>().add(LoadStaffList());
+    _titleController.addListener(_scheduleDraftSave);
+    _descController.addListener(_scheduleDraftSave);
+    _amountController.addListener(_scheduleDraftSave);
+    _laborAmountController.addListener(_scheduleDraftSave);
+    _loadDescriptionFormats();
+    _restoreDraft();
   }
 
   @override
   void dispose() {
+    _draftSaveTimer?.cancel();
+    if (_draftReady && _hasUnsavedJobData()) {
+      unawaited(CreateJobDraftStore.save(_draftMap()));
+    }
     _titleController.dispose();
     _descController.dispose();
     _amountController.dispose();
+    _laborAmountController.dispose();
+    for (final c in _descriptionTextControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _loadDescriptionFormats() async {
+    try {
+      final bundles =
+          await context.read<IServicesRepository>().getDescriptionFormatBundles();
+      if (!mounted) return;
+      setState(() {
+        _descriptionBundles = bundles;
+        final hasDraftIds = _pendingDescriptionDraft?['descriptionCategoryIds'] is List;
+        if (!hasDraftIds &&
+            _selectedDescriptionCategoryIds.isEmpty &&
+            bundles.length == 1 &&
+            bundles.first.fields.isNotEmpty) {
+          _selectedDescriptionCategoryIds.add(bundles.first.category.id);
+        }
+        _applyDescriptionDraft();
+      });
+    } catch (_) {}
+  }
+
+  void _ensureDescriptionControllers() {
+    for (final bundle in _descriptionBundles) {
+      for (final field in bundle.fields) {
+        if (field.isCheckbox) {
+          _descriptionCheckboxValues.putIfAbsent(field.id, () => false);
+        } else {
+          _descriptionTextControllers.putIfAbsent(field.id, () {
+            final c = TextEditingController();
+            c.addListener(_scheduleDraftSave);
+            return c;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -85,15 +157,255 @@ class _CreateJobPageState extends State<CreateJobPage> {
       );
       if (image != null) {
         final bytes = await image.readAsBytes();
-        setState(() => _imageBytes = bytes);
+        setState(() {
+          _imageBytes = bytes;
+          _projectPhotoExpanded = true;
+        });
+        _scheduleDraftSave();
       }
     }
   }
 
+  bool _hasUnsavedJobData() {
+    return _selectedCustomerId != null ||
+        _selectedStaff != null ||
+        _titleController.text.trim().isNotEmpty ||
+        _descController.text.trim().isNotEmpty ||
+        _amountController.text.trim().isNotEmpty ||
+        _laborAmountController.text.trim().isNotEmpty ||
+        _dueDate != null ||
+        _imageBytes != null ||
+        _warrantyDuration != null ||
+        _showLaborBilling ||
+        _showMaterialsBilling ||
+        _selectedItems.isNotEmpty ||
+        _selectedDescriptionCategoryIds.isNotEmpty ||
+        _descriptionCheckboxValues.values.any((v) => v) ||
+        _descriptionTextControllers.values.any((c) => c.text.trim().isNotEmpty);
+  }
+
+  Map<String, dynamic> _draftMap() {
+    return {
+      'customerId': _selectedCustomerId,
+      'customerName': _selectedCustomerName,
+      'staffId': _selectedStaff?.id,
+      'staffName': _selectedStaff?.name,
+      'staffCode': _selectedStaff?.staffCode,
+      'staffRole': _selectedStaff?.role,
+      'title': _titleController.text,
+      'description': _descController.text,
+      'amount': _amountController.text,
+      'laborAmount': _laborAmountController.text,
+      'dueDate': _dueDate?.toIso8601String(),
+      'warrantyDuration': _warrantyDuration,
+      'showLaborBilling': _showLaborBilling,
+      'showMaterialsBilling': _showMaterialsBilling,
+      'descriptionCategoryIds': _selectedDescriptionCategoryIds.toList(),
+      'descriptionText': {
+        for (final e in _descriptionTextControllers.entries)
+          if (e.value.text.trim().isNotEmpty) e.key.toString(): e.value.text,
+      },
+      'descriptionChecks': {
+        for (final e in _descriptionCheckboxValues.entries)
+          if (e.value) e.key.toString(): true,
+      },
+      'projectPhotoExpanded': _projectPhotoExpanded,
+      'imageBase64': _imageBytes == null ? null : base64Encode(_imageBytes!),
+      'items': _selectedItems
+          .map((i) => {
+                'id': i.id,
+                'name': i.name,
+                'category': i.category,
+                'price': i.price,
+                'quantity': i.quantity,
+              })
+          .toList(),
+    };
+  }
+
+  Future<void> _restoreDraft() async {
+    final draft = await CreateJobDraftStore.load();
+    if (!mounted) return;
+    if (draft == null) {
+      _draftReady = true;
+      return;
+    }
+
+    Uint8List? image;
+    final rawImage = draft['imageBase64'] as String?;
+    if (rawImage != null && rawImage.isNotEmpty) {
+      try {
+        image = base64Decode(rawImage);
+      } catch (_) {}
+    }
+
+    DateTime? due;
+    final rawDue = draft['dueDate'] as String?;
+    if (rawDue != null && rawDue.isNotEmpty) {
+      due = DateTime.tryParse(rawDue);
+    }
+
+    final items = <ServiceJobItem>[];
+    final rawItems = draft['items'];
+    if (rawItems is List) {
+      for (final row in rawItems) {
+        if (row is! Map) continue;
+        items.add(ServiceJobItem(
+          id: (row['id'] as num?)?.toInt(),
+          name: (row['name'] as String?) ?? '',
+          category: row['category'] as String?,
+          price: (row['price'] as num?)?.toDouble() ?? 0,
+          quantity: (row['quantity'] as num?)?.toDouble() ?? 1,
+        ));
+      }
+    }
+
+    Staff? staff;
+    if (draft['staffId'] != null && draft['staffName'] != null) {
+      staff = Staff(
+        id: (draft['staffId'] as num).toInt(),
+        name: draft['staffName'] as String,
+        staffCode: draft['staffCode'] as String? ?? '',
+        role: draft['staffRole'] as String? ?? 'STAFF',
+      );
+    }
+
+    setState(() {
+      _selectedCustomerId = draft['customerId'] as String?;
+      _selectedCustomerName = draft['customerName'] as String?;
+      _selectedStaff = staff;
+      _titleController.text = (draft['title'] as String?) ?? '';
+      _descController.text = (draft['description'] as String?) ?? '';
+      _amountController.text = (draft['amount'] as String?) ?? '';
+      _laborAmountController.text = (draft['laborAmount'] as String?) ?? '';
+      _dueDate = due;
+      _imageBytes = image;
+      _warrantyDuration = draft['warrantyDuration'] as String?;
+      final legacyDetailed = draft['showDetailedBilling'] == true;
+      _showLaborBilling = draft['showLaborBilling'] == true ||
+          (draft['showLaborBilling'] == null && legacyDetailed);
+      _showMaterialsBilling = draft['showMaterialsBilling'] == true ||
+          (draft['showMaterialsBilling'] == null && legacyDetailed);
+      _projectPhotoExpanded = draft['projectPhotoExpanded'] == true || image != null;
+      _selectedItems
+        ..clear()
+        ..addAll(items);
+      _titleFieldKey = UniqueKey();
+      _draftReady = true;
+    });
+    _pendingDescriptionDraft = draft;
+    _applyDescriptionDraft();
+  }
+
+  Map<String, dynamic>? _pendingDescriptionDraft;
+
+  void _applyDescriptionDraft() {
+    _ensureDescriptionControllers();
+    final draft = _pendingDescriptionDraft;
+    if (draft == null) return;
+    final ids = draft['descriptionCategoryIds'];
+    if (ids is List) {
+      _selectedDescriptionCategoryIds
+        ..clear()
+        ..addAll(ids.whereType<num>().map((e) => e.toInt()));
+    }
+    final texts = draft['descriptionText'];
+    if (texts is Map) {
+      texts.forEach((k, v) {
+        final id = int.tryParse(k.toString());
+        if (id == null) return;
+        _descriptionTextControllers.putIfAbsent(id, () {
+          final c = TextEditingController();
+          c.addListener(_scheduleDraftSave);
+          return c;
+        }).text = v.toString();
+      });
+    }
+    final checks = draft['descriptionChecks'];
+    if (checks is Map) {
+      checks.forEach((k, v) {
+        final id = int.tryParse(k.toString());
+        if (id != null) _descriptionCheckboxValues[id] = v == true;
+      });
+    }
+  }
+
+  void _scheduleDraftSave() {
+    if (!_draftReady) return;
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(milliseconds: 400), () {
+      if (!_draftReady) return;
+      if (_hasUnsavedJobData()) {
+        unawaited(CreateJobDraftStore.save(_draftMap()));
+      } else {
+        unawaited(CreateJobDraftStore.clear());
+      }
+    });
+  }
+
+  Future<void> _confirmClearDraft() async {
+    if (!_hasUnsavedJobData()) {
+      await CreateJobDraftStore.clear();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear this job?'),
+        content: const Text(
+          'This removes the saved draft and all fields on this page. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _clearForm();
+  }
+
+  Future<void> _clearForm() async {
+    _draftReady = false;
+    await CreateJobDraftStore.clear();
+    if (!mounted) return;
+    setState(() {
+      _selectedCustomerId = null;
+      _selectedCustomerName = null;
+      _titleController.clear();
+      _descController.clear();
+      _amountController.clear();
+      _laborAmountController.clear();
+      _dueDate = null;
+      _imageBytes = null;
+      _warrantyDuration = null;
+      _showLaborBilling = false;
+      _showMaterialsBilling = false;
+      _projectPhotoExpanded = false;
+      _selectedItems.clear();
+      _selectedDescriptionCategoryIds.clear();
+      _descriptionCheckboxValues.clear();
+      for (final c in _descriptionTextControllers.values) {
+        c.clear();
+      }
+      _pendingDescriptionDraft = null;
+      _titleFieldKey = UniqueKey();
+      _draftReady = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final settings = context.read<SettingsBloc>().state.settings;
+    final settings = context.watch<SettingsBloc>().state.settings;
     final symbol = settings?.currency ?? '₦';
+    final laborAllowed = settings?.servicesLaborEnabled ?? true;
+    final materialsAllowed = settings?.servicesMaterialsEnabled ?? true;
+    final showLabor = laborAllowed && _showLaborBilling;
+    final showMaterials = materialsAllowed && _showMaterialsBilling;
+    final useSimpleTotal = !showLabor && !showMaterials;
 
     return BlocListener<ServicesBloc, ServicesState>(
       listener: (context, state) {
@@ -106,11 +418,21 @@ class _CreateJobPageState extends State<CreateJobPage> {
               _selectedCustomerId = last.id;
               _selectedCustomerName = last.name;
             });
+            _scheduleDraftSave();
           }
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Create New Job')),
+        appBar: AppBar(
+          title: const Text('Create New Job'),
+          actions: [
+            IconButton(
+              tooltip: 'Clear form',
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: _confirmClearDraft,
+            ),
+          ],
+        ),
         body: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -119,46 +441,87 @@ class _CreateJobPageState extends State<CreateJobPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildCustomerSelector(),
+                const SizedBox(height: 16),
+                _buildStaffSelector(),
                 const SizedBox(height: 24),
                 
-                // Project Image Section
-                const Text('Project Photos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Center(
-                  child: GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 150,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[300]!, width: 2),
-                        image: _imageBytes != null 
-                            ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
-                            : null,
-                      ),
-                      child: _imageBytes == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo_outlined, size: 40, color: Theme.of(context).primaryColor),
-                                const SizedBox(height: 8),
-                                const Text('Add Job/Expected Image', style: TextStyle(color: Colors.grey)),
-                              ],
-                            )
-                          : Container(
-                              alignment: Alignment.bottomRight,
-                              padding: const EdgeInsets.all(8),
-                              child: CircleAvatar(
-                                backgroundColor: Colors.black54,
-                                child: IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.white, size: 20),
-                                  onPressed: _pickImage,
-                                ),
+                // Project Image Section — optional; collapsed for hotel rooms and similar jobs
+                Card(
+                  margin: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                          backgroundImage: _imageBytes != null ? MemoryImage(_imageBytes!) : null,
+                          child: _imageBytes == null
+                              ? Icon(Icons.add_a_photo_outlined, color: Theme.of(context).primaryColor)
+                              : null,
+                        ),
+                        title: const Text('Project Photo', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          _imageBytes != null
+                              ? 'Photo attached. Tap to view or change.'
+                              : 'Optional. Skip for hotel rooms or when a photo cannot be taken.',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_imageBytes != null)
+                              IconButton(
+                                tooltip: 'Remove photo',
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() => _imageBytes = null);
+                                  _scheduleDraftSave();
+                                },
                               ),
+                            Icon(_projectPhotoExpanded ? Icons.expand_less : Icons.expand_more),
+                          ],
+                        ),
+                        onTap: () => setState(() => _projectPhotoExpanded = !_projectPhotoExpanded),
+                      ),
+                      if (_projectPhotoExpanded)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
+                              height: 150,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey[300]!, width: 2),
+                                image: _imageBytes != null
+                                    ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
+                                    : null,
+                              ),
+                              child: _imageBytes == null
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.add_a_photo_outlined, size: 40, color: Theme.of(context).primaryColor),
+                                        const SizedBox(height: 8),
+                                        const Text('Add Job / Expected Image', style: TextStyle(color: Colors.grey)),
+                                      ],
+                                    )
+                                  : Container(
+                                      alignment: Alignment.bottomRight,
+                                      padding: const EdgeInsets.all(8),
+                                      child: CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                                          onPressed: _pickImage,
+                                        ),
+                                      ),
+                                    ),
                             ),
-                    ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -172,6 +535,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
                     _jobTitlePresets = state.presets;
 
                     return Autocomplete<String>(
+                      key: _titleFieldKey,
+                      initialValue: TextEditingValue(text: _titleController.text),
                       optionsBuilder: (TextEditingValue textEditingValue) {
                         if (textEditingValue.text == '') return _jobTitlePresets;
                         return _jobTitlePresets.where((String option) {
@@ -192,16 +557,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
                           controller: controller,
                           focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: 'Job Type / Title',
-                            hintText: 'e.g. Traditional Dress Sewing',
+                            labelText: 'Service Offering / Job Type',
+                            hintText: 'e.g. Repair, Consultation, Maintenance',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            prefixIcon: const Icon(Icons.work_outline),
+                            prefixIcon: const Icon(Icons.design_services_outlined),
                             suffixIcon: IconButton(
                               icon: const Icon(Icons.arrow_drop_down),
                               onPressed: () {
                                 if (_jobTitlePresets.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('No presets found. Add them in dashboard settings.'))
+                                    const SnackBar(content: Text('No service presets found. Add them in Services Setup.')),
                                   );
                                 }
                                 if (!focusNode.hasFocus) focusNode.requestFocus();
@@ -216,32 +581,49 @@ class _CreateJobPageState extends State<CreateJobPage> {
                 ),
                 
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _descController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'Small Description',
-                    hintText: 'e.g. Measurements, specific fabric info...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.description_outlined),
-                  ),
+                _buildDescriptionSection(
+                  formatsAllowed: settings?.servicesDescriptionFormatEnabled ?? true,
                 ),
                 const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Detailed Billing (Materials + Labor)', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Add specific materials and workmanship fees'),
-                  value: _showDetailedBilling,
-                  activeColor: Theme.of(context).primaryColor,
-                  onChanged: (v) {
-                    setState(() {
-                      _showDetailedBilling = v;
-                      if (v) {
-                        _amountController.text = _calculateTotal().toStringAsFixed(2);
-                      }
-                    });
-                  },
-                ),
-                if (!_showDetailedBilling)
+                if (laborAllowed)
+                  SwitchListTile(
+                    title: const Text('Labor', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Add a workmanship / labor fee'),
+                    value: _showLaborBilling,
+                    activeColor: Theme.of(context).primaryColor,
+                    onChanged: (v) {
+                      setState(() {
+                        _showLaborBilling = v;
+                        if (!v) {
+                          _laborAmountController.clear();
+                        }
+                        if (v || _showMaterialsBilling) {
+                          _amountController.text = _calculateTotal().toStringAsFixed(2);
+                        }
+                      });
+                      _scheduleDraftSave();
+                    },
+                  ),
+                if (materialsAllowed)
+                  SwitchListTile(
+                    title: const Text('Materials', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Add specific materials and parts'),
+                    value: _showMaterialsBilling,
+                    activeColor: Theme.of(context).primaryColor,
+                    onChanged: (v) {
+                      setState(() {
+                        _showMaterialsBilling = v;
+                        if (!v) {
+                          _selectedItems.clear();
+                        }
+                        if (v || _showLaborBilling) {
+                          _amountController.text = _calculateTotal().toStringAsFixed(2);
+                        }
+                      });
+                      _scheduleDraftSave();
+                    },
+                  ),
+                if (useSimpleTotal)
                   TextFormField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
@@ -252,8 +634,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
                       prefixText: '$symbol ',
                     ),
                     validator: (v) => (v == null || double.tryParse(v) == null) ? 'Invalid amount' : null,
-                  )
-                else
+                  ),
+                if (showLabor)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -289,6 +671,12 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         },
                       ),
                       const SizedBox(height: 16),
+                    ],
+                  ),
+                if (showMaterials)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -324,30 +712,32 @@ class _CreateJobPageState extends State<CreateJobPage> {
                                   _selectedItems.removeWhere((i) => i.id == item.id);
                                   _updateTotal();
                                 });
+                                _scheduleDraftSave();
                               },
                             ),
                           ),
                         )),
                       const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Grand Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                            Text(
-                                CurrencyFormatter.formatWithSymbol(_calculateTotal(), symbol: symbol),
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).primaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
+                  ),
+                if (!useSimpleTotal)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Grand Total:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(
+                            CurrencyFormatter.formatWithSymbol(_calculateTotal(), symbol: symbol),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).primaryColor),
+                        ),
+                      ],
+                    ),
                   ),
                 const SizedBox(height: 16),
                 _buildDatePicker(),
@@ -366,6 +756,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                         .toList(),
                     onChanged: (val) {
                       setState(() => _warrantyDuration = val);
+                      _scheduleDraftSave();
                     },
                   ),
                 ],
@@ -435,7 +826,10 @@ class _CreateJobPageState extends State<CreateJobPage> {
           firstDate: DateTime.now(),
           lastDate: DateTime.now().add(const Duration(days: 365)),
         );
-        if (date != null) setState(() => _dueDate = date);
+        if (date != null) {
+          setState(() => _dueDate = date);
+          _scheduleDraftSave();
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -500,6 +894,13 @@ class _CreateJobPageState extends State<CreateJobPage> {
                           initiallyExpanded: true,
                           title: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                           children: items.map((m) => ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                              backgroundImage: m.image != null ? MemoryImage(m.image!) : null,
+                              child: m.image == null
+                                  ? const Icon(Icons.build_outlined, color: Colors.blue, size: 20)
+                                  : null,
+                            ),
                             title: Text(m.name),
                             subtitle: Text('Default: ₦${m.defaultPrice}'),
                             trailing: const Icon(Icons.add_circle_outline),
@@ -510,6 +911,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
                                   _selectedItems.add(result);
                                   _updateTotal();
                                 });
+                                _scheduleDraftSave();
                                 Navigator.pop(context);
                               }
                             },
@@ -577,11 +979,16 @@ class _CreateJobPageState extends State<CreateJobPage> {
   }
 
   double _calculateTotal() {
-    final labor = double.tryParse(_laborAmountController.text) ?? 0.0;
-    if (!_showDetailedBilling) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final showLabor = (settings?.servicesLaborEnabled ?? true) && _showLaborBilling;
+    final showMaterials = (settings?.servicesMaterialsEnabled ?? true) && _showMaterialsBilling;
+    if (!showLabor && !showMaterials) {
       return double.tryParse(_amountController.text) ?? 0.0;
     }
-    final itemsTotal = _selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final labor = showLabor ? (double.tryParse(_laborAmountController.text) ?? 0.0) : 0.0;
+    final itemsTotal = showMaterials
+        ? _selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity))
+        : 0.0;
     return labor + itemsTotal;
   }
 
@@ -595,33 +1002,428 @@ class _CreateJobPageState extends State<CreateJobPage> {
             _selectedCustomerId = customer.id;
             _selectedCustomerName = customer.name;
           });
+          _scheduleDraftSave();
           Navigator.pop(context);
         },
       ),
     );
   }
 
-  void _submit() {
+  String? _composeJobDescription({required bool formatsAllowed}) {
+    if (!formatsAllowed || _descriptionBundles.isEmpty) {
+      final text = _descController.text.trim();
+      return text.isEmpty ? null : text;
+    }
+    final sections = <JobDescriptionSection>[];
+    for (final bundle in _descriptionBundles) {
+      if (!_selectedDescriptionCategoryIds.contains(bundle.category.id)) continue;
+      sections.add(JobDescriptionSection(
+        categoryId: bundle.category.id,
+        category: bundle.category.name,
+        items: bundle.fields
+            .map((f) => JobDescriptionItem(
+                  fieldId: f.id,
+                  label: f.name,
+                  type: f.fieldType,
+                  value: f.isCheckbox
+                      ? _descriptionCheckboxValues[f.id] == true
+                      : (_descriptionTextControllers[f.id]?.text.trim() ?? ''),
+                ))
+            .toList(),
+      ));
+    }
+    final notes = _descController.text.trim();
+    if (sections.isEmpty && notes.isEmpty) return null;
+    return JobDescriptionCodec.encode(sections: sections, notes: notes);
+  }
+
+  Widget _buildDescriptionSection({required bool formatsAllowed}) {
+    if (!formatsAllowed || _descriptionBundles.isEmpty) {
+      return TextFormField(
+        controller: _descController,
+        maxLines: 2,
+        decoration: InputDecoration(
+          labelText: 'Small Description',
+          hintText: formatsAllowed
+              ? 'Add description formats in Services Setup to use a table here.'
+              : 'Optional notes about this job',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: const Icon(Icons.description_outlined),
+        ),
+      );
+    }
+
+    final available = _descriptionBundles
+        .where((b) => !_selectedDescriptionCategoryIds.contains(b.category.id))
+        .toList();
+    final selected = _descriptionBundles
+        .where((b) => _selectedDescriptionCategoryIds.contains(b.category.id))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Description',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            if (available.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => _pickDescriptionCategory(available),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add category'),
+              ),
+          ],
+        ),
+        if (selected.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Text(
+              available.isEmpty
+                  ? 'Add fields to a Description Format category in Services Setup.'
+                  : 'Tap Add category to pick a predefined description table.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+          ),
+        ...selected.map(_buildDescriptionCategoryTable),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _descController,
+          maxLines: 2,
+          decoration: InputDecoration(
+            labelText: 'Extra notes (optional)',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            prefixIcon: const Icon(Icons.notes_outlined),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionCategoryTable(ServiceDescriptionFormatBundle bundle) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    bundle.category.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove category',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDescriptionCategoryIds.remove(bundle.category.id);
+                    });
+                    _scheduleDraftSave();
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (bundle.fields.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('This category has no fields yet.'),
+            )
+          else
+            Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.2),
+                1: FlexColumnWidth(1.4),
+              },
+              border: TableBorder(
+                horizontalInside: BorderSide(color: Colors.grey.shade200),
+              ),
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.grey.shade100),
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text('Format', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text('Value', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                ...bundle.fields.map((field) {
+                  _ensureDescriptionControllers();
+                  return TableRow(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Text(field.name, style: const TextStyle(fontSize: 13)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: field.isCheckbox
+                            ? Align(
+                                alignment: Alignment.centerLeft,
+                                child: Checkbox(
+                                  value: _descriptionCheckboxValues[field.id] ?? false,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _descriptionCheckboxValues[field.id] = val ?? false;
+                                    });
+                                    _scheduleDraftSave();
+                                  },
+                                ),
+                              )
+                            : TextField(
+                                controller: _descriptionTextControllers.putIfAbsent(
+                                  field.id,
+                                  () {
+                                    final c = TextEditingController();
+                                    c.addListener(_scheduleDraftSave);
+                                    return c;
+                                  },
+                                ),
+                                keyboardType: field.isNumber
+                                    ? const TextInputType.numberWithOptions(decimal: true)
+                                    : TextInputType.text,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDescriptionCategory(
+      List<ServiceDescriptionFormatBundle> available) async {
+    final chosen = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Pick a description category',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ...available.map(
+              (b) => ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: Text(b.category.name),
+                subtitle: Text(
+                  '${b.fields.length} field${b.fields.length == 1 ? '' : 's'}',
+                ),
+                onTap: () => Navigator.pop(ctx, b.category.id),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    setState(() {
+      _selectedDescriptionCategoryIds.add(chosen);
+      _ensureDescriptionControllers();
+    });
+    _scheduleDraftSave();
+  }
+
+  Widget _buildStaffSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Assigned Staff (Required)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (_selectedStaff != null)
+              TextButton(
+                onPressed: _authenticateStaff,
+                child: const Text('Change Staff', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _authenticateStaff,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _selectedStaff != null ? Colors.blue.withValues(alpha: 0.06) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _selectedStaff != null ? Colors.blue.shade300 : Colors.grey.shade300,
+                width: _selectedStaff != null ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: _selectedStaff != null ? Colors.blue.shade100 : Colors.grey.shade200,
+                  child: Icon(
+                    Icons.badge_outlined,
+                    color: _selectedStaff != null ? Colors.blue.shade800 : Colors.grey.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedStaff != null ? 'Assigned Staff (PIN Verified)' : 'Service Staff Assignment',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedStaff != null ? Colors.blue.shade700 : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _selectedStaff != null
+                            ? '${_selectedStaff!.name} (ID: ${_selectedStaff!.staffId ?? "None"})'
+                            : 'Select Staff & Login with 4-Digit PIN',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _selectedStaff != null ? FontWeight.bold : FontWeight.normal,
+                          color: _selectedStaff != null ? Colors.black87 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_selectedStaff != null)
+                  Chip(
+                    avatar: const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    label: const Text('PIN VERIFIED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
+                    backgroundColor: Colors.green.shade50,
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )
+                else
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _authenticateStaff() async {
+    final staff = await showDialog<Staff>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const StaffAuthDialog(),
+    );
+    if (staff != null && mounted) {
+      setState(() {
+        _selectedStaff = staff;
+      });
+      _scheduleDraftSave();
+    }
+  }
+
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCustomerId == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select or create a customer')));
         return;
       }
 
-      final total = double.parse(_amountController.text);
-      final labor = double.tryParse(_laborAmountController.text) ?? 0.0;
+      // If staff is not yet assigned/authenticated, require staff authentication
+      if (_selectedStaff == null) {
+        final staffList = context.read<StaffBloc>().state.staffList;
+        if (staffList.isNotEmpty) {
+          final staff = await showDialog<Staff>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const StaffAuthDialog(),
+          );
+          if (staff == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Staff PIN authentication is required to create a service job')),
+              );
+            }
+            return;
+          }
+          if (mounted) {
+            setState(() => _selectedStaff = staff);
+          }
+        }
+      }
+
+      if (_selectedStaff != null) {
+        await JobStaffStore.saveLatestStaff(_selectedStaff!.id!, _selectedStaff!.name);
+      }
+
+      final settings = context.read<SettingsBloc>().state.settings;
+      final showLabor = (settings?.servicesLaborEnabled ?? true) && _showLaborBilling;
+      final showMaterials = (settings?.servicesMaterialsEnabled ?? true) && _showMaterialsBilling;
+      final total = showLabor || showMaterials
+          ? _calculateTotal()
+          : double.parse(_amountController.text);
+      final labor = showLabor ? (double.tryParse(_laborAmountController.text) ?? 0.0) : 0.0;
 
       context.read<ServicesBloc>().add(CreateServiceJob(
             customerId: _selectedCustomerId!,
             title: _titleController.text,
-            description: _descController.text,
+            description: _composeJobDescription(
+              formatsAllowed: settings?.servicesDescriptionFormatEnabled ?? true,
+            ),
             totalAmount: total,
             laborAmount: labor,
-            items: _selectedItems,
+            items: showMaterials ? _selectedItems : [],
             dueDate: _dueDate,
             image: _imageBytes,
             warrantyDuration: _warrantyDuration,
           ));
+      _draftReady = false;
+      unawaited(CreateJobDraftStore.clear());
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Job saved locally.')),
@@ -658,6 +1460,19 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
             widget.onSelected(state.customers.last);
           }
         }
+        if (state.successMessage == 'Walk-in customer selected') {
+          ServiceCustomer? walkIn;
+          for (final customer in state.customers) {
+            if (ServiceCustomer.isWalkInName(customer.name)) {
+              walkIn = customer;
+              break;
+            }
+          }
+          walkIn ??= state.customers.isEmpty ? null : state.customers.first;
+          if (walkIn != null) {
+            widget.onSelected(walkIn);
+          }
+        }
       },
       child: Container(
         height: MediaQuery.of(context).size.height * 0.7,
@@ -673,6 +1488,15 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
               onChanged: (v) => context.read<ServicesBloc>().add(SearchServiceCustomers(query: v)),
             ),
             const SizedBox(height: 12),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.shade100,
+                child: const Icon(Icons.storefront, color: Colors.orange),
+              ),
+              title: const Text('Walk-in Customer', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('No name on file — use for counter jobs'),
+              onTap: () => context.read<ServicesBloc>().add(const EnsureWalkInCustomer()),
+            ),
             TextButton.icon(
               onPressed: _showAddCustomerDialog,
               icon: const Icon(Icons.add),
@@ -692,10 +1516,15 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                     return const Center(child: Text('No customers found.'));
                   }
 
+                  final namedCustomers = customers.where((c) => !ServiceCustomer.isWalkInName(c.name)).toList();
+                  if (namedCustomers.isEmpty) {
+                    return const Center(child: Text('No named customers yet. Use Walk-in or add a new customer.'));
+                  }
+
                   return ListView.builder(
-                    itemCount: customers.length,
+                    itemCount: namedCustomers.length,
                     itemBuilder: (context, index) {
-                      final customer = customers[index];
+                      final customer = namedCustomers[index];
                       return ListTile(
                         title: Text(customer.name),
                         subtitle: Text(customer.phone ?? ''),
@@ -717,10 +1546,11 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
     final phoneCtrl = TextEditingController();
     final addressCtrl = TextEditingController();
     Uint8List? customerImage;
+    String? phoneError;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add New Customer'),
           content: SingleChildScrollView(
@@ -744,27 +1574,90 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
+                  textCapitalization: TextCapitalization.words,
+                ),
                 const SizedBox(height: 12),
-                TextField(controller: phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder())),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.phone),
+                    errorText: phoneError,
+                  ),
+                  onChanged: (_) {
+                    if (phoneError != null) {
+                      setDialogState(() => phoneError = null);
+                    }
+                  },
+                ),
                 const SizedBox(height: 12),
-                TextField(controller: addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Home/Office Address', border: OutlineInputBorder())),
+                TextField(
+                  controller: addressCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Home/Office Address', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on)),
+                ),
               ],
             ),
           ),
           actions: [
-            NoLabelButton(onPressed: () => Navigator.pop(context), text: 'Cancel'),
+            NoLabelButton(onPressed: () => Navigator.pop(dialogCtx), text: 'Cancel'),
             ElevatedButton(
               onPressed: () {
-                if (nameCtrl.text.isNotEmpty) {
-                  context.read<ServicesBloc>().add(CreateServiceCustomer(
-                    name: nameCtrl.text,
-                    phone: phoneCtrl.text,
-                    address: addressCtrl.text,
-                    image: customerImage,
-                  ));
-                  Navigator.pop(context);
+                final name = nameCtrl.text.trim();
+                final phone = phoneCtrl.text.trim();
+
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Customer name is required')),
+                  );
+                  return;
                 }
+
+                if (phone.isNotEmpty) {
+                  final existingList = context.read<ServicesBloc>().state.customers;
+                  final digits = phone.replaceAll(RegExp(r'\D'), '');
+                  final match = existingList.where((c) {
+                    final p = (c.phone ?? '').trim();
+                    if (p.isEmpty) return false;
+                    if (p == phone) return true;
+                    final cd = p.replaceAll(RegExp(r'\D'), '');
+                    if (cd.isNotEmpty && digits.isNotEmpty) {
+                      if (cd == digits) return true;
+                      if (cd.length >= 10 && digits.length >= 10) {
+                        return cd.substring(cd.length - 10) == digits.substring(digits.length - 10);
+                      }
+                    }
+                    return false;
+                  }).firstOrNull;
+
+                  if (match != null) {
+                    setDialogState(() {
+                      phoneError = 'Phone already used by ${match.name}';
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('A customer with phone number "$phone" already exists (${match.name}).'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                }
+
+                context.read<ServicesBloc>().add(CreateServiceCustomer(
+                  name: name,
+                  phone: phone.isEmpty ? null : phone,
+                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                  image: customerImage,
+                ));
+                Navigator.pop(dialogCtx);
               },
               child: const Text('Save Customer'),
             ),

@@ -41,18 +41,28 @@ dns.setDefaultResultOrder('ipv4first');
 // 1. IMPORTS (Controllers & Middleware)
 import { PaymentController } from './controllers/payment.controller';
 import { OnboardingController } from './controllers/onboarding.controller';
+import { SettingsController } from './controllers/settings.controller';
 import { InviteController } from './controllers/invite.controller';
 import { AIController } from './controllers/ai.controller';
 import { AdminController } from './controllers/admin.controller';
+import { TenantInstitutePortController } from './controllers/tenant-institute-port.controller';
+import { PlatformFeeProfilesController } from './controllers/platform-fee-profiles.controller';
+import { PlatformFeeAssessmentsController } from './controllers/platform-fee-assessments.controller';
+import { PlatformFeeDistributionController } from './controllers/platform-fee-distribution.controller';
+import { attachTenantBillingRoutes } from './modules/tenant-billing/register-routes';
+import { attachHealthInsuranceRoutes } from './modules/health-insurance/register-routes';
+import { AgentWebhookController } from './modules/agent-portal/controllers/agent-webhook.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { WalletController } from './controllers/wallet.controller';
 import { UserController } from './controllers/user.controller';
+import { MakerCheckerController } from './controllers/maker-checker.controller';
 import { AuditArchiveService } from './services/audit-archive.service';
 import { GovAuditService } from './services/gov-audit.service';
 import { CurriculumController } from './controllers/curriculum.controller';
 import { BillingController } from './controllers/billing.controller';
 import { ReferralController } from './controllers/referral.controller';
 import { AttendanceController } from './controllers/attendance.controller';
+import { createUnappliedSchoolCardService, registerSchoolCardRoutes } from './modules/school-gate/school-card.routes';
 import { InsightsController } from './controllers/insights.controller';
 import { RetentionController } from './controllers/retention.controller';
 import { WebhookController } from './controllers/webhook.controller';
@@ -61,6 +71,8 @@ import { ReconciliationController } from './controllers/reconciliation.controlle
 import { StudentController } from './controllers/student.controller';
 import { SchoolSyncController } from './controllers/school-sync.controller';
 import { SchoolPaymentsController } from './controllers/school-payments.controller';
+import { TermBillsController } from './controllers/term-bills.controller';
+import { ParentBroadcastController } from './controllers/parent-broadcast.controller';
 import { StaffController } from './controllers/staff.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
@@ -90,20 +102,34 @@ import { DatabaseStore } from './modules/financial-platform/infrastructure/Datab
 import { InvestigationQueueService } from './modules/financial-platform/reconciliation/InvestigationQueueService';
 import { QuasarConnector } from './modules/financial-platform/infrastructure/QuasarConnector';
 import { HealthController } from './controllers/health.controller';
+import { FinancialDisputeController } from './controllers/financial-dispute.controller';
+import { ProductionEnvController, requireProductionEnvGovernor } from './controllers/production-env.controller';
 
 import { authenticate, optionalAuthenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
+import { requireAdminMfa, requireCheckerMfa } from './middleware/require-admin-mfa.middleware';
 import { correlationIdMiddleware } from './middleware/correlation.middleware';
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(correlationIdMiddleware);
 
 const PORT = process.env.PORT || 3004;
 
 // 1. GLOBAL MIDDLEWARE
 app.disable('x-powered-by'); // Prevent framework fingerprinting
-app.use(helmet()); 
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith('/socket.io')) return next();
+  return helmet({
+    // HTTP LAN tablets abort polling if Helmet advertises HTTPS-only.
+    strictTransportSecurity: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: { 'upgrade-insecure-requests': null },
+    },
+  })(req, res, next);
+}); 
 
 // Dynamic CORS Configuration
 const allowedOrigins = process.env.CORS_ORIGINS 
@@ -158,6 +184,28 @@ app.use(express.json({
 })); 
 app.use(express.urlencoded({ extended: true, limit: maxPayloadSize }));
 
+// Staging nginx `location /api/` uses `proxy_pass http://127.0.0.1:3004/;` (trailing
+// slash), which strips `/api` before Node. Canonical routes are `/api/...`.
+// Restore the prefix except for handlers that exist only on the unprefixed path.
+// `/devices` is excluded because nginx also proxies `/devices/` unstripped.
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const path = req.path || '';
+  if (path === '/api' || path.startsWith('/api/')) return next();
+  if (path.startsWith('/socket.io')) return next();
+  const passthrough =
+    path === '/livez' || path === '/readyz' || path === '/health' ||
+    path === '/liveness' || path === '/readiness' || path === '/healthz' ||
+    path.startsWith('/payments') ||
+    path.startsWith('/public') ||
+    path.startsWith('/uploads') ||
+    path.startsWith('/webhooks') ||
+    path.startsWith('/auth') ||
+    path === '/devices' || path.startsWith('/devices/');
+  if (passthrough) return next();
+  req.url = '/api' + (req.url.startsWith('/') ? req.url : `/${req.url}`);
+  next();
+});
+
 // Rate Limiting Middlewares
 const globalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_GLOBAL_WINDOW_MS || '900000', 10), // Default: 15 mins
@@ -177,14 +225,65 @@ const authLimiter = rateLimit({
 
 const verificationLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_VERIFICATION_WINDOW_MS || '3600000', 10), // Default: 1 hour
-  max: parseInt(process.env.RATE_LIMIT_VERIFICATION_MAX || '10', 10),
+  max: parseInt(process.env.RATE_LIMIT_VERIFICATION_MAX || '30', 10),
   message: { error: 'Too many verification attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-app.use(morgan('dev')); 
-app.use(globalLimiter);
+app.use(morgan('dev'));
+
+// In-process Observability metrics interceptor
+import { ObservabilityCollectorService } from './services/observability/observability-collector.service';
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const reqPath = String(req.originalUrl || req.path || req.url || '');
+  // Explicitly exclude observability endpoints and health probes from request metrics
+  if (
+    reqPath.startsWith('/api/admin/observability') ||
+    reqPath.startsWith('/admin/observability') ||
+    req.headers['x-monitoring-probe'] === 'true'
+  ) {
+    return next();
+  }
+
+  const start = Date.now();
+  res.on('finish', () => {
+    try {
+      const latency = Date.now() - start;
+      ObservabilityCollectorService.getInstance().recordHttpRequest(
+        req.method,
+        reqPath,
+        res.statusCode,
+        latency,
+      );
+    } catch {
+      // Non-blocking in-memory collector
+    }
+  });
+  next();
+});
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method !== 'POST') return next();
+  const path = String(req.originalUrl || req.url || '');
+  if (!/\/webhooks\/quasar(?:\?|$)/i.test(path) && !/\/webhooks\/quasar$/i.test(req.path || '')) {
+    return next();
+  }
+  const started = Date.now();
+  res.on('finish', () => {
+    const raw = (req as any).rawBody;
+    const bodyLength = Buffer.isBuffer(raw)
+      ? raw.length
+      : Number(req.headers['content-length'] || 0);
+    console.log(
+      `[WebhookAccess] ${req.method} ${path} status=${res.statusCode} bodyLength=${bodyLength} ip=${req.ip} delivery=${req.headers['x-quasar-delivery-id'] || '-'} ms=${Date.now() - started}`,
+    );
+  });
+  next();
+});
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith('/socket.io')) return next();
+  return globalLimiter(req, res, next);
+});
 
 import path from 'path';
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -196,6 +295,9 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.get('/livez', HealthController.livez);
 app.get('/readyz', HealthController.readyz);
 app.get('/health', HealthController.health);
+app.get('/api/livez', HealthController.livez);
+app.get('/api/readyz', HealthController.readyz);
+app.get('/api/health', HealthController.health);
 // Legacy aliases — same handlers (documented; prefer /livez|/readyz)
 app.get('/liveness', HealthController.livez);
 app.get('/readiness', HealthController.readyz);
@@ -211,6 +313,9 @@ app.post('/payments/intents/:id/refund', authenticate, checkRole(['super_admin',
 app.get('/payments/history', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PaymentController.getPaymentHistory);
 
 // Public Onboarding & System Lookup Data
+app.get('/settings/onboarding', SettingsController.getOnboardingSettings);
+app.get('/api/settings/onboarding', SettingsController.getOnboardingSettings);
+app.put('/api/settings/onboarding', authenticate, checkRole(['super_admin', 'owner']), SettingsController.updateOnboardingSettings);
 app.get('/public/lookup', LookupController.getLookup);
 app.post('/admin/lookup', LookupController.saveLookup);
 app.post('/public/otp/send', verificationLimiter, OTPController.sendOTP);
@@ -222,10 +327,15 @@ app.post('/public/onboarding/report-issue', OnboardingController.reportIssue);
 // Platform User Authentication & MFA / Recovery
 app.post('/api/auth/login', authLimiter, AuthController.login);
 app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
+app.post('/api/auth/change-password', authLimiter, authenticate, AuthController.changePassword);
 app.post('/api/auth/mfa/setup', authLimiter, AuthController.mfaSetup);
 app.post('/api/auth/mfa/verify', authLimiter, AuthController.mfaVerify);
 app.post('/api/auth/refresh', authLimiter, AuthController.refresh);
 app.post('/api/auth/logout', authLimiter, AuthController.logout);
+app.get('/api/auth/check-email', OnboardingController.checkEmail);
+app.post('/api/auth/check-email', OnboardingController.checkEmail);
+app.get('/api/auth/check-agent-code', OnboardingController.checkAgentCode);
+app.post('/api/auth/check-agent-code', OnboardingController.checkAgentCode);
 app.post('/api/auth/send-email-otp', verificationLimiter, OnboardingController.sendEmailOtp);
 app.post('/api/auth/verify-email-otp', verificationLimiter, OnboardingController.verifyEmailOtp);
 
@@ -250,10 +360,34 @@ const registerCollisionAdmin = (
   (app as any)[method](`/api/admin${pathAfterAdmin}`, ...handlers);
 };
 
+const registerApiPair = (
+  method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+  apiPath: string,
+  ...handlers: any[]
+) => {
+  const canonical = apiPath.startsWith('/api') ? apiPath : `/api${apiPath.startsWith('/') ? apiPath : `/${apiPath}`}`;
+  const stripped = canonical.replace(/^\/api/, '') || '/';
+  (app as any)[method](canonical, ...handlers);
+  if (stripped !== canonical) {
+    (app as any)[method](stripped, ...handlers);
+  }
+};
+
 /** --- SYSTEM ADMIN (SUPER ADMIN ONLY) --- **/
 registerCollisionAdmin('get', '/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
 registerCollisionAdmin('post', '/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
+registerCollisionAdmin('post', '/tenants/ping-missing-identity', authenticate, checkRole(['super_admin']), AdminController.pingMissingTenantIdentities);
+registerCollisionAdmin('post', '/tenants/:id/ping-identity', authenticate, checkRole(['super_admin']), AdminController.pingTenantIdentity);
+registerCollisionAdmin('get', '/verification-log', authenticate, checkRole(['super_admin']), AdminController.listVerificationLog);
+registerCollisionAdmin('get', '/production-env', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.getSnapshot);
+registerCollisionAdmin('post', '/production-env/propose', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, ProductionEnvController.propose);
+registerCollisionAdmin('post', '/production-env/approve', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, requireCheckerMfa, ProductionEnvController.approve);
+registerCollisionAdmin('post', '/production-env/reject', authenticate, checkRole(['super_admin']), requireProductionEnvGovernor, requireCheckerMfa, ProductionEnvController.reject);
 registerCollisionAdmin('patch', '/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
+registerCollisionAdmin('get', '/tenants/:id/institute-port', authenticate, checkRole(['super_admin']), TenantInstitutePortController.get);
+registerCollisionAdmin('post', '/tenants/:id/institute-port/propose', authenticate, checkRole(['super_admin']), TenantInstitutePortController.propose);
+registerCollisionAdmin('post', '/tenants/:id/institute-port/approve', authenticate, checkRole(['super_admin']), requireCheckerMfa, TenantInstitutePortController.approve);
+registerCollisionAdmin('post', '/tenants/:id/institute-port/reject', authenticate, checkRole(['super_admin']), requireCheckerMfa, TenantInstitutePortController.reject);
 registerCollisionAdmin('patch', '/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
 registerCollisionAdmin('post', '/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
 app.post('/admin/reconciliation/run-job', authenticate, checkRole(['super_admin']), async (req: Request, res: Response) => {
@@ -272,27 +406,30 @@ app.post('/admin/reconciliation/run-job', authenticate, checkRole(['super_admin'
 });
 
 // Insights & Reporting Routes
-app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'admin', 'support']), SupportController.listComplaints);
-app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'admin', 'support']), SupportController.updateComplaintStatus);
 app.get('/admin/retention/suggestion', authenticate, checkRole(['super_admin', 'admin']), RetentionController.getPersonalSuggestion);
 app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin', 'admin']), RetentionController.getAtRiskUsers);
 
 // Dashboard Routes
-app.get('/api/dashboard/overview', authenticate, checkRole(['super_admin', 'admin']), DashboardController.getOverview);
-app.get('/api/dashboard/alerts', authenticate, checkRole(['super_admin', 'admin']), DashboardController.getAlerts);
-app.get('/api/dashboard/governance', authenticate, checkRole(['super_admin', 'admin']), DashboardController.getGovernance);
-app.get('/api/dashboard/analytics', authenticate, checkRole(['super_admin', 'admin']), DashboardController.getAnalytics);
+const dashboardRoles = ['super_admin', 'admin', 'operator', 'owner', 'platform_admin', 'tenant_admin', 'internal_staff', 'admin_ops', 'admin_finance', 'admin_treasury', 'admin_executive', 'admin_risk'];
+registerApiPair('get', '/api/dashboard/overview', authenticate, checkRole(dashboardRoles), DashboardController.getOverview);
+registerApiPair('get', '/api/dashboard/alerts', authenticate, checkRole(dashboardRoles), DashboardController.getAlerts);
+registerApiPair('get', '/api/dashboard/governance', authenticate, checkRole(dashboardRoles), DashboardController.getGovernance);
+registerApiPair('get', '/api/dashboard/analytics', authenticate, checkRole(dashboardRoles), DashboardController.getAnalytics);
 
 // Admin Agent Onboarding routes
 registerCollisionAdmin('post', '/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.onboardAgent);
 registerCollisionAdmin('get', '/agents', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.listAgents);
 registerCollisionAdmin('get', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.getAgent);
+registerCollisionAdmin('patch', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentProfile);
 registerCollisionAdmin('patch', '/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentStatus);
 registerCollisionAdmin('patch', '/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateKycStatus);
 registerCollisionAdmin('get', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.getCommissions);
 registerCollisionAdmin('patch', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.updateCommissions);
 registerCollisionAdmin('post', '/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageAgent);
 registerCollisionAdmin('post', '/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageTenants);
+registerCollisionAdmin('post', '/agents/:id/resend-invite', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.resendInvite);
+registerCollisionAdmin('post', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateLogo);
+registerCollisionAdmin('delete', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.deleteLogo);
 
 registerCollisionAdmin('post', '/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
@@ -372,14 +509,81 @@ import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
+app.get('/api/admin/kyc/documents', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.listPending);
+app.patch('/api/admin/kyc/documents/:id', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.reviewDocument);
+
+const platformFeeAdminRoles = ['super_admin', 'admin_deploy'];
+registerCollisionAdmin('get', '/platform-fees', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.list);
+registerCollisionAdmin('get', '/platform-fees/agents', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.listAgents);
+registerCollisionAdmin('get', '/platform-fees/agent-commission', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.agentCommission);
+registerCollisionAdmin('get', '/platform-fees/assessments', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeAssessmentsController.list);
+registerCollisionAdmin('get', '/platform-fees/assessments/:assessmentId', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeAssessmentsController.get);
+registerCollisionAdmin('get', '/platform-fees/reconciliation', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeAssessmentsController.reconciliation);
+registerCollisionAdmin('get', '/platform-fees/distribution', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.distribution);
+registerCollisionAdmin('get', '/platform-fees/stakeholders', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.listStakeholders);
+registerCollisionAdmin('post', '/platform-fees/stakeholders', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.createStakeholder);
+registerCollisionAdmin('get', '/platform-fees/stakeholders/:id', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.getStakeholder);
+registerCollisionAdmin('patch', '/platform-fees/stakeholders/:id', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.updateStakeholder);
+registerCollisionAdmin('get', '/platform-fees/stakeholders/:id/payables', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.listPayables);
+registerCollisionAdmin('get', '/platform-fees/stakeholders/:id/settlements', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.listSettlements);
+registerCollisionAdmin('get', '/platform-fees/withdrawals', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.listWithdrawals);
+registerCollisionAdmin('post', '/platform-fees/withdrawals', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.createWithdrawal);
+registerCollisionAdmin('get', '/platform-fees/withdrawals/:withdrawalId', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.getWithdrawal);
+registerCollisionAdmin('post', '/platform-fees/withdrawals/:withdrawalId/approve', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.approveWithdrawal);
+registerCollisionAdmin('post', '/platform-fees/withdrawals/:withdrawalId/reject', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeDistributionController.rejectWithdrawal);
+registerCollisionAdmin('get', '/platform-fees/:transactionType', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.get);
+registerCollisionAdmin('put', '/platform-fees/:transactionType/draft', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.saveDraft);
+registerCollisionAdmin('post', '/platform-fees/:transactionType/propose', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.propose);
+registerCollisionAdmin('post', '/platform-fees/:transactionType/reject', authenticate, checkRole(platformFeeAdminRoles), requireCheckerMfa, PlatformFeeProfilesController.reject);
+registerCollisionAdmin('post', '/platform-fees/:transactionType/publish', authenticate, checkRole(platformFeeAdminRoles), requireCheckerMfa, PlatformFeeProfilesController.publish);
+registerCollisionAdmin('post', '/platform-fees/:transactionType/preview', authenticate, checkRole(platformFeeAdminRoles), PlatformFeeProfilesController.preview);
+registerCollisionAdmin('get', '/agent-webhooks', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminList);
+registerCollisionAdmin('get', '/agent-webhooks/:agentId/deliveries', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminDeliveries);
+registerCollisionAdmin('post', '/agent-webhooks/:agentId/enable', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminEnable);
+registerCollisionAdmin('post', '/agent-webhooks/:agentId/disable', authenticate, checkRole(platformFeeAdminRoles), AgentWebhookController.adminDisable);
+
 app.get('/api/tenant/:id/kyc', authenticate, TenantKycController.getKycDocuments);
+
+const deviceLinkQrLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many device-link requests. Please try again later.' },
+});
+app.post(
+  '/api/tenant/devices/link-qr',
+  authenticate,
+  deviceLinkQrLimiter,
+  OnboardingController.generateAuthenticatedDeviceLinkQr,
+);
 
 // Agent Portal Routes
 app.post('/api/agent/register', AgentController.register);
 app.post('/api/agent/login', AgentController.login);
 app.post('/api/agent/change-password', AgentController.changePassword);
+app.post('/api/agent/forgot-password', verificationLimiter, AgentController.forgotPassword);
+app.post('/api/agent/reset-password', authLimiter, AgentController.resetPassword);
 app.post('/api/agent/resolve-suspension', AgentController.resolveSuspension);
+import { BankHmoDistributionController } from './modules/health-insurance/controllers/bank-hmo-distribution.controller';
 app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
+app.get('/api/agent/hmo-distribution/catalogue', authenticate, BankHmoDistributionController.catalogue);
+app.get('/api/agent/hmo-distribution/catalogue/:providerId', authenticate, BankHmoDistributionController.provider);
+app.get('/api/agent/hmo-distribution/facilities', authenticate, BankHmoDistributionController.facilities);
+app.get('/api/agent/hmo-distribution/offerings', authenticate, BankHmoDistributionController.offerings);
+app.post('/api/agent/hmo-distribution/offerings', authenticate, BankHmoDistributionController.changeOffering);
+app.post('/api/agent/hmo-distribution/selections', authenticate, BankHmoDistributionController.validateSelection);
+app.get('/api/agent/hmo-distribution/overview', authenticate, BankHmoDistributionController.overview);
+app.get('/api/agent/hmo-distribution/tenants', authenticate, BankHmoDistributionController.tenants);
+app.post('/api/agent/hardware/assign', authenticate, AgentController.assignHardware);
+app.post('/api/agent/hardware/sync', authenticate, AgentController.syncHardware);
+
+import { productCatalogController } from './modules/product-catalog/product-catalog.controller';
+
+app.get('/api/agent/catalog/products', authenticate, (req, res) => productCatalogController.getMasterProducts(req, res));
+app.get('/api/agent/catalog/offers', authenticate, (req, res) => productCatalogController.getHmoOffers(req, res));
+app.post('/api/agent/catalog/offers', authenticate, (req, res) => productCatalogController.configureOfferPrice(req, res));
+app.get('/api/agent/catalog/assignments', authenticate, (req, res) => productCatalogController.listAssignments(req, res));
+app.post('/api/agent/catalog/assignments', authenticate, (req, res) => productCatalogController.assignProduct(req, res));
+app.delete('/api/agent/catalog/assignments/:id', authenticate, (req, res) => productCatalogController.revokeAssignment(req, res));
 
 import activationRoutes from './routes/activation.routes';
 import { authRoutes } from './routes/auth.routes';
@@ -387,23 +591,35 @@ import ecsRoutes from './routes/ecs.routes';
 import vaultRoutes from './routes/vault.routes';
 import settingsRoutes from './routes/settings.routes';
 import financeRoutes from './routes/finance.routes';
+import servicesRoutes from './routes/services.routes';
 import syncRoutes from './routes/sync.routes';
 import crmRoutes from './routes/crm.routes';
 import inventoryRoutes from './routes/inventory.routes';
+import catalogRoutes from './routes/catalog.routes';
 import operationsRoutes from './routes/operations.routes';
 import financialPlatformRoutes from './routes/financial-platform.routes';
+import observabilityRoutes from './routes/observability.routes';
 
 app.use(activationRoutes);
 app.use('/auth', authRoutes);
 app.use('/v1/ecs', ecsRoutes);
 app.use('/vault', vaultRoutes);
+app.use('/api/vault', vaultRoutes);
 app.use('/settings', settingsRoutes);
 app.use('/api/v1/finance', authenticate, financeRoutes);
+app.use('/api/v1/services', authenticate, servicesRoutes);
+app.use('/api/services', authenticate, servicesRoutes);
+app.use('/services', authenticate, servicesRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/crm', authenticate, crmRoutes);
 app.use('/api/inventory', authenticate, inventoryRoutes);
+app.use('/inventory', authenticate, inventoryRoutes);
+app.use('/api/v1/catalog', authenticate, catalogRoutes);
+app.use('/v1/catalog', authenticate, catalogRoutes);
 app.use('/api/v1', authenticate, operationsRoutes);
 app.use('/api/v1', financialPlatformRoutes);
+app.use('/api/admin/observability', observabilityRoutes);
+app.use('/admin/observability', observabilityRoutes);
 
 
 // Orchestration Endpoints
@@ -414,11 +630,12 @@ app.post('/api/orchestration/tiers/elevate', authenticate, checkRole(['super_adm
 
 // Runtime Engine
 app.get('/api/v1/runtime/config', authenticate, RuntimeController.getConfig);
+app.get('/v1/runtime/config', authenticate, RuntimeController.getConfig);
 
 // Admin Operations
 app.post('/api/admin/master-mode/enter', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.enterMasterMode);
-app.get('/api/admin/dashboard-stats', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.getDashboardStats);
-app.get('/api/admin/audit-logs', authenticate, checkRole(['super_admin', 'admin', 'owner']), TerminalController.getAuditLog);
+registerCollisionAdmin('get', '/dashboard-stats', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.getDashboardStats);
+app.get('/api/admin/audit-logs', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'owner', 'tenant_admin', 'finance_staff', 'staff']), AuditController.getSystemAuditLogs);
 app.get('/admin/profile', authenticate, AdminController.getProfile);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 app.get('/api/admin/profile', authenticate, AdminController.getProfile);
@@ -450,11 +667,12 @@ const storage = multer.diskStorage({
 
 const localUpload = multer({ storage: storage });
 
-app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('cac_document'), AdminController.uploadCacDocument);
+app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), upload.single('cac_document'), AdminController.uploadCacDocument);
 app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('backup_file'), AdminController.uploadClaudeBackup);
 app.post('/api/admin/virtual-account/init', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.initVirtualAccountEngine);
 
 import { MfaController } from './controllers/mfa.controller';
+import { CompanyTransferAuthController } from './controllers/company-transfer-auth.controller';
 app.post('/api/mfa/generate', authenticate, MfaController.generate);
 app.post('/api/mfa/enable', authenticate, MfaController.enable);
 
@@ -476,89 +694,135 @@ registerCollisionAdmin('get', '/settings', authenticate, checkRole(['super_admin
 registerCollisionAdmin('patch', '/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
 registerCollisionAdmin('get', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
 registerCollisionAdmin('patch', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
-app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
+registerCollisionAdmin('post', '/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
 // Quasar POS encryption key (card switch ICC crypto)
+// /admin/* stays for local Vite proxy; /api/admin/* is required on staging nginx.
 app.get('/admin/quasar/integrations', authenticate, checkRole(['super_admin']), AdminController.listQuasarIntegrations);
-app.get('/admin/quasar/pos-encryption-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarPosEncryptionKeyStatus);
-app.post('/admin/quasar/pos-encryption-key/rotate', authenticate, checkRole(['super_admin']), AdminController.rotateQuasarPosEncryptionKey);
-app.post('/admin/quasar/pos-encryption-key/store', authenticate, checkRole(['super_admin']), AdminController.storeQuasarPosEncryptionKey);
-app.get('/admin/quasar/api-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarApiKeyStatus);
-app.post('/admin/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
+registerCollisionAdmin('get', '/quasar/pos-encryption-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarPosEncryptionKeyStatus);
+registerCollisionAdmin('post', '/quasar/pos-encryption-key/rotate', authenticate, checkRole(['super_admin']), AdminController.rotateQuasarPosEncryptionKey);
+registerCollisionAdmin('post', '/quasar/pos-encryption-key/store', authenticate, checkRole(['super_admin']), AdminController.storeQuasarPosEncryptionKey);
+registerCollisionAdmin('get', '/quasar/api-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarApiKeyStatus);
+registerCollisionAdmin('post', '/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
 
 // Commission Command Center
-app.get('/admin/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);
-app.post('/admin/commissions/approvals/:id/approve', authenticate, checkRole(['super_admin']), CommissionController.approveCommission);
-app.post('/admin/commissions/approvals/:id/reject', authenticate, checkRole(['super_admin']), CommissionController.rejectCommission);
-app.post('/admin/commissions/clawback', authenticate, checkRole(['super_admin']), CommissionController.executeClawback);
-app.get('/admin/commissions/audit', authenticate, checkRole(['super_admin']), CommissionController.listAuditHistory);
-app.get('/admin/commissions/agents/progress', authenticate, checkRole(['super_admin']), CommissionController.listAgentProgress);
-app.get('/admin/commissions/plans', authenticate, checkRole(['super_admin']), CommissionController.listPlansAndTargets);
-app.get('/admin/commissions/budgets', authenticate, checkRole(['super_admin']), CommissionController.listCampaignsAndBudgets);
-app.post('/admin/commissions/simulate', authenticate, checkRole(['super_admin']), CommissionController.simulateCommission);
+registerCollisionAdmin('get', '/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);
+registerCollisionAdmin('post', '/commissions/approvals/:id/approve', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.approveCommission);
+registerCollisionAdmin('post', '/commissions/approvals/:id/reject', authenticate, checkRole(['super_admin']), requireCheckerMfa, CommissionController.rejectCommission);
+registerCollisionAdmin('post', '/commissions/clawback', authenticate, checkRole(['super_admin']), CommissionController.executeClawback);
+registerCollisionAdmin('get', '/commissions/audit', authenticate, checkRole(['super_admin']), CommissionController.listAuditHistory);
+registerCollisionAdmin('get', '/commissions/agents/progress', authenticate, checkRole(['super_admin']), CommissionController.listAgentProgress);
+registerCollisionAdmin('get', '/commissions/plans', authenticate, checkRole(['super_admin']), CommissionController.listPlansAndTargets);
+registerCollisionAdmin('get', '/commissions/budgets', authenticate, checkRole(['super_admin']), CommissionController.listCampaignsAndBudgets);
+registerCollisionAdmin('post', '/commissions/simulate', authenticate, checkRole(['super_admin']), CommissionController.simulateCommission);
 
 // Plans & Targets CRUD Endpoints
-app.post('/admin/commissions/programs', authenticate, checkRole(['super_admin']), CommissionController.createProgram);
-app.put('/admin/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.updateProgram);
-app.delete('/admin/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteProgram);
-app.post('/admin/commissions/programs/:id/versions', authenticate, checkRole(['super_admin']), CommissionController.createVersion);
-app.post('/admin/commissions/versions/:id/clone', authenticate, checkRole(['super_admin']), CommissionController.cloneVersion);
-app.post('/admin/commissions/versions/:id/activate', authenticate, checkRole(['super_admin']), CommissionController.activateVersion);
-app.put('/admin/commissions/versions/:id/rules', authenticate, checkRole(['super_admin']), CommissionController.updateVersionRules);
-app.delete('/admin/commissions/versions/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteVersion);
+registerCollisionAdmin('post', '/commissions/programs', authenticate, checkRole(['super_admin']), CommissionController.createProgram);
+registerCollisionAdmin('put', '/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.updateProgram);
+registerCollisionAdmin('delete', '/commissions/programs/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteProgram);
+registerCollisionAdmin('post', '/commissions/programs/:id/versions', authenticate, checkRole(['super_admin']), CommissionController.createVersion);
+registerCollisionAdmin('post', '/commissions/versions/:id/clone', authenticate, checkRole(['super_admin']), CommissionController.cloneVersion);
+registerCollisionAdmin('post', '/commissions/versions/:id/activate', authenticate, checkRole(['super_admin']), CommissionController.activateVersion);
+registerCollisionAdmin('put', '/commissions/versions/:id/rules', authenticate, checkRole(['super_admin']), CommissionController.updateVersionRules);
+registerCollisionAdmin('delete', '/commissions/versions/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteVersion);
 
-app.post('/admin/commissions/category-rules', authenticate, checkRole(['super_admin']), CommissionController.createCategoryRule);
-app.put('/admin/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateCategoryRule);
-app.delete('/admin/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteCategoryRule);
+registerCollisionAdmin('post', '/commissions/category-rules', authenticate, checkRole(['super_admin']), CommissionController.createCategoryRule);
+registerCollisionAdmin('put', '/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateCategoryRule);
+registerCollisionAdmin('delete', '/commissions/category-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteCategoryRule);
 
-app.post('/admin/commissions/performance-rules', authenticate, checkRole(['super_admin']), CommissionController.createPerformanceRule);
-app.put('/admin/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updatePerformanceRule);
-app.delete('/admin/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deletePerformanceRule);
+registerCollisionAdmin('post', '/commissions/performance-rules', authenticate, checkRole(['super_admin']), CommissionController.createPerformanceRule);
+registerCollisionAdmin('put', '/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updatePerformanceRule);
+registerCollisionAdmin('delete', '/commissions/performance-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deletePerformanceRule);
 
-app.post('/admin/commissions/terminal-rules', authenticate, checkRole(['super_admin']), CommissionController.createTerminalRule);
-app.put('/admin/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateTerminalRule);
-app.delete('/admin/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteTerminalRule);
+registerCollisionAdmin('post', '/commissions/terminal-rules', authenticate, checkRole(['super_admin']), CommissionController.createTerminalRule);
+registerCollisionAdmin('put', '/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.updateTerminalRule);
+registerCollisionAdmin('delete', '/commissions/terminal-rules/:id', authenticate, checkRole(['super_admin']), CommissionController.deleteTerminalRule);
 
 // Subscriptions
-app.post('/admin/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
+registerCollisionAdmin('post', '/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
 app.get('/api/subscription/status', authenticate, AdminController.getSubscriptionStatus);
 
 // API Endpoints for Admin (Invify Pro App / Operator App)
 // User Device Controls & Audit Archiving (Super Admin only)
-app.get('/api/admin/user-devices', authenticate, checkRole(['super_admin']), UserController.listDevices);
-app.post('/api/admin/user-devices/approve', authenticate, checkRole(['super_admin']), UserController.approveDevice);
-app.post('/api/admin/user-devices/block', authenticate, checkRole(['super_admin']), UserController.blockDevice);
-app.post('/api/admin/audit/archive', authenticate, checkRole(['super_admin']), UserController.triggerArchiving);
+registerCollisionAdmin('get', '/user-devices', authenticate, checkRole(['super_admin']), UserController.listDevices);
+registerCollisionAdmin('post', '/user-devices/approve', authenticate, checkRole(['super_admin']), UserController.approveDevice);
+registerCollisionAdmin('post', '/user-devices/block', authenticate, checkRole(['super_admin']), UserController.blockDevice);
+registerCollisionAdmin('post', '/audit/archive', authenticate, checkRole(['super_admin']), UserController.triggerArchiving);
 app.post('/admin/devices/:deviceId/upgrade-to-company', authenticate, checkRole(['super_admin']), DeviceController.upgradeToCompany);
 
 
 
 // Device Activation Hub Endpoints
 app.get('/devices', authenticate, DeviceController.getDevices);
+app.get('/api/devices', authenticate, DeviceController.getDevices);
+app.get('/api/devices/connected', authenticate, DeviceController.getConnectedPresence);
+// Nginx staging `location /api/` strips `/api`; keep the stripped alias.
+app.get('/devices/connected', authenticate, DeviceController.getConnectedPresence);
 app.get('/devices/activations', authenticate, DeviceController.getActivations);
 app.post('/devices/activations', authenticate, DeviceController.createActivation);
+app.post('/devices/activations/:id/approve', authenticate, DeviceController.approveActivation);
+app.post('/devices/activations/:id/reject', authenticate, DeviceController.rejectActivation);
+app.post('/devices/activations/:id/resend-email', authenticate, DeviceController.resendActivationEmail);
 app.post('/devices/validate', DeviceController.validateCode);
 app.post('/devices/onboard', authenticate, DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 app.patch('/devices/activations/:code/reset', authenticate, checkRole(['super_admin']), DeviceController.resetActivation);
+// Same-origin admin (app.invify.org) only proxies /api/* — keep /api aliases so
+// activation generate/list do not hit the SPA host (HTTP 405).
+app.get('/api/devices/activations', authenticate, DeviceController.getActivations);
+app.post('/api/devices/activations', authenticate, DeviceController.createActivation);
+app.post('/api/devices/activations/:id/approve', authenticate, DeviceController.approveActivation);
+app.post('/api/devices/activations/:id/reject', authenticate, DeviceController.rejectActivation);
+app.post('/api/devices/activations/:id/resend-email', authenticate, DeviceController.resendActivationEmail);
+app.post('/api/devices/validate', DeviceController.validateCode);
+app.post('/api/devices/onboard', authenticate, DeviceController.onboardDevice);
+app.patch('/api/devices/:id', authenticate, DeviceController.updateDevice);
+app.patch('/api/devices/activations/:code/reset', authenticate, checkRole(['super_admin']), DeviceController.resetActivation);
 
 // ─── DEVICE TELEMETRY & FLEET VISIBILITY ──────────────────────────────────────
 app.get('/api/devices/:deviceId/status', authenticate, DeviceController.getDeviceStatus);
 app.get('/api/devices/:deviceId/telemetry', authenticate, DeviceController.getDeviceTelemetry);
 app.get('/api/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
+app.post(
+  '/api/devices/:deviceId/command',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_ops', 'manager']),
+  DeviceController.sendCommand,
+);
+app.post(
+  '/api/devices/:deviceId/commands',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_ops', 'manager']),
+  DeviceController.sendCommand,
+);
+app.get('/devices/:deviceId/status', authenticate, DeviceController.getDeviceStatus);
+app.get('/devices/:deviceId/telemetry', authenticate, DeviceController.getDeviceTelemetry);
+app.get('/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
+app.post(
+  '/devices/:deviceId/command',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_ops', 'manager']),
+  DeviceController.sendCommand,
+);
+app.post(
+  '/devices/:deviceId/commands',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_ops', 'manager']),
+  DeviceController.sendCommand,
+);
 
 // Terminal Sync (Public / Onboarding for mobile app)
-app.post('/api/mobile/terminal/sync', optionalAuthenticate, TerminalController.mobileSync);
+app.post('/api/mobile/terminal/sync', authenticate, TerminalController.mobileSync);
 app.post('/api/mobile/terminal/keyexchange-success', TerminalController.keyExchangeSuccess);
 app.get('/api/mobile/terminal/status', TerminalController.mobileStatus);
 
-// Terminal Admin APIs
-app.get('/api/admin/terminals', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getTablets);
-app.post('/api/admin/terminals/import', authenticate, checkRole(['super_admin']), terminalUploadMiddleware, TerminalController.importTerminals);
-app.get('/api/admin/terminals/assignments', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getAssignments);
-app.post('/api/admin/terminals/assignments', authenticate, checkRole(['super_admin']), TerminalController.assignHardware);
-app.get('/api/admin/terminals/audit', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
-app.patch('/api/admin/terminals/:id/status', authenticate, checkRole(['super_admin']), TerminalController.updateTablet);
+// Terminal Admin APIs (dual-register: nginx staging strips `/api`)
+registerCollisionAdmin('get', '/terminals', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getTablets);
+registerCollisionAdmin('post', '/terminals/import', authenticate, checkRole(['super_admin']), terminalUploadMiddleware, TerminalController.importTerminals);
+registerCollisionAdmin('get', '/terminals/assignments', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getAssignments);
+registerCollisionAdmin('post', '/terminals/assignments', authenticate, checkRole(['super_admin']), TerminalController.assignHardware);
+registerCollisionAdmin('get', '/terminals/audit', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
+registerCollisionAdmin('patch', '/terminals/:id/status', authenticate, checkRole(['super_admin']), TerminalController.updateTablet);
 app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsController.getAdminAnalytics);
 
 // Global AI Search
@@ -570,8 +834,42 @@ registerCollisionAdmin('post', '/tenants/:id/provision-va', authenticate, checkT
 registerCollisionAdmin('post', '/tenants/:id/provision-virtual-account', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
 registerCollisionAdmin('post', '/tenants/:id/students/:studentId/provision-va', authenticate, checkTenantAccess, AdminController.provisionStudentVirtualAccount);
 registerCollisionAdmin('post', '/tenants/:id/customers/:customerId/provision-va', authenticate, checkTenantAccess, AdminController.provisionCustomerVirtualAccount);
-app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLedger);
-app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
+app.get('/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listLedger);
+app.get('/api/admin/ledger', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listLedger);
+app.get('/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
+app.get('/api/admin/payments', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'owner', 'tenant_admin']), AdminController.listPayments);
+app.get('/api/admin/tenant-payables', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listTenantPayables);
+app.get('/admin/tenant-payables', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listTenantPayables);
+app.post('/api/admin/virtual-accounts/refresh', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury']), AdminController.refreshVirtualAccounts);
+app.post('/admin/virtual-accounts/refresh', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury']), AdminController.refreshVirtualAccounts);
+
+const paymentAlertRoles = ['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury'] as const;
+async function listPaymentAlerts(_req: any, res: any) {
+  try {
+    const { listPaymentAlerts } = await import('./services/payment-alert-quasar-sync');
+    const rows = await listPaymentAlerts();
+    return res.status(200).json({ rows });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to list payment alerts' });
+  }
+}
+async function repushPaymentAlert(req: any, res: any) {
+  try {
+    const { repushPaymentAlert } = await import('./services/payment-alert-quasar-sync');
+    const row = await repushPaymentAlert(String(req.params.id || ''));
+    return res.status(200).json({ ok: true, alert: row });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ error: error.message || 'Failed to repush payment alert' });
+  }
+}
+app.get('/api/admin/payment-alerts', authenticate, checkRole([...paymentAlertRoles]), listPaymentAlerts);
+app.get('/admin/payment-alerts', authenticate, checkRole([...paymentAlertRoles]), listPaymentAlerts);
+app.post('/api/admin/payment-alerts/:id/repush', authenticate, checkRole([...paymentAlertRoles]), repushPaymentAlert);
+app.post('/admin/payment-alerts/:id/repush', authenticate, checkRole([...paymentAlertRoles]), repushPaymentAlert);
+app.get('/api/admin/virtual-accounts', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listVirtualAccounts);
+app.get('/admin/virtual-accounts', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.listVirtualAccounts);
+app.get('/api/admin/virtual-accounts/:accountNumber/transactions', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.getVirtualAccountTransactions);
+app.get('/admin/virtual-accounts/:accountNumber/transactions', authenticate, checkRole(['super_admin', 'internal_staff', 'admin', 'admin_finance', 'admin_treasury', 'owner', 'tenant_admin']), AdminController.getVirtualAccountTransactions);
 
 // Wallet Endpoints (Internal Ledger)
 app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getBalance);
@@ -581,7 +879,13 @@ app.get('/api/v1/wallet/transactions', authenticate, checkTenantAccess, WalletCo
 registerCollisionAdmin('get', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.listUsers);
 registerCollisionAdmin('post', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.createUser);
 registerCollisionAdmin('patch', '/users/:id', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.updateUser);
-app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner']), InviteController.sendInvite);
+registerCollisionAdmin('post', '/users/:id/reset-mfa', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.resetUserMfa);
+registerCollisionAdmin('post', '/users/:id/reset-password', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.resetStaffPassword);
+app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner', 'super_admin', 'admin']), InviteController.sendInvite);
+app.post('/api/admin/invites', authenticate, checkRole(['tenant_admin', 'owner', 'super_admin', 'admin']), InviteController.sendInvite);
+registerCollisionAdmin('get', '/maker-checker', authenticate, MakerCheckerController.list);
+registerCollisionAdmin('post', '/maker-checker/:id/approve', authenticate, MakerCheckerController.approve);
+registerCollisionAdmin('post', '/maker-checker/:id/reject', authenticate, MakerCheckerController.reject);
 
 // Curriculum System
 app.get('/admin/curriculum', authenticate, CurriculumController.listCurriculum);
@@ -603,11 +907,32 @@ app.get('/referrals/stats', authenticate, ReferralController.getStats);
 app.post('/referrals/send', authenticate, ReferralController.sendInvite);
 
 // Attendance System
-app.get('/attendance/students', authenticate, AttendanceController.listStudents);
-app.post('/attendance/enroll', authenticate, AttendanceController.enroll);
-app.post('/attendance/save', authenticate, AttendanceController.autoSave);
-app.post('/attendance/bulk-present', authenticate, AttendanceController.bulkPresent);
-app.get('/attendance/history', authenticate, AttendanceController.getHistory);
+const registerAttendanceRoute = (method: 'get' | 'post' | 'put' | 'delete', path: string, ...handlers: any[]) => {
+  (app as any)[method](path, ...handlers);
+  (app as any)[method](`/api${path}`, ...handlers);
+};
+
+registerAttendanceRoute('get', '/attendance/students', authenticate, AttendanceController.listStudents);
+registerAttendanceRoute('post', '/attendance/enroll', authenticate, AttendanceController.enroll);
+registerAttendanceRoute('get', '/attendance/settings', authenticate, AttendanceController.getSettings);
+registerAttendanceRoute('put', '/attendance/settings', authenticate, AttendanceController.updateSettings);
+registerAttendanceRoute('get', '/attendance/calendar', authenticate, AttendanceController.listCalendarExceptions);
+registerAttendanceRoute('post', '/attendance/calendar', authenticate, AttendanceController.addCalendarException);
+registerAttendanceRoute('delete', '/attendance/calendar/:id', authenticate, AttendanceController.deleteCalendarException);
+registerAttendanceRoute('get', '/attendance/assignments', authenticate, AttendanceController.listAssignments);
+registerAttendanceRoute('post', '/attendance/assignments', authenticate, AttendanceController.createAssignment);
+registerAttendanceRoute('delete', '/attendance/assignments/:id', authenticate, AttendanceController.deleteAssignment);
+registerAttendanceRoute('get', '/attendance/register', authenticate, AttendanceController.getRegister);
+registerAttendanceRoute('post', '/attendance/save', authenticate, AttendanceController.saveRegister);
+registerAttendanceRoute('post', '/attendance/bulk-present', authenticate, AttendanceController.bulkPresent);
+registerAttendanceRoute('post', '/attendance/correct', authenticate, AttendanceController.correctEntry);
+registerAttendanceRoute('get', '/attendance/report', authenticate, AttendanceController.getClassReport);
+registerAttendanceRoute('get', '/attendance/report/pdf', authenticate, AttendanceController.exportClassReportPdf);
+registerAttendanceRoute('get', '/attendance/register/pdf', authenticate, AttendanceController.exportRegisterPdf);
+registerAttendanceRoute('get', '/attendance/student-history/:studentId', authenticate, AttendanceController.getStudentHistory);
+registerAttendanceRoute('get', '/attendance/history', authenticate, AttendanceController.getHistory);
+registerAttendanceRoute('get', '/attendance/audit-log', authenticate, AttendanceController.getAuditLog);
+registerSchoolCardRoutes(app, authenticate, createUnappliedSchoolCardService());
 
 // Class Insights
 app.get('/insights/class', authenticate, InsightsController.getClassInsights);
@@ -618,7 +943,10 @@ app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin']), Re
 app.get('/admin/retention/suggestion', authenticate, RetentionController.getPersonalSuggestion);
 
 // Webhooks (Secret Verification handled internally)
+// Staging nginx `location /api/` strips `/api`, so public URL is
+// https://staging.invify.org/api/webhooks/quasar → Node /webhooks/quasar.
 app.post('/webhooks/quasar', WebhookController.handleQuasarWebhook);
+app.post('/api/webhooks/quasar', WebhookController.handleQuasarWebhook);
 app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
 app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
 app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
@@ -647,26 +975,96 @@ app.post('/api/reconciliation/:id/retry', authenticate, checkTenantPermission('r
 app.post('/api/reconciliation/:id/lock', authenticate, checkTenantPermission('reconciliation.lock'), ReconciliationController.lock);
 app.post('/api/reconciliation/:id/unlock', authenticate, checkTenantPermission('reconciliation.unlock'), ReconciliationController.unlock);
 // Payout Configuration
-app.get('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getSettings);
-app.post('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.saveSettings);
-app.post('/api/payout/withdraw', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_treasury']), checkTenantAccess, PayoutController.withdraw);
+app.get('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff', 'staff']), checkTenantAccess, PayoutController.getSettings);
+app.post('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, requireAdminMfa, PayoutController.saveSettings);
+app.post('/api/payout/quote', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_treasury']), checkTenantAccess, PayoutController.quote);
+app.post('/api/payout/withdraw', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_treasury']), checkTenantAccess, requireAdminMfa, PayoutController.withdraw);
 app.get('/api/payout/history', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PayoutController.getHistory);
-app.get('/api/payout/banks', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getBanks);
+app.get('/api/payout/banks', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff', 'staff']), checkTenantAccess, PayoutController.getBanks);
 app.post('/api/payout/resolve-account', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.resolveAccount);
 
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSummary);
+app.get('/api/finance/school-dashboard', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolDashboard);
+app.post('/api/finance/withdrawable/sync', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), async (req, res) => {
+  try {
+    const { resolveAuthoritativeTenantId } = await import('./utils/finance-tenant');
+    const tenantId = resolveAuthoritativeTenantId(req);
+    if (!tenantId) return res.status(401).json({ error: 'Tenant context missing' });
+    const { QuasarWithdrawableService } = await import('./services/quasar-withdrawable.service');
+    const credits = Array.isArray(req.body?.credits) ? req.body.credits : [];
+    const available = await QuasarWithdrawableService.sync(String(tenantId), credits);
+    return res.status(200).json({ ok: true, withdrawable: available });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to sync withdrawable funds' });
+  }
+});
+app.get('/api/finance/daily-revenue', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getDailyRevenue);
+app.get('/api/finance/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSchoolTransactions);
+app.get('/api/finance/student/:studentId/summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getStudentSummary);
+app.get('/api/finance/student/:studentId/transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getStudentTransactions);
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
 app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
+
+const financeDisputeRoles = [
+  'super_admin',
+  'admin',
+  'admin_finance',
+  'admin_treasury',
+  'admin_risk',
+  'finance_staff',
+] as const;
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.list,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.create,
+);
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes/:id',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.get,
+);
+registerCollisionAdmin(
+  'get',
+  '/finance/disputes/:id/audit',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  FinancialDisputeController.audit,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes/:id/approve',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  requireCheckerMfa,
+  FinancialDisputeController.approve,
+);
+registerCollisionAdmin(
+  'post',
+  '/finance/disputes/:id/reject',
+  authenticate,
+  checkRole([...financeDisputeRoles]),
+  requireCheckerMfa,
+  FinancialDisputeController.reject,
+);
 
 // Card settlement reconciliation (processor file upload → mark Quasar pull settled)
 import {
   CardSettlementController,
   cardSettlementUploadMiddleware,
 } from './controllers/card-settlement.controller';
-import { requireAdminMfa } from './middleware/require-admin-mfa.middleware';
-
 app.get(
   '/api/admin/finance/card-settlement/templates',
   authenticate,
@@ -700,28 +1098,28 @@ app.post('/api/pos/transactionFromMpos', authenticate, PosController.processTran
 app.post('/api/v1/pos/transactionFromMpos', authenticate, PosController.processTransaction);
 app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
 app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
-app.get('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getRoutingConfig);
-app.post('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.updateRoutingConfig);
-app.get('/admin/pos/routing/affected-devices', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getAffectedDevices);
-app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.refreshKimonoParams);
-app.get('/admin/pos/observability', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getObservabilityMetrics);
-app.post('/admin/pos/simulate', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.simulateRoute);
+registerCollisionAdmin('get', '/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getRoutingConfig);
+registerCollisionAdmin('post', '/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.updateRoutingConfig);
+registerCollisionAdmin('get', '/pos/routing/affected-devices', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getAffectedDevices);
+registerCollisionAdmin('post', '/pos/kimono-params/refresh', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.refreshKimonoParams);
+registerCollisionAdmin('get', '/pos/observability', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getObservabilityMetrics);
+registerCollisionAdmin('post', '/pos/simulate', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.simulateRoute);
 
-// Terminal & Inventory Management Operations
-app.get('/api/admin/inventory/stats', authenticate, TerminalController.getStats);
-app.get('/api/admin/inventory/tablets', authenticate, TerminalController.getTablets);
-app.patch('/api/admin/inventory/tablets/:id', authenticate, TerminalController.updateTablet);
-app.get('/api/admin/inventory/mpos', authenticate, TerminalController.getMpos);
-app.patch('/api/admin/inventory/mpos/:id', authenticate, TerminalController.updateMpos);
-app.get('/api/admin/inventory/printers', authenticate, TerminalController.getPrinters);
-app.patch('/api/admin/inventory/printers/:id', authenticate, TerminalController.updatePrinter);
-app.get('/api/admin/inventory/tids', authenticate, TerminalController.getTids);
-app.patch('/api/admin/inventory/tids/:id', authenticate, TerminalController.updateTid);
-app.post('/api/admin/inventory/upload', authenticate, terminalUploadMiddleware, TerminalController.importTerminals);
-app.post('/api/admin/inventory/assign', authenticate, TerminalController.assignHardware);
-app.get('/api/admin/inventory/assignments', authenticate, TerminalController.getAssignments);
-app.post('/api/admin/inventory/assignments/:id/unassign', authenticate, TerminalController.unassignHardware);
-app.get('/api/admin/inventory/audit', authenticate, TerminalController.getAuditLog);
+// Terminal & Inventory Management Operations (dual-register: nginx staging strips `/api`)
+registerCollisionAdmin('get', '/inventory/stats', authenticate, TerminalController.getStats);
+registerCollisionAdmin('get', '/inventory/tablets', authenticate, TerminalController.getTablets);
+registerCollisionAdmin('patch', '/inventory/tablets/:id', authenticate, TerminalController.updateTablet);
+registerCollisionAdmin('get', '/inventory/mpos', authenticate, TerminalController.getMpos);
+registerCollisionAdmin('patch', '/inventory/mpos/:id', authenticate, TerminalController.updateMpos);
+registerCollisionAdmin('get', '/inventory/printers', authenticate, TerminalController.getPrinters);
+registerCollisionAdmin('patch', '/inventory/printers/:id', authenticate, TerminalController.updatePrinter);
+registerCollisionAdmin('get', '/inventory/tids', authenticate, TerminalController.getTids);
+registerCollisionAdmin('patch', '/inventory/tids/:id', authenticate, TerminalController.updateTid);
+registerCollisionAdmin('post', '/inventory/upload', authenticate, terminalUploadMiddleware, TerminalController.importTerminals);
+registerCollisionAdmin('post', '/inventory/assign', authenticate, TerminalController.assignHardware);
+registerCollisionAdmin('get', '/inventory/assignments', authenticate, TerminalController.getAssignments);
+registerCollisionAdmin('post', '/inventory/assignments/:id/unassign', authenticate, TerminalController.unassignHardware);
+registerCollisionAdmin('get', '/inventory/audit', authenticate, TerminalController.getAuditLog);
 
 // ─── APK Fleet Deployment ────────────────────────────────────────────────
 import { ApkController, apkUploadMiddleware } from './controllers/apk.controller';
@@ -731,6 +1129,15 @@ app.post('/api/admin/apk/deploy', authenticate, ApkController.deployApk);
 app.post('/api/admin/apk/uninstall', authenticate, ApkController.uninstallApk);
 app.delete('/api/admin/apk/:id', authenticate, ApkController.removeApk);
 app.patch('/api/admin/apk/:id/url', authenticate, ApkController.updateApkUrl);
+app.get('/api/apk/:id/download', ApkController.downloadApk);
+// Nginx staging `location /api/` strips the `/api` prefix; keep stripped aliases.
+app.get('/admin/apk', authenticate, ApkController.getVault);
+app.post('/admin/apk/upload', authenticate, apkUploadMiddleware, ApkController.uploadApk);
+app.post('/admin/apk/deploy', authenticate, ApkController.deployApk);
+app.post('/admin/apk/uninstall', authenticate, ApkController.uninstallApk);
+app.delete('/admin/apk/:id', authenticate, ApkController.removeApk);
+app.patch('/admin/apk/:id/url', authenticate, ApkController.updateApkUrl);
+app.get('/apk/:id/download', ApkController.downloadApk);
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);
@@ -745,16 +1152,25 @@ app.post('/api/finance/integrity/recompute', authenticate, IntegrityController.r
 app.get('/api/notifications', authenticate, NotificationController.getNotifications);
 app.post('/api/notifications/:id/read', authenticate, NotificationController.markAsRead);
 app.post('/api/notifications/read-all', authenticate, NotificationController.markAllAsRead);
+app.get('/api/notifications/preferences', authenticate, NotificationController.getPreferences);
+app.put('/api/notifications/preferences', authenticate, NotificationController.savePreferences);
 // Compat aliases used by admin NotificationEngine (historical /api/v1 path)
 app.get('/api/v1/notifications', authenticate, NotificationController.getNotifications);
 app.post('/api/v1/notifications/:id/read', authenticate, NotificationController.markAsRead);
 app.post('/api/v1/notifications/read-all', authenticate, NotificationController.markAllAsRead);
+app.get('/api/v1/notifications/preferences', authenticate, NotificationController.getPreferences);
+app.put('/api/v1/notifications/preferences', authenticate, NotificationController.savePreferences);
 
 // Student & Finance Core
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);
 app.post('/api/finance/student-virtual-account/:studentId', authenticate, StudentController.provisionStudentVirtualAccount);
 app.post('/api/finance/customer-virtual-account/:customerId', authenticate, CustomerController.getVirtualAccount);
 app.post('/api/finance/staff-virtual-account/:userId', authenticate, CustomerController.getStaffVirtualAccount);
+app.post(
+  '/api/finance/company-transfer/authorize',
+  authenticate,
+  CompanyTransferAuthController.authorize,
+);
 app.get('/api/finance/virtual-accounts', authenticate, CustomerController.listTenantVirtualAccounts);
 app.get('/api/finance/virtual-accounts/:accountNumber/transactions', authenticate, CustomerController.getVirtualAccountTransactions);
 app.post('/api/finance/virtual-accounts/:accountNumber/sweep', authenticate, CustomerController.sweepVirtualAccountFunds);
@@ -771,6 +1187,12 @@ app.get(
   authenticate,
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolSyncController.getRoster,
+);
+app.get(
+  '/api/school/billing',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolSyncController.getBilling,
 );
 
 // School payments + disputes (device Cash/POS → tenant admin web)
@@ -805,6 +1227,32 @@ app.patch(
   SchoolPaymentsController.updateDispute,
 );
 
+// Class term bills → individual parent emails + downloadable PDF
+app.post(
+  '/api/school/term-bills/email',
+  authenticate,
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  TermBillsController.emailClassBills,
+);
+app.post(
+  '/api/school/term-bills/pdf',
+  authenticate,
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  TermBillsController.downloadPdf,
+);
+app.get(
+  '/api/school/parent-broadcast/audience',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  ParentBroadcastController.audience,
+);
+app.post(
+  '/api/school/parent-broadcast',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  ParentBroadcastController.send,
+);
+
 // POS staff roster + personal salary bank (Flutter Web Sync → tenant admin)
 app.post(
   '/api/staff/bulk-sync',
@@ -812,11 +1260,23 @@ app.post(
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   StaffController.bulkSync,
 );
+app.post(
+  '/api/staff',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  StaffController.create,
+);
 app.get(
   '/api/staff',
   authenticate,
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   StaffController.list,
+);
+app.patch(
+  '/api/staff/:id',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  StaffController.patch,
 );
 app.post(
   '/api/staff/:id/pay-salary',
@@ -878,8 +1338,20 @@ app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Respons
 // ─── SUPPORT & COMPLAINTS ROUTES ─────────────────────────────────────────────
 app.post('/api/mobile/complaints', SupportController.createComplaint);
 app.get('/api/mobile/complaints', SupportController.getMobileComplaints);
-app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.listComplaints);
-app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.updateComplaintStatus);
+registerCollisionAdmin(
+  'get',
+  '/complaints',
+  authenticate,
+  checkRole(['super_admin', 'internal_staff', 'admin_ops', 'admin', 'support']),
+  SupportController.listComplaints,
+);
+registerCollisionAdmin(
+  'patch',
+  '/complaints/:id/status',
+  authenticate,
+  checkRole(['super_admin', 'internal_staff', 'admin_ops', 'admin', 'support']),
+  SupportController.updateComplaintStatus,
+);
 
 // ─── EMERGENCY APPLOCK ─────────────────────────────────────────────
 app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
@@ -923,9 +1395,15 @@ app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'i
   }
 });
 
+attachTenantBillingRoutes(app);
+attachHealthInsuranceRoutes(app);
+
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+  res.status(404).json({
+    error: 'Endpoint not found',
+    message: 'This section could not be loaded. Please refresh and try again.',
+  });
 });
 
 // 4. GLOBAL ERROR HANDLER
@@ -941,6 +1419,17 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (status === 404) code = 'ERR_NOT_FOUND';
   if (status === 422) code = 'ERR_UNPROCESSABLE_ENTITY';
   if (status === 429) code = 'ERR_TOO_MANY_REQUESTS';
+
+  if (err?.name === 'MulterError' || err?.code === 'LIMIT_FILE_SIZE') {
+    const uploadStatus = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(uploadStatus).json({
+      success: false,
+      code: uploadStatus === 413 ? 'ERR_PAYLOAD_TOO_LARGE' : 'ERR_BAD_REQUEST',
+      error: err.message || 'Upload failed',
+      message: err.message || 'Upload failed',
+      correlationId: (req as any).correlationId,
+    });
+  }
 
   res.status(status).json({
     success: false,
@@ -968,19 +1457,33 @@ export const io = new SocketIOServer(server, {
     },
     methods: ['GET', 'POST'],
     credentials: true
-  }
-});
+  },
+  // Honor X-Forwarded-For from nginx so device IP is the tablet, not 127.0.0.1.
+  // Engine.IO supports this; @types/socket.io omits it.
+  proxy: true as unknown as undefined,
+  transports: ['polling', 'websocket'],
+  allowUpgrades: false,
+  allowEIO3: true,
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  connectTimeout: 45000,
+} as ConstructorParameters<typeof SocketIOServer>[1]);
 
 io.use(async (socket, next) => {
   try {
-    const { isMockTokenAllowed, isMockAuthAllowed } = require('./config/constants');
+    const { isMockTokenAllowed, isMockAuthAllowed, isPrivateLanIp } = require('./config/constants');
     const { BuildVariantService } = require('./config/build-variant');
     const { verifySupabaseAccessToken, verifyWithSharedSecrets, peekAlg, supabaseProjectUrl } = require('./utils/supabase-jwt');
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
 
-    // LOCAL-only mock socket auth (impossible in staging/production via isMockTokenAllowed)
+    // LOCAL mock socket auth. Also allowed from a private LAN IP when this
+    // process is not production (npm run dev:staging on a PC still needs it).
     if (token === 'mock-super-admin') {
-      if (!isMockTokenAllowed()) {
+      const lanMock =
+        process.env.NODE_ENV !== 'production' &&
+        process.env.APP_ENV !== 'production' &&
+        isPrivateLanIp(socketClientIp(socket));
+      if (!isMockTokenAllowed() && !lanMock) {
         return next(new Error('Authentication error: mock tokens are not allowed in this environment'));
       }
       const tenantId =
@@ -1013,41 +1516,37 @@ io.use(async (socket, next) => {
     const localJwtSecret = process.env.JWT_SECRET;
     let jwtPayload: any = null;
 
-    if (requiresVerify) {
-      const alg = peekAlg(token);
-      const isAsymmetric = alg.startsWith('ES') || alg.startsWith('RS') || alg.startsWith('PS');
+    const alg = peekAlg(token);
+    const isAsymmetric = alg.startsWith('ES') || alg.startsWith('RS') || alg.startsWith('PS');
+    const secrets = [localJwtSecret, supabaseJwtSecret].filter(
+      (s) => typeof s === 'string' && s.length >= 16,
+    ) as string[];
 
-      if (isAsymmetric) {
-        const base = supabaseProjectUrl();
-        if (!base) {
-          return next(new Error('Authentication error: SUPABASE_URL required for asymmetric JWT'));
-        }
-      } else {
-        if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
-          return next(new Error('Authentication error: JWT verification secret not configured'));
-        }
+    if (isAsymmetric) {
+      const base = supabaseProjectUrl();
+      if (!base) {
+        return next(new Error('Authentication error: SUPABASE_URL required for asymmetric JWT'));
       }
       try {
-        jwtPayload = await verifySupabaseAccessToken(token);
+        jwtPayload = await Promise.race([
+          verifySupabaseAccessToken(token),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('jwks timeout')), 5000),
+          ),
+        ]);
       } catch {
         return next(new Error('Authentication error: Invalid or expired token'));
       }
     } else {
-      // LOCAL: verify with JWKS/HS first, then JWT_SECRET — never decode-only
+      if (secrets.length === 0) {
+        return next(new Error('Authentication error: JWT verification secret not configured'));
+      }
+      // Device onboarding tokens are HS256 + JWT_SECRET. Do not fall through
+      // to JWKS — LAN-only Wi-Fi has no internet and the handshake times out.
       try {
-        jwtPayload = await verifySupabaseAccessToken(token);
+        jwtPayload = verifyWithSharedSecrets(token, secrets);
       } catch {
-        const secrets = [supabaseJwtSecret, localJwtSecret].filter(
-          (s) => typeof s === 'string' && s.length >= 16,
-        ) as string[];
-        if (secrets.length === 0) {
-          return next(new Error('Authentication error: JWT verification secret not configured'));
-        }
-        try {
-          jwtPayload = verifyWithSharedSecrets(token, secrets);
-        } catch {
-          return next(new Error('Authentication error: Invalid or expired token'));
-        }
+        return next(new Error('Authentication error: Invalid or expired token'));
       }
     }
 
@@ -1055,6 +1554,29 @@ io.use(async (socket, next) => {
     const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
     if (!userId) {
       return next(new Error('Authentication error: Missing subject claim'));
+    }
+
+    const claimTenantId =
+      jwtPayload.tenant_id ||
+      jwtPayload.tenantId ||
+      jwtPayload.app_metadata?.tenantId ||
+      jwtPayload.user_metadata?.tenantId ||
+      null;
+    const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
+    const isDeviceOwnerClaim =
+      !!claimTenantId && ['owner', 'tenant_admin', 'staff'].includes(claimRole);
+
+    // Onboarded tablets already carry tenant on the JWT. Skip the users-table
+    // round trip so Engine.IO handshake finishes before the client times out.
+    if (isDeviceOwnerClaim) {
+      socket.data.user = {
+        id: userId,
+        tenant_id: claimTenantId,
+        role: claimRole,
+        email: userEmail,
+      };
+      socket.data.tenantId = claimTenantId;
+      return next();
     }
 
     const { supabaseAdmin } = require('./db/supabase');
@@ -1098,21 +1620,23 @@ io.use(async (socket, next) => {
     }
 
     if (profileErr || !profile) {
-      // Staging/prod: fail closed — no claim/handshake privilege escalation
-      if (requiresVerify) {
-        return next(new Error('Authentication error: User profile not found'));
-      }
-      // LOCAL only: least-privilege claim fallback (never admin/super_admin by default)
       const fallbackTenantId =
         jwtPayload.tenant_id ||
         jwtPayload.tenantId ||
         jwtPayload.app_metadata?.tenantId ||
         jwtPayload.user_metadata?.tenantId ||
         null;
+      const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
+      const isDeviceOwnerClaim =
+        !!fallbackTenantId &&
+        ['owner', 'tenant_admin', 'staff'].includes(claimRole);
+
+      if (requiresVerify && !isDeviceOwnerClaim) {
+        return next(new Error('Authentication error: User profile not found'));
+      }
       if (!fallbackTenantId) {
         return next(new Error('Authentication error: User profile not found'));
       }
-      const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
       profile = {
         tenant_id: fallbackTenantId,
         role: claimRole === 'super_admin' || claimRole === 'admin' ? 'owner' : claimRole,
@@ -1127,15 +1651,49 @@ io.use(async (socket, next) => {
   }
 });
 
-io.on('connection', (socket: Socket) => {
-  console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId})`);
+function socketClientIp(socket: Socket): string {
+  const hdr = socket.handshake.headers['x-forwarded-for'];
+  const forwarded = (typeof hdr === 'string' ? hdr : Array.isArray(hdr) ? hdr[0] : '')
+    ?.split(',')[0]
+    ?.trim();
+  const real = String(socket.handshake.headers['x-real-ip'] || '').trim();
+  let ip = forwarded || real || socket.handshake.address || 'unknown';
+  ip = ip.replace(/^::ffff:/, '');
+  if (ip === '::1') ip = '127.0.0.1';
+  return ip;
+}
 
-  // Join tenant room immediately so emergency_lock reaches devices even if
-  // the client never emits join_room (or emits it late).
+io.on('connection', (socket: Socket) => {
+  const handshakeDeviceId = socket.handshake.auth?.deviceId;
+  if (handshakeDeviceId) {
+    socket.data.deviceId = String(handshakeDeviceId);
+  }
+  socket.data.ip = socketClientIp(socket);
+  console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId} IP: ${socket.data.ip})`);
+
+  // Join global + tenant rooms immediately so broadcasts and emergency_lock
+  // reach devices even if the client never emits join_room (or emits it late).
+  socket.join('all');
+  if (socket.data.deviceId) {
+    socket.join(`device:${socket.data.deviceId}`);
+  }
   if (socket.data.tenantId) {
     socket.join(`tenant:${socket.data.tenantId}`);
     console.log(`[Socket.io] Auto-joined tenant:${socket.data.tenantId} for ${socket.id}`);
+    import('./services/payment-alert-trail.service')
+      .then(({ PaymentAlertTrailService }) => PaymentAlertTrailService.flushTenant(io, socket.data.tenantId))
+      .catch((err: any) => console.warn('[PaymentAlert] flush on connect failed:', err?.message || err));
   }
+
+  socket.on('payment.alert.ack', (data: any) => {
+    const reference = String(data?.reference || '').trim();
+    if (!reference || !socket.data.tenantId) return;
+    import('./services/payment-alert-trail.service')
+      .then(({ PaymentAlertTrailService }) =>
+        PaymentAlertTrailService.acknowledge(socket.data.tenantId, reference, socket.data.deviceId || null),
+      )
+      .catch((err: any) => console.warn('[PaymentAlert] ack failed:', err?.message || err));
+  });
   
   // Clients will emit 'join_room' passing their characteristics
   socket.on('join_room', (data: any) => {
@@ -1147,7 +1705,11 @@ io.on('connection', (socket: Socket) => {
     }
     if (data.plan) { socket.join(`plan:${String(data.plan).toLowerCase()}`); joined.push(`plan:${data.plan}`); }
     if (data.type) { socket.join(`type:${String(data.type).toLowerCase()}`); joined.push(`type:${data.type}`); }
-    if (data.deviceId) { socket.join(`device:${data.deviceId}`); joined.push(`device:${data.deviceId}`); }
+    if (data.deviceId) {
+      socket.data.deviceId = String(data.deviceId);
+      socket.join(`device:${data.deviceId}`);
+      joined.push(`device:${data.deviceId}`);
+    }
     if (data.businessName) { socket.join(`business:${data.businessName}`); joined.push(`business:${data.businessName}`); }
     socket.join('all');
     console.log(`[Socket.io] Client ${socket.id} joined rooms: ${joined.join(', ')}`);
@@ -1163,6 +1725,27 @@ io.on('connection', (socket: Socket) => {
       lat: data.lat,
       lng: data.lng
     });
+  });
+
+  socket.on('device_identity_pong', async (data: any) => {
+    try {
+      const tenantId = socket.data.tenantId || data?.tenantId;
+      if (!tenantId) return;
+      const { persistLiveDeviceIdentity } = require('./utils/persist-live-device-identity');
+      const { isUsableDeviceId, normalizeDeviceId } = require('./utils/device-identity');
+      const saved = await persistLiveDeviceIdentity({
+        tenantId,
+        deviceId: data?.deviceId,
+        location: data?.location,
+      });
+      if (saved.deviceId && isUsableDeviceId(saved.deviceId)) {
+        const serial = normalizeDeviceId(saved.deviceId);
+        socket.data.deviceId = serial;
+        socket.join(`device:${serial}`);
+      }
+    } catch (err: any) {
+      console.warn('[Socket.io] device_identity_pong failed:', err?.message || err);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -1254,6 +1837,86 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
     console.log(`[Workers] In-process financial workers DISABLED${isProdVariant ? ' (strictly forbidden in production)' : ''}`);
   }
 
+  // Agent webhook outbox: non-financial delivery only. Never on production.
+  const stagingVariant =
+    String(process.env.NODE_ENV || '').toLowerCase() === 'staging' ||
+    String(process.env.BUILD_VARIANT || '').toUpperCase() === 'STAGING';
+  const webhookWorkerOn =
+    !isProdVariant && (process.env.ENABLE_AGENT_WEBHOOK_WORKER === 'true' || stagingVariant);
+  if (webhookWorkerOn) {
+    let webhookTickBusy = false;
+    const webhookTick = async () => {
+      if (webhookTickBusy) return;
+      webhookTickBusy = true;
+      try {
+        const { deliverDueEvents } = await import('./modules/agent-portal/services/agent-webhook.service');
+        await deliverDueEvents();
+      } catch (err: any) {
+        console.warn('[agent-webhook-worker]', err?.message || err);
+      } finally {
+        webhookTickBusy = false;
+      }
+    };
+    setInterval(webhookTick, 15_000);
+    setTimeout(webhookTick, 5_000);
+    console.log('[Workers] Agent webhook outbox ENABLED (15s, lock, no financial mutation)');
+  } else {
+    console.log('[Workers] Agent webhook outbox DISABLED');
+  }
+
+  try {
+    const variant = BuildVariantService.getInstance();
+    if (variant.isStaging() && !variant.isProd() && process.env.FEE_ORCHESTRATION_LIVE === 'true') {
+      const { FeePostingWorker } = require('./services/fee-posting-outbox');
+      const { SupabaseFeePostingOutboxStore } = require('./services/fee-posting-outbox.stores');
+      const worker = new FeePostingWorker(new SupabaseFeePostingOutboxStore());
+      setInterval(() => {
+        worker.runOnce(10).catch((err: any) => console.error('[FeeOutbox] worker:', err?.message || err));
+      }, 15_000);
+      console.log('[Workers] Fee posting outbox ENABLED (staging live only)');
+    } else {
+      console.log('[Workers] Fee posting outbox DISABLED');
+    }
+  } catch (err: any) {
+    console.warn('[Workers] Fee posting outbox not started:', err?.message || err);
+  }
+
+  let paymentAlertBusy = false;
+  setInterval(() => {
+    if (paymentAlertBusy) return;
+    paymentAlertBusy = true;
+    import('./services/payment-alert-trail.service')
+      .then(({ PaymentAlertTrailService }) => PaymentAlertTrailService.retryDue(io))
+      .then(() => import('./services/payment-alert-quasar-sync').then((mod) => mod.syncConnectedTenantCredits(io)))
+      .catch((err: any) => console.warn('[PaymentAlert] retry failed:', err?.message || err))
+      .finally(() => {
+        paymentAlertBusy = false;
+      });
+  }, 3_000);
+
+  // Quasar approve does not fire a webhook — poll open POUT rows via GET /transfers/{reference}.
+  // Narrow status sync only; not the broader ENABLE_INPROCESS_FINANCIAL_WORKERS gate.
+  if (process.env.DISABLE_PAYOUT_STATUS_POLLER !== 'true') {
+    let payoutPollBusy = false;
+    const payoutPollMs = Math.max(30_000, Number(process.env.PAYOUT_STATUS_POLLER_MS) || 60_000);
+    setInterval(() => {
+      if (payoutPollBusy) return;
+      payoutPollBusy = true;
+      import('./services/payout-status.service')
+        .then(({ PayoutStatusService }) => PayoutStatusService.pollOpenPayouts(25))
+        .then((result) => {
+          if (result.applied > 0) {
+            console.log(`[PayoutStatus] polled ${result.checked}, applied ${result.applied}`);
+          }
+        })
+        .catch((err: any) => console.warn('[PayoutStatus] poller failed:', err?.message || err))
+        .finally(() => {
+          payoutPollBusy = false;
+        });
+    }, payoutPollMs);
+    console.log(`[Workers] Payout status poller ENABLED (${payoutPollMs}ms)`);
+  }
+
   server.listen(PORT as number, '0.0.0.0', () => {
     console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);
     // Hydrate Quasar webhook signing secret from Integration Vault after boot
@@ -1270,7 +1933,8 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
           );
           if (secret) {
             process.env.QUASAR_WEBHOOK_SIGNING_SECRET = secret;
-            console.log(`[Boot] Hydrated QUASAR_WEBHOOK_SIGNING_SECRET from Integration Vault (${envName})`);
+            process.env.QUASAR_WEBHOOK_SECRET = secret;
+            console.log(`[Boot] Hydrated QUASAR_WEBHOOK_SIGNING_SECRET / QUASAR_WEBHOOK_SECRET from Integration Vault (${envName})`);
             break;
           }
         }

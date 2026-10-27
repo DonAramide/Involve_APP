@@ -229,8 +229,8 @@ const internalRows = ref([...props.rows])
 
 // Sync reactive properties gracefully
 watch(() => props.rows, (newRows) => {
-  internalRows.value = [...newRows]
-}, { deep: true })
+  internalRows.value = Array.isArray(newRows) ? [...newRows] : []
+})
 
 // Simulated Real-time WebSocket Row Injection loop
 let streamInterval = null

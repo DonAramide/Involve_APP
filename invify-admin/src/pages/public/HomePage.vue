@@ -23,11 +23,14 @@
                 :key="activeIndex"
                 :src="activeImages[activeIndex].src" 
                 :alt="activeImages[activeIndex].alt" 
+                :class="{ 'home-hero__img--contain': activeImages[activeIndex].contain }"
+                :style="activeImages[activeIndex].position ? { objectPosition: activeImages[activeIndex].position } : null"
               />
               <img 
                 v-else
-                src="/invify-showcase/imgtab001.jpg" 
-                alt="Invify business interface displayed on connected devices" 
+                src="/invify-showcase/invify-devices-photo.jpg" 
+                class="home-hero__img--contain"
+                alt="Invify-branded Samsung tablet, VM30 card reader, and receipt printer" 
               />
             </transition>
           </div>
@@ -125,8 +128,10 @@ const showcaseItems = computed(() => [
 ])
 
 const heroImages = [
-  { src: '/invify-showcase/imgtab001.jpg', alt: 'Samsung tablet showing Invify Student Analytics dashboard' },
-  { src: '/invify-showcase/imgkit001.jpg', alt: 'Invify complete retail POS hardware kit' }
+  { src: '/invify-showcase/invify-devices-photo.jpg', alt: 'Invify-branded Samsung tablet, VM30 card reader, and receipt printer', contain: true },
+  { src: '/invify-showcase/invify-boxes-photo.jpg', alt: 'Invify Smart Education Billing System and Retail Point of Sale System boxes' },
+  { src: '/invify-showcase/invify-school-kit-photo.jpg', alt: 'Open Invify School Edition box with tablet, receipt printer, and charger', position: 'center 85%' },
+  { src: '/invify-showcase/invify-lineup-photo.jpg', alt: 'Invify tablets, card reader, and receipt printers with Retail Point of Sale System box', position: 'center 60%' }
 ]
 
 // Shuffled array of images to cycle through
@@ -202,6 +207,11 @@ onUnmounted(() => {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
+}
+
+.home-hero__visual img.home-hero__img--contain {
+  object-fit: contain;
+  background: #e9e6f5;
 }
 
 /* Beautiful Hero Carousel Crossfade transition */

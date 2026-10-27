@@ -4,6 +4,7 @@ import '../models/school_tables.dart';
 import '../../domain/services/ai_service_interface.dart';
 import '../../domain/entities/lesson_note_models.dart';
 import '../../domain/services/lesson_note_validator.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 class LessonNoteApiService implements IAIService {
   final Dio _dio;
@@ -59,20 +60,13 @@ class LessonNoteApiService implements IAIService {
       }
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
-        throw const NetworkException('Connection timed out. Please check your signal.');
+        throw const NetworkException('The server took too long to respond. Please try again.');
       }
-      if (e.response?.statusCode == 404) {
-        throw Exception(
-          'Lesson note AI endpoint not found on server. Please update/restart the backend.',
-        );
-      }
-      final serverMsg = e.response?.data is Map
-          ? (e.response!.data['error'] ?? e.response!.data['message'])
-          : null;
       throw Exception(
-        serverMsg != null
-            ? 'Generation failed: $serverMsg'
-            : 'Generation failed (${e.response?.statusCode ?? 'network error'}). Please try again.',
+        friendlyApiError(
+          e,
+          fallback: 'Could not generate the lesson note. Please try again.',
+        ),
       );
     } catch (e) {
       rethrow;

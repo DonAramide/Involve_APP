@@ -6,12 +6,14 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/stock/domain/catalog_category.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
 import 'package:involve_app/features/services/domain/entities/service_customer.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/service_booking_dialog.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
@@ -121,6 +123,9 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
               if (state.isSaved) {
                 // 1. Reload stock (since items were sold)
                 context.read<StockBloc>().add(LoadItems());
+                try {
+                  context.read<SchoolBloc>().add(LoadSchoolData());
+                } catch (_) {}
 
                 // 2. Reset flow for next transaction
                 context.read<InvoiceBloc>().add(ResetInvoice());
@@ -207,10 +212,10 @@ class _MobileCartButton extends StatelessWidget {
                   // Local scaffold so SnackBars/toasts appear above the cart sheet
                   backgroundColor: Colors.transparent,
                   body: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: Theme.of(sheetContext).colorScheme.surface,
                       borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
+                          const BorderRadius.vertical(top: Radius.circular(20)),
                     ),
                     child: _CartSummary(
                       isSidePanel: false,
@@ -257,6 +262,7 @@ class _ItemSelector extends StatefulWidget {
 
 class _ItemSelectorState extends State<_ItemSelector> {
   int? _selectedCategoryId;
+  String? _selectedCatalogLabel;
   String? _selectedServiceType; // New: For service type filtering
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -309,6 +315,10 @@ class _ItemSelectorState extends State<_ItemSelector> {
               } else if (_selectedCategoryId != null) {
                  // Filter by Stock Category
                  filteredItems = filteredItems.where((i) => i.categoryId == _selectedCategoryId).toList();
+              } else if (_selectedCatalogLabel != null) {
+                filteredItems = filteredItems.where((i) =>
+                  catalogCategoryLabel(i, state.categories) == _selectedCatalogLabel
+                ).toList();
               }
               
               // Apply search filter
@@ -368,6 +378,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
                     _buildFilterChip('All', null, null),
                     // Standard Categories
                     ...state.categories.map((cat) => _buildFilterChip(cat.name, cat.id, null)),
+                    if (settings?.businessMode == 'school')
+                      ..._catalogLabels(state).map(_buildCatalogChip),
                     // Service Types (if enabled)
                     if (settings?.serviceBillingEnabled == true)
                       ...serviceTypes.map((type) => _buildFilterChip(type, null, type, isService: true)),
@@ -414,7 +426,11 @@ class _ItemSelectorState extends State<_ItemSelector> {
                                   item: item,
                                   quantity: quantity,
                                   onAdd: () => _handleItemAdd(context, item, settings),
-                                  onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
+                                  onRemove: quantity > 0
+                                      ? () => context.read<InvoiceBloc>().add(
+                                            AddItemToInvoice(item, -1, serviceMeta: cartItem?.serviceMeta),
+                                          )
+                                      : null,
                                   settings: settings,
                                 );
                             },
@@ -432,9 +448,45 @@ class _ItemSelectorState extends State<_ItemSelector> {
     );
   }
 
+  List<String> _catalogLabels(StockLoaded state) {
+    final named = state.categories.map((category) => category.name).toSet();
+    final labels = <String>[];
+    for (final item in state.items) {
+      final label = catalogCategoryLabel(item, state.categories);
+      if (named.contains(label) || labels.contains(label)) continue;
+      labels.add(label);
+    }
+    labels.sort();
+    return labels;
+  }
+
+  Widget _buildCatalogChip(String label) {
+    final isSelected = _selectedCatalogLabel == label &&
+        _selectedCategoryId == null &&
+        _selectedServiceType == null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : null,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        onSelected: (_) {
+          setState(() {
+            _selectedCatalogLabel = label;
+            _selectedCategoryId = null;
+            _selectedServiceType = null;
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildFilterChip(String label, int? categoryId, String? serviceType, {bool isService = false}) {
     final isSelected = (serviceType != null && _selectedServiceType == serviceType) || 
-                       (serviceType == null && _selectedServiceType == null && _selectedCategoryId == categoryId);
+                       (serviceType == null && _selectedServiceType == null && _selectedCatalogLabel == null && _selectedCategoryId == categoryId);
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -449,6 +501,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
         ),
         onSelected: (selected) {
           setState(() {
+            _selectedCatalogLabel = null;
             if (serviceType != null) {
               _selectedServiceType = serviceType;
               _selectedCategoryId = null;
@@ -463,7 +516,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
   }
 
   Future<void> _handleItemAdd(BuildContext context, Item item, AppSettings? settings) async {
-    if (item.type == 'service') {
+    final schoolFee = settings?.businessMode == 'school' || item.businessMode == 'school';
+    if (item.type == 'service' && !schoolFee) {
       // Show booking dialog
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
@@ -599,9 +653,11 @@ class _POSItemCard extends StatelessWidget {
                     flex: 3,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[100],
                         gradient: LinearGradient(
-                          colors: [Colors.grey[100]!, Colors.grey[200]!],
+                          colors: isDark
+                              ? [const Color(0xFF2C2C2C), const Color(0xFF1E1E1E)]
+                              : [Colors.grey[100]!, Colors.grey[200]!],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ),
@@ -737,8 +793,8 @@ class _CartSummary extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                  color: isDark ? theme.colorScheme.surface : Colors.grey[50],
+                  border: Border(bottom: BorderSide(color: isDark ? theme.dividerColor : Colors.grey[100]!)),
                 ),
                 child: Row(
                   children: [
@@ -771,7 +827,7 @@ class _CartSummary extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final item = state.items[index];
                     return Dismissible(
-                      key: ValueKey(item.item.id),
+                      key: ValueKey('${item.item.id}-${item.item.name}-$index-${item.serviceMeta}'),
                       direction: DismissDirection.endToStart,
                       background: Container(
                         alignment: Alignment.centerRight,
@@ -784,7 +840,7 @@ class _CartSummary extends StatelessWidget {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                          border: Border(bottom: BorderSide(color: isDark ? theme.dividerColor : Colors.grey[100]!)),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Column(
@@ -859,7 +915,7 @@ class _CartSummary extends StatelessWidget {
                                 // Controls (Right)
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.grey[100],
+                                    color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
                                     borderRadius: BorderRadius.circular(24),
                                   ),
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -869,7 +925,9 @@ class _CartSummary extends StatelessWidget {
                                       _QuickBtn(
                                         icon: Icons.remove,
                                         color: Colors.red[700]!,
-                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
+                                        onTap: () => context.read<InvoiceBloc>().add(
+                                          AddItemToInvoice(item.item, -1, serviceMeta: item.serviceMeta),
+                                        ),
                                       ),
                                       GestureDetector(
                                         onLongPress: () => _showQuantityDialog(context, item),
@@ -885,7 +943,9 @@ class _CartSummary extends StatelessWidget {
                                       _QuickBtn(
                                         icon: Icons.add,
                                         color: Colors.green[700]!,
-                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, 1)),
+                                        onTap: () => context.read<InvoiceBloc>().add(
+                                          AddItemToInvoice(item.item, 1, serviceMeta: item.serviceMeta),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -906,7 +966,7 @@ class _CartSummary extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[50],
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   ),
                   child: SingleChildScrollView(
@@ -954,7 +1014,7 @@ class _CartSummary extends StatelessWidget {
                                       'Add Customer Name & Phone'),
                               style: TextStyle(
                                   color: state.customerName != null
-                                      ? Colors.black
+                                      ? (isDark ? Colors.white : Colors.black)
                                       : Colors.blue),
                             ),
                             subtitle: state.customerAddress != null
@@ -1050,6 +1110,9 @@ class _CartSummary extends StatelessWidget {
   }
 
   Widget _buildSummaryRow(BuildContext context, String label, double amount, String currency, {bool isTotal = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1061,7 +1124,7 @@ class _CartSummary extends StatelessWidget {
               style: TextStyle(
                 fontSize: isTotal ? 18 : 14,
                 fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-                color: isTotal ? Colors.black : Colors.grey[600],
+                color: isTotal ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.grey[400] : Colors.grey[600]),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1075,7 +1138,7 @@ class _CartSummary extends StatelessWidget {
             style: TextStyle(
               fontSize: isTotal ? 20 : 15,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
-              color: isTotal ? Theme.of(context).colorScheme.primary : Colors.black,
+              color: isTotal ? theme.colorScheme.primary : (isDark ? Colors.white : Colors.black),
             ),
           ),
         ],
@@ -1126,6 +1189,7 @@ class _CartSummary extends StatelessWidget {
     final hasAssignee = state.customerName?.trim().isNotEmpty == true;
     final isRosterStudent = state.studentId != null;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1177,7 +1241,7 @@ class _CartSummary extends StatelessWidget {
                           state.customerPhone!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[700],
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
                           ),
                         ),
                       if (!isRosterStudent &&
@@ -1186,7 +1250,7 @@ class _CartSummary extends StatelessWidget {
                           state.customerAddress!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
                       if (isRosterStudent &&
@@ -1195,7 +1259,7 @@ class _CartSummary extends StatelessWidget {
                           'ID: ${state.admissionNumber}${state.className != null ? ' · ${state.className}' : ''}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
                     ],
@@ -1210,7 +1274,7 @@ class _CartSummary extends StatelessWidget {
           title: Text(
             settings?.assignToCustomerLabel ?? 'Assign to Student',
             style: TextStyle(
-              color: isRosterStudent ? Colors.black : Colors.blue,
+              color: isRosterStudent ? (isDark ? Colors.white : Colors.black) : Colors.blue,
               fontWeight: isRosterStudent ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
@@ -1234,7 +1298,7 @@ class _CartSummary extends StatelessWidget {
             settings?.assignExternalCustomerLabel ??
                 'Add External Customer/Student',
             style: TextStyle(
-              color: hasAssignee && !isRosterStudent ? Colors.black : Colors.blue,
+              color: hasAssignee && !isRosterStudent ? (isDark ? Colors.white : Colors.black) : Colors.blue,
               fontWeight: hasAssignee && !isRosterStudent
                   ? FontWeight.w600
                   : FontWeight.normal,
@@ -1313,6 +1377,9 @@ class _CartSummary extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
+          final theme = Theme.of(ctx);
+          final isDark = theme.brightness == Brightness.dark;
+
           return AlertDialog(
             title: const Text('Apply Discount'),
             content: SingleChildScrollView(
@@ -1323,7 +1390,7 @@ class _CartSummary extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -1334,7 +1401,7 @@ class _CartSummary extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: selectedType == DiscountType.amount ? Colors.white : Colors.transparent,
+                                color: selectedType == DiscountType.amount ? (isDark ? theme.cardColor : Colors.white) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: selectedType == DiscountType.amount ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
                               ),
@@ -1348,7 +1415,7 @@ class _CartSummary extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: selectedType == DiscountType.percentage ? Colors.white : Colors.transparent,
+                                color: selectedType == DiscountType.percentage ? (isDark ? theme.cardColor : Colors.white) : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: selectedType == DiscountType.percentage ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
                               ),
@@ -1390,11 +1457,29 @@ class _CartSummary extends StatelessWidget {
                 ),
               ElevatedButton(
                 onPressed: () {
-                  final discount = double.tryParse(controller.text) ?? 0;
-                  // Basic validation for percentage
-                  if (selectedType == DiscountType.percentage && (discount < 0 || discount > 100)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a percentage between 0 and 100')),
+                  final discount = double.tryParse(controller.text.trim()) ?? 0;
+                  final bill = invoiceBloc.state;
+                  final cost = CurrencyFormatter.roundMoney(bill.subtotal + bill.tax);
+                  if (invoiceBloc.calculationService.discountExceedsCost(
+                    bill.subtotal,
+                    bill.tax,
+                    discount,
+                    selectedType,
+                  )) {
+                    showDialog(
+                      context: ctx,
+                      builder: (alertContext) => AlertDialog(
+                        title: const Text('Discount not allowed'),
+                        content: Text(
+                          'This discount is more than the actual cost of ${CurrencyFormatter.formatWithSymbol(cost, symbol: currency)}. The discount was not applied.',
+                        ),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(alertContext),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
                     );
                     return;
                   }
@@ -1455,6 +1540,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
   final addrController = TextEditingController(text: currentAddress);
   final invoiceBloc = context.read<InvoiceBloc>();
   String? selectedCustomerId = invoiceBloc.state.customerId;
+  String? existingCustomerName;
 
   showDialog(
     context: context,
@@ -1476,9 +1562,17 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                       children: [
                         const Icon(Icons.check_circle, color: Colors.green, size: 16),
                         const SizedBox(width: 8),
-                        const Expanded(child: Text('Linked to Customer Profile', style: TextStyle(color: Colors.green, fontSize: 12))),
+                        Expanded(
+                          child: Text(
+                            existingCustomerName != null ? 'Linked: $existingCustomerName' : 'Linked to Customer Profile',
+                            style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
                         InkWell(
-                          onTap: () => setState(() => selectedCustomerId = null),
+                          onTap: () => setState(() {
+                            selectedCustomerId = null;
+                            existingCustomerName = null;
+                          }),
                           child: const Icon(Icons.close, color: Colors.grey, size: 16),
                         ),
                       ],
@@ -1491,6 +1585,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                       if (customer != null) {
                         setState(() {
                           selectedCustomerId = customer.id;
+                          existingCustomerName = customer.name;
                           nameController.text = customer.name;
                           phoneController.text = customer.phone ?? '';
                           addrController.text = customer.address ?? '';
@@ -1503,68 +1598,111 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: nameController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerNameLabel ?? 'Customer Name', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.person),
+                  decoration: InputDecoration(
+                    labelText: settings?.customerNameLabel ?? 'Customer Name', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                  autofocus: true,
+                  validator: (val) {
+                    final label = settings?.customerLabel.toLowerCase() ?? 'customer';
+                    return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
+                  },
                 ),
-                autofocus: true,
-                validator: (val) {
-                  final label = settings?.customerLabel.toLowerCase() ?? 'customer';
-                  return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: phoneController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.phone),
-                  hintText: 'e.g. 08012345678',
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: InputDecoration(
+                    labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.phone),
+                    hintText: 'e.g. 08012345678',
+                  ),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: PhoneNumberInput.formatters,
+                  maxLength: PhoneNumberInput.maxDigits,
+                  onChanged: (val) async {
+                    final phone = val.trim();
+                    if (phone.length >= 10 && selectedCustomerId == null) {
+                      final repo = context.read<IServicesRepository>();
+                      final existing = await repo.getCustomerByPhone(phone);
+                      if (existing != null) {
+                        setState(() {
+                          selectedCustomerId = existing.id;
+                          existingCustomerName = existing.name;
+                          if (nameController.text.trim().isEmpty) {
+                            nameController.text = existing.name;
+                          }
+                          if (addrController.text.trim().isEmpty && existing.address != null) {
+                            addrController.text = existing.address!;
+                          }
+                        });
+                      }
+                    }
+                  },
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'Phone number required';
+                    final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
+                    if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                      return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.phone,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Phone number required';
-                  final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                    return 'Phone must be 11 to 15 digits';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: addrController,
-                decoration: InputDecoration(
-                  labelText: settings?.customerAddressLabel ?? 'Customer Address', 
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.location_on),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: addrController,
+                  decoration: InputDecoration(
+                    labelText: settings?.customerAddressLabel ?? 'Customer Address', 
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.location_on),
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final phone = phoneController.text.trim();
+                final name = nameController.text.trim();
+                final addr = addrController.text.trim();
+
+                String? finalCustId = selectedCustomerId;
+                final repo = context.read<IServicesRepository>();
+                if (finalCustId == null && phone.isNotEmpty) {
+                  final existing = await repo.getCustomerByPhone(phone);
+                  if (existing != null) {
+                    finalCustId = existing.id;
+                  } else {
+                    try {
+                      final created = await repo.createCustomer(
+                        name: name,
+                        phone: phone,
+                        address: addr.isEmpty ? null : addr,
+                      );
+                      finalCustId = created.id;
+                    } catch (_) {}
+                  }
+                }
+
+                invoiceBloc.add(UpdateCustomerInfo(
+                  name: name,
+                  phone: phone,
+                  address: addr.isEmpty ? null : addr,
+                  customerId: finalCustId,
+                ));
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-        ElevatedButton(
-          onPressed: () {
-            if (formKey.currentState?.validate() ?? false) {
-              invoiceBloc.add(UpdateCustomerInfo(
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                address: addrController.text.isEmpty ? null : addrController.text.trim(),
-                customerId: selectedCustomerId,
-              ));
-              Navigator.pop(ctx);
-            }
-          },
-          child: const Text('SAVE'),
-        ),
-      ],
-    ),
     ),
   );
 }
@@ -1597,10 +1735,13 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
           (c.phone != null && c.phone!.contains(query))
         ).toList();
         
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(16),
           height: MediaQuery.of(context).size.height * 0.75,
@@ -1610,7 +1751,7 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
                 width: 40,
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(color: isDark ? Colors.grey[700] : Colors.grey[300], borderRadius: BorderRadius.circular(2)),
               ),
               const Text('Select Customer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
@@ -1620,7 +1761,7 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   filled: true,
-                  fillColor: Colors.grey[100],
+                  fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
                 ),
                 onChanged: (val) => setState(() => query = val.toLowerCase()),
               ),
@@ -1689,9 +1830,12 @@ void _showExternalCustomerDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Use this for walk-in or non-roster payers. Details appear on the receipt.',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).brightness == Brightness.dark ? Colors.grey[400] : Colors.black54,
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1728,13 +1872,15 @@ void _showExternalCustomerDialog(
                   hintText: 'e.g. 08012345678',
                 ),
                 keyboardType: TextInputType.phone,
+                inputFormatters: PhoneNumberInput.formatters,
+                maxLength: PhoneNumberInput.maxDigits,
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
                     return 'Phone number required';
                   }
                   final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                    return 'Phone must be 11 to 15 digits';
+                  if (digitsOnly.length < 11 || digitsOnly.length > PhoneNumberInput.maxDigits) {
+                    return 'Phone must be 11 to ${PhoneNumberInput.maxDigits} digits';
                   }
                   return null;
                 },
@@ -1799,38 +1945,42 @@ void _showStudentPicker(BuildContext context) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => StatefulBuilder(
-      builder: (context, setState) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(16),
-        height: MediaQuery.of(context).size.height * 0.85,
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      builder: (context, setState) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Text('Select ${settings?.customerLabel ?? "Customer"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            
-            // Search Bar for Students
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by name or admission number...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey[100],
+              Text('Select ${settings?.customerLabel ?? "Customer"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              
+              // Search Bar for Students
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by name or admission number...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: isDark ? theme.colorScheme.surfaceContainerHighest : Colors.grey[100],
+                ),
+                onChanged: (val) => setState(() => studentSearchQuery = val.toLowerCase()),
               ),
-              onChanged: (val) => setState(() => studentSearchQuery = val.toLowerCase()),
-            ),
             const SizedBox(height: 12),
 
             // Class Filter
@@ -1967,9 +2117,10 @@ void _showStudentPicker(BuildContext context) {
             ),
           ],
         ),
-      ),
-    ),
-  );
+      );
+    },
+  ),
+);
 }
 
 void _showQuantityDialog(BuildContext context, InvoiceItem item) {

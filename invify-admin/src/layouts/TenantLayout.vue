@@ -28,12 +28,19 @@
 
           <!-- Dynamic Active Tenant Brand Logo/Title Container -->
           <div class="row items-center op-gap-6 border-indigo-left q-pl-md q-ml-sm v-hide-xs">
-            <q-icon name="storefront" color="amber-4" size="xs" />
+            <q-avatar size="22px" class="bg-panel rounded-borders" v-if="activeTenantLogo">
+              <img :src="activeTenantLogo" alt="Tenant Logo" style="object-fit: contain;" />
+            </q-avatar>
+            <q-icon v-else :name="tenantCategoryIcon" color="amber-4" size="xs" />
             <span class="text-metric-mono text-weight-bold text-amber-4 text-uppercase text-caption" style="font-size: 11px;">
               {{ activeBusinessName }}
             </span>
             <q-badge color="indigo-10" text-color="indigo-3" class="text-metric-sm text-weight-bold letter-spacing-1 q-ml-xs">
-              {{ activeIndustry.toUpperCase() }}
+              {{ (activeIndustry || 'BUSINESS').toUpperCase() }}
+            </q-badge>
+            <!-- Distinct HMO Partner Identity Pill (Separated from School Identity) -->
+            <q-badge v-if="assignedHmoPartner" color="teal-10" text-color="teal-2" class="text-metric-sm q-ml-xs">
+              HMO: {{ assignedHmoPartner }}
             </q-badge>
           </div>
         </div>
@@ -78,9 +85,9 @@
               </q-item>
               
               <!-- Quick access triggers -->
-              <q-item v-if="['retail', 'hospitality', 'healthcare'].includes(activeIndustry.toLowerCase())" clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
-                <q-item-section avatar><q-icon name="vpn_key" size="xs" color="amber-4" /></q-item-section>
-                <q-item-section class="text-white text-weight-bold">Device Activation</q-item-section>
+              <q-item clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
+                <q-item-section avatar><q-icon name="qr_code_2" size="xs" color="amber-4" /></q-item-section>
+                <q-item-section class="text-white text-weight-bold">Devices</q-item-section>
               </q-item>
 
               <q-separator dark class="q-my-xs opacity-10" />
@@ -181,7 +188,12 @@
 
       <router-view v-slot="{ Component }">
         <transition appear enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-          <component :is="Component" :key="$route.fullPath" />
+          <Suspense timeout="0">
+            <component :is="Component" :key="$route.fullPath" />
+            <template #fallback>
+              <InvifyLoadingState message="LOADING YOUR DASHBOARD..." />
+            </template>
+          </Suspense>
         </transition>
       </router-view>
     </q-page-container>
@@ -194,6 +206,9 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { adminApi, api } from '../api'
 import { logoutAuthenticatedSession } from '../auth/session'
+import InvifyLoadingState from '../components/InvifyLoadingState.vue'
+import { ensureTenantRealtime } from '../services/tenantSocket'
+import { useFinanceStore } from '../stores/finance.store'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -205,9 +220,19 @@ const operatorEmail = ref(localStorage.getItem('operator_email') || 'owner@busin
 const operatorName = ref('')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'OWNER')
 const activeBusinessName = ref('')
+const activeTenantLogo = ref('')
+const assignedHmoPartner = ref('')
 
 // Industry configuration: read from localStorage (tenant_type / school, retail, etc.)
 const activeIndustry = ref(localStorage.getItem('tenant_type') || '')
+
+const tenantCategoryIcon = computed(() => {
+  const mode = String(activeIndustry.value || '').toLowerCase()
+  if (mode.includes('school') || mode.includes('education')) return 'school'
+  if (mode.includes('health') || mode.includes('hmo')) return 'health_and_safety'
+  if (mode.includes('bank') || mode.includes('finance')) return 'account_balance'
+  return 'storefront'
+})
 
 const getTenantIdFromToken = () => {
   // Prefer JWT tenantId for tenant operators so a stale twin in localStorage cannot stick.
@@ -247,6 +272,8 @@ const loadTenantDetails = async () => {
       if (res.data && res.data.tenant) {
         activeBusinessName.value = res.data.tenant.name || ''
         activeIndustry.value = res.data.tenant.business_mode || res.data.tenant.type || ''
+        activeTenantLogo.value = res.data.tenant.logo_url || res.data.tenant.logo || ''
+        assignedHmoPartner.value = res.data.tenant.assigned_hmo_name || res.data.tenant.hmo_partner_name || localStorage.getItem('assigned_hmo_name') || ''
         localStorage.setItem('tenant_type', activeIndustry.value)
         
         // Find operator name
@@ -276,6 +303,7 @@ const coreNavigationTree = [
   { label: 'Wallet & Treasury', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'green-4' },
   { label: 'Reconciliation Center', path: '/tenant/reconciliation', icon: 'account_tree', color: 'amber-4' },
   { label: 'Staff Management', path: '/tenant/staff', icon: 'people_outline', color: 'cyan-4' },
+  { label: 'Devices', path: '/tenant/devices', icon: 'qr_code_2', color: 'amber-4' },
   { label: 'BI Reports & Exports', path: '/tenant/reports', icon: 'insert_chart_outlined', color: 'purple-3' },
   { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' },
   { label: 'Financial Platform', path: '/tenant/settings/financial-platform', icon: 'account_balance', color: 'amber-4' },
@@ -290,14 +318,20 @@ const industryNavigationTree = computed(() => {
       { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
       { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
+      { label: 'ID Cards', path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: 'SCHOOL' },
+      { label: 'Entry and Exit', path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
+      { label: 'Attendance', path: '/tenant/attendance', icon: 'fact_check', color: 'blue-4', mode: 'SCHOOL' },
+      { label: 'Message parents', path: '/tenant/parent-messages', icon: 'campaign', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'School Payments', path: '/tenant/school-payments', icon: 'payments', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
       { label: 'Inventory', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'deep-orange-4', mode: 'SCHOOL' },
       { label: 'Library', path: '/tenant/curriculum', icon: 'library_books', color: 'brown-4', mode: 'SCHOOL' },
       { label: 'Transport', path: '/tenant/logistics/fleet', icon: 'directions_bus', color: 'blue-grey-4', mode: 'SCHOOL' },
       { label: 'Staff', path: '/tenant/users?role=TEACHER', icon: 'people', color: 'grey-4', mode: 'SCHOOL' },
+      { label: 'Devices', path: '/tenant/devices', icon: 'qr_code_2', color: 'amber-4', mode: 'SCHOOL' },
       { label: 'Communication', path: '/tenant/settings', icon: 'campaign', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Reports', path: '/tenant/analytics', icon: 'insert_chart', color: 'teal-4', mode: 'SCHOOL' }
     ]
@@ -305,22 +339,19 @@ const industryNavigationTree = computed(() => {
     return [
       { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' },
       { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: 'RETAIL' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'RETAIL' },
       { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: 'RETAIL' },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' },
       { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: 'RETAIL' }
     ]
-  } else if (mode === 'services' || mode === 'service') {
+  } else if (mode === 'services' || mode === 'service' || mode === 'hospitality' || mode === 'invify_services') {
     return [
-      { label: 'Service Jobs Ledger', path: '/tenant/transactions', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
+      { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
+      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SERVICE' },
       { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: 'SERVICE' },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'SERVICE' },
+      { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: 'SERVICE' },
       { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: 'SERVICE' }
-    ]
-  } else if (mode === 'hospitality') {
-    return [
-      { label: 'Service Order Matrix', path: '/tenant/hospitality/rooms', icon: 'dry_cleaning', color: 'indigo-4', mode: 'HOTEL' },
-      { label: 'Appointments & Bookings', path: '/tenant/hospitality/bookings', icon: 'calendar_today', color: 'cyan-4', mode: 'HOTEL' },
-      { label: 'Service Catalog Invoicing', path: '/tenant/hospitality/billing', icon: 'receipt', color: 'green-4', mode: 'HOTEL' }
     ]
   } else if (mode === 'logistics') {
     return [
@@ -340,7 +371,11 @@ const industryNavigationTree = computed(() => {
   return []
 })
 
-onMounted(loadTenantDetails)
+onMounted(() => {
+  loadTenantDetails()
+  ensureTenantRealtime()
+  useFinanceStore().subscribe()
+})
 </script>
 
 <style scoped>

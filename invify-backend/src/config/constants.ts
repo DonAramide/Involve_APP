@@ -86,3 +86,16 @@ export function isMockTokenAllowed(): boolean {
   }
   return variantService.isLocal() || process.env.NODE_ENV === 'test';
 }
+
+/** True for loopback / RFC1918 clients talking to a non-production Node process. */
+export function isPrivateLanIp(ip?: string | null): boolean {
+  if (!ip) return false;
+  const n = String(ip).replace(/^::ffff:/, '');
+  return (
+    n === '127.0.0.1' ||
+    n === '::1' ||
+    n.startsWith('10.') ||
+    n.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(n)
+  );
+}

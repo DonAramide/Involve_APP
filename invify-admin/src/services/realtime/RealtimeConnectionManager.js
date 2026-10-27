@@ -76,7 +76,7 @@ class RealtimeConnectionManager {
   initWebSocketTransport(tenantId, apiKey) {
     try {
       // Mocked endpoint URI incorporating strict tenant authentication parameters
-      const wsUrl = `wss://telemetry.IIPS.app/v1/stream?tenant=${encodeURIComponent(tenantId)}&token=${encodeURIComponent(apiKey)}`
+      const wsUrl = `wss://telemetry.invify.org/v1/stream?tenant=${encodeURIComponent(tenantId)}&token=${encodeURIComponent(apiKey)}`
       
       // Simulate real browser interface initialization
       console.log(`[RealtimeCore] Initializing primary WebSocket transport layer: ${wsUrl}`)

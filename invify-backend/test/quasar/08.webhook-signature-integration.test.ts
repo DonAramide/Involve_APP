@@ -270,4 +270,80 @@ describe('POST /webhooks/quasar — Express integration test', () => {
     expect(res.body).toEqual({ status: 'already_processed' });
     expect(MockLedger.createDoubleEntry).not.toHaveBeenCalled();
   });
+
+  it('accepts QFS virtual_account.funded without a checkout reference', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'transactions_log') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: null, error: null }),
+              single: () => Promise.resolve({ data: null, error: null }),
+            }),
+          }),
+          insert: () => Promise.resolve({ error: null }),
+          update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        };
+      }
+      if (table === 'customers') {
+        return {
+          select: () => ({
+            eq: () => ({
+              limit: () => Promise.resolve({
+                data: [{ id: 'par-1', tenant_id: MOCK_TENANT_ID, name: 'Momom' }],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'wallets') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({
+                data: { id: 'wallet-uuid-def-456' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            filter: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            limit: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+        insert: () => Promise.resolve({ error: null }),
+      };
+    });
+
+    const payloadObj = {
+      event: 'virtual_account.funded',
+      data: {
+        sandbox: true,
+        mode: 'sandbox_credit',
+        accountNumber: '9001234568',
+        amount: '1.0000',
+        currency: 'NGN',
+        reason: 'Initial Wallet Funding',
+      },
+    };
+    const payloadStr = JSON.stringify(payloadObj);
+    const signature = generateSignature(payloadStr, SIGNING_SECRET);
+
+    const res = await request(app)
+      .post('/webhooks/quasar')
+      .set('Content-Type', 'application/json')
+      .set('x-quasar-signature', signature)
+      .set('x-quasar-delivery-id', 'del-qfs-001')
+      .set('x-quasar-timestamp', String(Math.floor(Date.now() / 1000)))
+      .send(payloadStr);
+
+    expect(res.status).toBe(200);
+    expect(MockLedger.exists).toHaveBeenCalledWith('quasar:qfs:del-qfs-001:credit');
+  });
 });

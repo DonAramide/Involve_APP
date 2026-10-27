@@ -2,8 +2,13 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { LicenseGenerator } from '../utils/license.util';
+import { applyPaidLicenseToTenant, paidLicenseFromActivation } from '../utils/paid-license';
 import { GovAuditService } from '../services/gov-audit.service';
 import { authenticator } from 'otplib';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { mergeDeviceInfo, ORIGIN_CUSTOMER, ORIGIN_INVIFY, originOfDevice } from '../utils/device-origin';
+import { canApproveTerminalActivation, TERMINAL_ACTIVATION_APPROVER } from '../utils/terminal-activation-approval';
+import { deliverApprovedTerminalActivation } from '../services/terminal-activation-delivery';
 
 function isNetworkTimeout(error: any): boolean {
   return (
@@ -12,6 +17,32 @@ function isNetworkTimeout(error: any): boolean {
     error.message?.includes('timeout') ||
     error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT'
   );
+}
+
+async function findTenantDevice(deviceId: string, tenantId: string) {
+  const id = String(deviceId || '').trim();
+  if (!id || !tenantId) return null;
+  const { data: byDevice } = await supabaseAdmin
+    .from('devices')
+    .select('device_id, tenant_id')
+    .eq('tenant_id', tenantId)
+    .ilike('device_id', id)
+    .maybeSingle();
+  if (byDevice) return byDevice;
+  const { data: byRow } = await supabaseAdmin
+    .from('devices')
+    .select('device_id, tenant_id, id')
+    .eq('tenant_id', tenantId)
+    .eq('id', id)
+    .maybeSingle();
+  if (byRow) return byRow;
+  const { data: registration } = await supabaseAdmin
+    .from('device_registrations')
+    .select('device_id, tenant_id')
+    .eq('tenant_id', tenantId)
+    .ilike('device_id', id)
+    .maybeSingle();
+  return registration || null;
 }
 
 export class DeviceController {
@@ -30,37 +61,91 @@ export class DeviceController {
         role === 'internal_staff' ||
         role.startsWith('admin_');
 
-      // 1. Fetch devices raw data (tenant-scoped for non-platform operators)
-      let query = supabase.from('devices').select('*');
-      if (!isPlatform) {
-        if (!user?.tenantId) {
-          return res.status(403).json({ error: 'Tenant context required' });
-        }
-        query = query.eq('tenant_id', user.tenantId);
-      }
-      const { data: devices, error: devError } = await query.order('last_seen', { ascending: false });
+      const tenantScope = isPlatform ? null : resolveAuthoritativeTenantId(req);
 
+      // 1. Fetch devices raw data (tenant-scoped for non-platform operators)
+      const buildDeviceQuery = () => {
+        let q = supabaseAdmin.from('devices').select('*');
+        if (tenantScope) {
+          q = q.eq('tenant_id', tenantScope);
+        }
+        return q;
+      };
+      if (!isPlatform && !tenantScope) {
+        return res.status(403).json({ error: 'Tenant context required' });
+      }
+      let { data: devices, error: devError } = await buildDeviceQuery().order('last_seen', { ascending: false });
+      if (devError) {
+        const retry = await buildDeviceQuery();
+        devices = retry.data;
+        devError = retry.error;
+      }
       if (devError) throw devError;
 
-      // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
-      const tenantIds = Array.from(new Set((devices || []).map(d => d.tenant_id).filter(Boolean)));
-      const tenantsMap = new Map<string, { name: string; plan: string }>();
+      let registrationQuery = supabaseAdmin.from('device_registrations').select('*');
+      if (tenantScope) {
+        registrationQuery = registrationQuery.eq('tenant_id', tenantScope);
+      }
+      const { data: registrations } = await registrationQuery;
+
+      const byId = new Map<string, any>();
+      (devices || []).forEach((d: any) => {
+        const key = String(d.device_id || d.id || '');
+        if (key) byId.set(key, d);
+      });
+      (registrations || []).forEach((r: any) => {
+        const key = String(r.device_id || '');
+        if (!key || byId.has(key)) return;
+        byId.set(key, {
+          device_id: r.device_id,
+          tenant_id: r.tenant_id,
+          status: String(r.status || 'ACTIVE').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : r.status,
+          last_seen: r.updated_at || r.created_at || null,
+          device_info: { agent_code: r.agent_code, location: r.location },
+          device_name: r.owner_name || r.device_id,
+        });
+      });
+      const mergedDevices = Array.from(byId.values());
+
+      const tenantIds = Array.from(new Set(mergedDevices.map(d => d.tenant_id).filter(Boolean)));
+      const tenantsMap = new Map<string, { name: string; plan: string; plan_expires_at: string | null; owner_email: string | null }>();
 
       if (tenantIds.length > 0) {
-        const { data: tenants, error: tenError } = await supabase
+        type TenantDeviceSummaryRow = {
+          id: string;
+          name: string;
+          plan: string;
+          plan_expires_at?: string | null;
+          owner_email?: string | null;
+        };
+        const initialTenants = await supabaseAdmin
           .from('tenants')
-          .select('id, name, plan')
+          .select('id, name, plan, plan_expires_at, owner_email')
           .in('id', tenantIds);
+        let tenants: TenantDeviceSummaryRow[] | null = initialTenants.data;
+        let tenError = initialTenants.error;
+        if (tenError && String(tenError.message || '').toLowerCase().includes('plan_expires_at')) {
+          const retry = await supabaseAdmin
+            .from('tenants')
+            .select('id, name, plan')
+            .in('id', tenantIds);
+          tenants = retry.data;
+          tenError = retry.error;
+        }
 
         if (!tenError && tenants) {
           tenants.forEach(t => {
-            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+            tenantsMap.set(t.id, {
+              name: t.name,
+              plan: t.plan,
+              plan_expires_at: t.plan_expires_at || null,
+              owner_email: t.owner_email || null,
+            });
           });
         }
       }
 
-      // 3. Map tenant details back to devices matching the shape expected by the frontend
-      const enrichedDevices = (devices || []).map(device => ({
+      const enrichedDevices = mergedDevices.map(device => ({
         ...device,
         tenants: tenantsMap.get(device.tenant_id) || null,
       }));
@@ -71,6 +156,66 @@ export class DeviceController {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
       console.error('[DeviceController] getDevices Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/devices/connected
+   * Live Socket.io sessions on this Node process (not the registered-fleet table).
+   */
+  static async getConnectedPresence(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' });
+      }
+
+      const { io } = require('../app');
+      const sockets = await io.fetchSockets();
+      const byDevice = new Map<string, { deviceId: string; tenantId: string | null; socketId: string; ip: string }>();
+
+      for (const sock of sockets) {
+        const tenantId = sock.data?.tenantId || sock.handshake?.auth?.tenantId || null;
+        if (!isPlatform && tenantId !== user.tenantId) continue;
+
+        const deviceId = String(
+          sock.data?.deviceId ||
+            sock.handshake?.auth?.deviceId ||
+            '',
+        ).trim();
+        if (!deviceId) continue;
+        if (!byDevice.has(deviceId)) {
+          const hdr = sock.handshake?.headers?.['x-forwarded-for'];
+          const forwarded = (typeof hdr === 'string' ? hdr : Array.isArray(hdr) ? hdr[0] : '')
+            ?.split(',')[0]
+            ?.trim();
+          const real = String(sock.handshake?.headers?.['x-real-ip'] || '').trim();
+          let ip = String(sock.data?.ip || forwarded || real || sock.handshake?.address || 'unknown');
+          ip = ip.replace(/^::ffff:/, '');
+          if (ip === '::1') ip = '127.0.0.1';
+          byDevice.set(deviceId, {
+            deviceId,
+            tenantId,
+            socketId: sock.id,
+            ip,
+          });
+        }
+      }
+
+      const devices = Array.from(byDevice.values());
+      return res.status(200).json({
+        connectedDevices: devices.length,
+        sockets: sockets.length,
+        devices,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] getConnectedPresence Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -89,7 +234,7 @@ export class DeviceController {
         role.startsWith('admin_');
 
       // 1. Fetch activations raw data (tenant-scoped for non-platform operators)
-      let actQuery = supabase.from('device_activations').select('*');
+      let actQuery = supabaseAdmin.from('device_activations').select('*');
       if (!isPlatform) {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
@@ -102,26 +247,42 @@ export class DeviceController {
 
       // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
       const tenantIds = Array.from(new Set((activations || []).map(a => a.tenant_id).filter(Boolean)));
-      const tenantsMap = new Map<string, { name: string; plan: string }>();
+      const tenantsMap = new Map<string, { name: string; plan: string; owner_email: string | null }>();
 
       if (tenantIds.length > 0) {
-        const { data: tenants, error: tenError } = await supabase
+        const { data: tenants, error: tenError } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, plan')
+          .select('id, name, plan, owner_email')
           .in('id', tenantIds);
 
         if (!tenError && tenants) {
           tenants.forEach(t => {
-            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+            tenantsMap.set(t.id, { name: t.name, plan: t.plan, owner_email: t.owner_email || null });
           });
         }
       }
 
       // 3. Map tenant details back to activations matching the shape expected by the frontend
-      const enrichedActivations = (activations || []).map(activation => ({
-        ...activation,
-        tenants: tenantsMap.get(activation.tenant_id) || null,
-      }));
+      const viewer = String(user?.email || '').trim().toLowerCase();
+      const enrichedActivations = (activations || []).map(activation => {
+        const hidden =
+          activation.status === 'awaiting_approval' || activation.status === 'rejected';
+        const decision = canApproveTerminalActivation(viewer, activation.created_by);
+        const awaiting = activation.status === 'awaiting_approval';
+        return {
+          ...activation,
+          activation_code: hidden ? null : activation.activation_code,
+          tenants: tenantsMap.get(activation.tenant_id) || null,
+          canApprove: awaiting && decision.ok,
+          approvalNote: !awaiting
+            ? null
+            : decision.ok
+              ? null
+              : viewer === TERMINAL_ACTIVATION_APPROVER
+                ? 'You requested this code, so a different support@iips.app sign-in must approve it.'
+                : 'Waiting for support@iips.app',
+        };
+      });
 
       return res.status(200).json(enrichedActivations);
     } catch (error: any) {
@@ -138,11 +299,50 @@ export class DeviceController {
    * Generates a new activation key
    */
   static async createActivation(req: Request, res: Response) {
-    try {
-      const user = (req as any).user;
-      let tenantId = user?.tenantId;
+    const user = (req as any).user;
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    let tenantId = user?.tenantId;
+    const operatorEmail = user?.email || 'unknown';
+    const operatorName = user?.name || operatorEmail.split('@')[0]?.toUpperCase() || 'Unknown';
 
-      if (user?.role === 'super_admin') {
+    const logGenerateAudit = async (
+      status: 'success' | 'failed',
+      details: { code?: string; error?: string; durationDays?: number; planIndex?: number; deviceSuffix?: string } = {},
+    ) => {
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'GENERATE_ACTIVATION_CODE',
+          user_email: operatorEmail,
+          user_name: operatorName,
+          ip_address: ip,
+          target: details.code || details.deviceSuffix || '-',
+          status,
+          tenant_id: tenantId || null,
+          metadata: {
+            tenant_id: tenantId || null,
+            created_by: operatorEmail,
+            duration_days: details.durationDays,
+            plan_index: details.planIndex,
+            device_suffix: details.deviceSuffix,
+            error: details.error,
+          },
+        });
+      } catch (err: any) {
+        console.error('[DeviceController] Failed to write generate-activation audit log:', err.message);
+      }
+    };
+
+    try {
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      if (isPlatform) {
         tenantId = req.body.tenantId || tenantId;
       }
 
@@ -196,7 +396,7 @@ export class DeviceController {
             device_suffix: deviceSuffix || '0',
             device_id: null, // No generated device identifier at creation time
             is_used: false,
-            status: 'pending',
+            status: 'awaiting_approval',
             created_by: creatorEmail,
             expires_at: expiresAtIso
           })
@@ -204,12 +404,26 @@ export class DeviceController {
           .single();
 
         if (error) throw error;
-        return res.status(201).json({ 
-          activation_code: data.activation_code,
-          expires_at: data.expires_at
+        await logGenerateAudit('success', {
+          code: data.activation_code,
+          durationDays: durationDaysNum,
+          planIndex: Number(planIndex) || 0,
+          deviceSuffix: deviceSuffix || '0',
+        });
+        return res.status(201).json({
+          id: data.id,
+          status: 'awaiting_approval',
+          expires_at: data.expires_at,
+          message: 'Waiting for support@iips.app to approve this terminal activation. The code stays hidden until then.',
         });
       } catch (dbErr: any) {
         if (isNetworkTimeout(dbErr)) {
+          await logGenerateAudit('failed', {
+            durationDays: durationDaysNum,
+            planIndex: Number(planIndex) || 0,
+            deviceSuffix: deviceSuffix || '0',
+            error: 'Database unavailable',
+          });
           return res.status(503).json({ 
             error: 'Database unavailable', 
             retryable: true,
@@ -220,7 +434,214 @@ export class DeviceController {
       }
     } catch (error: any) {
       console.error('[DeviceController] createActivation Error:', error.message);
+      await logGenerateAudit('failed', { error: error.message });
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /devices/activations/:id/approve
+   * Checker: support@iips.app only, and not the maker.
+   */
+  static async approveActivation(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation request not found' });
+      if (row.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: 'This activation is not waiting for approval' });
+      }
+
+      const decision = canApproveTerminalActivation(user?.email, row.created_by);
+      if (!decision.ok) return res.status(403).json({ error: decision.error });
+
+      const { data: updated, error: updateErr } = await supabaseAdmin
+        .from('device_activations')
+        .update({ status: 'pending' })
+        .eq('id', id)
+        .eq('status', 'awaiting_approval')
+        .select()
+        .maybeSingle();
+      if (updateErr) throw updateErr;
+      if (!updated) return res.status(409).json({ error: 'This activation was already reviewed' });
+
+      let emailSent = false;
+      let emailedTo: string | null = null;
+      let emailError: string | undefined;
+      try {
+        const delivery = await deliverApprovedTerminalActivation(updated);
+        emailSent = delivery.sent;
+        emailedTo = delivery.to;
+        emailError = delivery.error;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'The activation file could not be emailed.';
+        console.error('[DeviceController] activation email failed:', emailError);
+      }
+      await DeviceController.rememberActivationEmail(updated.id, emailedTo, emailSent);
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'APPROVE_ACTIVATION_CODE',
+          user_email: user.email,
+          user_name: user.name || user.email,
+          ip_address: req.socket.remoteAddress || '127.0.0.1',
+          target: updated.activation_code,
+          status: 'success',
+          tenant_id: updated.tenant_id,
+          metadata: { maker: row.created_by, emailedTo, emailSent },
+        });
+      } catch (_) {}
+
+      return res.status(200).json({
+        success: true,
+        id: updated.id,
+        status: 'pending',
+        activation_code: updated.activation_code,
+        expires_at: updated.expires_at,
+        emailSent,
+        emailedTo,
+        emailError: emailSent ? undefined : emailError,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] approveActivation Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to approve activation' });
+    }
+  }
+
+  /**
+   * POST /devices/activations/:id/reject
+   */
+  static async rejectActivation(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('id, status, created_by, tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation request not found' });
+      if (row.status !== 'awaiting_approval') {
+        return res.status(400).json({ error: 'This activation is not waiting for approval' });
+      }
+
+      const decision = canApproveTerminalActivation(user?.email, row.created_by);
+      if (!decision.ok) return res.status(403).json({ error: decision.error });
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('device_activations')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+        .eq('status', 'awaiting_approval');
+      if (updateErr) throw updateErr;
+
+      return res.status(200).json({ success: true, id, status: 'rejected' });
+    } catch (error: any) {
+      console.error('[DeviceController] rejectActivation Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to reject activation' });
+    }
+  }
+
+  static async resendActivationEmail(req: Request, res: Response) {
+    return res.status(200).json({ success: true, message: 'Activation email queued' });
+  }
+
+  /**
+   * POST /devices/activations/:id/resend-email
+   * Sends the approved activation file to the tenant email again.
+   */
+  static async resendActivationEmail(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation not found' });
+
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform && String(user?.tenantId || '') !== String(row.tenant_id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      if (row.status === 'awaiting_approval' || row.status === 'rejected' || !row.activation_code) {
+        return res.status(400).json({ error: 'Approve this activation before emailing it.' });
+      }
+
+      let emailSent = false;
+      let emailedTo: string | null = null;
+      let emailError: string | undefined;
+      try {
+        const delivery = await deliverApprovedTerminalActivation(row);
+        emailSent = delivery.sent;
+        emailedTo = delivery.to;
+        emailError = delivery.error;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'The activation file could not be emailed.';
+        console.error('[DeviceController] activation resend failed:', emailError);
+      }
+      await DeviceController.rememberActivationEmail(row.id, emailedTo, emailSent);
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'RESEND_ACTIVATION_EMAIL',
+          user_email: user?.email || 'unknown',
+          user_name: user?.name || user?.email || 'unknown',
+          ip_address: req.socket.remoteAddress || '127.0.0.1',
+          target: row.activation_code,
+          status: emailSent ? 'success' : 'failed',
+          tenant_id: row.tenant_id,
+          metadata: { emailedTo, emailSent, emailError: emailSent ? undefined : emailError },
+        });
+      } catch (_) {}
+
+      return res.status(emailSent ? 200 : 502).json({
+        success: emailSent,
+        id: row.id,
+        emailSent,
+        emailedTo,
+        emailedAt: emailSent ? new Date().toISOString() : null,
+        emailError: emailSent ? undefined : emailError,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] resendActivationEmail Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to resend activation email' });
+    }
+  }
+
+  private static async rememberActivationEmail(id: string, to: string | null, sent: boolean) {
+    if (!sent || !to) return;
+    const { error } = await supabaseAdmin
+      .from('device_activations')
+      .update({ emailed_to: to, emailed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.warn('[DeviceController] activation email stamp skipped:', error.message);
     }
   }
 
@@ -263,53 +684,71 @@ export class DeviceController {
         return res.status(400).json({ error: 'Invalid activation code' });
       }
 
-      if (activation.is_used || activation.status === 'used') {
-        return res.status(400).json({ error: 'Activation code has already been used' });
+      if (activation.status === 'awaiting_approval') {
+        return res.status(400).json({
+          error: 'This activation code is waiting for approval from support@iips.app.',
+        });
+      }
+      if (activation.status === 'rejected') {
+        return res.status(400).json({ error: 'This activation code was rejected.' });
       }
 
-      if (new Date(activation.expires_at) <= new Date() || activation.status === 'expired') {
-        return res.status(400).json({ error: 'Activation code has expired' });
-      }
-
-      // Enforce ownership integrity: user must belong to the same tenant as the activation (except super_admin)
-      const user = (req as any).user;
-      if (user && user.role !== 'super_admin' && activation.tenant_id !== user.tenantId) {
-        return res.status(403).json({ error: 'Forbidden: Activation code belongs to a different tenant' });
-      }
-
-      // 2. Perform conditional atomic update (expires_at > NOW() verified in query)
       let updatedActivation: any = null;
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('device_activations')
-          .update({
-            is_used: true,
-            status: 'used',
-            device_id: deviceId,
-            used_at: new Date().toISOString()
-          })
-          .eq('activation_code', code)
-          .eq('is_used', false)
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString()) // Expiration verification inside the atomic lock operation
-          .select()
-          .maybeSingle();
+      const alreadyRedeemedHere =
+        (activation.is_used || activation.status === 'used') &&
+        activation.device_id &&
+        activation.device_id === deviceId;
 
-        if (error) throw error;
-        updatedActivation = data;
-      } catch (updateErr: any) {
-        if (isNetworkTimeout(updateErr)) {
-          return res.status(503).json({
-            error: 'Database unavailable',
-            retryable: true,
-            retryAfterMs: 2000
-          });
+      if (activation.is_used || activation.status === 'used') {
+        if (!alreadyRedeemedHere) {
+          return res.status(400).json({ error: 'Activation code has already been used' });
         }
-        throw updateErr;
+        updatedActivation = activation;
       }
 
       if (!updatedActivation) {
-        return res.status(400).json({ error: 'Activation code is invalid, expired, or has already been used' });
+        if (new Date(activation.expires_at) <= new Date() || activation.status === 'expired') {
+          return res.status(400).json({ error: 'Activation code has expired' });
+        }
+
+        // Enforce ownership integrity: user must belong to the same tenant as the activation (except super_admin)
+        const user = (req as any).user;
+        if (user && user.role !== 'super_admin' && activation.tenant_id !== user.tenantId) {
+          return res.status(403).json({ error: 'Forbidden: Activation code belongs to a different tenant' });
+        }
+
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('device_activations')
+            .update({
+              is_used: true,
+              status: 'used',
+              device_id: deviceId,
+              used_at: new Date().toISOString()
+            })
+            .eq('activation_code', code)
+            .eq('is_used', false)
+            .eq('status', 'pending')
+            .gt('expires_at', new Date().toISOString())
+            .select()
+            .maybeSingle();
+
+          if (error) throw error;
+          updatedActivation = data;
+        } catch (updateErr: any) {
+          if (isNetworkTimeout(updateErr)) {
+            return res.status(503).json({
+              error: 'Database unavailable',
+              retryable: true,
+              retryAfterMs: 2000
+            });
+          }
+          throw updateErr;
+        }
+
+        if (!updatedActivation) {
+          return res.status(400).json({ error: 'Activation code is invalid, expired, or has already been used' });
+        }
       }
 
       // 3. Resolve device role dynamically
@@ -381,22 +820,50 @@ export class DeviceController {
 
         if (upsertError) throw upsertError;
 
-        let tenantData = null;
+        const paid = paidLicenseFromActivation(updatedActivation);
+
         try {
-          const { data: tenant } = await supabaseAdmin
-            .from('tenants')
-            .select('*')
-            .eq('id', updatedActivation.tenant_id)
-            .single();
-          tenantData = tenant;
-        } catch (e) {
-          console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
+          await supabaseAdmin
+            .from('device_registrations')
+            .update({
+              tenant_id: updatedActivation.tenant_id,
+              status: 'active',
+              is_trial: false,
+              trial_ends_at: paid.plan_expires_at,
+            })
+            .eq('device_id', deviceId);
+        } catch (regErr: any) {
+          console.warn('[DeviceController] device_registrations rebind failed (non-fatal):', regErr?.message || regErr);
         }
 
+        let tenantData = null;
+        try {
+          tenantData = await applyPaidLicenseToTenant(updatedActivation.tenant_id, paid);
+        } catch (upgradeErr: any) {
+          console.warn('[DeviceController] tenant paid-plan upgrade failed (non-fatal):', upgradeErr?.message || upgradeErr);
+        }
+        if (!tenantData) {
+          try {
+            const { data: tenant } = await supabaseAdmin
+              .from('tenants')
+              .select('*')
+              .eq('id', updatedActivation.tenant_id)
+              .single();
+            tenantData = tenant;
+          } catch (e) {
+            console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
+          }
+        }
+
+        const planIndex = Number(updatedActivation.plan_index || 0);
+        const planName = paid.plan;
         return res.status(200).json({
           valid: true,
           activation_code: updatedActivation.activation_code,
           duration_days: updatedActivation.duration_days,
+          plan_index: planIndex,
+          plan: planName,
+          plan_expires_at: paid.plan_expires_at,
           tenant_id: updatedActivation.tenant_id,
           tenant: tenantData,
           device_id: deviceId,
@@ -678,7 +1145,29 @@ export class DeviceController {
         }
       }
 
-      // Step 2: Upsert device record in Supabase
+      // Step 2: Upsert device. New onboard that is not already in inventory is customer incoming.
+      let existingDevice: any = null;
+      try {
+        const { data } = await supabaseAdmin
+          .from('devices')
+          .select('*')
+          .eq('device_id', resolvedDeviceId)
+          .maybeSingle();
+        existingDevice = data || null;
+      } catch (lookupErr: any) {
+        console.warn('[DeviceController] existing device lookup failed:', lookupErr.message);
+      }
+
+      const alreadyListed = Boolean(existingDevice);
+      const existingOrigin = existingDevice ? originOfDevice(existingDevice) : null;
+      const isInvifyFleet = alreadyListed && existingOrigin === 'INVIFY_UPLOADED';
+      if (isInvifyFleet) {
+        deviceCategory = 'COMPANY_DEVICE';
+      } else if (!alreadyListed) {
+        deviceCategory = 'USER_DEVICE';
+      }
+      const originTag = isInvifyFleet || deviceCategory === 'COMPANY_DEVICE' ? ORIGIN_INVIFY : ORIGIN_CUSTOMER;
+
       const deviceRecord = {
         device_id: resolvedDeviceId,
         tenant_id: tenantId,
@@ -686,7 +1175,7 @@ export class DeviceController {
         device_role: deviceRole,
         status: 'active',
         device_suffix: deviceInfo?.deviceSuffix || null,
-        device_info: deviceInfo || null,
+        device_info: mergeDeviceInfo(existingDevice?.device_info, deviceInfo || {}, originTag),
         theme_color: themeColor || null,
         inventory_record_id: inventoryRecordId,
         device_name: deviceInfo?.model || deviceInfo?.deviceName || resolvedDeviceId,
@@ -761,21 +1250,15 @@ export class DeviceController {
         if (!user?.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
         }
-        const { data: owned, error: ownErr } = await supabase
-          .from('devices')
-          .select('device_id')
-          .eq('device_id', deviceId)
-          .eq('tenant_id', user.tenantId)
-          .maybeSingle();
-        if (ownErr) throw ownErr;
+        const owned = await findTenantDevice(deviceId, user.tenantId);
         if (!owned) {
           return res.status(404).json({ error: 'Device not found' });
         }
       }
 
-      const { data, error } = await supabase.from('device_status').select('*').eq('device_id', deviceId).single();
+      const { data, error } = await supabaseAdmin.from('device_status').select('*').eq('device_id', deviceId).maybeSingle();
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json(data || { device_id: deviceId, status: 'unknown' });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
@@ -787,11 +1270,31 @@ export class DeviceController {
   static async getDeviceTelemetry(req: Request, res: Response) {
     try {
       const { deviceId } = req.params;
-      const { data, error } = await supabase.from('device_telemetry').select('*').eq('device_id', deviceId).order('created_at', { ascending: false }).limit(50);
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform) {
+        const tenantId = resolveAuthoritativeTenantId(req);
+        const owned = await findTenantDevice(deviceId, tenantId);
+        if (!owned) {
+          return res.status(404).json({ error: 'Device not found' });
+        }
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('device_telemetry')
+        .select('*')
+        .eq('device_id', deviceId)
+        .order('created_at', { ascending: false })
+        .limit(50);
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json(data || []);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      const status = error.status || 500;
+      return res.status(status).json({ error: error.message });
     }
   }
 
@@ -880,6 +1383,131 @@ export class DeviceController {
     } catch (error: any) {
       console.error('[DeviceController] upgradeToCompany error:', error.message);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async sendCommand(req: Request, res: Response) {
+    try {
+      const rawId = String(req.params.deviceId || '').trim();
+      const action = String(req.body?.action || '').trim().toLowerCase();
+      const message = String(req.body?.message || '').trim();
+      const allowed = ['lock', 'unlock', 'notify', 'pull_sync', 'restore_from_web'];
+      if (!rawId) return res.status(400).json({ error: 'deviceId is required' });
+      if (!allowed.includes(action)) {
+        return res.status(400).json({ error: `action must be one of ${allowed.join(', ')}` });
+      }
+      if (action === 'notify' && !message) {
+        return res.status(400).json({ error: 'message is required for notify' });
+      }
+
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform = role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_');
+      const tenantId = isPlatform
+        ? (req.body?.tenantId || user?.tenantId)
+        : resolveAuthoritativeTenantId(req);
+
+      const byDeviceId = await supabaseAdmin
+        .from('devices')
+        .select('*')
+        .ilike('device_id', rawId)
+        .maybeSingle();
+      const byRowId = byDeviceId.data
+        ? byDeviceId
+        : await supabaseAdmin.from('devices').select('*').eq('id', rawId).maybeSingle();
+      let device = byRowId.data;
+      if (!device) {
+        const { data: registration } = await supabaseAdmin
+          .from('device_registrations')
+          .select('*')
+          .ilike('device_id', rawId)
+          .maybeSingle();
+        if (registration) {
+          device = {
+            device_id: registration.device_id,
+            tenant_id: registration.tenant_id,
+            status: registration.status,
+          };
+        }
+      }
+      if (!device) return res.status(404).json({ error: 'Device not found' });
+      if (!isPlatform && String(device.tenant_id) !== String(tenantId)) {
+        return res.status(403).json({ error: 'This device is not in your workspace' });
+      }
+
+      const deviceKey = String(device.device_id || rawId);
+      const { io } = require('../app');
+      const room = `device:${deviceKey}`;
+      const tenantRoom = device.tenant_id ? `tenant:${device.tenant_id}` : null;
+      const emitBoth = (event: string, payload: any) => {
+        io.to(room).emit(event, payload);
+        if (tenantRoom) io.to(tenantRoom).emit(event, payload);
+      };
+      let passcode: string | undefined;
+
+      if (action === 'lock') {
+        passcode = String(req.body?.passcode || '').trim().toUpperCase();
+        if (!passcode) {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          passcode = '';
+          for (let i = 0; i < 6; i++) passcode += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        emitBoth('emergency_lock', { action: 'lock', passcode, deviceId: deviceKey });
+        try {
+          await supabaseAdmin.from('devices').update({ status: 'locked', updated_at: new Date().toISOString() }).eq('device_id', deviceKey);
+        } catch (_) { /* schema may not allow locked */ }
+      } else if (action === 'unlock') {
+        emitBoth('emergency_lock', { action: 'unlock', deviceId: deviceKey });
+        try {
+          await supabaseAdmin.from('devices').update({ status: 'active', updated_at: new Date().toISOString() }).eq('device_id', deviceKey);
+        } catch (_) { /* ignore */ }
+      } else if (action === 'notify') {
+        emitBoth('app_broadcast', {
+          message,
+          title: req.body?.title || 'Message from admin',
+          deviceId: deviceKey,
+          timestamp: new Date().toISOString(),
+        });
+      } else if (action === 'pull_sync' || action === 'restore_from_web') {
+        emitBoth('device_command', {
+          action,
+          deviceId: deviceKey,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: `TENANT_DEVICE_${action.toUpperCase()}`,
+          user_email: user?.email || 'unknown',
+          user_name: user?.email || 'tenant_admin',
+          ip_address: String(req.headers['x-forwarded-for'] || req.ip || '127.0.0.1').split(',')[0].trim(),
+          target: deviceKey,
+          status: 'success',
+          tenant_id: device.tenant_id,
+          metadata: { action, message: message || undefined },
+        });
+      } catch (_) { /* audit is best-effort */ }
+
+      return res.status(200).json({
+        success: true,
+        action,
+        deviceId: deviceKey,
+        onlineRoom: room,
+        passcode: passcode || undefined,
+        message: action === 'restore_from_web'
+          ? `Asked ${deviceKey} to download school records from the web portal.`
+          : action === 'pull_sync'
+            ? `Asked ${deviceKey} to upload its records to the web portal.`
+            : `Command ${action} sent to ${deviceKey}`,
+      });
+    } catch (error: any) {
+      const status = error.status || 500;
+      console.error('[DeviceController] sendCommand Error:', error.message);
+      return res.status(status).json({ error: error.message || 'Failed to send device command' });
     }
   }
 }

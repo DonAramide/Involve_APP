@@ -1,24 +1,61 @@
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/widgets/invify_brand_logo.dart';
 
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/required_location.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/phone_number_input.dart';
+import 'package:involve_app/core/utils/validators.dart';
 import '../utils/onboarding_navigator.dart';
+import '../utils/link_device_qr.dart';
+import '../utils/onboarding_draft_store.dart';
 import '../../data/nigeria_states_lgas.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/services/socket_service.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
+
+class _EmailAccountCheck {
+  const _EmailAccountCheck({
+    required this.exists,
+    required this.sameDevice,
+    this.thisDeviceId,
+    this.registeredDevices = const [],
+  });
+
+  final bool exists;
+  final bool sameDevice;
+  final String? thisDeviceId;
+  final List<String> registeredDevices;
+
+  bool get isConflict => exists && !sameDevice;
+}
+
+class _AgentCodeCheck {
+  const _AgentCodeCheck({
+    required this.valid,
+    this.error,
+    this.agentName,
+  });
+
+  final bool valid;
+  final String? error;
+  final String? agentName;
+}
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
@@ -35,13 +72,17 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _emailFocusNode = FocusNode();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   // Existing Fields
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _whatsappController = TextEditingController();
+  bool _whatsappSameAsMobile = true;
   final _agentCodeController = TextEditingController();
+  WestAfricanCountry _selectedCountryCode = westAfricanCountries.first;
   
   // Address Fields
   final _streetController = TextEditingController();
@@ -53,14 +94,23 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   String _selectedIndustry = 'retail';
   String _primaryColorHex = '#6366F1';
   bool _isLoading = false;
+  bool _isCapturingTelemetry = false;
+  bool _isCheckingEmail = false;
+  bool _isCheckingAgent = false;
+  String? _emailCheckError;
+  String? _agentCodeError;
+  static const _invifyDefaultAgentCode = 'AAA000';
+  String? _capturedDeviceId;
+  String? _capturedGpsLocation;
   int _currentStep = 0;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool? _isServerReachable;
 
   final List<Map<String, String>> _stepsInfo = [
     {
       'title': 'Welcome to Invify',
-      'desc': ' fin-tech grade enterprise system orchestrator. Let\'s configure your device profile for lightning-fast speeds.',
+      'desc': 'Fintech grade enterprise system orchestrator. Let\'s configure your device profile for lightning-fast speeds.',
       'icon': 'rocket_launch',
     },
     {
@@ -83,53 +133,793 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   @override
   void initState() {
     super.initState();
+    _emailController.addListener(_onEmailChanged);
+    _emailFocusNode.addListener(_onEmailFocusChanged);
+    _agentCodeController.addListener(_onAgentCodeChanged);
+    _phoneController.addListener(_syncWhatsAppFromMobile);
     _pingServer();
-    final state = context.read<SettingsBloc>().state;
-    if (state.settings != null) {
-      final savedName = state.settings!.organizationName;
-      // Only pre-fill if there's a real saved name (not a placeholder)
-      if (savedName.isNotEmpty && savedName != 'My Business' && savedName != 'My Business (Reset)') {
-        _businessNameController.text = savedName;
+    _restoreDraft().then((_) {
+      if (mounted) _primeDeviceId();
+    });
+  }
+
+  void _onEmailChanged() {
+    if (_emailCheckError != null) {
+      setState(() => _emailCheckError = null);
+    }
+  }
+
+  void _onAgentCodeChanged() {
+    if (_agentCodeError != null) {
+      setState(() => _agentCodeError = null);
+    }
+  }
+
+  void _onEmailFocusChanged() async {
+    if (!_emailFocusNode.hasFocus && _currentStep == 1) {
+      final email = _emailController.text.trim();
+      final emailRegex = RegExp(r'^[\w\.-]+@[\w-]+\.[a-zA-Z]{2,}$');
+      if (email.isNotEmpty && emailRegex.hasMatch(email)) {
+        final check = await _inspectEmailAccount(email);
+        if (check.isConflict && mounted) {
+          setState(() {
+            _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+          });
+          _formKey.currentState?.validate();
+          await _showExistingEmailDialog(email, check);
+        }
       }
     }
   }
 
-  Future<void> _pingServer() async {
-    try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 3)));
-      await dio.get('${AppConfig.baseUrl}/settings/onboarding');
-      if (mounted) setState(() => _isServerReachable = true);
-    } catch (_) {
-      if (mounted) setState(() => _isServerReachable = false);
-    }
+  Future<void> _persistDraft({int? step}) async {
+    await OnboardingDraftStore.save({
+      'step': step ?? _currentStep,
+      'firstName': _firstNameController.text,
+      'lastName': _lastNameController.text,
+      'email': _emailController.text,
+      'password': _passwordController.text,
+      'confirmPassword': _confirmPasswordController.text,
+      'businessName': _businessNameController.text,
+      'phone': _phoneController.text,
+      'whatsapp': _whatsappController.text,
+      'whatsappSameAsMobile': _whatsappSameAsMobile,
+      'agentCode': _agentCodeController.text,
+      'countryDial': _selectedCountryCode.dialCode,
+      'streetAddress': _streetController.text,
+      'country': _selectedCountry,
+      'state': _selectedCountry == 'Nigeria' ? _selectedState : _stateController.text,
+      'lga': _selectedLga,
+      'industry': _selectedIndustry,
+      'themeColor': _primaryColorHex,
+      'deviceId': _capturedDeviceId,
+      'gpsLocation': _capturedGpsLocation,
+    });
+    await OnboardingNavigator.persistOnboardingPreferences(
+      industry: _selectedIndustry,
+      themeColor: _primaryColorHex,
+    );
   }
 
-  Future<String> _getCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return 'Location disabled';
+  Future<void> _restoreDraft() async {
+    final draft = await OnboardingDraftStore.load();
+    if (!mounted) return;
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return 'Permissions denied';
+    if (draft == null) {
+      final state = context.read<SettingsBloc>().state;
+      if (state.settings != null) {
+        final savedName = state.settings!.organizationName;
+        if (savedName.isNotEmpty &&
+            savedName != 'My Business' &&
+            savedName != 'My Business (Reset)') {
+          setState(() => _businessNameController.text = savedName);
+        }
       }
-      if (permission == LocationPermission.deniedForever) return 'Permissions denied forever';
+      return;
+    }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      );
-      return 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+    WestAfricanCountry? matchedCountry;
+    final savedDial = draft['countryDial']?.toString();
+    if (savedDial != null && savedDial.isNotEmpty) {
+      for (final c in westAfricanCountries) {
+        if (c.dialCode == savedDial) {
+          matchedCountry = c;
+          break;
+        }
+      }
+    }
+
+    setState(() {
+      _firstNameController.text = draft['firstName']?.toString() ?? _firstNameController.text;
+      _lastNameController.text = draft['lastName']?.toString() ?? _lastNameController.text;
+      _emailController.text = draft['email']?.toString() ?? _emailController.text;
+      _passwordController.text = draft['password']?.toString() ?? _passwordController.text;
+      _confirmPasswordController.text =
+          draft['confirmPassword']?.toString() ?? _confirmPasswordController.text;
+      _businessNameController.text =
+          draft['businessName']?.toString() ?? _businessNameController.text;
+      _phoneController.text = draft['phone']?.toString() ?? _phoneController.text;
+      _whatsappController.text = draft['whatsapp']?.toString() ?? _whatsappController.text;
+      _whatsappSameAsMobile = draft['whatsappSameAsMobile'] != false;
+      if (_whatsappSameAsMobile && _whatsappController.text.isEmpty) {
+        _whatsappController.text = _phoneController.text;
+      }
+      _agentCodeController.text = draft['agentCode']?.toString() ?? _agentCodeController.text;
+      _streetController.text = draft['streetAddress']?.toString() ?? _streetController.text;
+      _selectedCountry = draft['country']?.toString() ?? _selectedCountry;
+      if (_selectedCountry == 'Nigeria') {
+        _selectedState = draft['state']?.toString();
+        _selectedLga = draft['lga']?.toString();
+      } else {
+        _stateController.text = draft['state']?.toString() ?? _stateController.text;
+      }
+      _selectedIndustry = draft['industry']?.toString() ?? _selectedIndustry;
+      _primaryColorHex = draft['themeColor']?.toString() ?? _primaryColorHex;
+      final savedDeviceId = draft['deviceId']?.toString();
+      if (_isValidDeviceId(savedDeviceId)) {
+        _capturedDeviceId = savedDeviceId;
+      }
+      final savedGps = draft['gpsLocation']?.toString();
+      if (_isValidGps(savedGps)) {
+        _capturedGpsLocation = savedGps;
+      }
+      if (matchedCountry != null) {
+        _selectedCountryCode = matchedCountry!;
+      }
+      final savedStep = draft['step'];
+      if (savedStep is int) {
+        _currentStep = savedStep.clamp(0, 3);
+      } else if (savedStep is num) {
+        _currentStep = savedStep.toInt().clamp(0, 3);
+      }
+    });
+    await OnboardingNavigator.persistOnboardingPreferences(
+      industry: _selectedIndustry,
+      themeColor: _primaryColorHex,
+    );
+  }
+
+  void _syncWhatsAppFromMobile() {
+    if (!_whatsappSameAsMobile) return;
+    if (_whatsappController.text == _phoneController.text) return;
+    _whatsappController.text = _phoneController.text;
+  }
+
+  int get _nationalPhoneMaxDigits => _selectedCountryCode.maxLength.clamp(1, 11);
+
+  String _formatFullPhone(String raw) {
+    var national = raw.trim().replaceAll(RegExp(r'\D'), '');
+    if (national.startsWith('0')) {
+      national = national.replaceFirst(RegExp(r'^0+'), '');
+    }
+    return '${_selectedCountryCode.dialCode}$national';
+  }
+
+  void _goToStep(int step) {
+    if (_currentStep == 1 && step > 1 && (_emailCheckError != null || _agentCodeError != null)) {
+      _formKey.currentState?.validate();
+      return;
+    }
+    setState(() => _currentStep = step.clamp(0, 3));
+    _persistDraft(step: _currentStep);
+  }
+
+  String? _serverPingError;
+
+  Future<void> _pingServer({bool showFeedback = false}) async {
+    String? errorReason;
+    bool success = false;
+    final targetUrl = AppConfig.baseUrl;
+
+    try {
+      final response = await http.get(Uri.parse('$targetUrl/livez'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode < 500) {
+        success = true;
+      } else {
+        errorReason = 'The Invify server is temporarily unavailable. Please try again.';
+      }
     } catch (e) {
-      return 'Unknown Location';
+      try {
+        final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 5)));
+        final res = await dio.get('$targetUrl/settings/onboarding');
+        if ((res.statusCode ?? 500) < 500) {
+          success = true;
+        } else {
+          errorReason = 'Could not reach the Invify server. Please try again.';
+        }
+      } catch (e2) {
+        errorReason = friendlyApiError(
+          e2,
+          fallback:
+              'Could not reach the Invify server. Connect this tablet to the same Wi-Fi as the office computer, then tap the cloud icon to retry.',
+        );
+      }
     }
+
+    if (mounted) {
+      setState(() {
+        _isServerReachable = success;
+        _serverPingError = success ? null : errorReason;
+      });
+
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Connected to the Invify server.'
+                  : (errorReason ??
+                      'Could not reach the Invify server. Connect this tablet to the same Wi-Fi as the office computer, then try again.'),
+            ),
+            backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  bool _isValidDeviceId(String? id) => DeviceInfoService.isUsableDeviceId(id);
+
+  bool _isValidGps(String? location) => RequiredLocation.isValid(location);
+
+  void _showTelemetryError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  /// Always requests location. Cached GPS is never enough to skip the prompt.
+  Future<bool> _ensureDeviceTelemetry({bool forceRefresh = true}) async {
+    if (_isCapturingTelemetry) return false;
+
+    setState(() => _isCapturingTelemetry = true);
+    try {
+      var deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (!_isValidDeviceId(deviceId)) {
+        deviceId = await DeviceInfoService.getDeviceSuffix();
+      }
+      if (!_isValidDeviceId(deviceId)) {
+        _showTelemetryError(
+          'Could not read this device serial number. Enable phone permission and try again.',
+        );
+        return false;
+      }
+
+      final location = await RequiredLocation.capture();
+      if (!location.ok) {
+        _showTelemetryError(
+          location.error ?? 'Location permission is required before you can continue.',
+        );
+        await RequiredLocation.openSettings(location);
+        return false;
+      }
+
+      if (!mounted) return false;
+      setState(() {
+        _capturedDeviceId = deviceId;
+        _capturedGpsLocation = location.location;
+      });
+      await _persistDraft();
+      return true;
+    } catch (e) {
+      _showTelemetryError(
+        'Could not capture GPS and device ID. Enable location and try again.',
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _isCapturingTelemetry = false);
+    }
+  }
+
+  Future<String?> _getCurrentLocation() async {
+    final ok = await _ensureDeviceTelemetry(forceRefresh: true);
+    if (!ok || !_isValidGps(_capturedGpsLocation)) return null;
+    return _capturedGpsLocation;
+  }
+
+  Future<void> _primeDeviceId() async {
+    if (_isValidDeviceId(_capturedDeviceId)) return;
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      if (!mounted || !_isValidDeviceId(deviceId)) return;
+      setState(() => _capturedDeviceId = deviceId);
+      await _persistDraft();
+    } catch (e) {
+      debugPrint('[Onboarding] Could not prime device ID: $e');
+    }
+  }
+
+  bool _deviceIdsLookSame(String? left, String? right) {
+    final a = (left ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final b = (right ?? '').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    if (a.isEmpty || b.isEmpty || a == 'UNKNOWN' || b == 'UNKNOWN') return false;
+    if (a == b) return true;
+    if (a.length >= 6 && b.length >= 6) return a.endsWith(b) || b.endsWith(a);
+    return false;
+  }
+
+  List<String> _asStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<_EmailAccountCheck> _inspectEmailAccount(String email) async {
+    final normalized = email.trim().toLowerCase();
+    await _primeDeviceId();
+    if (!_isValidDeviceId(_capturedDeviceId)) {
+      try {
+        final forced = await DeviceInfoService.getDeviceSuffix();
+        if (_isValidDeviceId(forced) && mounted) {
+          setState(() => _capturedDeviceId = forced);
+        }
+      } catch (e) {
+        debugPrint('[CheckEmail] Forced device ID capture failed: $e');
+      }
+    }
+    final deviceId = _isValidDeviceId(_capturedDeviceId) ? _capturedDeviceId!.trim() : null;
+    _EmailAccountCheck result = _EmailAccountCheck(
+      exists: false,
+      sameDevice: false,
+      thisDeviceId: deviceId,
+    );
+    if (normalized.isEmpty) return result;
+
+    setState(() => _isCheckingEmail = true);
+
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      validateStatus: (status) => status != null && status < 500,
+    ));
+
+    final urls = [
+      '${AppConfig.baseUrl}/api/auth/check-email',
+      '${AppConfig.baseUrl}/auth/check-email',
+      if (AppConfig.baseUrl.contains(':3004')) ...[
+        '${AppConfig.baseUrl3000}/api/auth/check-email',
+        '${AppConfig.baseUrl3000}/auth/check-email',
+      ],
+      'http://192.168.1.193:3004/api/auth/check-email',
+      'http://192.168.1.193:3004/auth/check-email',
+      'http://10.0.2.2:3004/api/auth/check-email',
+      'http://localhost:3004/api/auth/check-email',
+    ];
+
+    try {
+      for (final url in urls) {
+        try {
+          final res = await dio.post(url, data: {
+            'email': normalized,
+            'deviceId': deviceId,
+            'device_id': deviceId,
+          });
+          if (res.data is! Map) continue;
+          final data = res.data as Map;
+          final registered = _asStringList(data['registeredDevices']);
+          final sameDevice = data['sameDevice'] == true;
+          if (res.statusCode == 200) {
+            if (data['exists'] == true || sameDevice) {
+              return _EmailAccountCheck(
+                exists: data['exists'] == true || sameDevice,
+                sameDevice: sameDevice,
+                thisDeviceId: (data['thisDeviceId']?.toString().trim().isNotEmpty == true)
+                    ? data['thisDeviceId'].toString()
+                    : deviceId,
+                registeredDevices: registered,
+              );
+            }
+            if (data['exists'] == false) {
+              result = _EmailAccountCheck(
+                exists: false,
+                sameDevice: false,
+                thisDeviceId: deviceId,
+                registeredDevices: registered,
+              );
+              break;
+            }
+          }
+          if (res.statusCode == 409 ||
+              data['code'] == 'EMAIL_ALREADY_EXISTS' ||
+              data['exists'] == true) {
+            return _EmailAccountCheck(
+              exists: true,
+              sameDevice: sameDevice,
+              thisDeviceId: deviceId,
+              registeredDevices: registered,
+            );
+          }
+        } catch (_) {}
+      }
+
+      if (!result.exists) {
+        try {
+          final escaped = normalized.replaceAll("'", "''");
+          final query =
+              "SELECT (EXISTS (SELECT 1 FROM public.users WHERE lower(email) = '$escaped') OR EXISTS (SELECT 1 FROM public.tenants WHERE lower(owner_email) = '$escaped')) as exists";
+          final rpcRes = await Supabase.instance.client.rpc('execute_sql', params: {'sql_query': query});
+          if (rpcRes is List && rpcRes.isNotEmpty && rpcRes.first is Map) {
+            if (rpcRes.first['exists'] == true) {
+              result = _EmailAccountCheck(
+                exists: true,
+                sameDevice: false,
+                thisDeviceId: deviceId,
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[CheckEmail] Supabase direct check fallback error: $e');
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingEmail = false);
+      }
+    }
+    return result;
+  }
+
+  Widget _deviceIdRow({
+    required String label,
+    required String value,
+    required bool matches,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SelectableText(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    height: 1.3,
+                  ),
+                ),
+              ),
+              if (matches)
+                const Padding(
+                  padding: EdgeInsets.only(left: 6, top: 1),
+                  child: Icon(Icons.check_circle, color: Color(0xFF34D399), size: 16),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showExistingEmailDialog(String email, _EmailAccountCheck check) async {
+    if (!mounted) return;
+    final thisId = (check.thisDeviceId?.trim().isNotEmpty == true)
+        ? check.thisDeviceId!.trim()
+        : (_capturedDeviceId ?? 'Not captured yet');
+    final registered = check.registeredDevices;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.amber.shade700.withOpacity(0.5)),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.amber.shade400, size: 28),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Email Already Registered',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                  children: [
+                    const TextSpan(text: 'An account associated with '),
+                    TextSpan(
+                      text: email,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(
+                      text: ' already exists. Compare this tablet with the devices stored for that account.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _deviceIdRow(
+                      label: 'THIS TABLET',
+                      value: thisId,
+                      matches: registered.any((id) => _deviceIdsLookSame(id, thisId)),
+                    ),
+                    const Divider(color: Colors.white12, height: 16),
+                    const Text(
+                      'ACCOUNT DEVICES (BACKEND)',
+                      style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    if (registered.isEmpty)
+                      const Text(
+                        'UNASSIGNED — no hardware serial is stored for this account yet.',
+                        style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.3),
+                      )
+                    else
+                      ...List.generate(registered.length, (index) {
+                        final id = registered[index];
+                        return _deviceIdRow(
+                          label: registered.length == 1
+                              ? 'REGISTERED DEVICE'
+                              : 'REGISTERED DEVICE ${index + 1}',
+                          value: id,
+                          matches: _deviceIdsLookSame(id, thisId),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'If this tablet ID matches a registered device, this is the original device. If the account is UNASSIGNED, this tablet will take that slot. If they differ, link this device from the web dashboard or use a different email.',
+                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _emailFocusNode.requestFocus();
+              _emailController.selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _emailController.text.length,
+              );
+            },
+            child: const Text('Use Different Email', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _startLinkQrScan(context);
+            },
+            icon: const Icon(Icons.qr_code_scanner, size: 16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            label: const Text('Link This Device', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _askUseInvifyDefaultAgent() async {
+    final useDefault = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: const Color(0xFF6366F1).withOpacity(0.5)),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.badge_outlined, color: Color(0xFF818CF8), size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Use Invify default institute?',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'No institute code was entered. Would you like to use Invify\'s default institute code AAA000?',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text(
+              'Enter a code',
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text(
+              'Use AAA000',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    return useDefault == true;
+  }
+
+  Future<_AgentCodeCheck> _validateAgentCode(String code) async {
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      return const _AgentCodeCheck(valid: false, error: 'Institute code is required');
+    }
+    if (!RegExp(r'^[A-Z0-9-]{3,20}$').hasMatch(normalized)) {
+      return const _AgentCodeCheck(valid: false, error: 'Enter a valid institute code');
+    }
+
+    setState(() => _isCheckingAgent = true);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 6),
+      validateStatus: (status) => status != null && status < 500,
+    ));
+    final urls = [
+      '${AppConfig.baseUrl}/api/auth/check-agent-code',
+      '${AppConfig.baseUrl}/auth/check-agent-code',
+      if (AppConfig.baseUrl.contains(':3004')) ...[
+        '${AppConfig.baseUrl3000}/api/auth/check-agent-code',
+        '${AppConfig.baseUrl3000}/auth/check-agent-code',
+      ],
+    ];
+
+    try {
+      for (final url in urls) {
+        try {
+          final res = await dio.post(url, data: {'agentCode': normalized, 'code': normalized});
+          if (res.data is! Map) continue;
+          final data = res.data as Map;
+          if (data['valid'] == true) {
+            return _AgentCodeCheck(
+              valid: true,
+              agentName: data['agentName']?.toString(),
+            );
+          }
+          if (res.statusCode == 404 || data['valid'] == false) {
+            return _AgentCodeCheck(
+              valid: false,
+              error: (data['error'] ?? data['message'] ?? 'This institute code does not exist').toString(),
+            );
+          }
+        } catch (e) {
+          debugPrint('[CheckAgent] $url failed: $e');
+        }
+      }
+      if (normalized == _invifyDefaultAgentCode) {
+        return const _AgentCodeCheck(valid: true, agentName: 'Invify');
+      }
+      return const _AgentCodeCheck(
+        valid: false,
+        error: 'Could not verify this institute code. Check your connection.',
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingAgent = false);
+    }
+  }
+
+  Future<bool> _ensureAgentCodeReady() async {
+    var code = _agentCodeController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      final useDefault = await _askUseInvifyDefaultAgent();
+      if (!useDefault || !mounted) {
+        setState(() => _agentCodeError = 'Institute code is required');
+        _formKey.currentState?.validate();
+        return false;
+      }
+      _agentCodeController.text = _invifyDefaultAgentCode;
+      code = _invifyDefaultAgentCode;
+      setState(() => _agentCodeError = null);
+    }
+
+    final check = await _validateAgentCode(code);
+    if (!mounted) return false;
+    if (!check.valid) {
+      setState(() => _agentCodeError = check.error ?? 'This institute code does not exist');
+      _formKey.currentState?.validate();
+      return false;
+    }
+    if (_agentCodeController.text.trim().toUpperCase() != code) {
+      _agentCodeController.text = code;
+    }
+    setState(() => _agentCodeError = null);
+    return true;
   }
 
   Future<void> _submitOnboarding({required bool isTrial}) async {
-    if (_isLoading) return;
+    if (_isLoading || _isCapturingTelemetry || _isCheckingEmail || _isCheckingAgent) return;
 
     if (!_formKey.currentState!.validate()) {
       setState(() => _currentStep = 1);
+      return;
+    }
+    if (InputValidator.validateStreetAddress(_streetController.text) != null) {
+      setState(() => _currentStep = 2);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.validate();
+      });
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final emailCheck = await _inspectEmailAccount(email);
+    if (emailCheck.isConflict) {
+      if (mounted) {
+        setState(() {
+          _currentStep = 1;
+          _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+        });
+        _formKey.currentState!.validate();
+        await _showExistingEmailDialog(email, emailCheck);
+      }
+      return;
+    }
+
+    final agentReady = await _ensureAgentCodeReady();
+    if (!agentReady || !mounted) {
+      if (mounted) setState(() => _currentStep = 1);
+      return;
+    }
+
+    final telemetryReady = await _ensureDeviceTelemetry(forceRefresh: true);
+    if (!telemetryReady || !mounted) return;
+    if (!_isValidDeviceId(_capturedDeviceId) || !_isValidGps(_capturedGpsLocation)) {
+      _showTelemetryError(
+        'Device ID and GPS are required before you can continue.',
+      );
       return;
     }
 
@@ -149,27 +939,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         debugPrint('Failed to fetch onboarding settings, using default channels.');
       }
 
-      // ── Collect Device ID and GPS Location before registration ──
-      final deviceId = await DeviceInfoService.getDeviceSuffix();
-      
-      // Use getLastKnownPosition or timeout getCurrentPosition to avoid 5+ second GPS hangs indoors
-      String gpsLocation = 'Unknown Location';
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-            Position? position = await Geolocator.getLastKnownPosition();
-            position ??= await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.medium,
-            ).timeout(const Duration(seconds: 2));
-            
-            gpsLocation = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
-          }
-        }
-      } catch (e) {
-        debugPrint('Geolocator timeout or error: $e');
-      }
+      final deviceId = _capturedDeviceId!;
+      final gpsLocation = _capturedGpsLocation!;
+
+      final formattedMobile = _formatFullPhone(_phoneController.text);
+      final formattedWhatsapp = _formatFullPhone(_whatsappController.text);
 
       // Keep buttons locked until OTP is sent and the verify page opens.
       final payload = {
@@ -177,11 +951,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'lastName': _lastNameController.text.trim(),
         'email': _emailController.text.trim(),
         'password': _passwordController.text,
-        'phone': _phoneController.text.trim(),
+        'phone': formattedMobile,
+        'whatsapp': formattedWhatsapp,
         'businessName': _businessNameController.text.trim(),
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
-        'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim().toUpperCase(),
+        'agentCode': _agentCodeController.text.trim().toUpperCase(),
         'deviceId': deviceId,
         'location': gpsLocation,
         'country': _selectedCountry,
@@ -193,7 +968,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       };
 
       if (mounted) {
+        await _persistDraft(step: 1);
         await OnboardingNavigator.proceed(context, payload, requiredChannels);
+        if (mounted) {
+          await _restoreDraft();
+          setState(() => _currentStep = 1);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -224,7 +1004,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             if (_currentStep > 0) {
-              setState(() => _currentStep--);
+              _goToStep(_currentStep - 1);
             } else {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
@@ -251,10 +1031,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                 child: Center(
                   child: Opacity(
                     opacity: 0.15,
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 500,
-                      height: 500,
+                    child: InvifyBrandLogo(
+                      size: 500,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -318,9 +1096,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                             ),
                                             onPressed: () {
                                               setState(() => _isServerReachable = null);
-                                              _pingServer();
+                                              _pingServer(showFeedback: true);
                                             },
-                                            tooltip: _isServerReachable! ? 'Connected to Server' : 'Server Unreachable (Tap to retry)',
+                                            tooltip: _isServerReachable!
+                                                ? 'Connected to the Invify server'
+                                                : 'Cannot reach the Invify server. Tap to retry',
                                           )
                                         else
                                           const Padding(
@@ -427,27 +1207,126 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ],
           ),
           const SizedBox(height: 20),
-          _buildTextField(_emailController, 'Email Address', Icons.email, isEmail: true),
+          _buildTextField(
+            _emailController, 
+            'Email Address', 
+            Icons.email, 
+            isEmail: true,
+            focusNode: _emailFocusNode,
+            suffixIcon: _isCheckingEmail
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)),
+                    ),
+                  )
+                : null,
+            customValidator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Email is required';
+              final trimmed = value.trim();
+              final emailRegex = RegExp(r'^[\w\.-]+@[\w-]+\.[a-zA-Z]{2,}$');
+              if (!emailRegex.hasMatch(trimmed)) {
+                return 'Enter a valid email address';
+              }
+              if (_emailCheckError != null) {
+                return _emailCheckError;
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 20),
-          _buildTextField(_passwordController, 'Portal Password', Icons.lock, isPassword: true),
+          _buildTextField(
+            _passwordController, 
+            'Create Web Password', 
+            Icons.lock, 
+            isPassword: true,
+            isObscured: _obscurePassword,
+            onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+            helperText: 'Used to sign in to the Invify Web Management Portal',
+            customValidator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Password is required';
+              if (value.length < 9) return 'Password must be at least 9 characters';
+              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Password must contain at least one capital letter (A-Z)';
+              if (!RegExp(r'[a-z]').hasMatch(value)) return 'Password must contain at least one lowercase letter (a-z)';
+              if (!RegExp(r'[0-9]').hasMatch(value)) return 'Password must contain at least one number (0-9)';
+              if (!RegExp(r'[^A-Za-z0-9]').hasMatch(value)) return 'Password must contain at least one symbol (e.g. !@#\$)';
+              return null;
+            },
+          ),
+          _buildPasswordRequirements(),
           const SizedBox(height: 20),
           _buildTextField(
             _confirmPasswordController, 
-            'Confirm Portal Password', 
+            'Confirm Web Password', 
             Icons.lock_outline, 
             isPassword: true,
+            isObscured: _obscureConfirmPassword,
+            onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             customValidator: (value) {
               if (value == null || value.isEmpty) return 'Required';
               if (value != _passwordController.text) return 'Passwords do not match';
               return null;
-            }
+            },
           ),
           const SizedBox(height: 20),
           _buildTextField(_businessNameController, 'Business / Tenant Name', Icons.business),
           const SizedBox(height: 20),
-          _buildTextField(_phoneController, 'WhatsApp Contact', Icons.phone, isPhone: true),
+          _buildPhoneFieldWithCountrySelector(
+            controller: _phoneController,
+            label: 'Mobile number',
+            requiredLabel: 'Mobile number is required',
+            allowCountryPicker: true,
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _whatsappSameAsMobile,
+            activeColor: const Color(0xFF6366F1),
+            title: const Text(
+              'Mobile number same as WhatsApp number',
+              style: TextStyle(color: Colors.white, fontSize: 13),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _whatsappSameAsMobile = value;
+                if (value) {
+                  _whatsappController.text = _phoneController.text;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          _buildPhoneFieldWithCountrySelector(
+            controller: _whatsappController,
+            label: 'WhatsApp number',
+            requiredLabel: 'WhatsApp number is required',
+            allowCountryPicker: false,
+            enabled: !_whatsappSameAsMobile,
+          ),
           const SizedBox(height: 20),
-          _buildTextField(_agentCodeController, 'Agent Code (Optional)', Icons.badge, isRequired: false),
+          _buildTextField(
+            _agentCodeController,
+            'Institute Code',
+            Icons.badge,
+            isRequired: false,
+            helperText: 'Required. Leave blank to choose Invify default AAA000.',
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 20,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9-]')),
+              UpperCaseTextFormatter(),
+            ],
+            customValidator: (_) {
+              if (_agentCodeError != null) return _agentCodeError;
+              final typed = _agentCodeController.text.trim();
+              if (typed.isNotEmpty && !RegExp(r'^[A-Za-z0-9-]{3,20}$').hasMatch(typed)) {
+                return 'Enter a valid institute code';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 24),
           const Align(
             alignment: Alignment.centerLeft,
@@ -488,6 +1367,65 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ),
         const SizedBox(height: 32),
         Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101625),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: (_isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFF59E0B))
+                  .withOpacity(0.35),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                        ? Icons.verified
+                        : Icons.gps_not_fixed,
+                    color: _isValidDeviceId(_capturedDeviceId) && _isValidGps(_capturedGpsLocation)
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Device telemetry',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Device ID: ${_capturedDeviceId ?? 'Not captured yet'}',
+                style: TextStyle(color: Colors.grey[300], fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'GPS: ${_capturedGpsLocation ?? 'Not captured yet'}',
+                style: TextStyle(color: Colors.grey[300], fontSize: 12),
+              ),
+              if (!_isValidDeviceId(_capturedDeviceId) || !_isValidGps(_capturedGpsLocation)) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'GPS and device ID must be captured before you can submit.',
+                  style: TextStyle(color: Colors.orange[200], fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFF101625),
@@ -507,30 +1445,54 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       ],
     );
   }
-
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isEmail = false, bool isPhone = false, bool isPassword = false, bool isRequired = true, String? Function(String?)? customValidator}) {
+  Widget _buildTextField(
+    TextEditingController controller, 
+    String label, 
+    IconData icon, {
+    bool isEmail = false, 
+    bool isPhone = false, 
+    bool isPassword = false, 
+    bool isRequired = true, 
+    String? Function(String?)? customValidator,
+    String? helperText,
+    bool? isObscured,
+    VoidCallback? onToggleObscure,
+    FocusNode? focusNode,
+    Widget? suffixIcon,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+  }) {
+    final obscure = isPassword ? (isObscured ?? _obscurePassword) : false;
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       style: const TextStyle(color: Colors.white),
-      obscureText: isPassword ? _obscurePassword : false,
+      obscureText: obscure,
+      textCapitalization: textCapitalization,
       keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
+      inputFormatters: isPhone ? PhoneNumberInput.formatters : inputFormatters,
+      maxLength: isPhone ? PhoneNumberInput.maxDigits : maxLength,
       decoration: InputDecoration(
         labelText: label,
+        helperText: helperText,
+        helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+        counterText: (!isPhone && maxLength != null) ? '' : null,
         labelStyle: const TextStyle(color: Color(0xFF818CF8)),
         prefixIcon: Icon(icon, color: const Color(0xFF818CF8)),
-        suffixIcon: isPassword
+        suffixIcon: suffixIcon ?? (isPassword
             ? IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  obscure ? Icons.visibility_off : Icons.visibility,
                   color: const Color(0xFF818CF8),
                 ),
-                onPressed: () {
+                onPressed: onToggleObscure ?? () {
                   setState(() {
                     _obscurePassword = !_obscurePassword;
                   });
                 },
               )
-            : null,
+            : null),
         filled: true,
         fillColor: const Color(0xFF101625),
         enabledBorder: OutlineInputBorder(
@@ -541,8 +1503,310 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF6366F1)),
         ),
+        errorStyle: const TextStyle(color: Color(0xFFF87171), fontSize: 12),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
       ),
       validator: customValidator ?? (isRequired ? (value) => value == null || value.trim().isEmpty ? 'Required' : null : null),
+    );
+  }
+
+  Widget _buildPasswordRequirements() {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _passwordController,
+      builder: (context, value, _) {
+        final text = value.text;
+        final hasMinLength = text.length >= 9;
+        final hasUppercase = RegExp(r'[A-Z]').hasMatch(text);
+        final hasNumber = RegExp(r'[0-9]').hasMatch(text);
+        final hasSymbol = RegExp(r'[^A-Za-z0-9]').hasMatch(text);
+
+        Widget buildChip(String label, bool isValid) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isValid ? const Color(0x2210B981) : const Color(0x1A6B7280),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isValid ? const Color(0xFF10B981) : Colors.white.withOpacity(0.08),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isValid ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  size: 12,
+                  color: isValid ? const Color(0xFF10B981) : Colors.grey[500],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isValid ? const Color(0xFF10B981) : Colors.grey[400],
+                    fontSize: 10.5,
+                    fontWeight: isValid ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(top: 8, bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Password Security Requirements:',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  buildChip('9+ Characters', hasMinLength),
+                  buildChip('1+ Capital (A-Z)', hasUppercase),
+                  buildChip('1+ Number (0-9)', hasNumber),
+                  buildChip('1+ Symbol (!@#\$)', hasSymbol),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhoneFieldWithCountrySelector({
+    required TextEditingController controller,
+    required String label,
+    required String requiredLabel,
+    bool allowCountryPicker = true,
+    bool enabled = true,
+  }) {
+    final maxDigits = _nationalPhoneMaxDigits;
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      style: const TextStyle(color: Colors.white),
+      keyboardType: TextInputType.phone,
+      inputFormatters: PhoneNumberInput.formattersFor(maxDigits),
+      maxLength: maxDigits,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: '70xxxxxxxx',
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
+        labelStyle: const TextStyle(color: Color(0xFF818CF8)),
+        helperText: 'Max $maxDigits digits (country code is separate)',
+        helperStyle: TextStyle(color: Colors.grey[400], fontSize: 11),
+        prefixIcon: InkWell(
+          onTap: allowCountryPicker ? _showCountryPickerBottomSheet : null,
+          borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _selectedCountryCode.flag,
+                  style: const TextStyle(fontSize: 18),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _selectedCountryCode.dialCode,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                if (allowCountryPicker) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, color: Color(0xFF818CF8), size: 18),
+                ],
+              ],
+            ),
+          ),
+        ),
+        filled: true,
+        fillColor: const Color(0xFF101625),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF6366F1)),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.06)),
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) return requiredLabel;
+        final clean = value.trim().replaceAll(RegExp(r'\D'), '');
+        if (clean.length > maxDigits) {
+          return 'Phone number cannot exceed $maxDigits digits';
+        }
+        if (clean.length < _selectedCountryCode.minLength) {
+          return 'Enter a valid ${_selectedCountryCode.name} number (min ${_selectedCountryCode.minLength} digits)';
+        }
+
+        if (RegExp(r'^(.)\1+$').hasMatch(clean)) {
+          return 'Invalid phone number (cannot be repetitive digits like 000000... or 111111...)';
+        }
+
+        const sequential = ['0123456789', '1234567890', '9876543210', '0987654321'];
+        for (final seq in sequential) {
+          if (seq.contains(clean) && clean.length >= 6) {
+            return 'Invalid phone number (cannot be sequential digits)';
+          }
+        }
+
+        if (_selectedCountryCode.code == 'NG') {
+          String normalized = clean.startsWith('0') ? clean.substring(1) : clean;
+          if (normalized.length == 10 && !RegExp(r'^[789]').hasMatch(normalized)) {
+            return 'Nigerian mobile numbers must start with 7, 8, or 9';
+          }
+        }
+
+        return null;
+      },
+    );
+  }
+
+  void _showCountryPickerBottomSheet() {
+    final searchCtrl = TextEditingController();
+    List<WestAfricanCountry> filtered = List.from(westAfricanCountries);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Container(
+            height: MediaQuery.of(ctx).size.height * 0.65,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  'Select West African Country Code',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: searchCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search country or dial code (+234)...',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF818CF8), size: 18),
+                    filled: true,
+                    fillColor: const Color(0xFF1E293B),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (query) {
+                    final q = query.toLowerCase().trim();
+                    setModalState(() {
+                      filtered = westAfricanCountries.where((c) {
+                        return c.name.toLowerCase().contains(q) ||
+                            c.dialCode.contains(q) ||
+                            c.code.toLowerCase().contains(q);
+                      }).toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                    itemBuilder: (context, index) {
+                      final country = filtered[index];
+                      final isSelected = country.code == _selectedCountryCode.code;
+
+                      return ListTile(
+                        onTap: () {
+                          setState(() {
+                            _selectedCountryCode = country;
+                            _selectedCountry = country.name;
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        leading: Text(country.flag, style: const TextStyle(fontSize: 24)),
+                        title: Text(
+                          country.name,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF818CF8) : Colors.white,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                        trailing: Text(
+                          country.dialCode,
+                          style: TextStyle(
+                            color: isSelected ? const Color(0xFF818CF8) : Colors.grey[400],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -570,7 +1834,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     final isSelected = _selectedIndustry == id;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedIndustry = id),
+        onTap: () {
+          setState(() => _selectedIndustry = id);
+          OnboardingNavigator.persistOnboardingPreferences(industry: id);
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -594,7 +1861,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   Widget _buildColorOption(String hex, Color color) {
     final isSelected = _primaryColorHex == hex;
     return InkWell(
-      onTap: () => setState(() => _primaryColorHex = hex),
+      onTap: () {
+        setState(() => _primaryColorHex = hex);
+        OnboardingNavigator.persistOnboardingPreferences(themeColor: hex);
+      },
       customBorder: const CircleBorder(),
       child: Container(
         padding: const EdgeInsets.all(4),
@@ -613,15 +1883,22 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  setState(() => _currentStep++);
-                },
+                onPressed: _isCapturingTelemetry
+                    ? null
+                    : () async {
+                        final ready = await _ensureDeviceTelemetry();
+                        if (!ready || !mounted) return;
+                        _goToStep(_currentStep + 1);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6366F1),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  _isCapturingTelemetry ? 'REQUESTING LOCATION…' : 'NEXT STEP',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -647,17 +1924,32 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (_currentStep > 0)
-            TextButton(onPressed: () => setState(() => _currentStep--), child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
+            TextButton(onPressed: () => _goToStep(_currentStep - 1), child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
           else
             const SizedBox.shrink(),
           ElevatedButton(
-            onPressed: () {
-              if (_currentStep == 1 && !_formKey.currentState!.validate()) return;
+            onPressed: (_isCapturingTelemetry || _isCheckingEmail || _isCheckingAgent)
+                ? null
+                : () async {
+              if (_currentStep == 1) {
+                if (!_formKey.currentState!.validate()) return;
+                final email = _emailController.text.trim();
+                final check = await _inspectEmailAccount(email);
+                if (check.isConflict) {
+                  if (!mounted) return;
+                  setState(() {
+                    _emailCheckError = 'This email is already registered. Please sign in or use a different email.';
+                  });
+                  _formKey.currentState!.validate();
+                  await _showExistingEmailDialog(email, check);
+                  return;
+                }
+                final agentReady = await _ensureAgentCodeReady();
+                if (!agentReady || !mounted) return;
+              }
+              if (!mounted) return;
               if (_currentStep == 2) {
-                 if (_streetController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Street Address is required')));
-                    return;
-                 }
+                 if (!_formKey.currentState!.validate()) return;
                  if (_selectedCountry == null) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country is required')));
                     return;
@@ -677,11 +1969,22 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                         return;
                      }
                  }
+                 final ready = await _ensureDeviceTelemetry();
+                 if (!ready || !mounted) return;
               }
-              setState(() => _currentStep++);
+              _goToStep(_currentStep + 1);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
-            child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            child: Text(
+              _isCheckingEmail && _currentStep == 1
+                  ? 'CHECKING EMAIL…'
+                  : _isCheckingAgent && _currentStep == 1
+                      ? 'CHECKING AGENT…'
+                  : _isCapturingTelemetry && _currentStep == 2
+                      ? 'GETTING GPS & DEVICE ID…'
+                      : 'NEXT STEP',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       );
@@ -693,24 +1996,21 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: () => _submitOnboarding(isTrial: false),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('ONBOARD & ACTIVATE DEVICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton(
-            onPressed: () => _submitOnboarding(isTrial: true),
-            style: OutlinedButton.styleFrom(side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)), foregroundColor: const Color(0xFF10B981), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('START FREE 3-DAY TRIAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: (_isLoading || _isCapturingTelemetry || _isCheckingAgent)
+                ? null
+                : () => _submitOnboarding(isTrial: true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF6366F1).withOpacity(0.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: Text(
+              _isCapturingTelemetry
+                  ? 'GETTING GPS & DEVICE ID…'
+                  : 'START FREE 3-DAY TRIAL',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
         ),
         const SizedBox(height: 16),
         Center(
-          child: TextButton(onPressed: () => setState(() => _currentStep = 2), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+          child: TextButton(onPressed: () => _goToStep(2), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
         ),
       ],
     );
@@ -718,13 +2018,19 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
   @override
   void dispose() {
+    _emailController.removeListener(_onEmailChanged);
+    _emailFocusNode.removeListener(_onEmailFocusChanged);
+    _emailFocusNode.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _businessNameController.dispose();
+    _phoneController.removeListener(_syncWhatsAppFromMobile);
     _phoneController.dispose();
+    _whatsappController.dispose();
+    _agentCodeController.removeListener(_onAgentCodeChanged);
     _agentCodeController.dispose();
     _streetController.dispose();
     _stateController.dispose();
@@ -744,7 +2050,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTextField(_streetController, 'Street Address', Icons.location_on),
+        _buildTextField(
+          _streetController,
+          'Street Address',
+          Icons.location_on,
+          helperText: 'e.g. 12 Adeola Street, Ikeja',
+          customValidator: InputValidator.validateStreetAddress,
+        ),
         const SizedBox(height: 20),
         SearchableDropdown(
           label: 'Country',
@@ -814,20 +2126,42 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     if (scannedCode == null || scannedCode.isEmpty) return;
     if (!mounted) return;
 
+    final payload = LinkDeviceQrPayload.tryParse(scannedCode);
+    if (payload == null) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(
+          content: Text(LinkDeviceQrPayload.invalidMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Capture context-dependent refs BEFORE any await
     final settingsBloc = this.context.read<SettingsBloc>();
+    final token = payload.token;
+    final tenantId = payload.tenantId;
 
-    // Parse the QR payload
     try {
-      final data = jsonDecode(scannedCode);
-      if (data['action'] == 'LINK_DEVICE') {
-        final token = data['token'] as String;
-        final tenantId = data['tenantId'] as String;
-
         setState(() => _isLoading = true);
 
-        final deviceId = await DeviceInfoService.getDeviceSuffix();
+        var deviceId = await DeviceInfoService.getDeviceSuffix();
+        if (!_isValidDeviceId(deviceId)) {
+          deviceId = await DeviceInfoService.getDeviceSuffix();
+        }
+        if (!_isValidDeviceId(deviceId)) {
+          if (mounted) setState(() => _isLoading = false);
+          _showTelemetryError(
+            'Could not read this device serial number. Enable phone permission and try again.',
+          );
+          return;
+        }
         final gpsLocation = await _getCurrentLocation();
+        if (gpsLocation == null) {
+          if (mounted) setState(() => _isLoading = false);
+          _showTelemetryError('Location is required before this device can be linked.');
+          return;
+        }
 
         final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
         final urls = [
@@ -835,6 +2169,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ];
 
         bool linkSuccess = false;
+        String? linkedBusinessName;
+        String? linkedBusinessMode;
+        String? linkedOfflineToken;
         String errorMessage = 'Failed to link device';
 
         for (final url in urls) {
@@ -849,6 +2186,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             });
             if (response.statusCode == 200 && response.data['success'] == true) {
               linkSuccess = true;
+              linkedBusinessName = response.data['businessName']?.toString();
+              linkedBusinessMode = response.data['businessMode']?.toString();
+              linkedOfflineToken = response.data['offlineToken']?.toString();
               break;
             }
           } catch (e) {
@@ -865,14 +2205,52 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         if (linkSuccess) {
           final security = SecurityService();
           await security.setTenantId(tenantId);
+          if (linkedOfflineToken != null && linkedOfflineToken.isNotEmpty) {
+            await security.setOfflineToken(linkedOfflineToken);
+            await SocketService().initializeSocket(
+              AppConfig.baseUrl,
+              tenantId: tenantId,
+              deviceId: deviceId,
+              businessName: linkedBusinessName,
+              token: linkedOfflineToken,
+            );
+          }
           await StorageService.setOnboardingCompleted(true);
           await StorageService.saveTrialStartDate(DateTime.now());
-          settingsBloc.add(LoadSettings());
+          await StorageService.markLinkedDeviceDashboardDefaultsPending();
+          if (linkedBusinessMode != null && linkedBusinessMode.isNotEmpty) {
+            await StorageService.markDeviceLinkedToTenant(linkedBusinessMode);
+            await OnboardingNavigator.persistOnboardingPreferences(industry: linkedBusinessMode);
+          } else {
+            await StorageService.markDeviceLinkedToTenant('');
+          }
+          settingsBloc.add(LoadSettings(
+            linkedBusinessName: linkedBusinessName,
+            linkedBusinessMode: linkedBusinessMode,
+          ));
 
           if (!mounted) return;
+          await TerminalSyncService.markLinkedDeviceBootstrapPending();
+          var bootstrapNote =
+              'Users and the admin password will load when this tablet is online.';
+          try {
+            final bootstrap = await TerminalSyncService.bootstrapLinkedDeviceFromAdmin(
+              deviceId: deviceId,
+            );
+            if (bootstrap.adminPassword || bootstrap.staff > 0) {
+              bootstrapNote =
+                  'Loaded ${bootstrap.staff} user${bootstrap.staff == 1 ? '' : 's'} and the admin password from the admin portal.';
+            } else {
+              bootstrapNote =
+                  'Linked. No portal users or admin password were found yet.';
+            }
+          } catch (e) {
+            debugPrint('[LinkDevice] admin bootstrap failed: $e');
+          }
+          if (!mounted) return;
           ScaffoldMessenger.of(this.context).showSnackBar(
-            const SnackBar(
-              content: Text('Device linked successfully! 3-day trial activated.'),
+            SnackBar(
+              content: Text('Device linked. $bootstrapNote'),
               backgroundColor: Colors.green,
             ),
           );
@@ -889,24 +2267,26 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ),
           );
         }
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(this.context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid QR code format for device linking.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
-          content: Text('Error parsing QR code: $e'),
+          content: Text(friendlyApiError(
+            e,
+            fallback: 'Failed to link device. Please try again.',
+          )),
           backgroundColor: Colors.red,
         ),
       );
     }
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }
 

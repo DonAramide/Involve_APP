@@ -30,7 +30,8 @@ data class MposTransactionResponse(
     var rrn: String? = null,
     var stan: String? = null,
     var statusCode: String? = null,
-    var transactionType: String? = null
+    var transactionType: String? = null,
+    var balance: String? = null
 ): Parcelable {
     fun paymentSuccess(): Boolean = statusCode?.endsWith("00") == true
 }

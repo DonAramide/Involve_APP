@@ -179,7 +179,8 @@
     </div>
 
     <!-- SETTLEMENT INSPECTION DRAWER -->
-    <q-drawer v-model="drawerOpen" side="right" overlay bordered class="bg-panel border-left drawer-shadow" :width="850">
+    <q-dialog v-model="drawerOpen" position="right" full-height>
+      <q-card class="bg-panel text-main column no-wrap" style="width: 850px; max-width: 96vw; height: 100%;">
       <div v-if="selectedSettlement" class="column full-height">
         
         <!-- Drawer Header & Action Center -->
@@ -193,7 +194,7 @@
               </div>
               <div class="text-caption text-muted font-mono">Reference: {{ selectedSettlement.reference }} | Created: {{ selectedSettlement.createdDate }}</div>
             </div>
-            <q-btn flat dense round icon="close" v-close-popup />
+            <q-btn flat dense round icon="close" @click="drawerOpen = false" />
           </div>
 
           <!-- Treasury Action Center -->
@@ -292,7 +293,7 @@
             <!-- BANK PROCESSING -->
             <q-tab-panel name="bank" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">NIP Reference:</span><span class="text-cyan-4">NIP/00020/260531/XYZ</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">NIP Reference:</span><span class="text-cyan-4">—</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transfer Status:</span><span class="text-green-4">SUCCESS</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Response Code:</span><span class="text-main">00</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Response Message:</span><span class="text-main">Approved or completed successfully</span></div>
@@ -333,7 +334,8 @@
           </q-tab-panels>
         </q-scroll-area>
       </div>
-    </q-drawer>
+      </q-card>
+    </q-dialog>
 
     <CardSettlementUploadDialog
       v-model="uploadDialogOpen"
@@ -349,6 +351,7 @@ import CardSettlementUploadDialog from '../../components/finance/CardSettlementU
 import { cardSettlementApi } from '../../api';
 import { onMounted } from 'vue';
 import { Notify } from 'quasar';
+import { userFacingApiError } from '../../utils/userFacingApiError';
 const { currentCurrency } = useCurrency();
 
 import { ref, computed } from 'vue'
@@ -409,7 +412,7 @@ async function loadBatches() {
       created_at: b.created_at ? new Date(b.created_at).toLocaleString() : 'N/A',
     }))
   } catch (e) {
-    Notify.create({ type: 'negative', message: 'Failed to load settlement batches' })
+    Notify.create({ type: 'negative', message: userFacingApiError(e, 'Failed to load settlement batches') })
   }
 }
 

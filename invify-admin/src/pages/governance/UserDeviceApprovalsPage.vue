@@ -178,6 +178,7 @@
 import { ref, onMounted } from 'vue'
 import { useQuasar, copyToClipboard } from 'quasar'
 import { adminApi } from '../../api'
+import { userFacingApiError } from '../../utils/userFacingApiError'
 
 const $q = useQuasar()
 const loading = ref(false)
@@ -203,7 +204,7 @@ const fetchDevices = async () => {
   } catch (err) {
     $q.notify({
       type: 'negative',
-      message: 'Failed to retrieve active devices queue: ' + (err.response?.data?.error || err.message)
+      message: userFacingApiError(err, 'Failed to retrieve active devices queue'),
     })
   } finally {
     loading.value = false

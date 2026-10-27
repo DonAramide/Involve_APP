@@ -9,9 +9,103 @@ import { PaymentGatewayConvergenceService } from '../services/gateway.service';
 import { QuasarWebhookService } from '../integrations/quasar/quasar-webhook.service';
 import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
+import { FinancialDisputeService } from '../services/financial-dispute.service';
+import { isParentCustomerId, pickParentOwnedAttribution } from '../utils/parent-va-routing';
+import { WalletService } from '../services/wallet.service';
+import { parentDepositLedgerEntries, type LedgerLeg } from '../services/school-fund-ownership';
+import { creditsSchoolWallet, loadVirtualAccountKind } from '../services/virtual-account-ownership';
+import { roundNaira } from '../utils/virtual-account-funds';
+import { FeeShadowIntegration } from '../services/fee-shadow-integration';
+import { PayoutReversalService } from '../services/payout-reversal.service';
+import { PaymentAlertTrailService } from '../services/payment-alert-trail.service';
+import {
+  PayoutStatusService,
+  resolveTransferOutcome,
+} from '../services/payout-status.service';
 
+function firstWebhookText(...values: unknown[]): string {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
 
+/** Quasar VA credits now include senderName and senderBankName. */
+function vaSenderFromEvent(event: any): { senderName: string; senderBank: string } {
+  const data = event?.data || {};
+  const meta = data.metadata || event?.metadata || {};
+  const sender = data.sender || meta.sender || {};
+  const senderName =
+    firstWebhookText(
+      data.senderName,
+      data.sender_name,
+      meta.senderName,
+      meta.sender_name,
+      sender.name,
+      sender.senderName,
+    ) || 'Unknown Sender';
+  const senderBank =
+    firstWebhookText(
+      data.senderBankName,
+      data.sender_bank_name,
+      meta.senderBankName,
+      meta.sender_bank_name,
+      data.senderBank,
+      data.sender_bank,
+      meta.senderBank,
+      meta.sender_bank,
+      sender.bankName,
+      sender.senderBankName,
+      data.bankName,
+    ) || 'Unknown Bank';
+  return { senderName, senderBank };
+}
 
+function isSandboxVaCredit(event: any): boolean {
+  return (
+    event?.event === 'virtual_account.funded' ||
+    event?.event === 'virtual_account.credit' ||
+    event?.data?.mode === 'sandbox_credit' ||
+    event?.data?.sandbox === true
+  );
+}
+
+function resolveWebhookTimestamp(req: Request, event: any): number | undefined {
+  const fromBody = Number(event?.timestamp);
+  if (Number.isFinite(fromBody) && fromBody > 0) {
+    return fromBody > 1e12 ? Math.floor(fromBody / 1000) : fromBody;
+  }
+  const fromHeader = Number(req.headers['x-quasar-timestamp']);
+  if (!Number.isFinite(fromHeader) || fromHeader <= 0) return undefined;
+  return fromHeader > 1e12 ? Math.floor(fromHeader / 1000) : fromHeader;
+}
+
+function resolveWebhookReference(req: Request, event: any): string | null {
+  const fromData = event?.data?.reference || event?.data?.id || event?.data?.deliveryId;
+  if (fromData) return String(fromData);
+  const deliveryId = String(req.headers['x-quasar-delivery-id'] || '').trim();
+  if (deliveryId) return `qfs:${deliveryId}`;
+  const va = event?.data?.accountNumber || event?.data?.virtualAccountNumber;
+  if (isSandboxVaCredit(event) && va) {
+    const amount = event?.data?.amount ?? '';
+    const stamp =
+      event?.data?.id ||
+      event?.timestamp ||
+      req.headers['x-quasar-timestamp'] ||
+      Date.now();
+    const reason = String(event?.data?.reason || 'funded').trim().replace(/\s+/g, '_');
+    // Include amount + stamp so two "Initial Wallet Funding" credits do not collapse.
+    return `qfs:${va}:${reason}:${amount}:${stamp}`;
+  }
+  return null;
+}
+
+function pushQuasarWebhookEnvSecrets(pushSecret: (value?: string | null) => void) {
+  pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
+  pushSecret(process.env.QUASAR_WEBHOOK_SECRET);
+  pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+}
 
 /**
  * WebhookController is the CRITICAL entry point for financial state updates.
@@ -29,13 +123,20 @@ export class WebhookController {
           ? rawBuf
           : JSON.stringify(req.body);
 
+    const incomingLen = Buffer.isBuffer(rawBuf) ? rawBuf.length : Buffer.byteLength(rawBody || '', 'utf8');
+    console.log(
+      `[Webhook] POST ${req.originalUrl || req.url} bodyLength=${incomingLen} hasSignature=${Boolean(signature)} delivery=${req.headers['x-quasar-delivery-id'] || '-'} ip=${req.ip}`,
+    );
+
     if (!signature || !rawBody) {
       return res.status(400).json({ error: 'Security headers or body missing' });
     }
 
     try {
       const event = req.body;
-      const { reference, amount, status } = event?.data || {};
+      const webhookTimestamp = resolveWebhookTimestamp(req, event);
+      const reference = resolveWebhookReference(req, event);
+      const { amount, status } = event?.data || {};
 
       // Card notification webhooks (Quasar → Invify) — ack even if HTTP timed out on switch path
       if (
@@ -45,9 +146,22 @@ export class WebhookController {
         return WebhookController._handleCardTransactionWebhook(req, res, event, signature, rawBody);
       }
 
+      // Maker-checker dispute debit (refund / chargeback / manual debit)
+      if (
+        typeof event?.event === 'string' &&
+        event.event.startsWith('dispute.debit.')
+      ) {
+        return WebhookController._handleDisputeDebitWebhook(req, res, event, signature, rawBody);
+      }
+
       // 1. RESOLVE TRANSACTION & TENANT (Never trust tenantId from payload)
+      // QFS virtual_account.funded has no checkout reference — use delivery-id / VA.
       if (!reference) {
-        return res.status(400).json({ error: 'Missing reference in payload' });
+        return res.status(400).json({
+          error: isSandboxVaCredit(event)
+            ? 'Missing accountNumber or x-quasar-delivery-id for sandbox credit'
+            : 'Missing reference in payload',
+        });
       }
 
       let resolvedTenantId: string | null = null;
@@ -55,6 +169,7 @@ export class WebhookController {
       let resolvedCustomerId: string | null = null;
       let resolvedStudentId: string | null = null;
       let resolvedAdmissionNumber: string | null = null;
+      let parentOwnedDeposit = false;
       let transaction: any = null;
 
       // Try finding the pre-existing checkout transaction by reference in transactions_log
@@ -86,22 +201,64 @@ export class WebhookController {
           if (tenantRec) {
             resolvedTenantId = tenantRec.id;
           } else {
-            // Check customers (includes school students mirrored as customers)
-            const { data: custRec } = await supabaseAdmin
+            const { data: parentVaEntities } = await supabaseAdmin
+              .from('school_entities')
+              .select('tenant_id, payload')
+              .eq('entity_type', 'parent_virtual_account')
+              .filter('payload->>accountNumber', 'eq', String(virtualAccountNumber))
+              .limit(5);
+
+            let parentVa = (parentVaEntities || [])[0] || null;
+            if (!parentVa) {
+              const { data: parentEntities } = await supabaseAdmin
+                .from('school_entities')
+                .select('tenant_id, payload')
+                .eq('entity_type', 'parent')
+                .filter('payload->>virtualAccountNumber', 'eq', String(virtualAccountNumber))
+                .limit(5);
+              parentVa = (parentEntities || [])[0] || null;
+            }
+
+            const { data: custRows } = await supabaseAdmin
               .from('customers')
               .select('id, tenant_id, name')
               .eq('virtual_account_number', virtualAccountNumber)
-              .maybeSingle();
+              .limit(20);
 
-            if (custRec) {
-              resolvedTenantId = custRec.tenant_id;
-              resolvedCustomerId = custRec.id;
-              if (typeof custRec.id === 'string' && custRec.id.startsWith('stu-')) {
-                resolvedStudentId = custRec.id;
-                resolvedAdmissionNumber = custRec.id.slice(4);
-              }
+            const { data: studentRecs } = await supabaseAdmin
+              .from('students')
+              .select('id, school_id, tenant_id, admission_number, first_name, last_name')
+              .eq('virtual_account_number', virtualAccountNumber)
+              .limit(10);
+
+            const parentPayload = (parentVa?.payload || {}) as Record<string, any>;
+            const parentHintRaw = String(
+              parentPayload.syncId || parentPayload.parentSyncId || parentVa?.tenant_id || '',
+            );
+            const parentCustomerIdHint = parentHintRaw
+              ? (parentHintRaw.startsWith('par-') ? parentHintRaw : `par-${parentHintRaw}`)
+              : null;
+
+            const attribution = pickParentOwnedAttribution({
+              customers: custRows || [],
+              students: studentRecs || [],
+              parentVaRegistered: Boolean(parentVa),
+              parentCustomerIdHint,
+            });
+
+            if (attribution.parentOwned) {
+              parentOwnedDeposit = true;
+              resolvedTenantId =
+                attribution.tenantId || parentVa?.tenant_id || (custRows || [])[0]?.tenant_id || null;
+              resolvedCustomerId = attribution.customerId;
+              resolvedStudentId = null;
+              resolvedAdmissionNumber = null;
+            } else if ((custRows || []).length) {
+              resolvedTenantId = attribution.tenantId;
+              resolvedCustomerId = attribution.customerId;
+              resolvedStudentId = attribution.studentId;
+              resolvedAdmissionNumber = attribution.admissionNumber;
             } else {
-              // Check staff users with assigned virtual accounts
               const { data: staffUser } = await supabaseAdmin
                 .from('users')
                 .select('id, tenant_id')
@@ -110,38 +267,32 @@ export class WebhookController {
 
               if (staffUser?.tenant_id) {
                 resolvedTenantId = staffUser.tenant_id;
+              } else if (studentRecs && studentRecs.length === 1) {
+                resolvedTenantId = attribution.tenantId;
+                resolvedCustomerId = attribution.customerId;
+                resolvedStudentId = attribution.studentId;
+                resolvedAdmissionNumber = attribution.admissionNumber;
               } else {
-                // Check cloud students table (school VA provision path)
-                const { data: studentRec } = await supabaseAdmin
-                  .from('students')
-                  .select('id, school_id, tenant_id, admission_number, first_name, last_name')
-                  .eq('virtual_account_number', virtualAccountNumber)
+                const { data: studentVa } = await supabaseAdmin
+                  .from('student_virtual_accounts')
+                  .select('student_id, school_id')
+                  .eq('account_number', virtualAccountNumber)
                   .maybeSingle();
 
-                if (studentRec) {
-                  resolvedTenantId = studentRec.tenant_id || studentRec.school_id;
-                  resolvedStudentId = studentRec.id;
-                  resolvedAdmissionNumber = studentRec.admission_number || null;
-                  if (!resolvedCustomerId && typeof studentRec.id === 'string') {
-                    resolvedCustomerId = studentRec.id;
-                  }
-                } else {
-                  // Legacy student_virtual_accounts table
-                  const { data: studentVa } = await supabaseAdmin
-                    .from('student_virtual_accounts')
-                    .select('student_id, school_id')
-                    .eq('account_number', virtualAccountNumber)
-                    .maybeSingle();
-
-                  if (studentVa) {
-                    resolvedTenantId = studentVa.school_id;
-                    resolvedStudentId = studentVa.student_id;
-                  }
+                if (studentVa) {
+                  resolvedTenantId = studentVa.school_id;
+                  resolvedStudentId = studentVa.student_id;
                 }
               }
             }
           }
         }
+      }
+
+      if (isParentCustomerId(resolvedCustomerId)) {
+        parentOwnedDeposit = true;
+        resolvedStudentId = null;
+        resolvedAdmissionNumber = null;
       }
 
       if (!resolvedTenantId) {
@@ -210,8 +361,7 @@ export class WebhookController {
           /* ignore decrypt failures */
         }
       }
-      pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
-      pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+      pushQuasarWebhookEnvSecrets(pushSecret);
 
       try {
         const { IntegrationVaultService } = await import('../services/integration-vault.service');
@@ -242,12 +392,13 @@ export class WebhookController {
       // Hydrate runtime env from first vault/tenant secret so subsequent requests stay warm
       if (!process.env.QUASAR_WEBHOOK_SIGNING_SECRET && candidateSecrets[0]) {
         process.env.QUASAR_WEBHOOK_SIGNING_SECRET = candidateSecrets[0];
+        process.env.QUASAR_WEBHOOK_SECRET = candidateSecrets[0];
       }
 
       // 3. VERIFY SIGNATURE (HMAC-SHA256, constant-time, timestamp replay protection)
       let isValid = false;
       for (const secret of candidateSecrets) {
-        if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) {
+        if (QuasarWebhookService.verifySignature(rawBody, signature, secret, webhookTimestamp)) {
           isValid = true;
           break;
         }
@@ -279,6 +430,39 @@ export class WebhookController {
 
       // 5. IDEMPOTENCY CHECK
       const idempotencyKey = `quasar:${reference}:credit`;
+      const isPayoutRow = String(transaction?.type || '').toLowerCase() === 'payout';
+      const envelopeId = String(event?.id || '').trim() || null;
+
+      // Transfer payouts: SUCCESS/FAILED/REJECTED (case-insensitive) + envelope.id dedupe.
+      // Approve in Quasar admin does not webhook; reject/fail and success do.
+      if (isPayoutRow) {
+        if (envelopeId && (await PayoutStatusService.envelopeAlreadyProcessed(envelopeId))) {
+          return res.status(200).json({ status: 'already_processed', note: 'envelope' });
+        }
+        const outcome = resolveTransferOutcome({
+          event: event?.event,
+          status: event?.data?.status ?? status,
+        });
+        if (outcome === 'success' || outcome === 'failed' || outcome === 'open') {
+          const applied = await PayoutStatusService.applyOutcome({
+            tenantId: resolvedTenantId!,
+            reference,
+            outcome,
+            quasarStatus: event?.data?.status,
+            reason: event?.data?.reason || event?.data?.message || null,
+            amount: event?.data?.amount ?? amount,
+            source: 'WEBHOOK',
+            envelopeId,
+          });
+          return res.status(200).json({
+            status: applied.applied ? 'processed' : 'already_processed',
+            payoutStatus: applied.status,
+            note: applied.note || null,
+          });
+        }
+        return res.status(200).json({ status: 'ignored', note: 'payout_non_terminal' });
+      }
+
       if (await LedgerService.exists(idempotencyKey)) {
         console.log(`[Idempotency] Already processed ${reference}. Returning success.`);
         return res.status(200).json({ status: 'already_processed' });
@@ -286,10 +470,11 @@ export class WebhookController {
 
       // 6. PROCESS STATE UPDATES OR LOG DEPOSITS
       if (transaction) {
-        if (status === 'success') {
-          await WebhookController._handleSuccess(resolvedTenantId!, resolvedWalletId!, reference, amount, idempotencyKey, event, transaction.type);
-        } else if (status === 'failed') {
-          await WebhookController._handleFailure(resolvedTenantId!, resolvedWalletId!, reference, event, transaction.type);
+        const normalizedStatus = String(status || '').trim().toLowerCase();
+        if (normalizedStatus === 'success' || event?.event === 'transfer.success') {
+          await WebhookController._handleSuccess(resolvedTenantId!, resolvedWalletId!, reference, amount, idempotencyKey, event, transaction.type, transaction.status);
+        } else if (normalizedStatus === 'failed' || event?.event === 'transfer.failed') {
+          await WebhookController._handleFailure(resolvedTenantId!, resolvedWalletId!, reference, event, transaction.type, transaction.status);
         }
       } else {
         // Direct virtual account deposit
@@ -309,10 +494,14 @@ export class WebhookController {
           }
 
           const virtualAccountNumber = event.data?.accountNumber || event.data?.virtualAccountNumber || event.data?.metadata?.virtualAccountNumber;
-          const senderName = event.data?.senderName || event.data?.metadata?.senderName || event.data?.accountName || 'Unknown Sender';
-          const senderBank = event.data?.senderBank || event.data?.metadata?.senderBank || event.data?.bankName || 'Unknown Bank';
-          const creditAmount = Number(amount);
+          const { senderName, senderBank } = vaSenderFromEvent(event);
+          const creditAmount = roundNaira(Number(amount));
           const isSandbox = event?.data?.sandbox === true;
+          const ownership = virtualAccountNumber
+            ? await loadVirtualAccountKind(String(virtualAccountNumber), { tenantId: resolvedTenantId })
+            : { kind: 'unknown' as const, tenantId: resolvedTenantId };
+          if (ownership.kind === 'parent') parentOwnedDeposit = true;
+          const schoolOwnedCredit = creditsSchoolWallet(ownership.kind) && !parentOwnedDeposit;
 
           if (!Number.isFinite(creditAmount)) {
             console.error(`[Webhook] Invalid amount for ${reference}:`, amount);
@@ -323,61 +512,111 @@ export class WebhookController {
           }
 
           try {
-            // Insert success deposit transaction in DB log
-            const { error: insertErr } = await supabaseAdmin
-              .from('transactions_log')
-              .insert({
-                reference,
-                tenant_id: resolvedTenantId,
-                wallet_id: resolvedWalletId,
-                amount: Math.round(creditAmount),
-                type: 'CREDIT',
-                provider: 'quasar',
-                status: 'SUCCESS',
-                metadata: {
-                  virtualAccountNumber,
-                  accountNumber: virtualAccountNumber,
-                  senderName,
-                  senderBank,
-                  sandbox: isSandbox,
-                  quasarEvent: event.event,
-                  ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
-                  ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
-                  ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
-                }
-              });
-            if (insertErr) {
-              throw new Error(insertErr.message || 'transactions_log insert failed');
+            const depositEntries: LedgerLeg[] = parentOwnedDeposit
+              ? parentDepositLedgerEntries(creditAmount)
+              : schoolOwnedCredit
+                ? [
+                    { account: 'QUASAR_CLEARING', type: 'DEBIT', amount: creditAmount },
+                    { account: 'USER_WALLET', type: 'CREDIT', amount: creditAmount },
+                  ]
+                : parentDepositLedgerEntries(creditAmount);
+
+            if (!schoolOwnedCredit && !parentOwnedDeposit) {
+              console.warn(
+                `[Webhook] Unknown virtual account ${virtualAccountNumber} for ${reference}; USER_WALLET was not credited.`,
+              );
             }
 
-            if (resolvedWalletId) {
-              // Double-entry bookkeeping: DR Clearing -> CR Merchant Wallet
-              await LedgerService.createDoubleEntry({
+            if (resolvedWalletId && (schoolOwnedCredit || parentOwnedDeposit)) {
+              const posted = await LedgerService.createDoubleEntry({
                 idempotencyKey,
                 tenantId: resolvedTenantId,
                 reference,
-                entries: [
-                  { account: "QUASAR_CLEARING", type: "DEBIT", amount: creditAmount },
-                  { account: "USER_WALLET", type: "CREDIT", amount: creditAmount }
-                ],
+                entries: depositEntries,
                 actorId: 'SYSTEM_WEBHOOK',
                 provider: 'quasar',
-                metadata: { source: 'quasar_webhook', type: 'deposit', sandbox: isSandbox }
+                metadata: {
+                  source: 'quasar_webhook',
+                  type: 'deposit',
+                  sandbox: isSandbox,
+                  paidVia: parentOwnedDeposit ? 'parent_account' : schoolOwnedCredit ? 'school_account' : 'unknown_account',
+                  schoolWalletCredit: schoolOwnedCredit,
+                },
               });
+              if ((posted as any)?.status === 'DE-DUPLICATED' || (posted as any)?.data?.status === 'DE-DUPLICATED') {
+                return res.status(200).json({ status: 'already_processed' });
+              }
+              if (schoolOwnedCredit) {
+                await FeeShadowIntegration.afterVaInwardResult(true, {
+                  tenantId: resolvedTenantId,
+                  amountNaira: creditAmount,
+                  reference,
+                });
+                try {
+                  const derived = await WalletService.getBalance(resolvedTenantId);
+                  await supabaseAdmin
+                    .from('wallets')
+                    .update({ balance: Number(derived?.balance || 0) })
+                    .eq('id', resolvedWalletId);
+                } catch (walletErr: any) {
+                  console.warn(`[Webhook] Wallet cache refresh failed for ${resolvedTenantId}:`, walletErr?.message || walletErr);
+                }
+              }
             } else {
               console.warn(`[Webhook] No Invify wallet for tenant ${resolvedTenantId}; logged deposit without ledger for ${reference}`);
             }
 
-            // Emit live updates over socket.io (tenant room + broadcast fallback for local/sandbox)
+            const { data: existingLog } = await supabaseAdmin
+              .from('transactions_log')
+              .select('id')
+              .eq('reference', reference)
+              .limit(1);
+            if (!existingLog?.length) {
+              const { error: insertErr } = await supabaseAdmin
+                .from('transactions_log')
+                .insert({
+                  reference,
+                  tenant_id: resolvedTenantId,
+                  wallet_id: resolvedWalletId,
+                  amount: creditAmount,
+                  type: 'CREDIT',
+                  provider: 'quasar',
+                  status: 'SUCCESS',
+                  metadata: {
+                    virtualAccountNumber,
+                    accountNumber: virtualAccountNumber,
+                    senderName,
+                    senderBank,
+                    sandbox: isSandbox,
+                    quasarEvent: event.event,
+                    amountNaira: creditAmount,
+                    amountRaw: amount,
+                    schoolWalletCredit: schoolOwnedCredit,
+                    ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
+                    ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
+                    ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                    ...(parentOwnedDeposit
+                      ? {
+                          paidVia: 'parent_account',
+                          ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                        }
+                      : {}),
+                  }
+                });
+              if (insertErr && !String(insertErr.message || '').toLowerCase().includes('duplicate')) {
+                throw new Error(insertErr.message || 'transactions_log insert failed');
+              }
+            }
+
+            // Keep resending to this tenant until a device acknowledges the socket.
             try {
               const { io } = require('../app');
-              if (io) {
-                const payload = {
-                  type: 'payment.success',
-                  reference,
-                  tenantId: resolvedTenantId,
+              await PaymentAlertTrailService.recordAndEmit(io, {
+                tenantId: resolvedTenantId,
+                reference,
+                amount: creditAmount,
+                payload: {
                   walletId: resolvedWalletId,
-                  amount: creditAmount,
                   customerId: resolvedCustomerId,
                   studentId: resolvedStudentId,
                   metadata: {
@@ -390,19 +629,17 @@ export class WebhookController {
                     ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
                     ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
                     ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
-                  }
-                };
-                io.to(`tenant:${resolvedTenantId}`).emit('payment.success', payload);
-                // Never fan out payment alerts to room "all" — that notifies every online device.
-                // Offline devices recover via /api/finance/missed-payments catch-up on reconnect.
-                console.log(
-                  `[Socket.io] Emitted payment.success to tenant:${resolvedTenantId} for ref ${reference}`,
-                );
-              } else {
-                console.warn('[Socket.io] io instance unavailable — deposit notification not pushed');
-              }
+                    ...(parentOwnedDeposit
+                      ? {
+                          paidVia: 'parent_account',
+                          ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                        }
+                      : {}),
+                  },
+                },
+              });
             } catch (e: any) {
-              console.error('[Socket.io] Failed to emit deposit.success:', e.message);
+              console.error('[PaymentAlert] Failed to record deposit alert:', e.message);
             }
 
             // Push / in-app notification path used by checkout success flow
@@ -454,6 +691,12 @@ export class WebhookController {
                   ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
                   ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
                   ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                  ...(parentOwnedDeposit
+                    ? {
+                        paidVia: 'parent_account',
+                        ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                      }
+                    : {}),
                 },
                 idempotencyKey: `event:deposit_success:${reference}`
               });
@@ -611,29 +854,56 @@ export class WebhookController {
   /**
    * Performs the double-entry write and updates transaction status.
    */
-  private static async _handleSuccess(tenantId: string, walletId: string, reference: string, amount: number, idempotencyKey: string, event: any, type: string = 'payment') {
+  private static async _handleSuccess(tenantId: string, walletId: string, reference: string, amount: number, idempotencyKey: string, event: any, type: string = 'payment', priorStatus?: string | null) {
     console.log(`[Webhook] Processing success for ${type} ref: ${reference}`);
 
-    // 1. Write double-entry ledger (Rules-compliant)
-    const entries = type === 'payout' 
-      ? [
-          { account: "SCHOOL_WALLET", type: "DEBIT" as const, amount },
-          { account: "EXTERNAL_BANK", type: "CREDIT" as const, amount }
-        ]
-      : [
-          { account: "QUASAR_CLEARING", type: "DEBIT" as const, amount },
-          { account: "USER_WALLET", type: "CREDIT" as const, amount }
-        ];
+    if (type === 'payout') {
+      // Wallet was debited (USER_WALLET → EXTERNAL_BANK) at initiation; success moves no money.
+      if (String(priorStatus || '').toUpperCase() === 'SUCCESS') {
+        console.log(`[Webhook] Payout ${reference} already SUCCESS. Skipping.`);
+        return;
+      }
+      const verdict = await PayoutReversalService.settlementState(tenantId, reference);
+      if (verdict !== 'RESERVED') {
+        console.error(`[Webhook] Payout success for ${reference} needs reconciliation: ${verdict}`);
+        await AuditService.log({
+          eventType: 'payout.reconciliation_required' as any,
+          reference,
+          tenantId,
+          payload: { reason: verdict, webhook_status: 'success', amount, event_data: event.data },
+        });
+        return;
+      }
+    } else {
+      await LedgerService.createDoubleEntry({
+        idempotencyKey,
+        tenantId,
+        reference,
+        entries: [
+          { account: 'QUASAR_CLEARING', type: 'DEBIT', amount },
+          { account: 'USER_WALLET', type: 'CREDIT', amount },
+        ],
+        actorId: 'SYSTEM_WEBHOOK',
+        provider: 'quasar',
+        metadata: { source: 'quasar_webhook', type }
+      });
+    }
 
-    await LedgerService.createDoubleEntry({
-      idempotencyKey,
-      tenantId,
-      reference,
-      entries: entries as any,
-      actorId: 'SYSTEM_WEBHOOK',
-      provider: 'quasar',
-      metadata: { source: 'quasar_webhook', type }
-    });
+    const vaEvent =
+      event?.event === 'virtual_account.credit' ||
+      event?.event === 'virtual_account.funded' ||
+      type === 'CREDIT' ||
+      type === 'DEPOSIT' ||
+      type === 'INWARD' ||
+      type === 'INWARD_PAYMENT' ||
+      type === 'VIRTUAL_ACCOUNT_CREDIT';
+    if (type !== 'payout' && vaEvent) {
+      await FeeShadowIntegration.afterVaInwardResult(true, {
+        tenantId,
+        amountNaira: Number(amount),
+        reference,
+      });
+    }
 
     // 2. Update Transaction Status → SUCCESS
     await supabaseAdmin
@@ -692,22 +962,34 @@ export class WebhookController {
       payload: { amount, type, event_data: event.data }
     });
 
-    // 6. Emit via Socket.io to the tenant room!
+    // 6. Credits stay on the alert trail until a device acknowledges the socket.
+    // Payouts remain a single socket emit.
     try {
       const { io } = require('../app');
-      if (io) {
-        io.to(`tenant:${tenantId}`).emit('payment.success', {
-          type: type === 'payout' ? 'payout.success' : 'payment.success',
-          reference,
+      if (type === 'payout') {
+        if (io) {
+          io.to(`tenant:${tenantId}`).emit('payment.success', {
+            type: 'payout.success',
+            reference,
+            tenantId,
+            walletId,
+            amount,
+            metadata: event.data?.metadata || {},
+          });
+        }
+      } else {
+        await PaymentAlertTrailService.recordAndEmit(io, {
           tenantId,
-          walletId,
+          reference,
           amount,
-          metadata: event.data?.metadata || {}
+          payload: {
+            walletId,
+            metadata: event.data?.metadata || {},
+          },
         });
-        console.log(`[Socket.io] Emitted payment.success to room tenant:${tenantId} for ref ${reference}`);
       }
     } catch (e: any) {
-      console.error('[Socket.io] Failed to emit payment.success via Socket.io:', e.message);
+      console.error('[PaymentAlert] Failed to emit payment alert:', e.message);
     }
 
     console.log(`[Event] Emit payment.success for ${reference}`);
@@ -716,9 +998,36 @@ export class WebhookController {
   /**
    * Updates transaction status to FAILED.
    */
-  private static async _handleFailure(tenantId: string, walletId: string, reference: string, event: any, type: string = 'payment') {
+  private static async _handleFailure(tenantId: string, walletId: string, reference: string, event: any, type: string = 'payment', priorStatus?: string | null) {
     console.log(`[Webhook] Processing failure for ${type} ref: ${reference}`);
-    
+    const prior = String(priorStatus || '').toUpperCase();
+
+    if (type === 'payout') {
+      if (prior === 'SUCCESS') {
+        // Restoring funds after a confirmed success could create money; route to a human.
+        console.error(`[Webhook] Payout ${reference} failed after SUCCESS — reconciliation required.`);
+        await AuditService.log({
+          eventType: 'payout.reconciliation_required' as any,
+          reference,
+          tenantId,
+          payload: { reason: 'FAILED_AFTER_SUCCESS', event_data: event.data },
+        });
+        return;
+      }
+      // Idempotent: deterministic key, amount taken from the original debit.
+      // Runs even on a repeated FAILED webhook so a crash between status update and reversal self-heals.
+      await PayoutReversalService.reverseFailedPayout({
+        tenantId,
+        reference,
+        reason: String(event?.data?.reason || event?.data?.message || event?.event || 'payout.failed'),
+        source: 'WEBHOOK_PAYOUT_FAILED',
+      });
+      if (prior === 'FAILED') {
+        console.log(`[Webhook] Payout ${reference} already FAILED. Reversal ensured; skipping notifications.`);
+        return;
+      }
+    }
+
     await supabaseAdmin
       .from('transactions_log')
       .update({ status: 'FAILED', processed_at: new Date().toISOString() })
@@ -747,6 +1056,101 @@ export class WebhookController {
     });
 
     console.log(`[Event] Emit payment.failed for ${reference}`);
+  }
+
+  private static async _verifyQuasarWebhookSignature(
+    event: any,
+    signature: string,
+    rawBody: string,
+    resolvedTenantId: string | null,
+  ): Promise<boolean> {
+    const candidateSecrets: string[] = [];
+    const pushSecret = (value?: string | null) => {
+      if (value && typeof value === 'string' && value.length >= 8 && !candidateSecrets.includes(value)) {
+        candidateSecrets.push(value);
+      }
+    };
+    if (resolvedTenantId) {
+      try {
+        const integration = await QuasarIntegrationStore.getByInvifyTenantId(resolvedTenantId);
+        if (integration) pushSecret(QuasarIntegrationStore.decryptSigningSecret(integration));
+      } catch {
+        /* ignore */
+      }
+    }
+    pushQuasarWebhookEnvSecrets(pushSecret);
+
+    for (const secret of candidateSecrets) {
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) return true;
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, undefined)) return true;
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[Webhook] Dispute HMAC mismatch — accepting in development');
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Quasar dispute debit notifications — complete maker-checker cases left APPROVED_EXECUTING
+   * after a sync timeout. Never credits wallets; completePosted debits USER_WALLET fail-closed.
+   */
+  private static async _handleDisputeDebitWebhook(
+    req: Request,
+    res: Response,
+    event: any,
+    signature: string,
+    rawBody: string,
+  ) {
+    const caseId = event?.data?.invifyCaseId || event?.data?.invify_case_id || event?.data?.metadata?.invifyCaseId;
+    let resolvedTenantId: string | null = null;
+    if (caseId) {
+      try {
+        const row = await FinancialDisputeService.getById(String(caseId));
+        resolvedTenantId = row.tenant_id;
+      } catch {
+        /* fall through */
+      }
+    }
+    if (!resolvedTenantId && event?.data?.tenantId) {
+      try {
+        const mapped = await QuasarIntegrationStore.getByQuasarTenantId(String(event.data.tenantId));
+        resolvedTenantId = mapped?.invify_tenant_id || null;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const isValid = await WebhookController._verifyQuasarWebhookSignature(
+      event,
+      signature,
+      rawBody,
+      resolvedTenantId,
+    );
+    if (!isValid) {
+      return res.status(401).json({ error: 'Auth failure' });
+    }
+
+    try {
+      const result = await FinancialDisputeService.applyQuasarWebhook(event);
+      if (resolvedTenantId) {
+        await AuditService.log({
+          eventType: 'webhook.received',
+          reference: String(caseId || event?.data?.id || 'dispute-debit'),
+          tenantId: resolvedTenantId,
+          payload: event,
+        });
+      }
+      return res.status(200).json({ received: true, event: event.event, result });
+    } catch (err: any) {
+      console.error('[Webhook] dispute.debit handler:', err.message);
+      return res.status(200).json({
+        received: true,
+        event: event.event,
+        note: err.message,
+        case: err.case || undefined,
+      });
+    }
   }
 
   /**
@@ -810,8 +1214,7 @@ export class WebhookController {
         /* ignore */
       }
     }
-    pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
-    pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+    pushQuasarWebhookEnvSecrets(pushSecret);
 
     let isValid = false;
     for (const secret of candidateSecrets) {

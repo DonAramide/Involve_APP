@@ -16,6 +16,7 @@ class DiscoveryService {
     required String deviceId,
     required String deviceName,
     required bool isMaster,
+    String? hardwareId,
     String? authToken,
   }) async {
     if (kIsWeb) return;
@@ -34,7 +35,10 @@ class DiscoveryService {
         }
       });
 
-      _broadcastTimer = Timer.periodic(const Duration(seconds: 5), (_) => _sendAnnouncement(deviceId, deviceName, isMaster, authToken));
+      _broadcastTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _sendAnnouncement(deviceId, deviceName, isMaster, authToken, hardwareId),
+      );
       
       // Cleanup stale peers
       Timer.periodic(const Duration(seconds: 15), (_) {
@@ -51,12 +55,13 @@ class DiscoveryService {
     }
   }
 
-  void _sendAnnouncement(String deviceId, String deviceName, bool isMaster, String? authToken) {
+  void _sendAnnouncement(String deviceId, String deviceName, bool isMaster, String? authToken, String? hardwareId) {
     if (_socket == null) return;
     
     final announcement = {
       'deviceId': deviceId,
       'deviceName': deviceName,
+      'hardwareId': hardwareId,
       'isMaster': isMaster,
       'port': 8080,
       'authToken': authToken,
@@ -76,6 +81,7 @@ class DiscoveryService {
       _discoveredPeers[id] = PeerDevice(
         deviceId: id,
         deviceName: json['deviceName'] ?? 'Unknown',
+        hardwareId: json['hardwareId']?.toString(),
         ip: ip,
         port: json['port'],
         isMaster: json['isMaster'] ?? false,

@@ -14,6 +14,17 @@ class ServiceCustomer extends Equatable {
   final String? virtualAccountBank;
   final DateTime? createdAt;
 
+  static const walkInName = 'Walk-in Customer';
+
+  static bool isWalkInName(String? name) {
+    final normalized = (name ?? '').trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    return normalized == 'walkincustomer' ||
+        normalized == 'walkinclient' ||
+        normalized == 'walkin' ||
+        normalized == 'workincustomer' ||
+        normalized == 'workin';
+  }
+
   const ServiceCustomer({
     required this.id,
     required this.name,

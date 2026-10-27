@@ -66,7 +66,7 @@ export class QuasarConnectivityHealthService {
       const { resolveQuasarBaseUrl } = require('./quasar-base-url');
       return resolveQuasarBaseUrl();
     } catch {
-      return process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+      return process.env.QUASAR_BASE_URL ?? 'https://api-quasar.invify.org/api/v1';
     }
   }
 

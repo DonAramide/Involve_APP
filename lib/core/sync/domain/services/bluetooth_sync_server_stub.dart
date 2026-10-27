@@ -6,7 +6,7 @@ class BluetoothSyncServer {
 
   BluetoothSyncServer({required this.syncRepository, required this.deviceId});
 
-  Future<void> start() async {
+  Future<void> start({String? confirmId}) async {
     // No-op on Web
   }
 

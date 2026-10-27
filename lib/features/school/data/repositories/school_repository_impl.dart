@@ -115,21 +115,26 @@ class SchoolRepositoryImpl implements SchoolRepository {
     return rows.map((row) => SchoolClass(
       id: row.id,
       name: row.name,
+      description: row.description,
     )).toList();
   }
 
   @override
   Future<void> addClass(SchoolClass schoolClass) async {
+    final desc = schoolClass.description?.trim();
     await database.into(database.classes).insert(db.ClassesCompanion.insert(
-      name: schoolClass.name,
+      name: schoolClass.name.trim(),
+      description: Value(desc == null || desc.isEmpty ? null : desc),
     ));
   }
 
   @override
   Future<void> updateClass(SchoolClass schoolClass) async {
+    final desc = schoolClass.description?.trim();
     await (database.update(database.classes)..where((t) => t.id.equals(schoolClass.id!)))
         .write(db.ClassesCompanion(
-      name: Value(schoolClass.name),
+      name: Value(schoolClass.name.trim()),
+      description: Value(desc == null || desc.isEmpty ? null : desc),
     ));
   }
 
@@ -145,8 +150,10 @@ class SchoolRepositoryImpl implements SchoolRepository {
       id: row.id,
       admissionNumber: row.admissionNumber,
       firstName: row.firstName,
+      middleName: row.middleName,
       lastName: row.lastName,
       classId: row.classId,
+      parentId: row.parentId,
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
@@ -160,6 +167,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
+      enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
+      notes: row.notes,
     )).toList();
   }
 
@@ -169,8 +178,10 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.id,
       database.students.admissionNumber,
       database.students.firstName,
+      database.students.middleName,
       database.students.lastName,
       database.students.classId,
+      database.students.parentId,
       database.students.parentName,
       database.students.parentPhone,
       database.students.balance,
@@ -183,6 +194,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.virtualAccountBank,
       database.students.virtualAccountStatus,
       database.students.department,
+      database.students.enrollmentStatus,
+      database.students.notes,
     ]);
     
     final rows = await query.get();
@@ -190,8 +203,10 @@ class SchoolRepositoryImpl implements SchoolRepository {
       id: row.read(database.students.id)!,
       admissionNumber: row.read(database.students.admissionNumber)!,
       firstName: row.read(database.students.firstName)!,
+      middleName: row.read(database.students.middleName),
       lastName: row.read(database.students.lastName)!,
       classId: row.read(database.students.classId)!,
+      parentId: row.read(database.students.parentId),
       parentName: row.read(database.students.parentName),
       parentPhone: row.read(database.students.parentPhone),
       balance: row.read(database.students.balance)!,
@@ -205,16 +220,20 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.read(database.students.virtualAccountBank),
       virtualAccountStatus: row.read(database.students.virtualAccountStatus),
       department: row.read(database.students.department),
+      enrollmentStatus: _enrollmentOf(row.read(database.students.enrollmentStatus)),
+      notes: row.read(database.students.notes),
     )).toList();
   }
 
   @override
-  Future<void> addStudent(Student student) async {
-    await database.into(database.students).insert(db.StudentsCompanion.insert(
+  Future<int> addStudent(Student student) async {
+    return database.into(database.students).insert(db.StudentsCompanion.insert(
       admissionNumber: student.admissionNumber,
       firstName: student.firstName,
+      middleName: Value(student.middleName),
       lastName: student.lastName,
       classId: student.classId,
+      parentId: Value(student.parentId),
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
@@ -228,6 +247,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
+      enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
+      notes: Value(student.notes),
     ));
   }
 
@@ -237,8 +258,10 @@ class SchoolRepositoryImpl implements SchoolRepository {
         .write(db.StudentsCompanion(
       admissionNumber: Value(student.admissionNumber),
       firstName: Value(student.firstName),
+      middleName: Value(student.middleName),
       lastName: Value(student.lastName),
       classId: Value(student.classId),
+      parentId: Value(student.parentId),
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
@@ -252,6 +275,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
       department: Value(student.department),
+      enrollmentStatus: Value(_enrollmentOf(student.enrollmentStatus)),
+      notes: Value(student.notes),
     ));
   }
 
@@ -261,12 +286,41 @@ class SchoolRepositoryImpl implements SchoolRepository {
   }
 
   @override
+  Future<void> assignParentToStudents({
+    required List<int> studentIds,
+    required String parentName,
+    required String parentPhone,
+    String? parentAddress,
+    String? parentEmail,
+  }) async {
+    if (studentIds.isEmpty) return;
+    final parent = await ensureParent(
+      fullName: parentName,
+      phone: parentPhone,
+      email: parentEmail,
+      address: parentAddress,
+    );
+    await linkStudentsToParent(parentId: parent.id!, studentIds: studentIds);
+  }
+
+  @override
   Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId}) async {
     await (database.update(database.students)
           ..where((t) => t.id.isIn(studentIds)))
         .write(db.StudentsCompanion(
       classId: Value(targetClassId),
       academicYearId: academicYearId != null ? Value(academicYearId) : const Value.absent(),
+      enrollmentStatus: const Value('promoted'),
+    ));
+  }
+
+  @override
+  Future<void> setStudentsEnrollmentStatus(List<int> studentIds, String status) async {
+    if (studentIds.isEmpty) return;
+    await (database.update(database.students)
+          ..where((t) => t.id.isIn(studentIds)))
+        .write(db.StudentsCompanion(
+      enrollmentStatus: Value(_enrollmentOf(status)),
     ));
   }
 
@@ -370,8 +424,10 @@ class SchoolRepositoryImpl implements SchoolRepository {
       id: row.id,
       admissionNumber: row.admissionNumber,
       firstName: row.firstName,
+      middleName: row.middleName,
       lastName: row.lastName,
       classId: row.classId,
+      parentId: row.parentId,
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
@@ -385,7 +441,473 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
       department: row.department,
+      enrollmentStatus: _enrollmentOf(row.enrollmentStatus),
+      notes: row.notes,
     );
+  }
+
+  String _enrollmentOf(String? raw) {
+    final v = (raw ?? 'active').trim().toLowerCase();
+    if (v == 'graduated' || v == 'promoted') return v;
+    return 'active';
+  }
+
+  SchoolParent _mapParent(db.ParentTable row, List<ParentVaAccount> vas) {
+    return SchoolParent(
+      id: row.id,
+      syncId: row.syncId,
+      fullName: row.fullName,
+      phone: row.phone,
+      email: row.email,
+      address: row.address,
+      virtualAccountNumber: row.virtualAccountNumber,
+      virtualAccountBank: row.virtualAccountBank,
+      virtualAccountName: row.virtualAccountName,
+      virtualAccountStatus: row.virtualAccountStatus,
+      creditBalance: row.creditBalance,
+      createdAt: row.createdAt ?? DateTime.now(),
+      virtualAccounts: vas,
+    );
+  }
+
+  Future<List<ParentVaAccount>> _vasForParent(int parentId) async {
+    final rows = await (database.select(database.parentVirtualAccounts)
+          ..where((t) => t.parentId.equals(parentId)))
+        .get();
+    return rows
+        .map(
+          (r) => ParentVaAccount(
+            id: r.id,
+            parentId: r.parentId,
+            accountNumber: r.accountNumber,
+            bankName: r.bankName,
+            accountName: r.accountName,
+            kind: r.kind,
+            isCanonical: r.isCanonical,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<SchoolParent>> getParents() async {
+    final rows = await database.select(database.parents).get();
+    final result = <SchoolParent>[];
+    for (final row in rows) {
+      if (row.isDeleted) continue;
+      result.add(_mapParent(row, await _vasForParent(row.id)));
+    }
+    return result;
+  }
+
+  @override
+  Future<SchoolParent?> getParentById(int id) async {
+    final row = await (database.select(database.parents)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (row == null || row.isDeleted) return null;
+    return _mapParent(row, await _vasForParent(id));
+  }
+
+  static String _phoneKey(String? raw) {
+    final d = (raw ?? '').replaceAll(RegExp(r'\D'), '');
+    if (d.length >= 10) return d.substring(d.length - 10);
+    return d;
+  }
+
+  @override
+  Future<SchoolParent?> findParentForStudent(Student student) async {
+    if (student.parentId != null) {
+      final linked = await getParentById(student.parentId!);
+      if (linked != null) return linked;
+    }
+    final phoneKey = _phoneKey(student.parentPhone);
+    if (phoneKey.length < 10) return null;
+    final parents = await getParents();
+    for (final parent in parents) {
+      if (_phoneKey(parent.phone) == phoneKey) return parent;
+    }
+    return null;
+  }
+
+  @override
+  Future<SchoolParent> ensureParent({
+    required String fullName,
+    String? phone,
+    String? email,
+    String? address,
+  }) async {
+    final key = Student.parentIdentity(fullName, phone);
+    final existingParents = await getParents();
+    SchoolParent? match;
+    for (final p in existingParents) {
+      if (p.parentKey == key) {
+        match = p;
+        break;
+      }
+    }
+    if (match != null) {
+      bool needUpdate = false;
+      var updated = match;
+      final trimmedPhone = (phone ?? '').trim();
+      if (trimmedPhone.isNotEmpty && (match.phone ?? '').trim().isEmpty) {
+        updated = updated.copyWith(phone: trimmedPhone);
+        needUpdate = true;
+      }
+      if ((email ?? '').trim().isNotEmpty && (match.email ?? '').trim() != email!.trim()) {
+        updated = updated.copyWith(email: email.trim());
+        needUpdate = true;
+      }
+      if ((address ?? '').trim().isNotEmpty && (match.address ?? '').trim() != address!.trim()) {
+        updated = updated.copyWith(address: address!.trim());
+        needUpdate = true;
+      }
+      if (needUpdate) {
+        await updateParent(updated);
+        return updated;
+      }
+      return match;
+    }
+    final now = DateTime.now();
+    final id = await database.into(database.parents).insert(
+          db.ParentsCompanion.insert(
+            fullName: fullName.trim(),
+            phone: Value(phone?.trim()),
+            email: Value(email?.trim()),
+            address: Value(address?.trim()),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+    return (await getParentById(id))!;
+  }
+
+  @override
+  Future<SchoolParent> linkStudentsToParent({
+    required int parentId,
+    required List<int> studentIds,
+  }) async {
+    final parent = await getParentById(parentId);
+    if (parent == null) {
+      throw StateError('Parent $parentId not found');
+    }
+    if (studentIds.isEmpty) return parent;
+    final resolvedPhone = (parent.phone ?? '').trim().isNotEmpty
+        ? parent.phone
+        : null;
+    await (database.update(database.students)
+          ..where((t) => t.id.isIn(studentIds)))
+        .write(db.StudentsCompanion(
+      parentId: Value(parentId),
+      parentName: Value(parent.fullName),
+      // Never wipe a student guardian phone with an empty parent.phone.
+      parentPhone: resolvedPhone != null ? Value(resolvedPhone) : const Value.absent(),
+    ));
+    if (parent.hasCanonicalVa) {
+      await (database.update(database.students)
+            ..where((t) => t.id.isIn(studentIds)))
+          .write(db.StudentsCompanion(
+        virtualAccountNumber: Value(parent.virtualAccountNumber),
+        virtualAccountBank: Value(parent.virtualAccountBank),
+        virtualAccountStatus: Value(parent.virtualAccountStatus ?? 'ACTIVE'),
+      ));
+    }
+    return parent;
+  }
+
+  @override
+  Future<SchoolParent?> findParentByVirtualAccount(String accountNumber) async {
+    final va = accountNumber.trim();
+    if (va.isEmpty) return null;
+    final row = await (database.select(database.parentVirtualAccounts)
+          ..where((t) => t.accountNumber.equals(va)))
+        .getSingleOrNull();
+    if (row != null) return getParentById(row.parentId);
+    final byCanonical = await (database.select(database.parents)
+          ..where((t) => t.virtualAccountNumber.equals(va)))
+        .getSingleOrNull();
+    if (byCanonical != null) {
+      return _mapParent(byCanonical, await _vasForParent(byCanonical.id));
+    }
+    final want = va.replaceAll(RegExp(r'\D'), '');
+    if (want.length < 8) return null;
+    final allVas = await database.select(database.parentVirtualAccounts).get();
+    for (final candidate in allVas) {
+      if (candidate.accountNumber.replaceAll(RegExp(r'\D'), '') == want) {
+        return getParentById(candidate.parentId);
+      }
+    }
+    final parents = await (database.select(database.parents)
+          ..where((t) => t.virtualAccountNumber.isNotNull()))
+        .get();
+    for (final parent in parents) {
+      final local = (parent.virtualAccountNumber ?? '').replaceAll(RegExp(r'\D'), '');
+      if (local == want) {
+        return _mapParent(parent, await _vasForParent(parent.id));
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<SchoolParent?> findParentByExternalKey(String key) async {
+    final raw = key.trim();
+    if (raw.isEmpty) return null;
+    final stripped = raw.toLowerCase().startsWith('par-') ? raw.substring(4) : raw;
+    final parents = await getParents();
+    for (final parent in parents) {
+      final id = parent.id?.toString() ?? '';
+      final sync = (parent.syncId ?? '').trim();
+      if (raw == 'par-$id' ||
+          (sync.isNotEmpty && (raw == sync || raw == 'par-$sync' || stripped == sync)) ||
+          stripped == id) {
+        return parent;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveParentVirtualAccount({
+    required int parentId,
+    required String accountNumber,
+    String? bankName,
+    String? accountName,
+    required bool canonical,
+  }) async {
+    final number = accountNumber.trim();
+    if (number.isEmpty) return;
+    final existing = await (database.select(database.parentVirtualAccounts)
+          ..where((t) => t.accountNumber.equals(number)))
+        .getSingleOrNull();
+    if (existing == null) {
+      await database.into(database.parentVirtualAccounts).insert(
+            db.ParentVirtualAccountsCompanion.insert(
+              parentId: parentId,
+              accountNumber: number,
+              bankName: Value(bankName),
+              accountName: Value(accountName),
+              kind: Value(canonical ? 'canonical' : 'legacy'),
+              isCanonical: Value(canonical),
+              createdAt: Value(DateTime.now()),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+    } else if (canonical && !existing.isCanonical) {
+      await (database.update(database.parentVirtualAccounts)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(db.ParentVirtualAccountsCompanion(
+        kind: const Value('canonical'),
+        isCanonical: const Value(true),
+        bankName: Value(bankName),
+        accountName: Value(accountName),
+      ));
+    }
+
+    if (canonical) {
+      await (database.update(database.parentVirtualAccounts)
+            ..where((t) => t.parentId.equals(parentId)))
+          .write(const db.ParentVirtualAccountsCompanion(
+        isCanonical: Value(false),
+        kind: Value('legacy'),
+      ));
+      await (database.update(database.parentVirtualAccounts)
+            ..where((t) => t.accountNumber.equals(number)))
+          .write(db.ParentVirtualAccountsCompanion(
+        isCanonical: const Value(true),
+        kind: const Value('canonical'),
+        bankName: Value(bankName),
+        accountName: Value(accountName),
+      ));
+      await (database.update(database.parents)..where((t) => t.id.equals(parentId)))
+          .write(db.ParentsCompanion(
+        virtualAccountNumber: Value(number),
+        virtualAccountBank: Value(bankName),
+        virtualAccountName: Value(accountName),
+        virtualAccountStatus: const Value('ACTIVE'),
+        updatedAt: Value(DateTime.now()),
+      ));
+      await (database.update(database.students)
+            ..where((t) => t.parentId.equals(parentId)))
+          .write(db.StudentsCompanion(
+        virtualAccountNumber: Value(number),
+        virtualAccountBank: Value(bankName),
+        virtualAccountStatus: const Value('ACTIVE'),
+      ));
+    }
+  }
+
+  @override
+  Future<void> updateParent(SchoolParent parent) async {
+    await (database.update(database.parents)..where((t) => t.id.equals(parent.id!)))
+        .write(db.ParentsCompanion(
+      fullName: Value(parent.fullName),
+      phone: Value(parent.phone),
+      email: Value(parent.email),
+      address: Value(parent.address),
+      virtualAccountNumber: Value(parent.virtualAccountNumber),
+      virtualAccountBank: Value(parent.virtualAccountBank),
+      virtualAccountName: Value(parent.virtualAccountName),
+      virtualAccountStatus: Value(parent.virtualAccountStatus),
+      creditBalance: Value(parent.creditBalance),
+      syncId: Value(parent.syncId),
+      updatedAt: Value(DateTime.now()),
+    ));
+    await (database.update(database.students)..where((t) => t.parentId.equals(parent.id!)))
+        .write(db.StudentsCompanion(
+      parentName: Value(parent.fullName),
+      parentPhone: Value(parent.phone),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  @override
+  Future<bool> parentPaymentExists(String reference) async {
+    final row = await (database.select(database.parentPayments)
+          ..where((t) => t.reference.equals(reference.trim())))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  @override
+  Future<ParentPaymentRecord> recordParentPayment(ParentPaymentRecord payment) async {
+    if (await parentPaymentExists(payment.reference)) {
+      return payment;
+    }
+    final paymentId = await database.into(database.parentPayments).insert(
+          db.ParentPaymentsCompanion.insert(
+            parentId: payment.parentId,
+            reference: payment.reference.trim(),
+            amount: payment.amount,
+            appliedToDebt: Value(payment.appliedToDebt),
+            toCredit: Value(payment.toCredit),
+            parentOutstandingBefore: Value(payment.parentOutstandingBefore),
+            parentOutstandingAfter: Value(payment.parentOutstandingAfter),
+            parentCreditBefore: Value(payment.parentCreditBefore),
+            parentCreditAfter: Value(payment.parentCreditAfter),
+            virtualAccountNumber: Value(payment.virtualAccountNumber),
+            source: Value(payment.source),
+            createdAt: Value(payment.createdAt),
+          ),
+        );
+    for (final alloc in payment.allocations) {
+      await database.into(database.parentPaymentAllocations).insert(
+            db.ParentPaymentAllocationsCompanion.insert(
+              parentPaymentId: paymentId,
+              studentId: alloc.studentId,
+              outstandingBefore: alloc.outstandingBefore,
+              allocated: alloc.allocated,
+              outstandingAfter: alloc.outstandingAfter,
+            ),
+          );
+    }
+    await (database.update(database.parents)..where((t) => t.id.equals(payment.parentId)))
+        .write(db.ParentsCompanion(
+      creditBalance: Value(payment.parentCreditAfter),
+      updatedAt: Value(DateTime.now()),
+    ));
+    return payment;
+  }
+
+  @override
+  Future<double> addParentCredit(int parentId, double amount) async {
+    final now = DateTime.now();
+    await database.customUpdate(
+      'UPDATE parents SET credit_balance = credit_balance + ?, updated_at = ? WHERE id = ?',
+      variables: [
+        Variable.withReal(amount),
+        Variable.withDateTime(now),
+        Variable.withInt(parentId),
+      ],
+      updates: {database.parents},
+    );
+    final row = await (database.select(database.parents)
+          ..where((t) => t.id.equals(parentId)))
+        .getSingleOrNull();
+    return row?.creditBalance ?? 0;
+  }
+
+  @override
+  Future<List<ParentPaymentRecord>> getParentPayments(int parentId) async {
+    final rows = await (database.select(database.parentPayments)
+          ..where((t) => t.parentId.equals(parentId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+    final result = <ParentPaymentRecord>[];
+    for (final row in rows) {
+      final allocs = await (database.select(database.parentPaymentAllocations)
+            ..where((t) => t.parentPaymentId.equals(row.id)))
+          .get();
+      result.add(
+        ParentPaymentRecord(
+          id: row.id,
+          parentId: row.parentId,
+          reference: row.reference,
+          amount: row.amount,
+          appliedToDebt: row.appliedToDebt,
+          toCredit: row.toCredit,
+          parentOutstandingBefore: row.parentOutstandingBefore,
+          parentOutstandingAfter: row.parentOutstandingAfter,
+          parentCreditBefore: row.parentCreditBefore,
+          parentCreditAfter: row.parentCreditAfter,
+          virtualAccountNumber: row.virtualAccountNumber,
+          source: row.source,
+          createdAt: row.createdAt,
+          allocations: allocs
+              .map(
+                (a) => ParentPaymentAllocationRecord(
+                  studentId: a.studentId,
+                  outstandingBefore: a.outstandingBefore,
+                  allocated: a.allocated,
+                  outstandingAfter: a.outstandingAfter,
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+    return result;
+  }
+
+  @override
+  Future<void> backfillParentsFromStudents() async {
+    final students = await getStudents();
+    final groups = <String, List<Student>>{};
+    for (final s in students) {
+      if (!s.hasParent) continue;
+      groups.putIfAbsent(s.parentKey, () => []).add(s);
+    }
+    for (final children in groups.values) {
+      final sample = children.first;
+      final parent = await ensureParent(
+        fullName: sample.parentName!.trim(),
+        phone: sample.parentPhone,
+      );
+      final ids = children.map((c) => c.id).whereType<int>().toList();
+      await linkStudentsToParent(parentId: parent.id!, studentIds: ids);
+
+      final withVa = [...children]
+        ..sort((a, b) => (a.id ?? 0).compareTo(b.id ?? 0));
+      final numbers = <String, Student>{};
+      for (final child in withVa) {
+        final n = (child.virtualAccountNumber ?? '').trim();
+        if (n.isEmpty) continue;
+        numbers.putIfAbsent(n, () => child);
+      }
+      if (numbers.isEmpty) continue;
+      final preferred = (parent.virtualAccountNumber ?? '').trim();
+      final uniqueNumbers = numbers.keys.toList();
+      final canonicalNumber =
+          uniqueNumbers.contains(preferred) ? preferred : uniqueNumbers.first;
+      for (final entry in numbers.entries) {
+        await saveParentVirtualAccount(
+          parentId: parent.id!,
+          accountNumber: entry.key,
+          bankName: entry.value.virtualAccountBank,
+          canonical: entry.key == canonicalNumber,
+        );
+      }
+    }
   }
 
   @override
@@ -396,26 +918,41 @@ class SchoolRepositoryImpl implements SchoolRepository {
       name: row.name,
       code: row.code,
       teacherId: row.teacherId,
+      teacherIds: _parseClassIds(row.teacherIds),
+      classIds: _parseClassIds(row.classIds),
     )).toList();
+  }
+
+  db.SubjectsCompanion _subjectCompanion(Subject subject, {required bool inserting}) {
+    final teacherIds = subject.assignedTeacherIds;
+    final primaryTeacherId = teacherIds.isEmpty ? null : teacherIds.first;
+    if (inserting) {
+      return db.SubjectsCompanion.insert(
+        name: subject.name,
+        code: Value(subject.code),
+        teacherId: Value(primaryTeacherId),
+        teacherIds: Value(teacherIds.isEmpty ? null : teacherIds.join(',')),
+        classIds: Value(subject.classIds?.join(',')),
+      );
+    }
+    return db.SubjectsCompanion(
+      name: Value(subject.name),
+      code: Value(subject.code),
+      teacherId: Value(primaryTeacherId),
+      teacherIds: Value(teacherIds.isEmpty ? null : teacherIds.join(',')),
+      classIds: Value(subject.classIds?.join(',')),
+    );
   }
 
   @override
   Future<void> addSubject(Subject subject) async {
-    await database.into(database.subjects).insert(db.SubjectsCompanion.insert(
-      name: subject.name,
-      code: Value(subject.code),
-      teacherId: Value(subject.teacherId),
-    ));
+    await database.into(database.subjects).insert(_subjectCompanion(subject, inserting: true));
   }
 
   @override
   Future<void> updateSubject(Subject subject) async {
     await (database.update(database.subjects)..where((t) => t.id.equals(subject.id!)))
-        .write(db.SubjectsCompanion(
-      name: Value(subject.name),
-      code: Value(subject.code),
-      teacherId: Value(subject.teacherId),
-    ));
+        .write(_subjectCompanion(subject, inserting: false));
   }
 
   @override
@@ -570,12 +1107,12 @@ class SchoolRepositoryImpl implements SchoolRepository {
   }
 
   @override
-  Future<void> addTeacher(Teacher teacher) async {
+  Future<int> addTeacher(Teacher teacher) async {
     final firstClassId = teacher.classIds != null && teacher.classIds!.isNotEmpty
         ? teacher.classIds!.first
         : teacher.classId;
 
-    await database.into(database.teachers).insert(db.TeachersCompanion.insert(
+    return database.into(database.teachers).insert(db.TeachersCompanion.insert(
       fullName: teacher.fullName,
       phone: Value(teacher.phone),
       profession: Value(teacher.profession),
@@ -587,6 +1124,29 @@ class SchoolRepositoryImpl implements SchoolRepository {
       image: Value(teacher.image),
       classIds: Value(teacher.classIds?.join(',')),
     ));
+  }
+
+  @override
+  Future<void> assignTeacherToSubjects(int teacherId, List<int> subjectIds) async {
+    final selected = subjectIds.toSet();
+    final subjects = await getSubjects();
+    for (final subject in subjects) {
+      final current = subject.assignedTeacherIds;
+      final shouldHave = selected.contains(subject.id);
+      final has = current.contains(teacherId);
+      if (shouldHave == has) continue;
+      final next = shouldHave
+          ? ([...current, teacherId]..sort())
+          : current.where((id) => id != teacherId).toList();
+      await updateSubject(Subject(
+        id: subject.id,
+        name: subject.name,
+        code: subject.code,
+        teacherId: next.isEmpty ? null : next.first,
+        teacherIds: next,
+        classIds: subject.classIds,
+      ));
+    }
   }
 
   @override
@@ -626,5 +1186,14 @@ class SchoolRepositoryImpl implements SchoolRepository {
       );
     final result = await query.getSingleOrNull();
     return result?.topic;
+  }
+
+  List<int>? _parseClassIds(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw
+        .split(',')
+        .where((s) => s.trim().isNotEmpty)
+        .map(int.parse)
+        .toList();
   }
 }

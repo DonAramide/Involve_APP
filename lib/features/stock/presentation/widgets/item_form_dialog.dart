@@ -12,8 +12,10 @@ import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../settings/domain/entities/settings.dart';
 import '../../../../core/utils/terminology.dart';
 import '../../../../core/widgets/barcode_scanner_dialog.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Item? item;
@@ -26,7 +28,8 @@ class ItemFormDialog extends StatefulWidget {
 }
 
 class _ItemFormDialogState extends State<ItemFormDialog> {
-  final _formKey = GlobalKey<FormState>();
+  var _formKey = GlobalKey<FormState>();
+  int _formGeneration = 0;
   late String _name;
   final _priceController = TextEditingController();
   final _costPriceController = TextEditingController();
@@ -42,13 +45,24 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   String? _billingType;
   String? _serviceCategory; 
   late String _businessMode;
+  bool _saveSubmitted = false;
 
   @override
   void initState() {
     super.initState();
     _name = widget.item?.name ?? '';
     _priceController.text = widget.item == null ? '0' : (widget.item!.price % 1 == 0 ? widget.item!.price.toInt().toString() : widget.item!.price.toString());
-    _costPriceController.text = widget.item == null ? '0' : (widget.item!.costPrice % 1 == 0 ? widget.item!.costPrice.toInt().toString() : widget.item!.costPrice.toString());
+    if (widget.item == null) {
+      final mode = context.read<SettingsBloc>().state.settings?.businessMode;
+      _costPriceController.text = mode == 'school' ? '' : '0';
+    } else if (widget.item!.costPrice == 0) {
+      final mode = widget.item!.businessMode;
+      _costPriceController.text = mode == 'school' ? '' : '0';
+    } else {
+      _costPriceController.text = widget.item!.costPrice % 1 == 0
+          ? widget.item!.costPrice.toInt().toString()
+          : widget.item!.costPrice.toString();
+    }
     _barcodeController.text = widget.item?.barcode ?? '';
     _stockQty = widget.item?.stockQty ?? 0;
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
@@ -86,15 +100,13 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImageFrom(ImageSource source) async {
     try {
       if (kIsWeb) {
-        // Use file_picker for web - better browser support
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           type: FileType.image,
           allowMultiple: false,
         );
-        
         if (result != null && result.files.isNotEmpty) {
           setState(() {
             _imageBytes = result.files.first.bytes;
@@ -103,40 +115,18 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         return;
       }
 
-      // Show selection dialog for mobile
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        builder: (ctx) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 600,
+        imageQuality: 85,
       );
 
-      if (source != null) {
-        final picker = ImagePicker();
-        final XFile? image = await picker.pickImage(
-          source: source,
-          maxWidth: 600,
-          imageQuality: 85,
-        );
-        
-        if (image != null) {
-          final bytes = await image.readAsBytes();
-          setState(() {
-            _imageBytes = bytes;
-          });
-        }
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -163,10 +153,24 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       bloc: widget.stockBloc,
       listenWhen: (previous, current) => previous.status != current.status,
       listener: (context, state) {
-        if (state.status == StockStatus.success) {
-          Navigator.of(context).pop();
+        if (state.status == StockStatus.success && _saveSubmitted) {
+          _saveSubmitted = false;
+          final savedName = _name;
+          if (widget.item == null) {
+            _showPostAddSuccessPrompt(context, savedName);
+          } else {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '${context.read<SettingsBloc>().state.settings!.productLabel} updated successfully.',
+                ),
+              ),
+            );
+          }
         }
         if (state.status == StockStatus.failure && state.error != null) {
+          _saveSubmitted = false;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.error!),
@@ -180,12 +184,44 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: KeyedSubtree(
+            key: ValueKey('item-form-$_formGeneration'),
+            child: _buildFormFields(context, settingsState, term, isServiceBillingEnabled, serviceTypes),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        ElevatedButton(
+          onPressed: _submit,
+          child: BlocBuilder<StockBloc, StockState>(
+            bloc: widget.stockBloc,
+            builder: (context, state) {
+              if (state.status == StockStatus.loading) {
+                return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
+              }
+              return Text(widget.item == null ? 'ADD' : 'SAVE');
+            },
+          ),
+        ),
+      ],
+      ),
+    );
+  }
+
+  Widget _buildFormFields(
+    BuildContext context,
+    SettingsState settingsState,
+    AppSettings term,
+    bool isServiceBillingEnabled,
+    List<String> serviceTypes,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
               // Image Picker
               GestureDetector(
-                onTap: _pickImage,
+                onTap: () => _pickImageFrom(ImageSource.gallery),
                 child: Container(
                   height: 100,
                   width: 100,
@@ -201,6 +237,26 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                       ? const Icon(Icons.add_a_photo, color: Colors.grey)
                       : null,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickImageFrom(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                      label: const Text('Take photo'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickImageFrom(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text('Gallery'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               
@@ -347,14 +403,17 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 keyboardType: TextInputType.number,
                 validator: (val) => InputValidator.validateNumber(val, term.sellingPriceLabel),
               ),
-              if (_type == 'product') ...[
+              if (_type == 'product' || term.businessMode == 'school') ...[
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _costPriceController,
-                  decoration: InputDecoration(labelText: '${term.costPriceLabel} (Optional)'),
+                  decoration: InputDecoration(
+                    labelText: '${term.costPriceLabel} (Optional)',
+                    hintText: term.businessMode == 'school' ? 'Leave blank if not used' : null,
+                  ),
                   keyboardType: TextInputType.number,
                   validator: (val) {
-                    if (val == null || val.isEmpty || val == '0' || val == '0.0') return null;
+                    if (val == null || val.trim().isEmpty || val == '0' || val == '0.0') return null;
                     
                     final costErr = InputValidator.validateNumber(val, term.costPriceLabel);
                     if (costErr != null) return costErr;
@@ -370,32 +429,83 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 ),
               ],
             ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-        ElevatedButton(
-          onPressed: _submit,
-          child: BlocBuilder<StockBloc, StockState>(
-            bloc: widget.stockBloc,
-            builder: (context, state) {
-              if (state.status == StockStatus.loading) {
-                return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
-              }
-              return Text(widget.item == null ? 'ADD' : 'SAVE');
-            },
-          ),
-        ),
-      ],
-    ),
     );
+  }
+
+  Future<void> _showPostAddSuccessPrompt(BuildContext context, String savedName) async {
+    final settings = context.read<SettingsBloc>().state.settings!;
+    final label = settings.productLabel;
+    final labelLower = label.toLowerCase();
+
+    final addMore = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text('$label added successfully'),
+        content: Text(
+          'Your $labelLower "$savedName" was saved.\n\n'
+          'Would you like to add another $labelLower before going to the dashboard?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('GO TO DASHBOARD'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ADD MORE'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (addMore == true) {
+      widget.stockBloc.add(ResetStockStatus());
+      _resetFormForAnotherEntry(settings);
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      DashboardPage.routeName,
+      (route) => false,
+    );
+  }
+
+  void _resetFormForAnotherEntry(AppSettings settings) {
+    setState(() {
+      _formKey = GlobalKey<FormState>();
+      _formGeneration++;
+      _name = '';
+      _priceController.text = '0';
+      _costPriceController.text = settings.businessMode == 'school' ? '' : '0';
+      _barcodeController.clear();
+      _stockQty = 0;
+      _legacyCategory = ItemCategory.drink;
+      _selectedCategoryId = null;
+      _imageBytes = null;
+      _minStockLevel = 0;
+      _businessMode = settings.businessMode;
+      if (settings.businessMode == 'school') {
+        _type = 'service';
+        _billingType = 'fixed';
+      } else {
+        _type = 'product';
+        _billingType = null;
+        _serviceCategory = null;
+      }
+    });
   }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      
+      _saveSubmitted = true;
+
       final price = double.tryParse(_priceController.text) ?? 0.0;
       final costPrice = double.tryParse(_costPriceController.text) ?? 0.0;
 

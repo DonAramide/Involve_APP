@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../../core/services/payment_alert_sound.dart';
+import '../../../../core/services/device_notification_service.dart';
 import '../../../dashboard/presentation/widgets/notification_bell.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../data/datasources/finance_realtime_data_source.dart';
@@ -30,6 +31,17 @@ class GlobalPaymentNotificationListener extends StatefulWidget {
 class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotificationListener> {
   StreamSubscription? _subscription;
   StreamSubscription? _studentCreditSub;
+  StreamSubscription? _parentCreditSub;
+
+  void _refreshSchool(String reason) {
+    final ctx = widget.navigatorKey.currentContext;
+    if (ctx == null) return;
+    try {
+      ctx.read<SchoolBloc>().add(LoadSchoolData());
+    } catch (e) {
+      debugPrint('[GlobalPaymentNotification] SchoolBloc refresh skipped ($reason): $e');
+    }
+  }
 
   @override
   void initState() {
@@ -41,14 +53,15 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
         '[GlobalPaymentNotification] Student credited: ${student.fullName} '
         'balance=${student.balance} credit=${student.creditBalance}',
       );
-      final ctx = widget.navigatorKey.currentContext;
-      if (ctx != null) {
-        try {
-          ctx.read<SchoolBloc>().add(LoadSchoolData());
-        } catch (e) {
-          debugPrint('[GlobalPaymentNotification] SchoolBloc refresh skipped: $e');
-        }
-      }
+      _refreshSchool('student');
+    });
+    _parentCreditSub =
+        CustomerWalletCreditService.instance.onParentCredited.listen((parent) {
+      debugPrint(
+        '[GlobalPaymentNotification] Parent credited: ${parent.fullName} '
+        'credit=${parent.creditBalance}',
+      );
+      _refreshSchool('parent');
     });
   }
 
@@ -87,9 +100,25 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
         }
         final studentName =
             (metadata['studentName'] ?? metadata['senderName'] ?? 'a student').toString();
-        final reference = event.data['reference'] ?? '';
+        final reference = '${event.data['reference'] ?? ''}'.trim();
 
         if (mounted) {
+          if (reference.isNotEmpty) {
+            final shouldNotify = await CustomerWalletCreditService.instance
+                .claimPaymentNotification(reference);
+            if (!shouldNotify) {
+              debugPrint(
+                '[GlobalPaymentNotification] Skip duplicate notify for $reference',
+              );
+              unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess({
+                'amount': amount,
+                'reference': reference,
+                'metadata': metadata,
+                ...event.data,
+              }));
+              return;
+            }
+          }
           _showNotification(amount, studentName, reference);
           unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess({
             'amount': amount,
@@ -105,12 +134,15 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   }
 
   void _showNotification(dynamic amount, String studentName, String reference) {
-    final message = '₦$amount received from $studentName!';
-    unawaited(PaymentAlertSound.play());
-    unawaited(NotificationInbox.add(
+        final message = '₦$amount received from $studentName!';
+        unawaited(PaymentAlertSound.play());
+        unawaited(NotificationInbox.removeReceivedPayment(
+          reference: reference,
+          message: message,
+        ));
+    unawaited(DeviceNotificationService.showPayment(
       message: message,
-      type: 'payment',
-      extra: {'reference': reference},
+      reference: reference.isEmpty ? null : reference,
     ));
     widget.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
@@ -132,6 +164,7 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   void dispose() {
     _subscription?.cancel();
     _studentCreditSub?.cancel();
+    _parentCreditSub?.cancel();
     super.dispose();
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -31,10 +32,14 @@ import '../bloc/staff_bloc.dart';
 import '../bloc/staff_state.dart';
 import '../../domain/entities/staff.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
+import '../widgets/sync_configuration_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import '../widgets/business_mode_selector.dart';
+import 'package:involve_app/features/school/presentation/widgets/parent_payment_share_mode_picker.dart';
 import 'package:involve_app/core/services/service_locator.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/core/sync/domain/services/web_cloud_sync_service.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
@@ -174,6 +179,29 @@ class _SettingsPageState extends State<SettingsPage> {
         const Divider(),
       ],
 
+      if (settings.businessMode == 'school' &&
+          _matches('Parent payment sharing', [
+            'parent',
+            'share',
+            'allocation',
+            'credit',
+            'lowest',
+            'highest',
+          ])) ...[
+        _buildSectionHeader(context, 'School parent payments'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: ParentPaymentShareModePicker(
+            value: settings.parentPaymentShareMode,
+            onChanged: (value) => _update(
+              context,
+              settings.copyWith(parentPaymentShareMode: value),
+            ),
+          ),
+        ),
+        const Divider(),
+      ],
+
 
       // Startup & State Persistence
       // Startup & State Persistence
@@ -230,7 +258,7 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: state.isExporting ? const Text('Exporting...', style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold)) : const Icon(Icons.backup),
             onTap: () => _showBackupOptions(context, state),
           ),
-        if (_matches('Sync'))
+        if (_matches('Sync', ['online', 'invoice', 'cloud']))
           ListTile(
             title: Row(
               children: [
@@ -246,6 +274,13 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {
               _showSyncSelector(context, state);
             },
+          ),
+        if (_matches('Sync Configuration', ['online sync', 'invoice update', 'cloud']))
+          ListTile(
+            title: const Text('Sync Configuration'),
+            subtitle: const Text('Online Sync and automatic invoice upload'),
+            trailing: const Icon(Icons.cloud_sync_rounded),
+            onTap: () => showSyncConfigurationDialog(context),
           ),
         if (_matches('Show Date & Time'))
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
@@ -314,13 +349,26 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildActivationBanner(BuildContext context, SettingsState state) {
     final isLocked = state.isBusinessLocked;
     final plan = state.userPlan;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final bannerBg = isLocked
+        ? (isDark ? Colors.blue.shade900.withValues(alpha: 0.45) : Colors.blue[50])
+        : (isDark ? Colors.orange.shade900.withValues(alpha: 0.45) : Colors.orange[50]);
+    final bannerBorder = isLocked
+        ? (isDark ? Colors.blue.shade300 : Colors.blue[200]!)
+        : (isDark ? Colors.orange.shade300 : Colors.orange[200]!);
+    final titleColor = isLocked
+        ? (isDark ? Colors.lightBlueAccent : Colors.blue[900])
+        : (isDark ? Colors.orangeAccent : Colors.orange[900]);
+    final bodyColor = isDark ? scheme.onSurface : Colors.black87;
+    final mutedColor = isDark ? scheme.onSurfaceVariant : Colors.blueGrey[800];
     
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isLocked ? Colors.blue[50] : Colors.orange[50],
+        color: bannerBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isLocked ? Colors.blue[200]! : Colors.orange[200]!),
+        border: Border.all(color: bannerBorder),
       ),
       child: Column(
         children: [
@@ -328,7 +376,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               Icon(
                 isLocked ? Icons.verified_user : Icons.info_outline,
-                color: isLocked ? Colors.blue : Colors.orange,
+                color: titleColor,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -339,14 +387,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       isLocked ? 'Identity Verified' : 'Initial Setup',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isLocked ? Colors.blue[900] : Colors.orange[900],
+                        color: titleColor,
                       ),
                     ),
                     Text(
                       isLocked 
                           ? 'Business identity and operation mode are permanently locked.' 
                           : 'You can edit your business name and mode once. They will be locked after saving.',
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12, color: bodyColor),
                     ),
                   ],
                 ),
@@ -354,35 +402,73 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           if (plan != null) ...[
-            const Divider(height: 24),
+            Divider(height: 24, color: isDark ? scheme.outline : null),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.stars, color: Colors.blueGrey, size: 20),
+                Icon(Icons.stars, color: mutedColor, size: 20),
                 const SizedBox(width: 12),
-                Text(
-                  'Current Plan: ',
-                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blueGrey[800]),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: plan.isBasic ? Colors.grey[200] : Colors.blueGrey[800],
-                    borderRadius: BorderRadius.circular(4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Current Plan: ',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: mutedColor),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: plan.isPremium
+                                  ? (isDark ? scheme.surfaceContainerHighest : Colors.grey[200])
+                                  : Colors.blueGrey[800],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              plan.displayName,
+                              style: TextStyle(
+                                color: plan.isPremium
+                                    ? (isDark ? scheme.onSurface : Colors.grey[800])
+                                    : Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (plan.expiryDate != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Expires: ${DateFormat('yyyy-MM-dd').format(plan.expiryDate!)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? scheme.onSurfaceVariant : Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  child: Text(
-                    plan.planType.toUpperCase(),
-                    style: TextStyle(
-                      color: plan.isBasic ? Colors.grey[800] : Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
-                if (plan.expiryDate != null) ...[
+                if (!plan.isPremium) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    'Expires: ${DateFormat('yyyy-MM-dd').format(plan.expiryDate!)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ElevatedButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const UpgradeDialog(),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ],
@@ -516,12 +602,46 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.cloud_sync_rounded, color: Colors.teal),
-            title: const Text('Web Sync (Full Cloud Sync)'),
-            subtitle: const Text('Instantly replicate all local data and products to the web dashboard'),
+            leading: const Icon(Icons.cloud_download_rounded, color: Colors.orange),
+            title: const Text('Restore school data from the web'),
+            subtitle: const Text('Copy students, staff, fees, bills, classes, and results from the dashboard onto this device'),
             onTap: () async {
               Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
+              await _restoreSchoolFromWeb();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.cloud_sync_rounded, color: Colors.teal),
+            title: const Text('Web Sync (Full Cloud Sync)'),
+            subtitle: Text(
+              state.userPlan?.hasOnlineAccess == true
+                  ? 'Instantly replicate all local data and products to the web dashboard'
+                  : 'Available on Standard and Premium',
+            ),
+            onTap: () async {
+              Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
               _triggerWebCloudSync();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.toggle_on, color: Colors.blue),
+            title: const Text('Sync Configuration'),
+            subtitle: const Text('Online Sync and automatic invoice upload'),
+            onTap: () {
+              Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
+              showSyncConfigurationDialog(context);
             },
           ),
           const SizedBox(height: 20),
@@ -541,10 +661,32 @@ class _SettingsPageState extends State<SettingsPage> {
     return sl<FinanceApiClient>();
   }
 
+  Future<void> _restoreSchoolFromWeb() async {
+    if (!mounted) return;
+    try {
+      final restored = await ProgressDialogUtils.showDancingProgress(context, () async {
+        final client = _safeClient();
+        final db = context.read<SettingsBloc>().backupService.database;
+        return WebCloudSyncService.pullSchoolRoster(database: db, client: client);
+      });
+      if (!mounted) return;
+      context.read<SettingsBloc>().add(LoadSettings());
+      context.read<StaffBloc>().add(LoadStaffList());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(restored?.banner ?? 'No school records are on the web portal yet.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not download school data.'))),
+      );
+    }
+  }
+
   Future<void> _triggerWebCloudSync() async {
     if (!mounted) return;
     try {
-      await ProgressDialogUtils.showDancingProgress(context, () async {
+      await ProgressDialogUtils.showUpdatableProgress(context, (setMessage) async {
         final dbPath = await context.read<SettingsBloc>().backupService.getDatabasePath();
         final file = File(dbPath);
         
@@ -558,16 +700,33 @@ class _SettingsPageState extends State<SettingsPage> {
         }
 
         final client = _safeClient();
-
-        // 1. Send database backup file (full SQLite copy to backend)
-        final formData = FormData.fromMap({
-          'backup_file': await MultipartFile.fromFile(dbPath, filename: 'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db'),
-        });
-        await client.post('/api/admin/claude-backup', data: formData);
-
-        // 2. Bulk-sync local items/products to Supabase via backend
         final db = context.read<SettingsBloc>().backupService.database;
+
+        void queueClaudeBackup() {
+          unawaited(() async {
+            try {
+              final formData = FormData.fromMap({
+                'backup_file': await MultipartFile.fromFile(
+                  dbPath,
+                  filename:
+                      'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db',
+                ),
+              });
+              await client.post(
+                '/api/admin/claude-backup',
+                data: formData,
+                options: Options(
+                  sendTimeout: const Duration(seconds: 25),
+                  receiveTimeout: const Duration(seconds: 25),
+                ),
+              );
+            } catch (e) {
+              debugPrint('Claude backup skipped: $e');
+            }
+          }());
+        }
         if (db != null) {
+          setMessage('Uploading products...');
           final localItems = await db.select(db.items).get();
           
           if (localItems.isNotEmpty) {
@@ -599,6 +758,7 @@ class _SettingsPageState extends State<SettingsPage> {
           }
 
           // 3. Bulk-sync local customers to Supabase via backend
+          setMessage('Uploading customers...');
           final localCustomers = await db.select(db.customers).get();
           if (localCustomers.isNotEmpty) {
             final customerPayloads = localCustomers.map((c) => {
@@ -624,6 +784,7 @@ class _SettingsPageState extends State<SettingsPage> {
           }
 
           // 3b. Bulk-sync staff (incl. personal salary bank) to tenant admin
+          setMessage('Uploading staff...');
           try {
             final localStaff = await db.select(db.staff).get();
             if (localStaff.isNotEmpty) {
@@ -636,6 +797,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         'phone': s.phone,
                         'role': s.role,
                         'isActive': s.isActive,
+                        'pinHash': s.staffCode,
                         'bankName': s.virtualBankName,
                         'bankCode': s.bankCode,
                         'accountNumber': s.virtualAccountNumber,
@@ -649,39 +811,88 @@ class _SettingsPageState extends State<SettingsPage> {
               debugPrint(
                 'Staff sync result: synced=${staffResult.data?['synced']}, errors=${staffResult.data?['errors']}',
               );
+              try {
+                if (sl.isRegistered<StaffRepositoryImpl>()) {
+                  await sl.get<StaffRepositoryImpl>().pullCloudGovernance();
+                }
+              } catch (_) {}
             }
           } catch (staffErr) {
             debugPrint('Bulk staff sync error: $staffErr');
           }
 
-          // 4. Bulk-sync local invoices (transactions) to Supabase via backend
+          // 4. School roster first so invoice student IDs already exist on the portal
+          setMessage('Uploading school records...');
+          try {
+            await WebCloudSyncService.pushSchoolRoster(database: db, client: client);
+          } catch (schoolErr) {
+            debugPrint('School bulk sync error: $schoolErr');
+            rethrow;
+          }
+
+          // 5. Bulk-sync local invoices (transactions) to Supabase via backend
+          setMessage('Uploading invoices...');
           final localInvoices = await db.select(db.invoices).get();
           if (localInvoices.isNotEmpty) {
             final List<Map<String, dynamic>> invoicePayloads = [];
+            Map<int, dynamic> studentsById = {};
+            try {
+              final localStudents = await db.select(db.students).get();
+              studentsById = {for (final s in localStudents) s.id: s};
+            } catch (_) {}
+
+            String studentCloudId(dynamic row) {
+              final existing = row.syncId?.toString() ?? '';
+              if (existing.isNotEmpty &&
+                  !existing.startsWith('local-') &&
+                  RegExp(
+                    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+                  ).hasMatch(existing)) {
+                return existing;
+              }
+              final admission = row.admissionNumber?.toString().trim() ?? '';
+              if (admission.isNotEmpty) {
+                return const Uuid().v5(
+                  '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                  'invify-school-student-admission-$admission',
+                );
+              }
+              return const Uuid().v5(
+                '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                'invify-school-student-${row.id}',
+              );
+            }
+
+            final allInvoiceItems = await db.select(db.invoiceItems).get();
+            final itemsByInvoiceId = <int, List<dynamic>>{};
+            for (final ii in allInvoiceItems) {
+              itemsByInvoiceId.putIfAbsent(ii.invoiceId, () => []).add(ii);
+            }
+            final itemById = {for (final it in localItems) it.id: it};
 
             for (final inv in localInvoices) {
-              final itemsForInv = await (db.select(db.invoiceItems)..where((ii) => ii.invoiceId.equals(inv.id))).get();
+              final itemsForInv = itemsByInvoiceId[inv.id] ?? const [];
 
-              final itemsPayload = itemsForInv.map((ii) => {
-                'invoiceItemSyncId': ii.syncId,
-                'productSyncId': null,
-                'itemId': ii.itemId.toString(),
-                'quantity': ii.quantity,
-                'unitPrice': ii.unitPrice,
-                'type': ii.type,
+              final itemsPayload = itemsForInv.map((ii) {
+                final itemId = ii.itemId as int?;
+                final localItem = itemId != null ? itemById[itemId] : null;
+                return {
+                  'invoiceItemSyncId': ii.syncId,
+                  'productSyncId': localItem?.syncId,
+                  'itemId': itemId?.toString(),
+                  'quantity': ii.quantity,
+                  'unitPrice': ii.unitPrice,
+                  'type': ii.type,
+                };
               }).toList();
 
-              for (final itemPayload in itemsPayload) {
-                final localItem = await (db.select(db.items)..where((it) => it.id.equals(int.parse(itemPayload['itemId'] as String)))).getSingleOrNull();
-                if (localItem != null) {
-                  itemPayload['productSyncId'] = localItem.syncId;
-                }
-              }
-
+              final studentRow = inv.studentId != null ? studentsById[inv.studentId!] : null;
+              final studentSyncId = studentRow != null ? studentCloudId(studentRow) : null;
               invoicePayloads.add({
                 'syncId': inv.syncId ?? 'INV-${inv.id}-${DateTime.now().millisecondsSinceEpoch}',
                 'invoiceNumber': inv.invoiceNumber,
                 'customerId': inv.customerId,
+                'studentSyncId': studentSyncId,
                 'customerName': inv.customerName,
                 'customerPhone': null,
                 'customerAddress': inv.customerAddress,
@@ -713,186 +924,72 @@ class _SettingsPageState extends State<SettingsPage> {
                 data: {'invoices': invoicePayloads},
               );
               debugPrint('Bulk invoice sync result: synced=${invResult.data?['synced']}, errors=${invResult.data?['errors']}');
+              final invErrors = invResult.data?['errors'];
+              if (invErrors is List && invErrors.isNotEmpty) {
+                throw Exception(invErrors.first.toString());
+              }
             } catch (invErr) {
               debugPrint('Bulk invoice sync error: $invErr');
+              rethrow;
             }
           }
 
-          // 5. School-mode roster + academics → web portal
+          // 5b. Service jobs + payments → tenant admin
+          setMessage('Uploading services...');
           try {
-            final years = await db.select(db.academicYears).get();
-            final terms = await db.select(db.terms).get();
-            final classes = await db.select(db.classes).get();
-            final teachers = await db.select(db.teachers).get();
-            final subjects = await db.select(db.subjects).get();
-            final students = await db.select(db.students).get();
-            List<dynamic> results = [];
-            try {
-              results = await db.select(db.results).get();
-            } catch (_) {
-              results = [];
-            }
-
-            String syncKey(String entity, dynamic row) {
-              final existing = (row as dynamic).syncId?.toString();
-              if (existing != null &&
-                  existing.isNotEmpty &&
-                  !existing.startsWith('local-') &&
-                  RegExp(
-                    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-                  ).hasMatch(existing)) {
-                return existing;
-              }
-              // Students: prefer admission number so web upserts stay 1:1 with mobile.
-              if (entity == 'student') {
-                final admission =
-                    (row as dynamic).admissionNumber?.toString().trim() ?? '';
-                if (admission.isNotEmpty) {
-                  return const Uuid().v5(
-                    '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
-                    'invify-school-student-admission-$admission',
-                  );
-                }
-              }
-              // Stable UUID from local row id so re-syncs upsert cleanly.
-              // Namespace.URL = 6ba7b811-9dad-11d1-80b4-00c04fd430c8
-              return const Uuid().v5(
-                '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
-                'invify-school-$entity-${row.id}',
+            final jobs = await db.select(db.serviceJobs).get();
+            if (jobs.isNotEmpty) {
+              final jobPayloads = jobs.map((j) => {
+                    'id': j.id,
+                    'jobId': j.jobId,
+                    'customerId': j.customerId,
+                    'title': j.title,
+                    'description': j.description,
+                    'totalAmount': j.totalAmount,
+                    'amountPaid': j.amountPaid,
+                    'laborAmount': j.laborAmount,
+                    'balance': j.balance,
+                    'status': j.status,
+                    'dueDate': j.dueDate?.toIso8601String(),
+                    'createdAt': j.createdAt.toIso8601String(),
+                    'warrantyDuration': j.warrantyDuration,
+                  }).toList();
+              await client.post(
+                '/api/v1/services/sync/jobs',
+                data: {'jobs': jobPayloads},
               );
             }
-
-            final classNameById = {
-              for (final c in classes) c.id: c.name,
-            };
-
-            final schoolPayload = {
-              'years': years
-                  .map((y) => {
-                        'id': y.id,
-                        'syncId': syncKey('year', y),
-                        'name': y.name,
-                        'startDate': y.startDate.toIso8601String(),
-                        'endDate': y.endDate.toIso8601String(),
-                        'isCurrent': y.isCurrent,
-                        'isDeleted': y.isDeleted,
-                      })
-                  .toList(),
-              'terms': terms
-                  .map((t) => {
-                        'id': t.id,
-                        'syncId': syncKey('term', t),
-                        'name': t.name,
-                        'academicYearId': t.academicYearId,
-                        'startDate': t.startDate.toIso8601String(),
-                        'endDate': t.endDate.toIso8601String(),
-                        'isCurrent': t.isCurrent,
-                        'isDeleted': t.isDeleted,
-                      })
-                  .toList(),
-              'classes': classes
-                  .map((c) => {
-                        'id': c.id,
-                        'syncId': syncKey('class', c),
-                        'name': c.name,
-                        'description': c.description,
-                        'isDeleted': c.isDeleted,
-                      })
-                  .toList(),
-              'teachers': teachers
-                  .map((t) => {
-                        'id': t.id,
-                        'syncId': syncKey('teacher', t),
-                        'fullName': t.fullName,
-                        'phone': t.phone,
-                        'profession': t.profession,
-                        'classId': t.classId,
-                        'salary': t.salary,
-                        'yearsInSchool': t.yearsInSchool,
-                        'employmentDate': t.employmentDate.toIso8601String(),
-                        'isDeleted': t.isDeleted,
-                      })
-                  .toList(),
-              'subjects': subjects
-                  .map((s) => {
-                        'id': s.id,
-                        'syncId': syncKey('subject', s),
-                        'name': s.name,
-                        'code': s.code,
-                        'teacherId': s.teacherId,
-                        'isDeleted': s.isDeleted,
-                      })
-                  .toList(),
-              'students': students
-                  .map((s) => {
-                        'id': s.id,
-                        'syncId': syncKey('student', s),
-                        'admissionNumber': s.admissionNumber,
-                        'firstName': s.firstName,
-                        'lastName': s.lastName,
-                        'classId': s.classId,
-                        'className': classNameById[s.classId],
-                        'academicYearId': s.academicYearId,
-                        'parentName': s.parentName,
-                        'parentPhone': s.parentPhone,
-                        'balance': s.balance,
-                        'creditBalance': s.creditBalance,
-                        'gender': s.gender,
-                        'department': s.department,
-                        'virtualAccountNumber': s.virtualAccountNumber,
-                        'virtualAccountBank': s.virtualAccountBank,
-                        'virtualAccountStatus': s.virtualAccountStatus,
-                        'isDeleted': s.isDeleted,
-                      })
-                  .toList(),
-              'results': results
-                  .map((r) => {
-                        'id': r.id,
-                        'syncId': syncKey('result', r),
-                        'studentId': r.studentId,
-                        'subjectId': r.subjectId,
-                        'termId': r.termId,
-                        'academicYearId': r.academicYearId,
-                        'assessmentScore': r.assessmentScore,
-                        'examScore': r.examScore,
-                        'totalScore': r.totalScore,
-                        'grade': r.grade,
-                        'remarks': r.remarks,
-                        'isDeleted': r.isDeleted,
-                      })
-                  .toList(),
-            };
-
-            final hasSchoolData = (schoolPayload['students'] as List).isNotEmpty ||
-                (schoolPayload['classes'] as List).isNotEmpty ||
-                (schoolPayload['teachers'] as List).isNotEmpty ||
-                (schoolPayload['years'] as List).isNotEmpty;
-
-            if (hasSchoolData) {
-              final schoolResult = await client.post(
-                '/api/school/bulk-sync',
-                data: schoolPayload,
+            final payments = await db.select(db.servicePayments).get();
+            if (payments.isNotEmpty) {
+              final payPayloads = payments.map((p) => {
+                    'id': p.id,
+                    'jobId': p.jobId,
+                    'amount': p.amount,
+                    'method': p.method,
+                    'reference': p.reference,
+                    'createdAt': p.createdAt.toIso8601String(),
+                  }).toList();
+              await client.post(
+                '/api/v1/services/sync/payments',
+                data: {'payments': payPayloads},
               );
-              debugPrint(
-                'School sync result: synced=${schoolResult.data?['synced']}, errors=${schoolResult.data?['errors']}',
-              );
-            } else {
-              debugPrint('School sync skipped: no local academic/student rows');
             }
-          } catch (schoolErr) {
-            debugPrint('School bulk sync error: $schoolErr');
+          } catch (svcErr) {
+            debugPrint('Bulk services sync error: $svcErr');
           }
         }
+
+        queueClaudeBackup();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ All data successfully synchronized to Web Portal!'),
+              content: Text('All data successfully synchronized to Web Portal!'),
               backgroundColor: Colors.teal,
             ),
           );
         }
-      }, message: 'Synchronizing all data to Web Portal...');
+      }, initialMessage: 'Syncing to web portal...');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -965,7 +1062,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Text('Switching to ${newMode.toUpperCase()} mode will change UI labels and certain functionalities.'),
             const SizedBox(height: 12),
             const Text(
-              '⚠️ WARNING: This setting is PERMANENT and cannot be changed once confirmed.',
+              'WARNING: This setting is PERMANENT and cannot be changed once confirmed.',
               style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
@@ -1020,19 +1117,104 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showChangePassword(BuildContext context) {
-    final controller = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscurePassword = true;
+    bool obscureConfirm = true;
+    String? errorMessage;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Set New Password'),
-        content: TextField(controller: controller, obscureText: true, decoration: const InputDecoration(labelText: 'New Password')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          TextButton(onPressed: () {
-            context.read<SettingsBloc>().add(SetSystemPassword(controller.text));
-            Navigator.pop(ctx);
-          }, child: const Text('SET')),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.deepPurple),
+              SizedBox(width: 8),
+              Text('Set New Password'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter a new unlock password for this device and confirm it below.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmController,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    prefixIcon: const Icon(Icons.lock_clock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pwd = passwordController.text.trim();
+                final confirm = confirmController.text.trim();
+                if (pwd.isEmpty) {
+                  setDialogState(() => errorMessage = 'Password cannot be empty');
+                  return;
+                }
+                if (pwd.length < 4) {
+                  setDialogState(() => errorMessage = 'Password must be at least 4 characters');
+                  return;
+                }
+                if (pwd != confirm) {
+                  setDialogState(() => errorMessage = 'Passwords do not match');
+                  return;
+                }
+                context.read<SettingsBloc>().add(SetSystemPassword(pwd));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('System password updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('SET PASSWORD'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1716,7 +1898,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
     final plan = state.userPlan;
-    final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isLifetime);
+    final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isPremium);
     final isLocked = !isProOrLifetime; 
 
     return ListTile(
@@ -1737,7 +1919,15 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       subtitle: isProOrLifetime
           ? const Text('Standard feature on your plan', style: TextStyle(color: Colors.green, fontSize: 12))
-          : const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange, fontSize: 12)),
+          : Text(
+              'Available on Standard & Premium plans',
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.orangeAccent
+                    : Colors.orange.shade800,
+                fontSize: 12,
+              ),
+            ),
       trailing: Switch(
         value: settings.serviceBillingEnabled,
         onChanged: isLocked 

@@ -15,6 +15,7 @@
 import { quasarPlatformClient, InvifyVertical, QuasarPlatformClient } from './quasar-platform.client';
 import { QuasarPaymentsClient } from './quasar-payments.client';
 import { QuasarIntegrationStore } from './quasar-integration.store';
+import { IntegrationVaultService } from '../../services/integration-vault.service';
 import * as crypto from 'crypto';
 
 export interface ProvisionMerchantParams {
@@ -34,10 +35,141 @@ export interface ProvisionMerchantResult {
   webhookRegistered: boolean;
 }
 
-const INVIFY_WEBHOOK_URL =
-  process.env.INVIFY_QUASAR_WEBHOOK_URL ?? 'https://api.invify.org/webhooks/quasar';
+const STAGING_QUASAR_WEBHOOK_URL = 'https://staging.invify.org/api/webhooks/quasar';
+const PRODUCTION_QUASAR_WEBHOOK_URL = 'https://api.invify.org/webhooks/quasar';
+
+/** Staging nginx only proxies /api/* to Node. /webhooks/* is the SPA and returns 405. */
+export function resolveInvifyWebhookUrl(): string {
+  const explicit = String(process.env.INVIFY_QUASAR_WEBHOOK_URL || '').trim();
+  if (explicit) {
+    try {
+      const parsed = new URL(explicit);
+      if (
+        parsed.hostname === 'staging.invify.org' &&
+        parsed.pathname.replace(/\/$/, '') === '/webhooks/quasar'
+      ) {
+        return STAGING_QUASAR_WEBHOOK_URL;
+      }
+    } catch {
+      /* keep explicit */
+    }
+    return explicit;
+  }
+  const env = String(
+    process.env.NODE_ENV || process.env.APP_ENV || process.env.INVIFY_ENV || '',
+  )
+    .trim()
+    .toLowerCase();
+  if (env.includes('staging')) return STAGING_QUASAR_WEBHOOK_URL;
+  return PRODUCTION_QUASAR_WEBHOOK_URL;
+}
+
 
 export class QuasarProvisioningService {
+
+  /**
+   * Register the Invify receiver on Quasar when the tenant has no endpoint yet.
+   * Safe to call on every provision — skips if already registered.
+   */
+  static async ensureWebhookRegistered(
+    invifyTenantId: string,
+    webhookReceiverUrl = resolveInvifyWebhookUrl(),
+    opts?: { correlationId?: string; paymentsClient?: QuasarPaymentsClient },
+  ): Promise<boolean> {
+    const existing = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
+    const paymentsClient =
+      opts?.paymentsClient ||
+      (existing ? new QuasarPaymentsClient(QuasarIntegrationStore.decryptSkSecret(existing)) : null);
+    if (!paymentsClient) return false;
+
+    // Staging Quasar delivers VA credits through QFS sandboxWebhookUrl, not POST /webhooks/endpoints.
+    if (existing) {
+      const sandboxOk = await this.ensureSandboxWebhookUrl(
+        invifyTenantId,
+        existing,
+        paymentsClient,
+        webhookReceiverUrl,
+        opts?.correlationId,
+      );
+      if (sandboxOk) return true;
+      if (existing.quasar_webhook_endpoint_id) return true;
+    }
+
+    try {
+      const endpoint = await paymentsClient.registerWebhookEndpoint(webhookReceiverUrl, {
+        correlationId: opts?.correlationId,
+        idempotencyKey: `webhook-register:${invifyTenantId}`,
+      });
+      if (!endpoint?.id || !endpoint?.signingSecret) {
+        throw new Error('Quasar webhook register returned no endpoint id/signing secret');
+      }
+      await QuasarIntegrationStore.registerWebhook({
+        invifyTenantId,
+        webhookEndpointId: endpoint.id,
+        signingSecret: endpoint.signingSecret,
+      });
+      console.log(
+        `[QuasarProvisioning] Webhook registered for ${invifyTenantId} url=${webhookReceiverUrl} endpoint=${endpoint.id}`,
+      );
+      return true;
+    } catch (webhookErr: any) {
+      console.error(
+        `[QuasarProvisioning] Webhook registration failed (non-fatal): ${webhookErr.message} url=${webhookReceiverUrl}`,
+      );
+      return false;
+    }
+  }
+
+  private static async ensureSandboxWebhookUrl(
+    invifyTenantId: string,
+    existing: Awaited<ReturnType<typeof QuasarIntegrationStore.getByInvifyTenantId>>,
+    paymentsClient: QuasarPaymentsClient,
+    webhookReceiverUrl: string,
+    correlationId?: string,
+  ): Promise<boolean> {
+    if (!existing) return false;
+    try {
+      const cfg = await paymentsClient.getSandboxConfig({
+        correlationId,
+        noRetry: true,
+      });
+      const currentUrl = String(cfg?.sandboxWebhookUrl || '').trim();
+      let secret = String(cfg?.sandboxSecretKey || '').trim();
+      let aligned = currentUrl === webhookReceiverUrl;
+      let rotated = false;
+      if (!aligned) {
+        const boot = await paymentsClient.bootstrapSandbox(
+          { sandboxWebhookUrl: webhookReceiverUrl },
+          {
+            correlationId,
+            noRetry: true,
+            idempotencyKey: `sandbox-bootstrap:${invifyTenantId}:${webhookReceiverUrl}`,
+          },
+        );
+        secret = String(boot?.sandboxSecretKey || boot?.config?.sandboxSecretKey || secret).trim();
+        aligned = true;
+        rotated = Boolean(secret);
+        console.log(
+          `[QuasarProvisioning] Sandbox webhook URL set for ${invifyTenantId} url=${webhookReceiverUrl}`,
+        );
+      }
+      if (secret && (rotated || !existing.quasar_webhook_signing_secret_enc)) {
+        await QuasarIntegrationStore.registerWebhook({
+          invifyTenantId,
+          webhookEndpointId:
+            existing.quasar_webhook_endpoint_id ||
+            String(cfg?.id || `sandbox:${existing.quasar_tenant_id}`),
+          signingSecret: secret,
+        });
+      }
+      return aligned;
+    } catch (err: any) {
+      console.warn(
+        `[QuasarProvisioning] Sandbox webhook ensure skipped for ${invifyTenantId}: ${err?.message || err}`,
+      );
+      return false;
+    }
+  }
 
   /**
    * Full atomic provisioning of a Quasar tenant for a new Invify merchant.
@@ -49,12 +181,16 @@ export class QuasarProvisioningService {
       tenantName,
       tenantType,
       environment = (process.env.QUASAR_ENV as 'test' | 'live') ?? 'test',
-      webhookReceiverUrl = INVIFY_WEBHOOK_URL,
+      webhookReceiverUrl = resolveInvifyWebhookUrl(),
     } = params;
 
     // ── Idempotency: return early if already provisioned ─────────────────────
     const existing = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
     if (existing) {
+      const webhookRegistered = await this.ensureWebhookRegistered(
+        invifyTenantId,
+        webhookReceiverUrl,
+      );
       console.log(`[QuasarProvisioning] Tenant ${invifyTenantId} already provisioned on Quasar — skipping.`);
       return {
         quasarTenantId: existing.quasar_tenant_id,
@@ -62,7 +198,7 @@ export class QuasarProvisioningService {
         quasarTenantCode: existing.quasar_tenant_code,
         vertical: existing.quasar_vertical,
         environment: existing.quasar_environment,
-        webhookRegistered: !!existing.quasar_webhook_endpoint_id,
+        webhookRegistered,
       };
     }
 
@@ -131,25 +267,11 @@ export class QuasarProvisioningService {
     });
 
     // ── Step 4: Register Webhook Endpoint ─────────────────────────────────────
-    let webhookRegistered = false;
-    try {
-      const paymentsClient = new QuasarPaymentsClient(apiKey.secretKey);
-      const endpoint = await paymentsClient.registerWebhookEndpoint(webhookReceiverUrl, {
-        correlationId,
-        idempotencyKey: `webhook-register:${invifyTenantId}`,
-      });
-
-      await QuasarIntegrationStore.registerWebhook({
-        invifyTenantId,
-        webhookEndpointId: endpoint.id,
-        signingSecret: endpoint.signingSecret,
-      });
-
-      webhookRegistered = true;
-    } catch (webhookErr: any) {
-      // Non-fatal — provisioning is still valid without webhook
-      console.error(`[QuasarProvisioning] Webhook registration failed (non-fatal): ${webhookErr.message}`);
-    }
+    const webhookRegistered = await this.ensureWebhookRegistered(
+      invifyTenantId,
+      webhookReceiverUrl,
+      { correlationId, paymentsClient: new QuasarPaymentsClient(apiKey.secretKey) },
+    );
 
     console.log(JSON.stringify({
       ts: new Date().toISOString(),
@@ -175,8 +297,9 @@ export class QuasarProvisioningService {
    * Retrieve a QuasarPaymentsClient for financial / sandbox calls.
    *
    * Resolution order:
-   *   1. Per-tenant sk from quasar_integrations (preferred for multi-merchant)
-   *   2. Global QUASAR_API_KEY (Invify general sk_test_* issued by Quasar)
+   *   1. Per-tenant sk from quasar_integrations
+   *   2. Integration Vault (GLOBAL quasar, STAGING then PRODUCTION then SANDBOX)
+   *   3. process.env QUASAR_API_KEY
    */
   static async getPaymentsClient(invifyTenantId: string): Promise<QuasarPaymentsClient> {
     const integration = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
@@ -185,30 +308,49 @@ export class QuasarProvisioningService {
       return new QuasarPaymentsClient(sk);
     }
 
-    const generalKey =
-      process.env.QUASAR_API_KEY?.trim() ||
-      process.env.QUASER_API_KEY?.trim();
-
-    if (generalKey && !generalKey.includes('your-quaser')) {
+    const generalKey = await this.resolveGeneralApiKey();
+    if (generalKey) {
       console.warn(
         `[QuasarProvisioning] No per-tenant Quasar integration for ${invifyTenantId}. ` +
-          `Using general QUASAR_API_KEY.`,
+          `Using vault/env QUASAR_API_KEY.`,
       );
       return new QuasarPaymentsClient(generalKey);
     }
 
     throw new Error(
       `[QuasarProvisioning] No Quasar integration for tenant ${invifyTenantId} ` +
-        `and QUASAR_API_KEY is missing/invalid. Provision the merchant or set QUASAR_API_KEY=sk_test_…`,
+        `and QUASAR_API_KEY is missing/invalid. Store sk_test_… in Integration Vault or env.`,
     );
   }
 
-  /** True when Invify has a usable general Quasar sk_test_* in env. */
+  static cleanApiKey(value?: string): string {
+    return String(value || '').trim().replace(/^["']|["']$/g, '');
+  }
+
+  static async resolveGeneralApiKey(): Promise<string | null> {
+    const looksLikeKey = (value: string) => value.startsWith('sk_test_') || value.startsWith('sk_live_');
+    const vaultEnvs = ['STAGING', 'PRODUCTION', 'SANDBOX'];
+    const keyNames = ['QUASAR_API_KEY', 'API_KEY', undefined];
+    for (const environment of vaultEnvs) {
+      for (const keyName of keyNames) {
+        try {
+          const vaultKey = this.cleanApiKey(
+            (await IntegrationVaultService.getDecryptedCredential('quasar', environment, undefined, keyName)) || '',
+          );
+          if (looksLikeKey(vaultKey)) return vaultKey;
+        } catch {
+          /* try next */
+        }
+      }
+    }
+    const envKey = this.cleanApiKey(process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY);
+    if (envKey && !envKey.includes('your-quaser')) return envKey;
+    return null;
+  }
+
+  /** True when Invify has a usable general Quasar sk_test_* in env or vault. */
   static hasGeneralApiKey(): boolean {
-    const key =
-      process.env.QUASAR_API_KEY?.trim() ||
-      process.env.QUASER_API_KEY?.trim() ||
-      '';
+    const key = this.cleanApiKey(process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY);
     return key.length > 0 && !key.includes('your-quaser');
   }
 }

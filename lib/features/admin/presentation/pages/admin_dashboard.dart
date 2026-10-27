@@ -20,7 +20,14 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/utils/device_info_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 import 'package:dio/dio.dart';
+import '../../../settings/domain/entities/user_plan.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/features/school/presentation/pages/parent_broadcast_page.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../domain/repositories/admin_repository.dart';
+import '../../domain/services/internal_wallet_breakdown.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -32,12 +39,31 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int? _subscriptionDaysRemaining;
+  double _localMonthCollected = 0;
+  bool _localMonthReady = false;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _fetchSubscriptionStatus();
+    _loadLocalMonthCollected();
+  }
+
+  Future<void> _loadLocalMonthCollected() async {
+    try {
+      final invoices = await context.read<InvoiceRepository>().getAllInvoices();
+      final now = DateTime.now();
+      final monthInvoices = invoices.where(
+        (inv) => inv.dateCreated.year == now.year && inv.dateCreated.month == now.month,
+      );
+      final total = salesPeriodTotals(monthInvoices).collected;
+      if (!mounted) return;
+      setState(() {
+        _localMonthCollected = total;
+        _localMonthReady = true;
+      });
+    } catch (_) {}
   }
 
   void _loadData() {
@@ -128,6 +154,137 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Future<void> _showInternalWalletBreakdown(BuildContext context, double displayed) async {
+    final ledgerFuture = context.read<IAdminRepository>().getInternalWalletLedger();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: ledgerFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const AlertDialog(
+                title: Text('Internal Wallet'),
+                content: SizedBox(
+                  height: 80,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return AlertDialog(
+                title: const Text('Internal Wallet'),
+                content: Text(
+                  'Could not load the USER_WALLET ledger rows. ${snapshot.error}',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Close'),
+                  ),
+                ],
+              );
+            }
+            final breakdown = InternalWalletBreakdown.fromApi(
+              transactions: snapshot.data ?? const [],
+              displayed: displayed,
+            );
+            final money = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
+            return AlertDialog(
+              title: const Text('How Internal Wallet is added up'),
+              content: SizedBox(
+                width: 420,
+                height: 420,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'This tile is USER_WALLET credits minus USER_WALLET debits. '
+                      'It is not monthly revenue and not parent credit.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: breakdown.lines.isEmpty
+                          ? const Center(child: Text('No USER_WALLET ledger rows were returned.'))
+                          : ListView.builder(
+                              itemCount: breakdown.lines.length,
+                              itemBuilder: (context, index) {
+                                final line = breakdown.lines[index];
+                                final signed = line.isCredit ? line.amount : -line.amount;
+                                final running = breakdown.lines
+                                    .take(index + 1)
+                                    .fold<double>(
+                                      0,
+                                      (sum, row) => sum + (row.isCredit ? row.amount : -row.amount),
+                                    );
+                                final when = line.at == null
+                                    ? ''
+                                    : DateFormat('yyyy-MM-dd HH:mm').format(line.at!.toLocal());
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    line.reference,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: Text(
+                                    [
+                                      line.isCredit ? 'CREDIT' : 'DEBIT',
+                                      if (line.label.isNotEmpty) line.label,
+                                      if (when.isNotEmpty) when,
+                                    ].join(' · '),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  trailing: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${signed >= 0 ? '+' : '−'}${money.format(signed.abs())}',
+                                        style: TextStyle(
+                                          color: line.isCredit ? Colors.green.shade700 : Colors.red.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        money.format(running),
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const Divider(),
+                    Text('Credits  ${money.format(breakdown.credits)}'),
+                    Text('Debits   ${money.format(breakdown.debits)}'),
+                    Text(
+                      'Net      ${money.format(breakdown.net)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Tile     ${money.format(breakdown.displayed)}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildMetricSection(BuildContext context, Map<String, dynamic> metrics) {
     final formatter = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     
@@ -140,9 +297,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     
     final walletValue = formatter.format(parseSafe(metrics['internal_wallet']));
-    final revenueValue = formatter.format(
-      parseSafe(metrics['monthly_revenue'] ?? metrics['total_revenue']),
-    );
+    final cloudMonth = parseSafe(metrics['monthly_revenue'] ?? metrics['total_revenue']);
+    final monthCollected = _localMonthReady ? _localMonthCollected : cloudMonth;
+    final revenueValue = formatter.format(monthCollected);
 
     return Row(
       children: [
@@ -152,6 +309,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             value: walletValue,
             icon: Icons.account_balance_wallet,
             color: Colors.blue,
+            onTap: () => _showInternalWalletBreakdown(
+              context,
+              parseSafe(metrics['internal_wallet']),
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -170,8 +331,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildQuickActions(BuildContext context, bool isMaster) {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
-        final isProUser = settingsState.userPlan?.isPro == true || settingsState.userPlan?.isLifetime == true || settingsState.userPlan?.planType == 'enterprise' || settingsState.userPlan?.planType == 'premium';
-        final isBasicOrFree = settingsState.userPlan?.isBasic == true || settingsState.userPlan?.planType == 'free_trial' || settingsState.userPlan?.isValid != true;
+        final plan = settingsState.userPlan;
+        final isProUser = plan?.hasOnlineAccess == true;
+        final isBasicOrFree = plan == null || plan.isBasicTier;
+        final linkDeviceLocked = !isProUser; // Standard or Premium required
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,10 +357,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
                 ),
                 _ActionTile(
+                  label: 'Message parents',
+                  icon: Icons.campaign_outlined,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentBroadcastPage())),
+                ),
+                _ActionTile(
                   label: 'Account Set up',
-                  icon: Icons.cloud_sync_rounded,
-                  onTap: isBasicOrFree ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
-                  isGated: isBasicOrFree,
+                  icon: Icons.manage_accounts_rounded,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
                 ),
                 _ActionTile(
                   label: 'Online Login',
@@ -220,13 +387,56 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _ActionTile(
                   label: 'Link New Device',
                   icon: Icons.qr_code_2,
-                  onTap: () => _showLinkQrDialog(context),
+                  onTap: linkDeviceLocked
+                      ? () => _showLinkDevicePlanLock(context)
+                      : () => _showLinkQrDialog(context),
+                  isGated: linkDeviceLocked,
                 ),
               ],
             ),
           ],
         );
       },
+    );
+  }
+
+  void _showLinkDevicePlanLock(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.orange.shade800),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Feature Locked')),
+          ],
+        ),
+        content: Text(
+          'Link New Device requires a Standard or Premium plan.\n\n'
+          '• ${UserPlan.basicSummary}\n'
+          '• ${UserPlan.standardSummary}\n'
+          '• ${UserPlan.premiumSummary}\n\n'
+          'Upgrade to unlock this module.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('NOT NOW'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamed(context, ActivationPage.routeName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('UPGRADE'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -280,11 +490,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               Icon(Icons.lock_outline_rounded, color: Colors.amber.shade700),
               const SizedBox(width: 8),
-              const Text('Pro Tier Feature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Web Access Locked', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           content: const Text(
-            'Online Web Access credentials configuration requires an active Pro subscription model. Please navigate to Account Set up to activate your premium relay link.',
+            'You need to upgrade to Standard or Premium to have access to the web.',
             style: TextStyle(fontSize: 13, height: 1.4),
           ),
           actions: [
@@ -297,7 +507,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage()));
+                Navigator.pushNamed(context, ActivationPage.routeName);
               },
               child: const Text('Upgrade Plan', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
@@ -753,8 +963,15 @@ class _MetricCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _MetricCard({required this.title, required this.value, required this.icon, required this.color});
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -762,17 +979,21 @@ class _MetricCard extends StatelessWidget {
       elevation: 0,
       color: color.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 4),
-            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 16),
+              Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 4),
+              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
         ),
       ),
     );
@@ -789,6 +1010,7 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visuallyLocked = isGated || onTap == null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -798,12 +1020,12 @@ class _ActionTile extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.withOpacity(0.2)),
           borderRadius: BorderRadius.circular(12),
-          color: onTap == null ? Colors.grey.withOpacity(0.05) : null,
+          color: visuallyLocked ? Colors.grey.withOpacity(0.05) : null,
         ),
         child: Column(
           children: [
             Opacity(
-              opacity: onTap == null ? 0.3 : 1.0,
+              opacity: visuallyLocked ? 0.3 : 1.0,
               child: Icon(icon, size: 28),
             ),
             const SizedBox(height: 12),
@@ -812,7 +1034,7 @@ class _ActionTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: onTap == null ? Colors.grey : null,
+                color: visuallyLocked ? Colors.grey : null,
               ),
               textAlign: TextAlign.center,
             ),

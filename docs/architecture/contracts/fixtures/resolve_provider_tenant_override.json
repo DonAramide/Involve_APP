@@ -1,0 +1,24 @@
+{
+  "decision": "RESOLVED",
+  "serviceType": "PAYMENTS",
+  "operationType": "CHECKOUT",
+  "quasarTenantId": "c3d11b8b-e85d-4f2b-8a8f-2872bc900382",
+  "provider": "flutterwave",
+  "allowedProviders": [
+    "paystack",
+    "flutterwave"
+  ],
+  "precedenceTier": "TENANT_OVERRIDE",
+  "institutionId": "11111111-2222-3333-4444-555555555555",
+  "institutionCode": "PROV01",
+  "institutionName": "Providus Bank Institution Portal",
+  "decisionTraceId": "trc_4b5c6d7e8f9a0b1c",
+  "policyVersion": 2,
+  "evaluatedAt": "2026-10-20T00:15:30.000Z",
+  "expiresAt": "2026-10-20T00:16:30.000Z",
+  "overrideDetails": {
+    "overrideId": "99999999-8888-7777-6666-555555555555",
+    "justification": "Lower card processing fee negotiated for tuition portal",
+    "approvedBy": "admin@invify.com"
+  }
+}

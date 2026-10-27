@@ -1,0 +1,6 @@
+{
+  "code": "ROUTING_REQUEST_INVALID",
+  "message": "operationType is not valid for this route.",
+  "traceId": "trc_err_bad_request_001",
+  "details": null
+}

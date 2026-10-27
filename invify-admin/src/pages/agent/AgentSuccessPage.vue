@@ -31,7 +31,7 @@
         text-color="black" 
         label="Return to Login" 
         class="text-weight-bold q-px-xl q-py-sm text-subtitle2" 
-        to="/agent/login" 
+        to="/institute/login" 
         no-caps
       />
       
