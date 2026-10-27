@@ -939,24 +939,6 @@ export class EmailService {
       }],
     );
   }
-
-  public async sendParentNotice(
-    to: string,
-    subject: string,
-    message: string,
-    schoolName: string,
-  ): Promise<boolean> {
-    const school = this.escapeHtml(schoolName || 'Your school');
-    const body = this.escapeHtml(message).replace(/\n/g, '<br/>');
-    return this.sendMail(
-      to,
-      subject,
-      `<p style="font-size: 15px; line-height: 1.55; color: #0f172a;">${body}</p>
-       <p style="font-size: 12px; color: #64748b;">Sent by ${school}.</p>`,
-      [],
-      { fromName: schoolName || 'Invify', skipLogo: false },
-    );
-  }
 }
 
 export const emailService = new EmailService();

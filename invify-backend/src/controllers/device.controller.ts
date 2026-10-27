@@ -556,10 +556,6 @@ export class DeviceController {
     }
   }
 
-  static async resendActivationEmail(req: Request, res: Response) {
-    return res.status(200).json({ success: true, message: 'Activation email queued' });
-  }
-
   /**
    * POST /devices/activations/:id/resend-email
    * Sends the approved activation file to the tenant email again.
