@@ -309,12 +309,16 @@ describe('POST /webhooks/quasar — Express integration test', () => {
           }),
         };
       }
+      const empty = () => Promise.resolve({ data: [], error: null });
       return {
         select: () => ({
           eq: () => ({
             maybeSingle: () => Promise.resolve({ data: null, error: null }),
-            filter: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
-            limit: () => Promise.resolve({ data: [], error: null }),
+            filter: () => ({ limit: empty }),
+            limit: empty,
+          }),
+          in: () => ({
+            limit: () => Object.assign(empty(), { eq: empty }),
           }),
         }),
         insert: () => Promise.resolve({ error: null }),

@@ -40,6 +40,11 @@ function mapVersion(
 }
 
 export async function loadOwningAgentForTenant(tenantId: string): Promise<OwningAgent | null> {
+  // In-memory shadow tests install their own orchestrator. An ownership read
+  // still opens PostgREST, and a refused connection is retried for 7s.
+  if (process.env.JEST_WORKER_ID && process.env.FEE_SHADOW_ALLOW_SUPABASE !== 'true') {
+    return null;
+  }
   const { data: links } = await supabaseAdmin
     .from('agent_tenants')
     .select('tenant_id, agent_id')
