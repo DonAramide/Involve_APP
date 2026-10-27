@@ -14,7 +14,10 @@
 import { QuasarPlatformClient, quasarPlatformClient } from '../../src/integrations/quasar/quasar-platform.client';
 import { QuasarPaymentsClient } from '../../src/integrations/quasar/quasar-payments.client';
 import { QuasarIntegrationStore } from '../../src/integrations/quasar/quasar-integration.store';
-import { QuasarProvisioningService } from '../../src/integrations/quasar/quasar-provisioning.service';
+import {
+  QuasarProvisioningService,
+  resolveInvifyWebhookUrl,
+} from '../../src/integrations/quasar/quasar-provisioning.service';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +76,8 @@ beforeEach(() => {
 
   // Payments client mock
   MockPaymentsClient.prototype.registerWebhookEndpoint = jest.fn().mockResolvedValue(MOCK_WEBHOOK);
+  MockPaymentsClient.prototype.getSandboxConfig = jest.fn().mockRejectedValue(new Error('no sandbox'));
+  MockPaymentsClient.prototype.bootstrapSandbox = jest.fn();
 
   // Store mocks
   MockStore.getByInvifyTenantId = jest.fn().mockResolvedValue(null); // Not yet provisioned
@@ -147,6 +152,20 @@ describe('QuasarProvisioningService.provisionMerchant', () => {
     expect(result.webhookRegistered).toBe(false);
     // Store.create should still have been called (provisioning itself succeeded)
     expect(MockStore.create).toHaveBeenCalled();
+  });
+});
+
+describe('resolveInvifyWebhookUrl', () => {
+  const original = process.env.INVIFY_QUASAR_WEBHOOK_URL;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.INVIFY_QUASAR_WEBHOOK_URL;
+    else process.env.INVIFY_QUASAR_WEBHOOK_URL = original;
+  });
+
+  it('rewrites staging SPA webhook path to the /api proxy', () => {
+    process.env.INVIFY_QUASAR_WEBHOOK_URL = 'https://staging.invify.org/webhooks/quasar';
+    expect(resolveInvifyWebhookUrl()).toBe('https://staging.invify.org/api/webhooks/quasar');
   });
 });
 

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
-import { BillingInvariantError, nairaStringToKobo } from '../modules/tenant-billing/tenant-billing.engine';
+import { BillingInvariantError, koboToNairaString, nairaStringToKobo } from '../modules/tenant-billing/tenant-billing.engine';
 import { Actor, TenantBillingService } from '../modules/tenant-billing/tenant-billing.service';
 import { getTenantBillingService } from '../modules/tenant-billing/tenant-billing.runtime';
 import { GovAuditService } from '../services/gov-audit.service';
+import { holdForSupportApproval } from '../services/maker-checker.service';
+import { notifyTenantBillingPayment } from '../modules/tenant-billing/notify';
 
 async function tenantNameById(ids: Array<string | null | undefined>): Promise<Map<string, string>> {
   const unique = [...new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))];
@@ -39,7 +41,10 @@ function actor(req: Request): Actor {
     id: user.id || 'unknown',
     email: user.email || 'unknown',
     role: String(user.role || ''),
-    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress,
+    ip: String((req.headers?.['x-forwarded-for'] as string) || '').split(',')[0]?.trim()
+      || req.socket?.remoteAddress
+      || req.ip
+      || 'maker-checker',
   };
 }
 
@@ -49,8 +54,19 @@ function kobo(body: any, field = 'amountKobo'): number {
   throw new BillingInvariantError('amountKobo or amountNaira is required');
 }
 
+function nairaLabel(body: any): string {
+  try {
+    const amount = kobo(body);
+    const [whole, frac = '00'] = koboToNairaString(amount).split('.');
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `₦${grouped}.${frac}`;
+  } catch {
+    return String(body?.amountNaira || body?.amountKobo || '');
+  }
+}
+
 function fail(res: Response, err: any) {
-  const status = err?.code === 'TENANT_ISOLATION' ? 403 : 400;
+  const status = err?.code === 'TENANT_ISOLATION' ? 403 : err?.code === 'ONGOING_PLAN' ? 409 : 400;
   return res.status(status).json({ success: false, error: err?.message || 'Billing error', code: err?.code });
 }
 
@@ -131,6 +147,15 @@ export class TenantBillingController {
   static async createPlan(req: Request, res: Response) {
     try {
       const svc = await TenantBillingController.ready();
+      svc.assertCanCreateDevicePlan(req.body.tenantId);
+      const held = await holdForSupportApproval(req, res, {
+        domain: 'tenant_billing',
+        action: 'create_plan',
+        target: `plan:${req.body.tenantId}`,
+        summary: `Create installment plan for tenant ${req.body.tenantId}`,
+        body: req.body || {},
+      });
+      if (held) return;
       const data = svc.createDeviceInstallmentPlan({
         tenantId: req.body.tenantId,
         deviceId: req.body.deviceId,
@@ -185,6 +210,26 @@ export class TenantBillingController {
   static async postPayment(req: Request, res: Response) {
     try {
       const svc = await TenantBillingController.ready();
+      if (!req.body.tenantId) throw new BillingInvariantError('tenantId is required');
+      kobo(req.body);
+      const names = await tenantNameById([req.body.tenantId]);
+      const tenantLabel = names.get(String(req.body.tenantId)) || req.body.tenantId;
+      const held = await holdForSupportApproval(req, res, {
+        domain: 'tenant_billing',
+        action: 'post_payment',
+        target: `payment:${req.body.tenantId}:${req.body.reference || req.body.idempotencyKey || 'new'}`,
+        summary: `Post ${nairaLabel(req.body)} payment for ${tenantLabel}`,
+        body: req.body || {},
+      });
+      if (held) {
+        void notifyTenantBillingPayment({
+          tenantId: req.body.tenantId,
+          stage: 'submitted',
+          amountLabel: nairaLabel(req.body),
+          reference: req.body.reference,
+        });
+        return;
+      }
       const result = await svc.postPayment({
         tenantId: req.body.tenantId,
         amountKobo: kobo(req.body),
@@ -212,6 +257,12 @@ export class TenantBillingController {
           method: result.payment.method,
         },
       } as any);
+      void notifyTenantBillingPayment({
+        tenantId: result.payment.tenantId,
+        stage: 'posted',
+        amountKobo: result.payment.amountKobo,
+        reference: result.payment.reference,
+      });
       return res.status(result.duplicate ? 200 : 201).json({ success: true, data: result });
     } catch (e) {
       return fail(res, e);

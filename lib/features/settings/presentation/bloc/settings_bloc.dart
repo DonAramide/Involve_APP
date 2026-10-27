@@ -12,6 +12,7 @@ import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
 import '../../domain/entities/settings.dart';
 import '../../../dashboard/domain/dashboard_menu_catalog.dart';
+import '../../../../services/terminal_sync_service.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -223,12 +224,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         if (linkedName.isNotEmpty && linkedName != workingSettings.organizationName) {
           workingSettings = workingSettings.copyWith(organizationName: linkedName);
         }
-        final linkedModeRaw = event.linkedBusinessMode?.trim() ?? '';
-        if (linkedModeRaw.isNotEmpty) {
-          final linkedMode = AppSettings.modeFromOnboarding(linkedModeRaw);
-          if (workingSettings.normalizedBusinessMode != linkedMode) {
-            workingSettings = workingSettings.copyWith(businessMode: linkedMode);
+        final tenantProfileMode = await _linkedTenantProfileMode(event.linkedBusinessMode);
+        if (tenantProfileMode != null) {
+          if (workingSettings.normalizedBusinessMode != tenantProfileMode) {
+            workingSettings = workingSettings.copyWith(businessMode: tenantProfileMode);
           }
+          await StorageService.setBusinessModeLocked(true);
         }
 
         final applyLinkedDashboard =
@@ -245,15 +246,52 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         }
       }
 
+      final modeLocked = await StorageService.isBusinessModeLocked();
       emit(state.copyWith(
         settings: workingSettings, 
         userPlan: plan,
-        isLoading: false
+        isLoading: false,
+        isModeLocked: modeLocked,
       ));
     } catch (e) {
       debugPrint('SettingsBloc: Error loading settings: $e');
       emit(state.copyWith(error: e.toString(), isLoading: false));
     }
+  }
+
+  /// Tenant profile mode for a QR-linked device. Null when this handset was not linked.
+  Future<String?> _linkedTenantProfileMode(String? eventMode) async {
+    final fromEvent = eventMode?.trim() ?? '';
+    if (fromEvent.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(fromEvent);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
+    }
+
+    final linked = await StorageService.isDeviceLinkedToTenant() ||
+        await TerminalSyncService.wasLinkedViaDeviceLink();
+    if (!linked) return null;
+
+    final config = await TerminalSyncService.loadCachedConfig();
+    final fromConfig = config?.type?.trim() ?? '';
+    if (fromConfig.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(fromConfig);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
+    }
+
+    final remembered = await StorageService.getLinkedTenantBusinessMode();
+    if (remembered != null && remembered.isNotEmpty) {
+      return AppSettings.modeFromOnboarding(remembered);
+    }
+
+    final industry = await StorageService.getOnboardingIndustry();
+    if (industry != null && industry.isNotEmpty) {
+      final mode = AppSettings.modeFromOnboarding(industry);
+      await StorageService.markDeviceLinkedToTenant(mode);
+      return mode;
+    }
+    return null;
   }
 
   Future<UserPlan> _loadUserPlan() async {

@@ -42,6 +42,8 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final settings = context.read<SettingsBloc>().state.settings;
     final memberLabel = settings?.customerLabel ?? 'Customer';
 
@@ -51,12 +53,19 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
         context.read<FinanceBloc>().add(LoadSchoolDashboard());
       },
       child: Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : Colors.grey.shade50,
       appBar: AppBar(
-        title: Text('$memberLabel Ledger', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          '$memberLabel Ledger',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
         centerTitle: true,
         actions: [
           IconButton(
@@ -86,15 +95,23 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
                       color: Colors.blueGrey.shade400,
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Connection Issue',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.blueGrey,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       friendlyApiError(state.message, fallback: 'Could not load student finance.'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
@@ -133,9 +150,13 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
 
                     // 3. Virtual Account (if exists)
                     if (state.virtualAccount != null) ...[
-                      const Text(
+                      Text(
                         'Instant Payment Details',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       VirtualAccountCard(
@@ -149,11 +170,12 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Transaction Feed',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : Colors.black87,
                           ),
                         ),
                         TextButton(
@@ -205,21 +227,27 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
   }
 
   Widget _buildHeader(AppSettings? settings) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade100),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.indigo.shade50,
+            backgroundColor: isDark ? Colors.indigo.shade900 : Colors.indigo.shade50,
             child: Text(
-              widget.studentName[0].toUpperCase(),
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade700, fontSize: 20),
+              widget.studentName.isEmpty ? '?' : widget.studentName[0].toUpperCase(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.indigo.shade100 : Colors.indigo.shade700,
+                fontSize: 20,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -229,7 +257,11 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
               children: [
                 Text(
                   widget.studentName,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 if (settings?.businessMode == 'school')
@@ -309,13 +341,19 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
   }
 
   Widget _buildActionPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade100)),
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? theme.dividerColor : Colors.grey.shade100)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, -4)),
+          BoxShadow(
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
         ],
       ),
       child: Row(
@@ -327,6 +365,8 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
               },
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                foregroundColor: isDark ? Colors.green.shade300 : Colors.green.shade700,
+                side: BorderSide(color: isDark ? Colors.green.shade700 : Colors.green.shade400),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Apply Discount', style: TextStyle(fontWeight: FontWeight.bold)),

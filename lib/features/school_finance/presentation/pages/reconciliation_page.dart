@@ -250,7 +250,12 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
       itemCount: data.length,
       itemBuilder: (context, index) {
         final item = data[index];
-        return _buildPaymentCard(item, settings);
+        if (item is! Map) return const SizedBox.shrink();
+        try {
+          return _buildPaymentCard(Map<String, dynamic>.from(item), settings);
+        } catch (_) {
+          return const SizedBox.shrink();
+        }
       },
     );
   }
@@ -277,7 +282,12 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
-    final date = DateTime.parse(item['createdAt']);
+    DateTime date;
+    try {
+      date = DateTime.parse('${item['createdAt'] ?? item['createdDate'] ?? ''}');
+    } catch (_) {
+      date = DateTime.now();
+    }
     final isIssue = item['issueType'] == 'duplicate_payment' || item['issueType'] == 'provider_mismatch';
     final isUnmatched = item['issueType'] != null && !isIssue;
     
@@ -324,7 +334,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      item['reference'],
+                      '${item['reference'] ?? ''}',
                       style: TextStyle(
                         fontSize: 11,
                         color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -334,7 +344,11 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                   ],
                 ),
                 Text(
-                  currencyFormat.format(item['amount']),
+                  currencyFormat.format(
+                    item['amount'] is num
+                        ? item['amount']
+                        : double.tryParse('${item['amount']}') ?? 0,
+                  ),
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 17,

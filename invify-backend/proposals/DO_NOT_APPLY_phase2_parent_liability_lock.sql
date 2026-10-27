@@ -1,0 +1,3 @@
+-- DO NOT APPLY. Superseded in detail by
+-- proposals/DO_NOT_APPLY_allocate_parent_credit.sql
+-- Still not an approved migration. Do not run against staging or production.

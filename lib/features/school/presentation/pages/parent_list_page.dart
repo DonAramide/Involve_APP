@@ -40,6 +40,12 @@ class _ParentListPageState extends State<ParentListPage> {
       return;
     }
     setState(() => _adminUnlocked = true);
+    _revalidate();
+  }
+
+  void _revalidate() {
+    if (!mounted) return;
+    context.read<SchoolBloc>().add(LoadSchoolData());
   }
 
   @override
@@ -72,6 +78,8 @@ class _ParentListPageState extends State<ParentListPage> {
 
           return Column(
             children: [
+              if (state.isLoading)
+                const LinearProgressIndicator(minHeight: 2),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Column(
@@ -162,12 +170,15 @@ class _ParentListPageState extends State<ParentListPage> {
                               .toSet()
                               .join(', ');
                           return InkWell(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ParentProfilePage(parentId: parent.id!),
-                              ),
-                            ),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ParentProfilePage(parentId: parent.id!),
+                                ),
+                              );
+                              _revalidate();
+                            },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               child: Row(

@@ -17,6 +17,7 @@ import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
+import 'package:involve_app/features/settings/presentation/widgets/admin_transfer_auth_dialog.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
@@ -24,7 +25,8 @@ import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import '../../pages/receipt_preview_page.dart';
 import '../../pages/invoice_success_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
-import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/invoice_payment_legs.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:involve_app/features/invoicing/domain/services/report_generator.dart' as reports hide DateTimeRange;
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'report_preview_page.dart';
@@ -42,6 +44,9 @@ import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school_finance/domain/services/quasar_withdrawable.dart';
 
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/terminology.dart';
@@ -62,6 +67,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   final TextEditingController _amountController = TextEditingController();
   Timer? _searchDebounce;
   bool _hasAssignedPosTerminal = false;
+  Map<String, String> _originRails = const {};
 
   @override
   void initState() {
@@ -70,6 +76,29 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     _amountController.addListener(() => setState(() {}));
     context.read<HistoryBloc>().add(LoadHistory());
     _loadPosTerminalGate();
+    _loadOriginRails();
+  }
+
+  Future<void> _loadOriginRails() async {
+    try {
+      final school = context.read<SchoolRepository>();
+      final invoiceRepo = context.read<InvoiceRepository>();
+      final parents = await school.getParents();
+      final payments = <ParentPaymentRecord>[];
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) continue;
+        payments.addAll(await school.getParentPayments(id));
+      }
+      final invoices = await invoiceRepo.getAllInvoices();
+      if (!mounted) return;
+      setState(() {
+        _originRails = QuasarWithdrawable.originRailByInvoiceNumber(
+          invoices: invoices,
+          payments: payments,
+        );
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadPosTerminalGate() async {
@@ -94,6 +123,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       if (_canUsePos(plan)) 'POS',
       'Transfer',
       if (hasConfiguredVa) 'VirtualAccount',
+      if (includeAll) 'Wallet',
     ];
     return methods;
   }
@@ -108,9 +138,51 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         return 'Company Bank Transfer';
       case 'Cash':
         return 'Cash Settlement';
+      case 'Wallet':
+        return 'Wallet / Parent Credit';
+      case 'Deferred':
+        return 'Pay later (method not set)';
       default:
         return method;
     }
+  }
+
+  /// Amount this confirmation actually posts. A partial company transfer clears
+  /// only what was already received, not the full invoice total.
+  double _transferClearAmount(Invoice invoice) {
+    final awaiting = awaitingCompanyBankTransferAmount(invoice);
+    if (awaiting > 0.001) return awaiting;
+    if (invoice.displayBalance > 0.001 && invoice.amountPaid > 0.001) {
+      return invoice.amountPaid;
+    }
+    return invoice.totalAmount;
+  }
+
+  bool _canConfirmPayment(Invoice invoice) {
+    if (invoice.isRolledForward || invoice.isFullySettled) return false;
+    final status = invoice.paymentStatus.toLowerCase();
+    if (status == 'paid') return false;
+    if (hasAwaitingCompanyBankTransfer(invoice)) return true;
+    if (status == 'pending') return true;
+    final method = invoice.paymentMethod;
+    final isTransfer =
+        method == 'Transfer' || method == 'VirtualAccount';
+    if (!isTransfer) return false;
+    final legs = displayPaymentLegs(invoice);
+    if (legs.isEmpty) return true;
+    return legs.any((leg) => !leg.confirmed);
+  }
+
+  String _partialMethodLine(Invoice invoice) {
+    final legs = displayPaymentLegs(invoice);
+    if (legs.isEmpty) return invoice.paymentMethod ?? 'N/A';
+    final labels = <String>[];
+    for (final leg in legs) {
+      final label =
+          '${_paymentMethodLabel(leg.method)}${leg.confirmed ? '' : ' pending'}';
+      if (!labels.contains(label)) labels.add(label);
+    }
+    return labels.join(' + ');
   }
 
   @override
@@ -503,12 +575,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"}'),
+            Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${_partialMethodLine(invoice)}'),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+                  Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.collectedAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
                   if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true && invoice.totalPrintAmount != null)
                     Padding(
                       padding: const EdgeInsets.only(left: 8.0),
@@ -574,6 +646,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 _buildHistorySummaryRow('Total', invoice.totalAmount, context, isTotal: true),
                 const SizedBox(height: 4),
                 _buildHistorySummaryRow('Paid', invoice.amountPaid, context),
+                ...displayPaymentLegs(invoice).map(
+                  (leg) => _buildReceivedHistoryRow(
+                    context,
+                    label: leg.confirmed ? 'Received' : 'Awaiting confirm',
+                    when: leg.receivedAt ?? invoice.dateCreated,
+                    detail:
+                        '${CurrencyFormatter.formatWithSymbol(leg.amount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} · ${_paymentMethodLabel(leg.method)}',
+                  ),
+                ),
                 if (invoice.changeGiven > 0)
                   _buildHistorySummaryRow('Change Given', invoice.changeGiven, context, color: Colors.green),
                 if (invoice.displayBalance > 0)
@@ -593,9 +674,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               spacing: 8.0,
               runSpacing: 4.0,
               children: [
-                if (invoice.paymentStatus.toLowerCase() == 'pending' ||
-                    ((invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.paymentStatus.toLowerCase() != 'paid')) ...[
-                  if (invoice.paymentMethod == 'VirtualAccount') ...[
+                if (_canConfirmPayment(invoice)) ...[
+                  if (invoice.paymentMethod == 'VirtualAccount' &&
+                      !hasAwaitingCompanyBankTransfer(invoice)) ...[
                     ElevatedButton.icon(
                       onPressed: () => _showPendingTransfersPopup(context, initialInvoice: invoice),
                       icon: const Icon(Icons.sync_alt, size: 16),
@@ -617,7 +698,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     ),
                   ],
                 ],
-                if (invoice.displayBalance > 0 && invoice.displayPaymentStatus.toLowerCase() != 'pending')
+                if (invoice.displayBalance > 0 &&
+                    invoice.displayPaymentStatus.toLowerCase() != 'pending' &&
+                    invoice.displayPaymentStatus.toLowerCase() != 'submitted')
                   ElevatedButton.icon(
                     onPressed: () => _showBalancePaymentDialog(context, invoice),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -664,6 +747,38 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               fontWeight: (isTotal || isBold) ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 14 : 12,
               color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceivedHistoryRow(
+    BuildContext context, {
+    required String label,
+    required DateTime when,
+    required String detail,
+  }) {
+    final whenText = DateFormat('yyyy-MM-dd HH:mm:ss').format(when);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              whenText,
+              style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade300),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              detail,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12),
             ),
           ),
         ],
@@ -1313,50 +1428,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               const SizedBox(height: 16),
               Builder(
                 builder: (context) {
-                  double totalCard = 0;
-                  double totalTransfer = 0;
-                  double totalVaTransfer = 0;
-                  double totalCash = 0;
-                  double totalWallet = 0;
-
-                  for (final inv in state.invoices) {
-                    final collected = inv.collectedAmount;
-                    if (collected <= 0) continue;
-                    switch (classifyInvoicePaymentRail(inv.paymentMethod)) {
-                      case InvoicePaymentRail.card:
-                        totalCard += collected;
-                        break;
-                      case InvoicePaymentRail.vaTransfer:
-                        totalVaTransfer += collected;
-                        break;
-                      case InvoicePaymentRail.bankTransfer:
-                        totalTransfer += collected;
-                        break;
-                      case InvoicePaymentRail.cash:
-                        totalCash += collected;
-                        break;
-                      case InvoicePaymentRail.wallet:
-                        totalWallet += collected;
-                        break;
-                      case InvoicePaymentRail.other:
-                        final method = (inv.paymentMethod ?? '').toLowerCase();
-                        if (method.contains('wallet')) {
-                          totalWallet += collected;
-                        } else if (method.contains('cash')) {
-                          totalCash += collected;
-                        } else if (method.contains('pos') || method.contains('card')) {
-                          totalCard += collected;
-                        } else if (method.contains('virtual') ||
-                            method.contains('va transfer')) {
-                          totalVaTransfer += collected;
-                        } else if (method.contains('transfer')) {
-                          totalTransfer += collected;
-                        } else {
-                          totalWallet += collected;
-                        }
-                        break;
-                    }
-                  }
+                  final rails = salesRailTotals(
+                    state.invoices,
+                    originRails: _originRails,
+                  );
+                  final totalCard = rails.card;
+                  final totalTransfer = rails.transfer;
+                  final totalVaTransfer = rails.vaTransfer;
+                  final totalCash = rails.cash;
+                  final totalWallet = rails.wallet;
 
                   Widget metric(String label, double amount, Color color) {
                     return Expanded(
@@ -1432,7 +1512,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     // Group sales by day
     final dailySales = groupBy(state.invoices, (Invoice inv) {
       return DateTime(inv.dateCreated.year, inv.dateCreated.month, inv.dateCreated.day);
-    }).map((date, invs) => MapEntry(date, invs.fold(0.0, (sum, inv) => sum + inv.collectedAmount)));
+    }).map((date, invs) => MapEntry(date, salesPeriodTotals(invs).collected));
 
     final sortedDates = dailySales.keys.toList()..sort();
     final spots = sortedDates.asMap().entries.map((e) {
@@ -1647,15 +1727,22 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     final hasConfiguredVa = allStaffList.any((s) => s.virtualAccountNumber != null && s.virtualAccountNumber!.trim().isNotEmpty);
 
     final refController = TextEditingController();
-    String selectedMethod = invoice.paymentMethod ?? 'Transfer';
+    final awaitingBank = hasAwaitingCompanyBankTransfer(invoice);
+    String selectedMethod = awaitingBank ? 'Transfer' : (invoice.paymentMethod ?? 'Transfer');
     if (selectedMethod == 'VirtualAccount' && !hasConfiguredVa) {
       selectedMethod = 'Transfer';
     }
     if (selectedMethod == 'POS' && !canUsePos) {
       selectedMethod = 'Transfer';
     }
-    if (selectedMethod != 'Transfer' && selectedMethod != 'VirtualAccount' && selectedMethod != 'Cash' && selectedMethod != 'POS') {
+    final methodWasUnset = selectedMethod != 'Transfer' &&
+        selectedMethod != 'VirtualAccount' &&
+        selectedMethod != 'Cash' &&
+        selectedMethod != 'POS';
+    if (awaitingBank) {
       selectedMethod = 'Transfer';
+    } else if (methodWasUnset) {
+      selectedMethod = 'Cash';
     }
     bool isProcessing = false;
 
@@ -1689,9 +1776,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            invoice.invoiceNumber,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          Expanded(
+                            child: Text(
+                              invoice.invoiceNumber,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF1B5E20),
+                              ),
+                            ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1708,37 +1801,58 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       ),
                       const SizedBox(height: 6),
                       if (invoice.customerName != null && invoice.customerName!.isNotEmpty)
-                        Text('Customer: ${invoice.customerName}', style: const TextStyle(fontSize: 12)),
+                        Text(
+                          'Customer: ${invoice.customerName}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20)),
+                        ),
                       Text(
-                        'Total Amount: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        'Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B5E20)),
+                      ),
+                      Text(
+                        'Already received: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency)} · ${_partialMethodLine(invoice)}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20)),
+                      ),
+                      Text(
+                        'Still outstanding: ${CurrencyFormatter.formatWithSymbol(invoice.displayBalance, symbol: currency)}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB71C1C)),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Payment Settlement Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                const Text('Payment Settlement Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF37474F))),
+                if (methodWasUnset) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'This ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency)} is not cash or a company transfer yet. Choose Cash if it was received in hand, or Company Bank Transfer if it reached the school account. It stays out of those totals until you save.',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF424242), height: 1.3),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: selectedMethod,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF212121), fontSize: 14),
+                  iconEnabledColor: const Color(0xFF212121),
                   items: [
                     const DropdownMenuItem(
                       value: 'Transfer',
-                      child: Text('Company Bank Transfer'),
+                      child: Text('Company Bank Transfer', style: TextStyle(color: Color(0xFF212121), fontSize: 14)),
                     ),
                     if (hasConfiguredVa)
                       const DropdownMenuItem(
                         value: 'VirtualAccount',
-                        child: Text('Virtual Account (VA Transfer — Reconciliation)'),
+                        child: const Text('Virtual Account (VA Transfer — Reconciliation)', style: TextStyle(color: Color(0xFF212121), fontSize: 14)),
                       ),
                     if (canUsePos)
                       const DropdownMenuItem(
                         value: 'POS',
-                        child: Text('Card (POS Terminal Settlement)'),
+                        child: const Text('Card (POS Terminal Settlement)', style: TextStyle(color: Color(0xFF212121), fontSize: 14)),
                       ),
                     const DropdownMenuItem(
                       value: 'Cash',
-                      child: Text('Cash Settlement'),
+                      child: const Text('Cash Settlement', style: TextStyle(color: Color(0xFF212121), fontSize: 14)),
                     ),
                   ],
                   onChanged: (val) {
@@ -1747,7 +1861,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     }
                   },
                   decoration: const InputDecoration(
+                    filled: true,
+                    fillColor: Colors.white,
                     border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFFBDBDBD)),
+                    ),
                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
@@ -1876,8 +1995,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       ? 'Virtual Account invoices must be mapped against received Quasar deposits in the Reconciliation Workspace.'
                       : selectedMethod == 'POS'
                           ? 'Card payments are authorized via MPOS terminals and settled automatically by Quasar.'
-                          : 'Confirming will mark this invoice as PAID in full and update customer accounting ledger.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                          : invoice.displayBalance > 0.001
+                              ? 'This saves only the money already received as ${_paymentMethodLabel(selectedMethod)}. The outstanding balance stays unpaid.'
+                              : 'This confirms the full amount as ${_paymentMethodLabel(selectedMethod)} and removes it from pending.',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF424242), fontStyle: FontStyle.italic),
                 ),
               ],
             ),
@@ -1917,15 +2038,40 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                           );
                           if (authorised != true) return;
                         }
+                        if (selectedMethod == 'Transfer') {
+                          final schoolName = context.read<SettingsBloc>().state.settings?.organizationName;
+                          final authorised = await requireAdminCompanyTransferAuth(
+                            context,
+                            amount: CurrencyFormatter.formatWithSymbol(
+                              _transferClearAmount(invoice),
+                              symbol: currency,
+                            ),
+                            beneficiary: schoolName,
+                            reference: invoice.invoiceNumber,
+                          );
+                          if (authorised != true) return;
+                        }
                         setDialogState(() => isProcessing = true);
                         try {
                           final repository = context.read<HistoryBloc>().getHistory.repository;
-                          final updated = invoice.copyWith(
-                            paymentStatus: 'Paid',
-                            amountPaid: invoice.totalAmount,
-                            balanceAmount: 0.0,
-                            paymentMethod: selectedMethod,
-                          );
+                          final Invoice updated;
+                          if (selectedMethod == 'Transfer' &&
+                              hasAwaitingCompanyBankTransfer(invoice)) {
+                            updated = confirmCompanyBankTransferLegs(invoice);
+                          } else {
+                            final received = invoice.amountPaid > 0.001
+                                ? invoice.amountPaid
+                                : invoice.totalAmount;
+                            final balance = CurrencyFormatter.roundMoney(
+                              (invoice.totalAmount - received).clamp(0.0, double.infinity),
+                            );
+                            updated = invoice.copyWith(
+                              paymentStatus: balance <= 0.001 ? 'Paid' : 'Partial',
+                              amountPaid: received,
+                              balanceAmount: balance,
+                              paymentMethod: selectedMethod,
+                            );
+                          }
                           await repository.updateInvoice(updated);
 
                           if (context.mounted) {
@@ -1951,7 +2097,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 icon: isProcessing
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.check_circle, size: 16),
-                label: Text(selectedMethod == 'Transfer' ? 'CONFIRM PAID (COMPANY BANK TRANSFER)' : 'MARK AS PAID (CASH)'),
+                label: Text(
+                  invoice.displayBalance > 0.001
+                      ? 'SAVE ${CurrencyFormatter.formatWithSymbol(_transferClearAmount(invoice), symbol: currency)} AS ${selectedMethod == 'Transfer' ? 'TRANSFER' : 'CASH'}'
+                      : (selectedMethod == 'Transfer'
+                          ? 'CONFIRM PAID (COMPANY BANK TRANSFER)'
+                          : 'MARK AS PAID (CASH)'),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: selectedMethod == 'Transfer' ? Colors.amber.shade800 : Colors.green.shade700,
                   foregroundColor: Colors.white,
@@ -3156,7 +3308,14 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                             onPressed: canSubmit && !isSubmitting
                                 ? () async {
                                     if (isManualTransfer) {
-                                      // Manual confirmation for Company Personal Bank Account ONLY
+                                      final schoolName = context.read<SettingsBloc>().state.settings?.organizationName;
+                                      final authorised = await requireAdminCompanyTransferAuth(
+                                        context,
+                                        amount: CurrencyFormatter.formatWithSymbol(selectedInvoice!.totalAmount),
+                                        beneficiary: schoolName,
+                                        reference: selectedInvoice!.invoiceNumber,
+                                      );
+                                      if (authorised != true) return;
                                       setState(() => isSubmitting = true);
                                       try {
                                         final repository = context.read<HistoryBloc>().getHistory.repository;

@@ -129,9 +129,12 @@ class PlanGatingInterceptor extends Interceptor {
         options.path.contains('/api/staff') ||
         options.path.contains('/api/v1/finance/invoices/bulk-sync') ||
         options.path.contains('/api/tenant/kyc') ||
+        options.path.contains('/api/admin/profile') ||
         options.path.contains('/api/admin/upload-cac') ||
         options.path.contains('/api/admin/claude-backup') ||
-        options.path.contains('/api/mobile/terminal/sync')) {
+        options.path.contains('/api/mobile/terminal/sync') ||
+        options.path.contains('/attendance') ||
+        options.path.contains('/api/attendance')) {
       return super.onRequest(options, handler);
     }
 
@@ -344,6 +347,23 @@ String? _messageForHttpStatus(int? statusCode) {
   }
 }
 
+/// Strips authenticator codes from HTTP debug output.
+String redactAuthCode(String text) {
+  return text
+      .replaceAll(
+        RegExp(r'("otp"\s*:\s*")[^"]*(")', caseSensitive: false),
+        r'$1[REDACTED]$2',
+      )
+      .replaceAll(
+        RegExp(r"('otp'\s*:\s*')[^']*(')", caseSensitive: false),
+        r"$1[REDACTED]$2",
+      )
+      .replaceAll(
+        RegExp(r'\botp\b(\s*[:=]\s*)\d{4,8}', caseSensitive: false),
+        r'otp$1[REDACTED]',
+      );
+}
+
 // ── FinanceApiClient ───────────────────────────────────────────────────────────
 
 /// The single HTTP client for all Finance API calls.
@@ -369,8 +389,9 @@ class FinanceApiClient {
   }) {
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(minutes: 2),
+      connectTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 45),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -393,8 +414,9 @@ class FinanceApiClient {
         responseBody: true,
         error: true,
         logPrint: (Object object) {
-          // Visible in Android Studio Logcat (filter: INVIFY_HTTP or flutter)
-          debugPrint('[INVIFY_HTTP] $object');
+          // Visible in Android Studio Logcat (filter: INVIFY_HTTP or flutter).
+          // Authenticator codes must not appear in logs.
+          debugPrint('[INVIFY_HTTP] ${redactAuthCode(object.toString())}');
         },
       ),
     ]);
@@ -422,12 +444,14 @@ class FinanceApiClient {
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
+    Options? options,
   }) async {
     try {
       return await _dio.post<T>(
         path,
         data: data,
         queryParameters: queryParameters,
+        options: options,
       );
     } on DioException catch (e) {
       throw _unwrap(e);

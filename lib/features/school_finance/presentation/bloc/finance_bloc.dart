@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -21,8 +22,13 @@ import '../../domain/entities/virtual_account.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
+import 'package:involve_app/features/school_finance/domain/services/quasar_withdrawable.dart';
 
 part 'finance_event.dart';
 part 'finance_state.dart';
@@ -81,8 +87,9 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         try {
           final studentInvoices = await invoiceRepository!.getInvoicesByStudentId(studentIdInt);
           
-          double totalPaid = studentInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
-          double outstandingBalance = studentInvoices.fold(0.0, (sum, i) => sum + i.balanceAmount);
+          final period = salesPeriodTotals(studentInvoices);
+          double totalPaid = period.collected;
+          double outstandingBalance = period.pending;
           double totalFees = totalPaid + outstandingBalance;
 
           final summary = StudentFinancialSummary(
@@ -281,7 +288,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
 
     List<Invoice> invoices = const [];
-    int studentCount = 0;
+    List<int> studentIds = const [];
     if (invoiceRepository != null) {
       try {
         invoices = await invoiceRepository!.getAllInvoices();
@@ -291,15 +298,24 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
     if (schoolRepository != null) {
       try {
-        studentCount = (await schoolRepository!.getStudents()).length;
+        studentIds = (await schoolRepository!.getStudents())
+            .map((s) => s.id)
+            .whereType<int>()
+            .toList();
       } catch (_) {}
     }
 
-    final localSummary = _summaryFromInvoices(invoices, studentCount);
+    final payments = await _loadParentPayments();
+    final localSummary = _summaryFromInvoices(
+      invoices,
+      studentIds,
+      payments,
+    );
     final localTx = _transactionsFromInvoices(invoices);
-    final summary = remoteSummary != null
+    var summary = remoteSummary != null
         ? _mergeRails(remoteSummary, localSummary)
         : localSummary;
+    summary = await _publishWithdrawable(invoices, payments, summary);
     if (chartData.isEmpty) {
       chartData = _chartFromInvoices(invoices, days: 7);
     }
@@ -343,7 +359,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
 
     List<Invoice> invoices = const [];
-    int studentCount = currentState.summary.totalStudents;
+    List<int> studentIds = const [];
     if (invoiceRepository != null) {
       try {
         invoices = await invoiceRepository!.getAllInvoices();
@@ -351,14 +367,23 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
     if (schoolRepository != null) {
       try {
-        studentCount = (await schoolRepository!.getStudents()).length;
+        studentIds = (await schoolRepository!.getStudents())
+            .map((s) => s.id)
+            .whereType<int>()
+            .toList();
       } catch (_) {}
     }
 
-    final localSummary = _summaryFromInvoices(invoices, studentCount);
-    final summary = remoteSummary != null
+    final payments = await _loadParentPayments();
+    final localSummary = _summaryFromInvoices(
+      invoices,
+      studentIds,
+      payments,
+    );
+    var summary = remoteSummary != null
         ? _mergeRails(remoteSummary, localSummary)
         : localSummary;
+    summary = await _publishWithdrawable(invoices, payments, summary);
     final transactions = _mergeTransactions(remoteTx, _transactionsFromInvoices(invoices));
 
     emit(currentState.copyWith(
@@ -394,53 +419,137 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   }
 
 
-  SchoolFinancialSummary _summaryFromInvoices(List<Invoice> invoices, int studentCount) {
-    double totalRevenue = 0;
-    double outstandingFees = 0;
-    double card = 0;
-    double va = 0;
-    double cash = 0;
-    final studentInvoices = <int, List<Invoice>>{};
-
-    for (final inv in invoices) {
-      final collected = inv.collectedAmount;
-      totalRevenue += collected;
-      outstandingFees += inv.outstandingAmount;
-      final rail = classifyInvoicePaymentRail(inv.paymentMethod);
-      if (rail == InvoicePaymentRail.card) {
-        card += collected;
-      } else if (rail == InvoicePaymentRail.vaTransfer) {
-        va += collected;
-      } else if (rail == InvoicePaymentRail.cash) {
-        cash += collected;
+  Future<SchoolFinancialSummary> _publishWithdrawable(
+    List<Invoice> invoices,
+    List<ParentPaymentRecord> payments,
+    SchoolFinancialSummary summary,
+  ) async {
+    final localSettleable = QuasarWithdrawable.calculate(
+      invoices: invoices,
+      payments: payments,
+    );
+    try {
+      final lines = QuasarWithdrawable.lines(invoices: invoices, payments: payments);
+      final shared = await repository.syncWithdrawableCredits(
+        lines
+            .map((line) => {
+                  'reference': line.reference,
+                  'amount': line.amount,
+                  'rail': line.rail,
+                  'paidAt': line.at.toUtc().toIso8601String(),
+                })
+            .toList(),
+      );
+      if (shared == null) {
+        return summary.withSharedWithdrawable(
+          _preferredWithdrawable(
+            localSettleable: localSettleable,
+            shared: 0,
+            remitted: summary.quasarRemitted,
+            sharedOk: false,
+          ),
+        );
       }
-      if (inv.studentId != null) {
-        studentInvoices.putIfAbsent(inv.studentId!, () => []).add(inv);
-      }
+      return summary.withSharedWithdrawable(
+        _preferredWithdrawable(
+          localSettleable: localSettleable,
+          shared: shared,
+          remitted: summary.quasarRemitted,
+          sharedOk: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Withdrawable sync skipped: $e');
+      return summary.withSharedWithdrawable(
+        _preferredWithdrawable(
+          localSettleable: localSettleable,
+          shared: summary.withdrawable,
+          remitted: summary.quasarRemitted,
+          sharedOk: summary.sharedWithdrawable,
+        ),
+      );
     }
+  }
 
-    int paidCount = 0;
-    int owingCount = 0;
-    for (final entry in studentInvoices.entries) {
-      final totalBalance = entry.value.fold(0.0, (sum, i) => sum + i.outstandingAmount);
-      if (totalBalance > 0) {
-        owingCount++;
-      } else {
-        paidCount++;
+  /// When the server pool was loaded, it is the ceiling. A missing server
+  /// figure falls back to the device calculation.
+  double _preferredWithdrawable({
+    required double localSettleable,
+    required double shared,
+    required double remitted,
+    required bool sharedOk,
+  }) {
+    final localNet = math.max(0.0, localSettleable - math.max(0.0, remitted));
+    if (!sharedOk) return localNet;
+    // The server reservation is the ceiling. The tablet must not offer more.
+    return math.min(localNet, math.max(0.0, shared));
+  }
+
+  Future<List<ParentPaymentRecord>> _loadParentPayments() async {
+    final school = schoolRepository;
+    if (school == null) return const [];
+    try {
+      final parents = await school.getParents();
+      final payments = <ParentPaymentRecord>[];
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) continue;
+        payments.addAll(await school.getParentPayments(id));
       }
+      return payments;
+    } catch (e) {
+      debugPrint('⚠️ FinanceBloc: Parent payments unavailable: $e');
+      return const [];
     }
+  }
+
+  SchoolFinancialSummary _summaryFromInvoices(
+    List<Invoice> invoices,
+    List<int> studentIds,
+    List<ParentPaymentRecord> payments,
+  ) {
+    final origin = QuasarWithdrawable.originRailByInvoiceNumber(
+      invoices: invoices,
+      payments: payments,
+    );
+    final period = salesPeriodTotals(invoices);
+    final rails = salesRailTotals(invoices, originRails: origin);
+    final totalRevenue = period.collected;
+    final outstandingFees = period.pending;
+    final parts = ParentCreditParts.fromPayments(
+      quasarBalance: 0,
+      payments: payments,
+    );
+    // Card bills plus card money paid onto a parent account.
+    // Transfer is school/staff VA used on a bill plus the gross parent
+    // virtual-account deposit. Parent-wallet bills stay off this row.
+    final card = rails.card + parts.card;
+    final va = rails.vaTransfer + ParentCreditParts.grossVirtualAccount(payments);
+    final cash = rails.cash;
+
+    final billedStudentIds = invoices
+        .where((inv) => inv.countsTowardSales && inv.studentId != null)
+        .map((inv) => inv.studentId!)
+        .toSet();
+    final idsForStatus = billedStudentIds.isNotEmpty ? billedStudentIds : studentIds.toSet();
+    final payStatus = countStudentPayStatus(studentIds: idsForStatus, invoices: invoices);
 
     return SchoolFinancialSummary(
       totalRevenue: totalRevenue,
       outstandingFees: outstandingFees,
-      paidStudentsCount: paidCount,
-      owingStudentsCount: owingCount,
-      totalStudents: studentCount > 0 ? studentCount : studentInvoices.length,
+      paidStudentsCount: payStatus.paid,
+      owingStudentsCount: payStatus.owing,
+      totalStudents: studentIds.isNotEmpty ? studentIds.length : idsForStatus.length,
       lastUpdated: DateTime.now(),
       cardCollected: card,
       vaTransferCollected: va,
       cashCollected: cash,
       quasarCollected: card + va,
+      withdrawable: QuasarWithdrawable.calculate(
+        invoices: invoices,
+        payments: payments,
+      ),
+      quasarLiveBalance: ParentCreditParts.grossVirtualAccount(payments),
     );
   }
 
@@ -448,35 +557,44 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     SchoolFinancialSummary remote,
     SchoolFinancialSummary local,
   ) {
-    final card = remote.cardCollected > 0.001 ? remote.cardCollected : local.cardCollected;
-    final va = remote.vaTransferCollected;
-    final cash = remote.cashCollected > 0.001 ? remote.cashCollected : local.cashCollected;
-    final quasar = remote.quasarCollected > 0.001 ? remote.quasarCollected : card + va;
+    final card = math.max(remote.cardCollected, local.cardCollected);
+    final va = math.max(local.vaTransferCollected, 0.0);
+    final cash = math.max(remote.cashCollected, local.cashCollected);
+    final quasar = card + va;
+    final remoteLive = remote.quasarLiveBalance ?? 0;
+    final localLive = local.quasarLiveBalance ?? 0;
+    final gross = localLive > remoteLive ? localLive : remoteLive;
+    final afterPayout = gross - remote.quasarRemitted;
+    final quasarHeld = afterPayout > 0 ? afterPayout : 0.0;
     return SchoolFinancialSummary(
-      totalRevenue: remote.totalRevenue > 0.001 ? remote.totalRevenue : local.totalRevenue,
-      outstandingFees:
-          remote.outstandingFees > 0.001 ? remote.outstandingFees : local.outstandingFees,
-      paidStudentsCount: remote.paidStudentsCount > 0
-          ? remote.paidStudentsCount
-          : local.paidStudentsCount,
-      owingStudentsCount: remote.owingStudentsCount > 0
-          ? remote.owingStudentsCount
-          : local.owingStudentsCount,
-      totalStudents: remote.totalStudents > 0 ? remote.totalStudents : local.totalStudents,
+      totalRevenue: local.totalRevenue,
+      outstandingFees: local.outstandingFees,
+      paidStudentsCount: local.paidStudentsCount,
+      owingStudentsCount: local.owingStudentsCount,
+      totalStudents: local.totalStudents > 0 ? local.totalStudents : remote.totalStudents,
       lastUpdated: remote.lastUpdated,
       cardCollected: card,
       vaTransferCollected: va,
       cashCollected: cash,
       quasarCollected: quasar,
-      quasarLiveBalance: remote.quasarLiveBalance,
+      quasarLiveBalance: quasarHeld > 0 ? quasarHeld : remote.quasarLiveBalance,
       invifyLoggedVa: remote.invifyLoggedVa,
       quasarBalanceStatus: remote.quasarBalanceStatus,
+      quasarRemitted: remote.quasarRemitted,
+      withdrawable: _preferredWithdrawable(
+        localSettleable: local.withdrawable,
+        shared: remote.withdrawable,
+        remitted: remote.quasarRemitted,
+        sharedOk: remote.sharedWithdrawable,
+      ),
+      sharedWithdrawable: remote.sharedWithdrawable,
     );
   }
 
   List<FinancialTransaction> _transactionsFromInvoices(List<Invoice> invoices) {
     final txs = <FinancialTransaction>[];
     for (final inv in invoices) {
+      if (!inv.countsTowardSales || inv.isRolledForward) continue;
       final collected = inv.collectedAmount;
       if (collected <= 0) continue;
       txs.add(FinancialTransaction(
@@ -536,11 +654,16 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       final dateStr =
           '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
       final dayRevenue = invoices.where((inv) {
+        if (!inv.countsTowardSales || inv.isRolledForward) return false;
         final created = inv.dateCreated;
         return created.year == targetDate.year &&
             created.month == targetDate.month &&
             created.day == targetDate.day;
-      }).fold(0.0, (sum, inv) => sum + inv.collectedAmount);
+      }).fold(0.0, (sum, inv) {
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final got = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        return sum + got;
+      });
       chart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
     }
     return chart;

@@ -22,7 +22,12 @@ import '../../../settings/domain/services/security_service.dart';
 import 'package:dio/dio.dart';
 import '../../../settings/domain/entities/user_plan.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/features/school/presentation/pages/parent_broadcast_page.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../domain/repositories/admin_repository.dart';
+import '../../domain/services/internal_wallet_breakdown.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -34,12 +39,31 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int? _subscriptionDaysRemaining;
+  double _localMonthCollected = 0;
+  bool _localMonthReady = false;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _fetchSubscriptionStatus();
+    _loadLocalMonthCollected();
+  }
+
+  Future<void> _loadLocalMonthCollected() async {
+    try {
+      final invoices = await context.read<InvoiceRepository>().getAllInvoices();
+      final now = DateTime.now();
+      final monthInvoices = invoices.where(
+        (inv) => inv.dateCreated.year == now.year && inv.dateCreated.month == now.month,
+      );
+      final total = salesPeriodTotals(monthInvoices).collected;
+      if (!mounted) return;
+      setState(() {
+        _localMonthCollected = total;
+        _localMonthReady = true;
+      });
+    } catch (_) {}
   }
 
   void _loadData() {
@@ -130,6 +154,137 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Future<void> _showInternalWalletBreakdown(BuildContext context, double displayed) async {
+    final ledgerFuture = context.read<IAdminRepository>().getInternalWalletLedger();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: ledgerFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const AlertDialog(
+                title: Text('Internal Wallet'),
+                content: SizedBox(
+                  height: 80,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return AlertDialog(
+                title: const Text('Internal Wallet'),
+                content: Text(
+                  'Could not load the USER_WALLET ledger rows. ${snapshot.error}',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Close'),
+                  ),
+                ],
+              );
+            }
+            final breakdown = InternalWalletBreakdown.fromApi(
+              transactions: snapshot.data ?? const [],
+              displayed: displayed,
+            );
+            final money = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
+            return AlertDialog(
+              title: const Text('How Internal Wallet is added up'),
+              content: SizedBox(
+                width: 420,
+                height: 420,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'This tile is USER_WALLET credits minus USER_WALLET debits. '
+                      'It is not monthly revenue and not parent credit.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: breakdown.lines.isEmpty
+                          ? const Center(child: Text('No USER_WALLET ledger rows were returned.'))
+                          : ListView.builder(
+                              itemCount: breakdown.lines.length,
+                              itemBuilder: (context, index) {
+                                final line = breakdown.lines[index];
+                                final signed = line.isCredit ? line.amount : -line.amount;
+                                final running = breakdown.lines
+                                    .take(index + 1)
+                                    .fold<double>(
+                                      0,
+                                      (sum, row) => sum + (row.isCredit ? row.amount : -row.amount),
+                                    );
+                                final when = line.at == null
+                                    ? ''
+                                    : DateFormat('yyyy-MM-dd HH:mm').format(line.at!.toLocal());
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    line.reference,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: Text(
+                                    [
+                                      line.isCredit ? 'CREDIT' : 'DEBIT',
+                                      if (line.label.isNotEmpty) line.label,
+                                      if (when.isNotEmpty) when,
+                                    ].join(' · '),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  trailing: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${signed >= 0 ? '+' : '−'}${money.format(signed.abs())}',
+                                        style: TextStyle(
+                                          color: line.isCredit ? Colors.green.shade700 : Colors.red.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        money.format(running),
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const Divider(),
+                    Text('Credits  ${money.format(breakdown.credits)}'),
+                    Text('Debits   ${money.format(breakdown.debits)}'),
+                    Text(
+                      'Net      ${money.format(breakdown.net)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Tile     ${money.format(breakdown.displayed)}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildMetricSection(BuildContext context, Map<String, dynamic> metrics) {
     final formatter = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     
@@ -142,9 +297,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     
     final walletValue = formatter.format(parseSafe(metrics['internal_wallet']));
-    final revenueValue = formatter.format(
-      parseSafe(metrics['monthly_revenue'] ?? metrics['total_revenue']),
-    );
+    final cloudMonth = parseSafe(metrics['monthly_revenue'] ?? metrics['total_revenue']);
+    final monthCollected = _localMonthReady ? _localMonthCollected : cloudMonth;
+    final revenueValue = formatter.format(monthCollected);
 
     return Row(
       children: [
@@ -154,6 +309,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             value: walletValue,
             icon: Icons.account_balance_wallet,
             color: Colors.blue,
+            onTap: () => _showInternalWalletBreakdown(
+              context,
+              parseSafe(metrics['internal_wallet']),
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -196,6 +355,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   label: 'System Setup',
                   icon: Icons.settings_applications,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
+                ),
+                _ActionTile(
+                  label: 'Message parents',
+                  icon: Icons.campaign_outlined,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentBroadcastPage())),
                 ),
                 _ActionTile(
                   label: 'Account Set up',
@@ -799,8 +963,15 @@ class _MetricCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _MetricCard({required this.title, required this.value, required this.icon, required this.color});
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -808,17 +979,21 @@ class _MetricCard extends StatelessWidget {
       elevation: 0,
       color: color.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 4),
-            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 16),
+              Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 4),
+              Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            ],
+          ),
         ),
       ),
     );

@@ -167,22 +167,30 @@ class StaffRepositoryImpl implements StaffRepository {
               syncId: (cloudId != null && cloudId.isNotEmpty)
                   ? Value(cloudId)
                   : const Value.absent(),
+              virtualBankName: Value(_textOrNull(cloud['bankName'] ?? cloud['bank_name'])),
+              bankCode: Value(_textOrNull(cloud['bankCode'] ?? cloud['bank_code'])),
+              virtualAccountNumber: Value(_textOrNull(cloud['accountNumber'] ?? cloud['account_number'])),
+              virtualAccountName: Value(_textOrNull(cloud['accountName'] ?? cloud['account_name'])),
               updatedAt: Value(DateTime.now()),
               isDeleted: const Value(false),
             ),
           );
           applied += 1;
-        } else if (name.isNotEmpty && pinHash != null && pinHash.length > 8) {
+        } else if (name.isNotEmpty) {
           final deviceId = await DeviceInfoService.getDeviceSuffix();
           await db.into(db.staff).insert(
             StaffCompanion.insert(
               name: name,
-              staffCode: pinHash,
+              staffCode: (pinHash != null && pinHash.length > 8) ? pinHash : 'NO-PIN-SET',
               staffId: Value(staffId),
               phone: Value(phone),
               role: Value(role),
               isActive: Value(isActive),
               syncId: Value(cloudId ?? const Uuid().v4()),
+              virtualBankName: Value(_textOrNull(cloud['bankName'] ?? cloud['bank_name'])),
+              bankCode: Value(_textOrNull(cloud['bankCode'] ?? cloud['bank_code'])),
+              virtualAccountNumber: Value(_textOrNull(cloud['accountNumber'] ?? cloud['account_number'])),
+              virtualAccountName: Value(_textOrNull(cloud['accountName'] ?? cloud['account_name'])),
               updatedAt: Value(DateTime.now()),
               createdAt: Value(DateTime.now()),
               deviceId: Value(deviceId),
@@ -195,7 +203,21 @@ class StaffRepositoryImpl implements StaffRepository {
         debugPrint('[StaffRepo] applyCloudStaffRecords row failed: $e');
       }
     }
+    if (applied > 0) {
+      final settings = await db.select(db.settings).get();
+      if (settings.isNotEmpty && !settings.first.staffManagementEnabled) {
+        await (db.update(db.settings)..where((row) => row.id.equals(settings.first.id))).write(
+          const SettingsCompanion(staffManagementEnabled: Value(true)),
+        );
+      }
+    }
     return applied;
+  }
+
+  String? _textOrNull(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty || text == '—') return null;
+    return text;
   }
 
   StaffTable? _matchLocal(List<StaffTable> local, Map<String, dynamic> cloud) {

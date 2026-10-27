@@ -1071,9 +1071,11 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
           settings.staffManagementEnabled, 
           (val) => _update(context, settings.copyWith(staffManagementEnabled: val)),
         ),
-        if (settings.staffManagementEnabled)
-          BlocBuilder<StaffBloc, StaffState>(
+        BlocBuilder<StaffBloc, StaffState>(
             builder: (context, state) {
+              if (!settings.staffManagementEnabled && state.staffList.isEmpty) {
+                return const SizedBox.shrink();
+              }
               if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING STAFF CONFIGURATION...');
               
               final userPlan = context.read<SettingsBloc>().state.userPlan;

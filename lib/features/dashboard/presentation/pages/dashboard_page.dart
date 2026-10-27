@@ -859,6 +859,13 @@ class _DashboardPageState extends State<DashboardPage> {
           onTap: () => Navigator.pushNamed(context, '/result_entry'),
         ),
         _DashboardMenuItem(
+          id: 'attendance',
+          title: 'ATTENDANCE',
+          icon: Icons.fact_check_outlined,
+          color: Colors.green,
+          onTap: () => Navigator.pushNamed(context, '/attendance'),
+        ),
+        _DashboardMenuItem(
           id: 'lesson_notes',
           title: 'LESSON NOTES',
           icon: Icons.note_alt,

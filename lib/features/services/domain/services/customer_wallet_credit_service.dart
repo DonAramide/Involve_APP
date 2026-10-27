@@ -90,7 +90,7 @@ class CustomerWalletCreditService {
           amountPaid: newPaid,
           balanceAmount: newBalance,
           paymentStatus: newBalance <= 0.001 ? 'Paid' : 'Partial',
-          paymentMethod: 'Transfer',
+          paymentMethod: 'Parent Credit',
         ),
       );
       remaining -= pay;
@@ -156,52 +156,20 @@ class CustomerWalletCreditService {
     return _roundNaira(sum);
   }
 
-  /// Parent credit is this account's live Quasar balance plus cash, school-account,
-  /// and card amounts, minus credit already mapped to children.
+  /// Display-only. Never overwrite stored parent credit from mixed local rails.
   Future<bool> recalculateParentCredit({
     required String accountNumber,
     required double quasarBalance,
   }) async {
-    final schoolRepo = _schoolRepository;
-    if (schoolRepo == null) return false;
-    final parent = await schoolRepo.findParentByVirtualAccount(accountNumber.trim());
-    if (parent?.id == null) return false;
-    final payments = await schoolRepo.getParentPayments(parent!.id!);
-    final parts = ParentCreditParts.fromPayments(
-      quasarBalance: quasarBalance,
-      payments: payments,
-    );
-    if ((parent.creditBalance - parts.recalculated).abs() <= 0.009) return false;
-    final updated = parent.copyWith(creditBalance: parts.recalculated);
-    await schoolRepo.updateParent(updated);
-    _parentCredits.add(updated);
-    debugPrint(
-      '[CustomerWalletCredit] ${parent.fullName} credit set to ₦${parts.recalculated} '
-      '(Quasar ₦${parts.quasarBalance} + cash ₦${parts.cash} + school ₦${parts.schoolAccount}, '
-      'was ₦${parent.creditBalance})',
-    );
-    return true;
+    return false;
   }
 
-  /// Parent credit follows the live Quasar balance. Extra local copies are dropped.
+  /// Display-only. Server-confirmed credits replace caches after command sync.
   Future<bool> alignParentCreditToQuasar({
     required String accountNumber,
     required double quasarBalance,
   }) async {
-    final schoolRepo = _schoolRepository;
-    if (schoolRepo == null) return false;
-    final parent = await schoolRepo.findParentByVirtualAccount(accountNumber.trim());
-    if (parent?.id == null) return false;
-    final target = _roundNaira(quasarBalance);
-    if ((parent!.creditBalance - target).abs() <= 0.009) return false;
-    final updated = parent.copyWith(creditBalance: target < 0 ? 0 : target);
-    await schoolRepo.updateParent(updated);
-    _parentCredits.add(updated);
-    debugPrint(
-      '[CustomerWalletCredit] ${parent.fullName} credit set to Quasar ₦$target '
-      '(was ₦${parent.creditBalance})',
-    );
-    return true;
+    return false;
   }
 
   Future<int> applyQuasarBalanceGap({

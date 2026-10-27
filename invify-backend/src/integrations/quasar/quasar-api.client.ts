@@ -205,8 +205,19 @@ export class QuasarApiClient {
       const status = err?.response?.status ?? 0;
       const axiosData = err?.response?.data as QFPResponse | undefined;
       const message = axiosData?.responseMessage || err.message;
-      this.log('error', path, correlationId, `Request failed: ${message}`);
-      throw new QuasarApiError(message, axiosData?.responseCode ?? String(status), path);
+      const body =
+        axiosData && typeof axiosData === 'object'
+          ? JSON.stringify(axiosData).replace(/"(signingSecret|secret|apiKey)"\s*:\s*"[^"]*"/gi, '"$1":"[redacted]"').slice(0, 240)
+          : '';
+      this.log(
+        'error',
+        path,
+        correlationId,
+        `Request failed: ${message}${body ? ` body=${body}` : ''}`,
+      );
+      const apiError = new QuasarApiError(message, axiosData?.responseCode ?? String(status), path);
+      if (status >= 400) apiError.status = status;
+      throw apiError;
     }
   }
 
@@ -269,6 +280,7 @@ export class QuasarApiClient {
 // ─── Error Type ───────────────────────────────────────────────────────────────
 
 export class QuasarApiError extends Error {
+  status?: number;
   constructor(
     message: string,
     public readonly responseCode: string,

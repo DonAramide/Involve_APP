@@ -581,14 +581,25 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                   fontWeight: FontWeight.bold, fontSize: 14)),
                           const SizedBox(height: 4),
                           _buildPaymentMethodSelector(context, invoiceState),
-                          if (invoiceState.paymentMethod != null) ...[
+                          if (invoiceState.paymentMethod != null &&
+                              invoiceState.paymentMethod != 'Deferred') ...[
                             const SizedBox(height: 12),
-                            const Text('Amount Received:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(
+                              (invoiceState.paymentMethod == 'Transfer' ||
+                                      invoiceState.paymentMethod ==
+                                          'VirtualAccount')
+                                  ? 'Expected Amount to Receive:'
+                                  : 'Amount Received:',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: _amountReceivedController,
+                              enabled:
+                                  invoiceState.paymentMethod != 'Deferred',
+                              readOnly:
+                                  invoiceState.paymentMethod == 'Deferred',
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                       decimal: true),
@@ -596,6 +607,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 prefixText: '${settings?.currency ?? '₦'} ',
                                 border: const OutlineInputBorder(),
                                 hintText: '0.00',
+                                helperText: invoiceState.paymentMethod ==
+                                        'Deferred'
+                                    ? 'Pay later is pending — nothing is collected yet.'
+                                    : null,
                               ),
                             ),
                             Builder(
@@ -1076,7 +1091,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
       double changeGiven = 0.0;
       double finalAmountPaid = amountReceived;
-      if (invoiceState.paymentMethod == 'VirtualAccount') {
+      if (invoiceState.paymentMethod == 'VirtualAccount' ||
+          invoiceState.paymentMethod == 'Deferred') {
         finalAmountPaid = 0.0;
       } else if (amountReceived > invoiceState.total) {
         if (settings?.allowGiveChange == true &&
@@ -1089,13 +1105,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       }
 
       final invoiceNumber = _previewInvoiceNumber;
-      final status = (invoiceState.paymentMethod == 'Transfer' ||
-              invoiceState.paymentMethod == 'VirtualAccount')
-          ? 'Pending'
-          : (CurrencyFormatter.roundMoney(amountReceived) >=
-                  CurrencyFormatter.roundMoney(invoiceState.total)
-              ? 'Paid'
-              : (amountReceived <= 0 ? 'Unpaid' : 'Partial'));
+      final status = invoiceState.paymentMethod == 'Deferred'
+          ? 'Unpaid'
+          : (invoiceState.paymentMethod == 'Transfer' ||
+                  invoiceState.paymentMethod == 'VirtualAccount')
+              ? 'Pending'
+              : (CurrencyFormatter.roundMoney(amountReceived) >=
+                      CurrencyFormatter.roundMoney(invoiceState.total)
+                  ? 'Paid'
+                  : (amountReceived <= 0 ? 'Unpaid' : 'Partial'));
 
       final invoice = Invoice(
         id: 0,
@@ -1305,16 +1323,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           )
         else
           RadioListTile<String>(
-            title: Row(children: [
-              const Text('POS Card', style: TextStyle(color: Colors.grey)),
-              const SizedBox(width: 8),
-              Text(
-                !isPro
-                    ? '(Pro Plan required)'
-                    : '(No terminal assigned)',
-                style: const TextStyle(fontSize: 10, color: Colors.red),
-              ),
-            ]),
+            title: const Text('POS Card', style: TextStyle(color: Colors.grey)),
+            subtitle: Text(
+              !isPro
+                  ? '(Pro Plan required)'
+                  : '(No terminal assigned)',
+              style: const TextStyle(fontSize: 10, color: Colors.red),
+            ),
             value: 'POS',
             groupValue: state.paymentMethod,
             dense: true,
@@ -1336,14 +1351,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           )
         else
           RadioListTile<String>(
-            title: Row(children: const [
-              Text('Transfer (Personal Company account)', style: TextStyle(color: Colors.grey)),
-              SizedBox(width: 8),
-              Text(
-                '(Pro Plan required)',
-                style: TextStyle(fontSize: 10, color: Colors.red),
-              ),
-            ]),
+            title: const Text('Transfer (Personal Company account)',
+                style: TextStyle(color: Colors.grey)),
+            subtitle: const Text(
+              '(Pro Plan required)',
+              style: TextStyle(fontSize: 10, color: Colors.red),
+            ),
             value: 'Transfer',
             groupValue: state.paymentMethod,
             dense: true,
@@ -1367,16 +1380,14 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           )
         else
           RadioListTile<String>(
-            title: Row(children: [
-              const Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.grey)),
-              const SizedBox(width: 8),
-              Text(
-                !isPro
-                    ? '(Pro Plan required)'
-                    : '(Virtual Account not set up on portal)',
-                style: const TextStyle(fontSize: 10, color: Colors.red),
-              ),
-            ]),
+            title: const Text('Pay with Transfer (Virtual Account)',
+                style: TextStyle(color: Colors.grey)),
+            subtitle: Text(
+              !isPro
+                  ? '(Pro Plan required)'
+                  : '(Virtual Account not set up on portal)',
+              style: const TextStyle(fontSize: 10, color: Colors.red),
+            ),
             value: 'VirtualAccount',
             groupValue: state.paymentMethod,
             dense: true,
@@ -1425,9 +1436,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     ),
         ),
         RadioListTile<String>(
-          title: const Text('Pay Later (deferred)/ part payment',
+          title: const Text('Pay Later (deferred)',
               style: TextStyle(
                   color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+          subtitle: const Text(
+            'Keeps the full invoice pending. Use Cash or Transfer for money already received.',
+            style: TextStyle(fontSize: 10, color: Colors.grey),
+          ),
           value: 'Deferred',
           groupValue: state.paymentMethod,
           dense: true,

@@ -5,7 +5,9 @@ import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -56,28 +58,13 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
         // Core Student Metrics
         int totalStudents = students.length;
         
-        // Calculate student financial status from invoices for consistency
-        final Map<int, double> studentBalances = {};
-        for (final inv in _allInvoices) {
-          if (inv.studentId != null) {
-            final due = inv.totalAmount - inv.amountPaid;
-            studentBalances[inv.studentId!] = (studentBalances[inv.studentId!] ?? 0.0) + (due > 0 ? due : 0.0);
-          }
-        }
-
-        int owingCount = 0;
-        int paidCount = 0;
-        double totalOwingValue = 0.0;
-
-        for (final student in students) {
-          final balance = studentBalances[student.id] ?? 0.0;
-          if (balance > 0) {
-            owingCount++;
-            totalOwingValue += balance;
-          } else {
-            paidCount++;
-          }
-        }
+        final payStatus = countStudentPayStatus(
+          studentIds: students.map((s) => s.id).whereType<int>(),
+          invoices: _allInvoices,
+        );
+        final owingCount = payStatus.owing;
+        final paidCount = payStatus.paid;
+        final totalOwingValue = payStatus.owingValue;
         
         return Scaffold(
           appBar: AppBar(
@@ -283,7 +270,7 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
     for (var inv in invoices) {
       if (inv.dateCreated.year == now.year) {
         final month = inv.dateCreated.month;
-        monthlyData[month] = (monthlyData[month] ?? 0) + inv.amountPaid;
+        monthlyData[month] = (monthlyData[month] ?? 0) + inv.collectedAmount;
       }
     }
 
@@ -492,35 +479,43 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
               // Filter based on selected filter
               final filteredYearInvoices = yearInvoices.where((i) {
                 if (_financialFilter == 'All') return true;
-                final isPaid = i.amountPaid >= i.totalAmount;
+                final isPaid = i.outstandingAmount <= 0.001;
                 if (_financialFilter == 'Paid Up') return isPaid;
                 return !isPaid; // 'Owing'
               }).toList();
               
               if (filteredYearInvoices.isEmpty) return const SizedBox.shrink();
 
-              double yearExpected = filteredYearInvoices.fold(0.0, (sum, i) => sum + i.totalAmount);
-              double yearRecovered = filteredYearInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
+              final yearTotals = salesPeriodTotals(
+                filteredYearInvoices.where((i) => !i.isRolledForward),
+              );
+              double yearExpected = yearTotals.invoiced;
+              double yearRecovered = yearTotals.collected;
               
               return ExpansionTile(
                 title: Text(y.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text('Expected: ${CurrencyFormatter.format(yearExpected)} | Recovered: ${CurrencyFormatter.format(yearRecovered)}'),
                 children: classes.map((c) {
-                  final classInvoices = filteredYearInvoices.where((i) => i.classId == c.id).toList();
+                  final classInvoices = filteredYearInvoices
+                      .where((i) => i.classId == c.id && !i.isRolledForward)
+                      .toList();
                   if (classInvoices.isEmpty) return const SizedBox.shrink();
 
-                  double classExpected = classInvoices.fold(0.0, (sum, i) => sum + i.totalAmount);
-                  double classRecovered = classInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
+                  final classTotals = salesPeriodTotals(
+                    classInvoices.where((i) => !i.isRolledForward),
+                  );
+                  double classExpected = classTotals.invoiced;
+                  double classRecovered = classTotals.collected;
 
                   return ExpansionTile(
                     title: Text(c.name),
                     subtitle: Text('Exp: ${CurrencyFormatter.format(classExpected)} | Rec: ${CurrencyFormatter.format(classRecovered)}'),
                     children: classInvoices.map((inv) {
-                      final bool isPaid = inv.amountPaid >= inv.totalAmount;
+                      final bool isPaid = inv.outstandingAmount <= 0.001;
                       return ListTile(
                         dense: true,
                         title: Text('${inv.customerName ?? "Unknown Student"} (${inv.invoiceNumber})'),
-                        subtitle: Text('Expected: ${CurrencyFormatter.format(inv.totalAmount)} | Recovered: ${CurrencyFormatter.format(inv.amountPaid)}'),
+                        subtitle: Text('Expected: ${CurrencyFormatter.format(inv.totalAmount)} | Recovered: ${CurrencyFormatter.format(inv.collectedAmount)}'),
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(

@@ -19,6 +19,8 @@ class StorageService {
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
   static const _linkedDashboardDefaultsKey = 'linked_device_dashboard_defaults';
+  static const _deviceLinkedKey = 'device_linked_to_tenant';
+  static const _linkedTenantModeKey = 'linked_tenant_business_mode';
 
   static Future<void> saveLicense(String licenseData) async {
     await _secureStorage.write(key: _licenseKey, value: licenseData);
@@ -177,5 +179,22 @@ class StorageService {
     if (val != 'true') return false;
     await _secureStorage.write(key: _linkedDashboardDefaultsKey, value: 'false');
     return true;
+  }
+
+  static Future<void> markDeviceLinkedToTenant(String businessMode) async {
+    final mode = businessMode.trim();
+    await _secureStorage.write(key: _deviceLinkedKey, value: 'true');
+    if (mode.isNotEmpty) {
+      await _secureStorage.write(key: _linkedTenantModeKey, value: mode);
+    }
+  }
+
+  static Future<bool> isDeviceLinkedToTenant() async {
+    return await _secureStorage.read(key: _deviceLinkedKey) == 'true';
+  }
+
+  static Future<String?> getLinkedTenantBusinessMode() async {
+    final mode = (await _secureStorage.read(key: _linkedTenantModeKey))?.trim() ?? '';
+    return mode.isEmpty ? null : mode;
   }
 }

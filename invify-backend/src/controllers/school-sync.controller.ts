@@ -267,6 +267,75 @@ export class SchoolSyncController {
     }
   }
 
+  /**
+   * GET /api/school/billing
+   * Fee catalog plus term bills already stored for this school.
+   * School fees are saved as service items, so this is not the product search.
+   */
+  static async getBilling(req: Request, res: Response) {
+    try {
+      const tenantId = resolveTenantScope(req);
+      if (!tenantId) {
+        return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
+      }
+
+      const [{ data: items, error: itemErr }, { data: invoices, error: invErr }] = await Promise.all([
+        supabaseAdmin.from('items').select('*').eq('tenant_id', tenantId).limit(2000),
+        supabaseAdmin
+          .from('invoices')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+          .limit(1000),
+      ]);
+      if (itemErr) throw new Error(itemErr.message);
+      if (invErr) throw new Error(invErr.message);
+
+      const invoiceIds = (invoices || []).map((row: any) => row.id).filter(Boolean);
+      const lines: any[] = [];
+      for (let i = 0; i < invoiceIds.length; i += 100) {
+        const batch = invoiceIds.slice(i, i + 100);
+        const { data, error } = await supabaseAdmin
+          .from('invoice_items')
+          .select('*')
+          .in('invoice_id', batch);
+        if (error) throw new Error(error.message);
+        lines.push(...(data || []));
+      }
+
+      const itemById = new Map((items || []).map((row: any) => [String(row.id), row]));
+      const linesByInvoice = new Map<string, any[]>();
+      for (const line of lines) {
+        const key = String(line.invoice_id);
+        const item = itemById.get(String(line.item_id));
+        const list = linesByInvoice.get(key) || [];
+        list.push({
+          ...line,
+          name: item?.name || 'School fee',
+          itemName: item?.name || 'School fee',
+        });
+        linesByInvoice.set(key, list);
+      }
+
+      const referenced = new Set(lines.map((line) => String(line.item_id)));
+      const fees = (items || []).filter((row: any) => {
+        if (row.is_deleted === true || row.status === 'archived') return false;
+        return row.business_mode === 'school' || row.type === 'service' || referenced.has(String(row.id));
+      });
+
+      return res.status(200).json({
+        fees,
+        invoices: (invoices || []).map((row: any) => ({
+          ...row,
+          items: linesByInvoice.get(String(row.id)) || [],
+        })),
+      });
+    } catch (error: any) {
+      console.error('[SchoolSyncController] getBilling Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   /** Keep one row per admission number (or name+class). Prefer richer / newer rows. */
   private static dedupeStudents(rows: any[]): any[] {
     const groups = new Map<string, any>();

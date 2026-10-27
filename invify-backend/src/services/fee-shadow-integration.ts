@@ -8,6 +8,7 @@ import {
 } from '../modules/fee-orchestration/stores/SupabaseFeeProfileCatalog';
 import { supabaseAdmin } from '../db/supabase';
 import { liveFeeAssessmentMode, isLiveFeePostingAllowed } from './fee-live-gate';
+import { deductVaInwardCharge } from './va-inward-charge.service';
 
 export const FEE_SHADOW_SOURCE_POS = 'invify.pos';
 export const FEE_SHADOW_SOURCE_VA = 'invify.va';
@@ -367,6 +368,11 @@ export class FeeShadowIntegration {
   ) {
     if (!success || !this.shouldAssessVaInward({ status: success ? 'success' : 'failed' })) {
       return { status: 'SKIPPED' as const };
+    }
+    try {
+      await deductVaInwardCharge(params);
+    } catch (err: any) {
+      console.warn('[VaInwardCharge] deduction skipped:', err?.message || err);
     }
     return this.assessVaInwardSafely(params);
   }

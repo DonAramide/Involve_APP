@@ -21,6 +21,7 @@ abstract class IFinanceRepository {
 
   // School-centric (Dashboard)
   Future<SchoolFinancialSummary> getSchoolSummary();
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits);
   Future<List<DailyRevenue>> getDailyRevenue({int days});
   Future<List<FinancialTransaction>> getGlobalTransactions({int limit, int offset});
   

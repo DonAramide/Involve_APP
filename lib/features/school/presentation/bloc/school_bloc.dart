@@ -6,6 +6,8 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:image/image.dart' as img;
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
 import 'package:involve_app/features/school/domain/services/parent_payment_allocator.dart';
 import 'package:involve_app/features/school/domain/entities/grading_rule.dart';
 import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
@@ -13,12 +15,15 @@ import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
+import 'package:involve_app/features/invoicing/domain/services/payment_balance_effect.dart';
+import 'package:involve_app/core/sync/domain/services/persisted_finance_command_id.dart';
 
 part 'school_event.dart';
 
@@ -124,6 +129,15 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         isLoading: false,
         status: SchoolStatus.initial,
       ));
+
+      final aligned = await _alignStudentBalancesWithInvoices(students);
+      if (aligned != null) {
+        emit(state.copyWith(students: aligned));
+      }
+      final credited = await _alignParentCredits(parents);
+      if (credited != null) {
+        emit(state.copyWith(parents: credited));
+      }
 
       // Run image cleanup in the background to fix CursorWindow issues for existing students
       _cleanupLargeImages();
@@ -759,7 +773,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       // Trust owing — do not skip when paymentStatus is a stale "Paid".
       final unpaid = invoices.where((inv) {
         if (inv.invoiceNumber.startsWith('PMT-')) return false;
-        final owing = inv.totalAmount - inv.amountPaid;
+        if (inv.isPendingPayment) return false;
+        final owing = inv.outstandingAmount;
         return owing > 0.001;
       }).toList()
         ..sort((a, b) {
@@ -778,7 +793,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       for (final inv in unpaid) {
         if (remaining <= 0.001) break;
         if (inv.id == null) continue;
-        final owing = inv.totalAmount - inv.amountPaid;
+        final owing = inv.outstandingAmount;
         final pay = remaining < owing ? remaining : owing;
         if (pay <= 0.001) continue;
         await invoiceRepository.recordPayment(inv.id!, pay, event.method);
@@ -791,14 +806,15 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final openDebt = _openAcademicDebt(refreshed);
 
       var credit = latest.creditBalance;
-      if (remaining > 0.001) {
+      if (remaining > 0.001 && shouldReduceOpenBalances(event.method)) {
         credit += remaining;
       }
 
-      // Keep ledger in sync with open bills so the red Balance chip clears after PAY.
-      await repository.updateStudent(
-        latest.copyWith(balance: openDebt, creditBalance: credit < 0 ? 0.0 : credit),
-      );
+      if (shouldReduceOpenBalances(event.method)) {
+        await repository.updateStudent(
+          latest.copyWith(balance: openDebt, creditBalance: credit < 0 ? 0.0 : credit),
+        );
+      }
 
       // Always write a Cash/POS payment slip for the full amount (receipt + print).
       // Bill rows are still updated via recordPayment; this slip does not change balance again.
@@ -959,7 +975,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         var debt = 0.0;
         for (final inv in invoices) {
           if (inv.invoiceNumber.startsWith('PMT-')) continue;
-          final owing = inv.totalAmount - inv.amountPaid;
+          final owing = inv.outstandingAmount;
           if (owing > 0) debt += owing;
         }
         if (debt > 0.001) return debt;
@@ -971,12 +987,16 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       }
 
       if (event.creditOnly) {
+        final commandId = await PersistedFinanceCommandIds.instance.obtain(
+          action: 'parent_fund',
+          entityKey: 'parent:${parent.id}',
+        );
         final creditBefore = parent.creditBalance;
         final creditAfter = await repository.addParentCredit(parent.id!, event.amount);
         final recorded = await repository.recordParentPayment(
           ParentPaymentRecord(
             parentId: parent.id!,
-            reference: 'PAR-${DateTime.now().millisecondsSinceEpoch}',
+            reference: commandId,
             amount: event.amount,
             appliedToDebt: 0,
             toCredit: event.amount,
@@ -988,6 +1008,20 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
             createdAt: DateTime.now(),
             allocations: const [],
           ),
+        );
+        await invoiceRepository.enqueueFinanceCommand(
+          eventName: 'finance.parent_fund',
+          commandId: commandId,
+          payload: {
+            'amount': event.amount,
+            'method': event.method,
+            'parentId': parent.id,
+            'confirmed': !isUnconfirmedTransferMethod(event.method),
+          },
+        );
+        await PersistedFinanceCommandIds.instance.release(
+          action: 'parent_fund',
+          entityKey: 'parent:${parent.id}',
         );
         emit(state.copyWith(
           status: SchoolStatus.success,
@@ -1016,10 +1050,21 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         mode: shareMode,
       );
 
+      final commandId = await PersistedFinanceCommandIds.instance.obtain(
+        action: 'parent_pay',
+        entityKey: 'parent:${parent.id}',
+      );
+      final allocCommandId = derivedFinanceCommandId(
+        action: 'parent_allocate',
+        operationId: commandId,
+        part: 'alloc',
+      );
+
       await _applyChildAllocations(
         allocations: result.allocations,
         children: children,
         method: event.method,
+        commandId: allocCommandId,
       );
 
       final creditBefore = parent.creditBalance;
@@ -1030,7 +1075,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final recorded = await repository.recordParentPayment(
         ParentPaymentRecord(
           parentId: parent.id!,
-          reference: 'PAR-${DateTime.now().millisecondsSinceEpoch}',
+          reference: commandId,
           amount: result.paymentNaira,
           appliedToDebt: result.appliedNaira,
           toCredit: result.creditNaira,
@@ -1051,6 +1096,37 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
               )
               .toList(),
         ),
+      );
+
+      if (result.creditNaira > 0.001) {
+        await invoiceRepository.enqueueFinanceCommand(
+          eventName: 'finance.parent_fund',
+          commandId: commandId,
+          payload: {
+            'amount': result.creditNaira,
+            'method': event.method,
+            'parentId': parent.id,
+            'confirmed': !isUnconfirmedTransferMethod(event.method),
+          },
+        );
+      }
+      if (result.appliedNaira > 0.001) {
+        await invoiceRepository.enqueueFinanceCommand(
+          eventName: 'finance.parent_allocate',
+          commandId: allocCommandId,
+          payload: {
+            'amount': result.appliedNaira,
+            'invoiceNumber': recorded.reference,
+            'reference': commandId,
+            'paymentMethod': 'Parent Credit',
+            'businessMode': 'school',
+          },
+        );
+      }
+
+      await PersistedFinanceCommandIds.instance.release(
+        action: 'parent_pay',
+        entityKey: 'parent:${parent.id}',
       );
 
       emit(state.copyWith(
@@ -1135,17 +1211,23 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         throw Exception('One of the selected children is not linked to this parent.');
       }
 
+      final commandId = await PersistedFinanceCommandIds.instance.obtain(
+        action: 'parent_allocate',
+        entityKey: 'parent:${parent.id}',
+      );
+
       await _applyChildAllocations(
         allocations: allocations,
         children: children,
         method: 'Parent Credit',
+        commandId: commandId,
       );
 
       final appliedNaira = ParentPaymentAllocator.toNaira(mappedKobo);
       final recorded = await repository.recordParentPayment(
         ParentPaymentRecord(
           parentId: parent.id!,
-          reference: 'MAP-${DateTime.now().millisecondsSinceEpoch}',
+          reference: commandId,
           amount: appliedNaira,
           appliedToDebt: appliedNaira,
           toCredit: 0,
@@ -1169,6 +1251,23 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         ),
       );
 
+      await invoiceRepository.enqueueFinanceCommand(
+        eventName: 'finance.parent_allocate',
+        commandId: commandId,
+        payload: {
+          'amount': appliedNaira,
+          'invoiceNumber': recorded.reference,
+          'reference': commandId,
+          'paymentMethod': 'Parent Credit',
+          'businessMode': 'school',
+        },
+      );
+
+      await PersistedFinanceCommandIds.instance.release(
+        action: 'parent_allocate',
+        entityKey: 'parent:${parent.id}',
+      );
+
       emit(state.copyWith(
         status: SchoolStatus.success,
         isLoading: false,
@@ -1190,6 +1289,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     required List<ChildAllocation> allocations,
     required List<Student> children,
     required String method,
+    String? commandId,
   }) async {
     for (final alloc in allocations) {
       if (alloc.allocatedKobo <= 0) continue;
@@ -1197,7 +1297,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final invoices = await invoiceRepository.getInvoicesByStudentId(alloc.studentId);
       final unpaid = invoices.where((inv) {
         if (inv.invoiceNumber.startsWith('PMT-')) return false;
-        return (inv.totalAmount - inv.amountPaid) > 0.001;
+        if (inv.isPendingPayment) return false;
+        return inv.outstandingAmount > 0.001;
       }).toList()
         ..sort((a, b) {
           final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
@@ -1207,26 +1308,124 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         });
       for (final inv in unpaid) {
         if (remaining <= 0.001 || inv.id == null) continue;
-        final owing = inv.totalAmount - inv.amountPaid;
+        final owing = inv.outstandingAmount;
         final pay = remaining < owing ? remaining : owing;
         if (pay <= 0.001) continue;
-        await invoiceRepository.recordPayment(inv.id!, pay, method);
+        await invoiceRepository.recordPayment(
+          inv.id!,
+          pay,
+          method,
+          commandId: commandId,
+          enqueueFinance: commandId == null,
+        );
         remaining -= pay;
       }
-      final child = children.firstWhere((s) => s.id == alloc.studentId);
-      await repository.updateStudent(
-        child.copyWith(balance: alloc.outstandingAfterNaira),
-      );
+      if (shouldReduceOpenBalances(method)) {
+        final child = children.firstWhere((s) => s.id == alloc.studentId);
+        await repository.updateStudent(
+          child.copyWith(balance: alloc.outstandingAfterNaira),
+        );
+      }
     }
   }
 
   /// Outstanding academic debt from INV/BILL rows (excludes PMT payment slips).
-  double _openAcademicDebt(List<Invoice> invoices) {
-    return invoices.fold<double>(0, (sum, inv) {
-      if (inv.invoiceNumber.startsWith('PMT-')) return sum;
-      final owing = inv.totalAmount - inv.amountPaid;
-      return sum + (owing > 0 ? owing : 0);
-    });
+  double _openAcademicDebt(List<Invoice> invoices) => openAcademicDebt(invoices);
+
+  Future<List<Student>?> _alignStudentBalancesWithInvoices(List<Student> students) async {
+    try {
+      final invoices = await invoiceRepository.getAllInvoices();
+      final byStudent = <int, List<Invoice>>{};
+      for (final inv in invoices) {
+        final id = inv.studentId;
+        if (id == null) continue;
+        byStudent.putIfAbsent(id, () => []).add(inv);
+      }
+      final next = <Student>[];
+      var changed = false;
+      for (final student in students) {
+        final id = student.id;
+        final bills = id == null ? const <Invoice>[] : (byStudent[id] ?? const <Invoice>[]);
+        final hasAcademicBills = bills.any((inv) => inv.countsTowardSales);
+        if (!hasAcademicBills) {
+          next.add(student);
+          continue;
+        }
+        final openDebt = openAcademicDebt(bills);
+        final ledgerDebt = student.balance > 0 ? student.balance : 0.0;
+        if ((openDebt - ledgerDebt).abs() <= 0.01) {
+          next.add(student);
+          continue;
+        }
+        final fixed = student.copyWith(balance: openDebt);
+        await repository.updateStudent(fixed);
+        next.add(fixed);
+        changed = true;
+      }
+      return changed ? next : null;
+    } catch (e) {
+      debugPrint('[SchoolBloc] ledger align skipped: $e');
+      return null;
+    }
+  }
+
+  /// Parent credit keeps the amount the parent paid. Quasar charges stay with the school.
+  Future<List<SchoolParent>?> _alignParentCredits(List<SchoolParent> parents) async {
+    try {
+      final next = <SchoolParent>[];
+      var changed = false;
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) {
+          next.add(parent);
+          continue;
+        }
+        final payments = await repository.getParentPayments(id);
+        final parts = ParentCreditParts.fromPayments(
+          quasarBalance: ParentCreditParts.parentQuasarBalance(
+            liveBalance: 0,
+            payments: payments,
+          ),
+          payments: payments,
+        );
+        final students = await repository.getStudents();
+        final childIds = students
+            .where((s) => s.parentId == id && s.id != null)
+            .map((s) => s.id!)
+            .toSet();
+        final invoices = await invoiceRepository.getAllInvoices();
+        var walletSpent = 0.0;
+        for (final inv in invoices) {
+          final sid = inv.studentId;
+          if (sid == null || !childIds.contains(sid)) continue;
+          if (!inv.countsTowardSales || inv.isRolledForward) continue;
+          if (classifyInvoicePaymentRail(inv.paymentMethod) !=
+              InvoicePaymentRail.wallet) {
+            continue;
+          }
+          final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+          final got = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+          walletSpent += got;
+        }
+        final spent = walletSpent > parts.mappedToChildren
+            ? walletSpent
+            : parts.mappedToChildren;
+        final credit = parts.quasarBalance + parts.additional - spent;
+        final nextCredit = credit < 0 ? 0.0 : credit;
+        if ((parent.creditBalance - nextCredit).abs() <= 0.009) {
+          next.add(parent);
+          continue;
+        }
+        final fixed = parent.copyWith(creditBalance: nextCredit);
+        await repository.updateParent(fixed);
+        next.add(fixed);
+        changed = true;
+      }
+      return changed ? next : null;
+    } catch (e) {
+      debugPrint('[SchoolBloc] parent credit align skipped: $e');
+      return null;
+    }
   }
 
   Future<void> _onProvisionVirtualAccount(ProvisionStudentVirtualAccountEvent event, Emitter<SchoolState> emit) async {
@@ -1564,7 +1763,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final unpaid = invoices
           .where((inv) {
             if (inv.invoiceNumber.startsWith('PMT-')) return false;
-            final owing = inv.totalAmount - inv.amountPaid;
+            if (inv.isPendingPayment) return false;
+            final owing = inv.outstandingAmount;
             return owing > 0.001;
           })
           .toList()
@@ -1592,7 +1792,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
 
       for (final inv in unpaid) {
         if (creditLeft <= 0.001) break;
-        final owing = inv.totalAmount - inv.amountPaid;
+        final owing = inv.outstandingAmount;
         final pay = creditLeft < owing ? creditLeft : owing;
         final newBalance = (owing - pay).clamp(0.0, double.infinity);
         await invoiceRepository.updateInvoice(

@@ -97,11 +97,11 @@ class _NibssCertPageState extends State<NibssCertPage> {
         context,
         (setMessage) async {
           setMessage('Waiting for card on terminal…');
-          return _mpos.initiatePayment(
+          final payment = await _mpos.initiatePayment(
             amount: amount,
             terminalId: _terminalId,
             activeHost: _activeHost,
-            processOnDevice: _processOnDevice,
+            processOnDevice: MposDeviceType.isMoreFun(_config?.terminalType),
             deviceType: _deviceType,
             transactionType: transactionType,
             cashbackAmount: cashbackAmount,
@@ -110,6 +110,15 @@ class _NibssCertPageState extends State<NibssCertPage> {
             latitude: geo?.latitude,
             longitude: geo?.longitude,
           );
+          if (payment.status == 'emv_data_ready' && payment.emvData != null) {
+            setMessage('Sending packed ISO through Quasar…');
+            return _mpos.forwardPackedCardToQuasar(
+              terminalId: _terminalId,
+              amount: transactionType.toUpperCase().contains('BALANCE') ? 0 : amount,
+              emvData: payment.emvData!,
+            );
+          }
+          return payment;
         },
         initialMessage: '$transactionType…',
       );

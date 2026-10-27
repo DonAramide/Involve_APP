@@ -40,6 +40,18 @@ export function isQuasarCreditEntry(entry: any): boolean {
   return ['credit', 'cr', 'deposit', 'inward', 'funding'].includes(direction);
 }
 
+/** Same amount within 2 minutes — webhook qfs_credit_* vs ledger id. */
+export function isSameQuasarCredit(
+  left: { amount: number; createdAt?: string },
+  right: { amount: number; createdAt?: string },
+): boolean {
+  if (Math.abs(Number(left.amount || 0) - Number(right.amount || 0)) > 0.009) return false;
+  const a = Date.parse(String(left.createdAt || ''));
+  const b = Date.parse(String(right.createdAt || ''));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return Math.abs(a - b) < 120_000;
+}
+
 export function quasarLedgerReference(entry: any, accountId: string): string {
   const reference = String(entry?.reference || entry?.correlation_id || entry?.correlationId || '').trim();
   if (reference) return reference;

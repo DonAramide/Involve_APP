@@ -326,10 +326,21 @@ export class AdminController {
     try {
       const { QuasarIntegrationStore } = require('../integrations/quasar/quasar-integration.store');
       const rows = await QuasarIntegrationStore.listAll();
+      const ids = [...new Set((rows || []).map((r: any) => r.invify_tenant_id).filter(Boolean))];
+      const names = new Map<string, string>();
+      if (ids.length) {
+        const { data, error } = await supabaseAdmin.from('tenants').select('id, name').in('id', ids);
+        if (error) console.warn('[AdminController] tenant names:', error.message);
+        for (const tenant of (data || []) as Array<{ id: string; name?: string }>) {
+          const label = String(tenant.name || '').trim();
+          if (label) names.set(tenant.id, label);
+        }
+      }
       return res.status(200).json({
         data: (rows || []).map((r: any) => ({
           invifyTenantId: r.invify_tenant_id,
           quasarTenantId: r.quasar_tenant_id,
+          tenantName: names.get(r.invify_tenant_id) || '',
           vertical: r.quasar_vertical,
           environment: r.quasar_environment,
           status: r.status,
@@ -1226,7 +1237,7 @@ export class AdminController {
         supabaseAdmin.from('users').select('*').eq('tenant_id', id),
         WalletService.getBalance(id), // USER_WALLET projection, not both sides of double-entry
         supabaseAdmin.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
-        supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id),
+        supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id).order('created_at', { ascending: false }),
         WalletService.getTransactions(id),
         supabaseAdmin.from('wallets').select('id, balance, updated_at').eq('tenant_id', id).maybeSingle(),
       ]);
@@ -1260,6 +1271,25 @@ export class AdminController {
       }
 
       const viewerEmail = String(user?.email || '').trim().toLowerCase();
+      const mailByCode = new Map<string, { to: string; at: string | null }>();
+      try {
+        const { data: mailLogs } = await supabaseAdmin
+          .from('audit_logs')
+          .select('target, timestamp, metadata')
+          .eq('tenant_id', id)
+          .in('action', ['APPROVE_ACTIVATION_CODE', 'RESEND_ACTIVATION_EMAIL'])
+          .order('timestamp', { ascending: false })
+          .limit(100);
+        for (const log of mailLogs || []) {
+          const code = String((log as any).target || '');
+          const to = String((log as any).metadata?.emailedTo || '').trim();
+          if (!code || !to || mailByCode.has(code)) continue;
+          mailByCode.set(code, { to, at: (log as any).timestamp || null });
+        }
+      } catch (mailLogErr: any) {
+        console.warn('[AdminController] activation email log skipped:', mailLogErr?.message || mailLogErr);
+      }
+
       const certificates = (certRes.data || []).map((a: any) => {
         const hidden = a.status === 'awaiting_approval' || a.status === 'rejected';
         const status =
@@ -1270,6 +1300,7 @@ export class AdminController {
               : a.is_used
                 ? 'USED'
                 : 'ACTIVE';
+        const mailed = mailByCode.get(String(a.activation_code || ''));
         return {
           id: a.id,
           code: hidden ? null : a.activation_code,
@@ -1283,6 +1314,8 @@ export class AdminController {
           status,
           createdBy: a.created_by || null,
           createdAt: a.created_at || null,
+          emailedTo: a.emailed_to || mailed?.to || null,
+          emailedAt: a.emailed_at || mailed?.at || null,
           canApprove: hidden && a.status === 'awaiting_approval' && canApproveTerminalActivation(viewerEmail, a.created_by).ok,
         };
       });
@@ -2126,7 +2159,7 @@ export class AdminController {
       ] = await Promise.all([
         supabaseAdmin
           .from('invoices')
-          .select('amount_paid, payment_status')
+          .select('invoice_number, amount_paid, payment_status, total_amount, created_at')
           .eq('tenant_id', targetTenantId),
         supabaseAdmin
           .from('students')
@@ -2152,6 +2185,14 @@ export class AdminController {
         (sum, inv) => sum + collectedInvoiceAmount(inv),
         0,
       );
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const monthlyRevenue = invoices.reduce((sum, inv) => {
+        const created = Date.parse(String((inv as any).created_at || ''));
+        if (!Number.isFinite(created) || created < monthStart.getTime()) return sum;
+        return sum + collectedInvoiceAmount(inv);
+      }, 0);
       const pendingInvoices = invoices.filter((inv) => {
         const status = String(inv.payment_status || '').toLowerCase();
         return status && !['paid', 'success', 'completed'].includes(status);
@@ -2164,7 +2205,7 @@ export class AdminController {
 
       let stats = {
         total_revenue: totalRevenue,
-        monthly_revenue: totalRevenue,
+        monthly_revenue: monthlyRevenue,
         active_students: studentsRes.count || 0,
         pending_invoices: pendingInvoices,
         internal_wallet: Number(walletRes?.balance || 0),
@@ -2182,10 +2223,6 @@ export class AdminController {
           const row = Array.isArray(rpcStats) ? rpcStats[0] : rpcStats;
           if (row && Number(row.active_students) > 0) {
             stats.active_students = Number(row.active_students);
-          }
-          if (row && Number(row.total_revenue) > stats.total_revenue) {
-            stats.total_revenue = Number(row.total_revenue);
-            stats.monthly_revenue = Number(row.total_revenue);
           }
         }
       } catch (_) {
@@ -2355,7 +2392,7 @@ export class AdminController {
       if (user.tenant_id) {
         const { data: tenantRow } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, phone, country, state, lga, street_address, settings, kyc_data, kyc_status')
+          .select('id, name, phone, country, state, lga, street_address, owner_email, owner_name, settings, kyc_data, kyc_status')
           .eq('id', user.tenant_id)
           .maybeSingle();
         tenant = tenantRow;
@@ -2363,15 +2400,26 @@ export class AdminController {
 
       const ownerProfile = (tenant?.settings as any)?.owner_profile || {};
       const nameParts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+      const streetAddress = String(
+        ownerProfile.streetAddress || ownerProfile.address || tenant?.street_address || '',
+      ).trim();
+      const city = String(ownerProfile.city || tenant?.lga || '').trim();
+      const state = String(ownerProfile.state || tenant?.state || '').trim();
+      const country = String(ownerProfile.country || tenant?.country || '').trim();
+      const address = [streetAddress, city, state, country].filter(Boolean).join(', ');
 
       return res.status(200).json({
         firstName: ownerProfile.firstName || nameParts[0] || '',
         lastName: ownerProfile.lastName || nameParts.slice(1).join(' ') || '',
-        email: user.email,
-        phone: ownerProfile.phone || tenant?.phone || '',
+        ownerName: tenant?.owner_name || [ownerProfile.firstName, ownerProfile.lastName].filter(Boolean).join(' ') || user.name || '',
+        email: user.email || tenant?.owner_email || ownerProfile.email || '',
+        phone: ownerProfile.phone || tenant?.phone || user.phone || '',
         businessName: ownerProfile.businessName || tenant?.name || '',
-        city: ownerProfile.city || tenant?.lga || '',
-        country: ownerProfile.country || tenant?.country || 'Nigeria',
+        streetAddress,
+        address,
+        city,
+        state,
+        country: country || 'Nigeria',
         bio: ownerProfile.bio || '',
         role: user.role,
         tenantId: user.tenant_id,

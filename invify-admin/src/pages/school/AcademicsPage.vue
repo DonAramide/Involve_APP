@@ -107,6 +107,10 @@
         </q-table>
       </q-tab-panel>
       <q-tab-panel name="parents">
+        <div class="row items-center q-mb-md">
+          <q-space />
+          <q-btn color="primary" icon="campaign" label="Message parents" to="/tenant/parent-messages" />
+        </div>
         <div class="row q-col-gutter-sm q-mb-md">
           <div class="col-12 col-sm-6">
             <q-input v-model="parentNameQuery" dense filled dark clearable label="Parent name" />

@@ -20,24 +20,37 @@ export function classifyInvoicePaymentMethod(raw?: string | null): InvoiceRail {
     .replace(/[\s-]+/g, '_');
 
   if (!method) return 'other';
-  if (method === 'wallet' || method === 'customer_wallet') return 'wallet';
-  if (method === 'cash' || method.includes('cash')) return 'cash';
-  if (method === 'card' || method === 'pos') return 'card';
+  if (method === 'parent_credit' || method.includes('parent_credit')) return 'wallet';
+  if (method === 'wallet' || method === 'customer_wallet' || method.endsWith('_wallet')) return 'wallet';
   if (
-    method === 'virtualaccount' ||
-    method === 'virtual_account' ||
+    method.includes('virtualaccount') ||
+    method.includes('virtual_account') ||
     method === 'va' ||
-    method === 'va_transfer' ||
+    method.includes('va_transfer') ||
     method === 'parent_account' ||
     method === 'parent_transfer'
   ) {
     return 'va_transfer';
   }
+  if (method === 'cash' || method.includes('cash')) return 'cash';
+  if (
+    method === 'card' ||
+    method === 'pos' ||
+    method.includes('pos') ||
+    method.includes('card') ||
+    method.includes('mpos') ||
+    method.includes('nibss')
+  ) {
+    return 'card';
+  }
   if (
     method === 'transfer' ||
     method === 'bank_transfer' ||
     method === 'company_bank' ||
-    method === 'company_account'
+    method === 'company_account' ||
+    method.includes('company_bank') ||
+    method.includes('company_account') ||
+    method.includes('transfer')
   ) {
     return 'bank_transfer';
   }

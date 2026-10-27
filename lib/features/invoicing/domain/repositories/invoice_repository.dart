@@ -5,7 +5,22 @@ abstract class InvoiceRepository {
   Future<void> saveInvoice(Invoice invoice, {bool adjustStudentBalance = true});
   Future<void> updateInvoice(Invoice invoice);
   /// Apply an additional payment to an existing invoice and reduce student/customer ledger debt.
-  Future<void> recordPayment(int invoiceId, double additionalAmount, String method);
+  Future<void> recordPayment(
+    int invoiceId,
+    double additionalAmount,
+    String method, {
+    String? commandId,
+    bool enqueueFinance = true,
+  });
+  /// Confirm local pending legs after accepted/duplicate server acknowledgement.
+  Future<void> confirmFinanceCommand(String commandId);
+  /// Rejected/reconciliation-required: leave pending projection; do not reverse unrelated rows.
+  Future<void> markFinanceCommandUnconfirmed(String commandId);
+  Future<void> enqueueFinanceCommand({
+    required String eventName,
+    required String commandId,
+    required Map<String, dynamic> payload,
+  });
   Future<List<Invoice>> getAllInvoices();
   Future<Invoice?> getInvoiceById(int id);
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end);

@@ -6,7 +6,7 @@
       <q-list dense separator class="bg-transparent">
         <q-item v-for="row in rows" :key="row.id" class="q-px-none">
           <q-item-section>
-            <q-item-label class="text-weight-medium">{{ row.summary }}</q-item-label>
+            <q-item-label class="text-weight-medium">{{ formatSummary(row.summary) }}</q-item-label>
             <q-item-label caption>Submitted by {{ row.makerEmail }}</q-item-label>
           </q-item-section>
           <q-item-section side>
@@ -26,6 +26,7 @@
 import { onMounted, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
+import { promptCheckerMfa } from '../utils/promptCheckerMfa'
 
 const props = defineProps({
   domain: { type: String, required: true },
@@ -38,6 +39,16 @@ const operatorEmail = (localStorage.getItem('operator_email') || '').trim().toLo
 
 const canApprove = (row) => operatorEmail === 'support@iips.app' && operatorEmail !== String(row.makerEmail || '').toLowerCase()
 
+function formatNaira(raw) {
+  const n = Number(String(raw || '').replace(/,/g, ''))
+  if (!Number.isFinite(n)) return String(raw || '')
+  return n.toLocaleString('en-NG', { style: 'currency', currency: 'NGN' })
+}
+
+function formatSummary(summary) {
+  return String(summary || '').replace(/Post\s+([\d,.]+)\s+payment/i, (_, amount) => `Post ${formatNaira(amount)} payment`)
+}
+
 const refresh = async () => {
   try {
     const { data } = await adminApi.listMakerChecker(props.domain)
@@ -48,10 +59,23 @@ const refresh = async () => {
 }
 
 const decide = async (row, action) => {
+  let otp = ''
+  if (props.domain === 'tenant_billing') {
+    otp = await promptCheckerMfa($q.dialog, {
+      title: action === 'approve' ? 'Approve with 2FA' : 'Reject with 2FA',
+      message: 'Enter the 6-digit authenticator code for this checker account. Billing payments cannot be approved without 2FA.',
+      okLabel: action === 'approve' ? 'Verify & approve' : 'Verify & reject',
+      okColor: action === 'approve' ? 'green-8' : 'red-8',
+    })
+    if (!otp) {
+      $q.notify({ type: 'warning', message: '2FA code is required for billing approvals.' })
+      return
+    }
+  }
   busyId.value = row.id
   try {
-    if (action === 'approve') await adminApi.approveMakerChecker(row.id)
-    else await adminApi.rejectMakerChecker(row.id)
+    if (action === 'approve') await adminApi.approveMakerChecker(row.id, { otp })
+    else await adminApi.rejectMakerChecker(row.id, { otp })
     $q.notify({
       type: 'positive',
       message: action === 'approve' ? 'Change approved and applied.' : 'Change rejected.',

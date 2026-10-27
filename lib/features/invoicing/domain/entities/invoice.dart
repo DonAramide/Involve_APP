@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../../stock/domain/entities/item.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/invoice_payment_rail.dart';
 
 enum DiscountType { amount, percentage }
 
@@ -140,9 +141,12 @@ class Invoice extends Equatable {
 
   bool get isPendingPayment => paymentStatus.toLowerCase() == 'pending';
 
+  bool get isRolledForward =>
+      paymentStatus.toLowerCase().contains('roll');
+
   /// True when paid covers the billed total at 2 decimal places (ignores tax float dust).
   bool get isFullySettled {
-    if (isPendingPayment) return false;
+    if (isPendingPayment || isPayLaterPaymentMethod(paymentMethod)) return false;
     final paid = CurrencyFormatter.roundMoney(amountPaid);
     final total = CurrencyFormatter.roundMoney(totalAmount);
     final balance = CurrencyFormatter.roundMoney(balanceAmount);
@@ -150,25 +154,46 @@ class Invoice extends Equatable {
   }
 
   String get displayPaymentStatus {
-    if (isPendingPayment) return paymentStatus;
+    if (isPendingPayment) return 'Submitted';
+    if (isRolledForward) return 'Rolled Forward';
+    if (isPayLaterPaymentMethod(paymentMethod)) return 'Unpaid';
     if (isFullySettled) return 'Paid';
     if (CurrencyFormatter.roundMoney(amountPaid) > 0) return 'Partial';
     return paymentStatus.isEmpty ? 'Unpaid' : paymentStatus;
   }
 
-  double get displayBalance =>
-      isFullySettled ? 0.0 : CurrencyFormatter.roundMoney((totalAmount - amountPaid).clamp(0.0, double.infinity));
+  double get displayBalance {
+    if (isFullySettled) return 0.0;
+    if (isPayLaterPaymentMethod(paymentMethod)) {
+      return CurrencyFormatter.roundMoney(totalAmount);
+    }
+    return CurrencyFormatter.roundMoney((totalAmount - amountPaid).clamp(0.0, double.infinity));
+  }
+
+  bool get isPaymentSlip => invoiceNumber.toUpperCase().startsWith('PMT-');
+
+  /// Bills only. Payment slips and credit/return rows must not move sales totals.
+  bool get countsTowardSales => !isPaymentSlip && totalAmount >= 0;
 
   /// Money actually received. Pending checkout (awaiting transfer/VA confirm) is 0.
   double get collectedAmount {
     if (isPendingPayment) return 0;
+    if (isPayLaterPaymentMethod(paymentMethod)) return 0;
     return CurrencyFormatter.roundMoney(amountPaid);
   }
 
   /// Still owed, including the full total of pending invoices.
+  /// Uses the smaller of (total − paid) and stored balance so a previous-term
+  /// roll-forward can close old debt without counting it as new cash collected.
   double get outstandingAmount {
-    if (isPendingPayment) return CurrencyFormatter.roundMoney(totalAmount);
-    return displayBalance;
+    if (isPendingPayment || isPayLaterPaymentMethod(paymentMethod)) {
+      return CurrencyFormatter.roundMoney(totalAmount);
+    }
+    final fromPaid = CurrencyFormatter.roundMoney(
+        (totalAmount - amountPaid).clamp(0.0, double.infinity));
+    final fromBalance =
+        CurrencyFormatter.roundMoney(balanceAmount.clamp(0.0, double.infinity));
+    return fromPaid < fromBalance ? fromPaid : fromBalance;
   }
 
   @override

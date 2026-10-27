@@ -532,6 +532,7 @@ const routes = [
 
       // School roster synced from Flutter Web Sync
       { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
+      { path: 'parent-messages', component: () => import('pages/school/ParentBroadcastPage.vue'), meta: { title: 'Message parents', requiresAuth: true } },
       { path: 'school-payments', component: () => import('pages/school/SchoolPaymentsPage.vue'), meta: { title: 'School Payments', requiresAuth: true } },
       
       // Dynamic School Mode Routes nested under Tenant Layout namespace

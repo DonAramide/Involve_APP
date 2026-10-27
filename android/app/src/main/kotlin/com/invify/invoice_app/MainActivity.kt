@@ -220,6 +220,7 @@ class MainActivity: FlutterActivity() {
                         val originalStan = call.argument<String>("originalStan")
                         val latitude = call.argument<Double>("latitude")
                         val longitude = call.argument<Double>("longitude")
+                        val sendField120 = call.argument<Boolean>("sendField120") ?: false
 
                         pendingPaymentResult = result
                         resultReplied = false
@@ -235,6 +236,7 @@ class MainActivity: FlutterActivity() {
                             originalStan = originalStan,
                             latitude = latitude,
                             longitude = longitude,
+                            sendField120 = sendField120,
                         )
 
                         MposSdk.initiatePayment(this, paymentRequest) { listener ->
@@ -330,7 +332,8 @@ class MainActivity: FlutterActivity() {
                                             "stan"            to txRes.stan,
                                             "statusCode"      to txRes.statusCode,
                                             "transactionType" to txRes.transactionType,
-                                            "paymentSuccess"  to txRes.paymentSuccess()
+                                            "paymentSuccess"  to txRes.paymentSuccess(),
+                                            "balance"         to txRes.balance
                                         )
                                     }
 

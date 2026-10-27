@@ -12,6 +12,15 @@ function invifyLogoPath(): string | null {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
 
+function iipsLogoPath(): string | null {
+  const candidates = [
+    path.join(__dirname, '../../assets/iips-logo.png'),
+    path.join(process.cwd(), 'backend/assets/iips-logo.png'),
+    path.join(process.cwd(), 'assets/iips-logo.png'),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
 export interface TermBillItem {
   name: string;
   quantity?: number;
@@ -343,13 +352,13 @@ export class PDFService {
       const contentWidth = pageWidth - 96;
 
       doc.rect(0, 0, pageWidth, 10).fill('#1e293b');
-      const logo = invifyLogoPath();
+      const logo = iipsLogoPath();
       if (logo) {
-        const logoWidth = 78;
+        const logoWidth = 132;
         const logoX = (pageWidth - logoWidth) / 2;
-        const logoY = 22;
+        const logoY = 28;
         doc.image(logo, logoX, logoY, { width: logoWidth });
-        doc.y = logoY + 102;
+        doc.y = logoY + logoWidth + 16;
       } else {
         doc.moveDown(1.2);
       }

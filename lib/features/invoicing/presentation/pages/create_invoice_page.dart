@@ -6,6 +6,7 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/stock/domain/catalog_category.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
 import 'package:involve_app/features/services/domain/entities/service_customer.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
@@ -261,6 +262,7 @@ class _ItemSelector extends StatefulWidget {
 
 class _ItemSelectorState extends State<_ItemSelector> {
   int? _selectedCategoryId;
+  String? _selectedCatalogLabel;
   String? _selectedServiceType; // New: For service type filtering
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -313,6 +315,10 @@ class _ItemSelectorState extends State<_ItemSelector> {
               } else if (_selectedCategoryId != null) {
                  // Filter by Stock Category
                  filteredItems = filteredItems.where((i) => i.categoryId == _selectedCategoryId).toList();
+              } else if (_selectedCatalogLabel != null) {
+                filteredItems = filteredItems.where((i) =>
+                  catalogCategoryLabel(i, state.categories) == _selectedCatalogLabel
+                ).toList();
               }
               
               // Apply search filter
@@ -372,6 +378,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
                     _buildFilterChip('All', null, null),
                     // Standard Categories
                     ...state.categories.map((cat) => _buildFilterChip(cat.name, cat.id, null)),
+                    if (settings?.businessMode == 'school')
+                      ..._catalogLabels(state).map(_buildCatalogChip),
                     // Service Types (if enabled)
                     if (settings?.serviceBillingEnabled == true)
                       ...serviceTypes.map((type) => _buildFilterChip(type, null, type, isService: true)),
@@ -440,9 +448,45 @@ class _ItemSelectorState extends State<_ItemSelector> {
     );
   }
 
+  List<String> _catalogLabels(StockLoaded state) {
+    final named = state.categories.map((category) => category.name).toSet();
+    final labels = <String>[];
+    for (final item in state.items) {
+      final label = catalogCategoryLabel(item, state.categories);
+      if (named.contains(label) || labels.contains(label)) continue;
+      labels.add(label);
+    }
+    labels.sort();
+    return labels;
+  }
+
+  Widget _buildCatalogChip(String label) {
+    final isSelected = _selectedCatalogLabel == label &&
+        _selectedCategoryId == null &&
+        _selectedServiceType == null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : null,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        onSelected: (_) {
+          setState(() {
+            _selectedCatalogLabel = label;
+            _selectedCategoryId = null;
+            _selectedServiceType = null;
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildFilterChip(String label, int? categoryId, String? serviceType, {bool isService = false}) {
     final isSelected = (serviceType != null && _selectedServiceType == serviceType) || 
-                       (serviceType == null && _selectedServiceType == null && _selectedCategoryId == categoryId);
+                       (serviceType == null && _selectedServiceType == null && _selectedCatalogLabel == null && _selectedCategoryId == categoryId);
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -457,6 +501,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
         ),
         onSelected: (selected) {
           setState(() {
+            _selectedCatalogLabel = null;
             if (serviceType != null) {
               _selectedServiceType = serviceType;
               _selectedCategoryId = null;
@@ -471,7 +516,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
   }
 
   Future<void> _handleItemAdd(BuildContext context, Item item, AppSettings? settings) async {
-    if (item.type == 'service') {
+    final schoolFee = settings?.businessMode == 'school' || item.businessMode == 'school';
+    if (item.type == 'service' && !schoolFee) {
       // Show booking dialog
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
@@ -1411,11 +1457,29 @@ class _CartSummary extends StatelessWidget {
                 ),
               ElevatedButton(
                 onPressed: () {
-                  final discount = double.tryParse(controller.text) ?? 0;
-                  // Basic validation for percentage
-                  if (selectedType == DiscountType.percentage && (discount < 0 || discount > 100)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a percentage between 0 and 100')),
+                  final discount = double.tryParse(controller.text.trim()) ?? 0;
+                  final bill = invoiceBloc.state;
+                  final cost = CurrencyFormatter.roundMoney(bill.subtotal + bill.tax);
+                  if (invoiceBloc.calculationService.discountExceedsCost(
+                    bill.subtotal,
+                    bill.tax,
+                    discount,
+                    selectedType,
+                  )) {
+                    showDialog(
+                      context: ctx,
+                      builder: (alertContext) => AlertDialog(
+                        title: const Text('Discount not allowed'),
+                        content: Text(
+                          'This discount is more than the actual cost of ${CurrencyFormatter.formatWithSymbol(cost, symbol: currency)}. The discount was not applied.',
+                        ),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(alertContext),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
                     );
                     return;
                   }

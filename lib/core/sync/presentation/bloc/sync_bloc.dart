@@ -17,6 +17,7 @@ import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_servic
     if (dart.library.io) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_native.dart'
     if (dart.library.html) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_web.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ class SyncWithPeerTriggered extends SyncEvent {
   final int? port;
   final String? bluetoothId;
   final bool isBluetooth;
+  final String? authToken;
   final String peerName;
 
   SyncWithPeerTriggered({
@@ -58,11 +60,12 @@ class SyncWithPeerTriggered extends SyncEvent {
     this.port,
     this.bluetoothId,
     this.isBluetooth = false,
+    this.authToken,
     required this.peerName,
   });
 
   @override
-  List<Object?> get props => [ip, port, bluetoothId, isBluetooth, peerName];
+  List<Object?> get props => [ip, port, bluetoothId, isBluetooth, authToken, peerName];
 }
 
 class SyncStatusChanged extends SyncEvent {
@@ -82,6 +85,8 @@ class SyncState extends Equatable {
   final bool isSyncing;
   final DateTime? lastSyncTime;
   final String? statusMessage;
+  final String localDeviceName;
+  final String localDeviceId;
 
   const SyncState({
     this.peers = const [],
@@ -91,6 +96,8 @@ class SyncState extends Equatable {
     this.isSyncing = false,
     this.lastSyncTime,
     this.statusMessage,
+    this.localDeviceName = '',
+    this.localDeviceId = '',
   });
 
   // Sentinel object — allows copyWith to distinguish "not passed" vs explicit null.
@@ -104,6 +111,8 @@ class SyncState extends Equatable {
     bool? isSyncing,
     DateTime? lastSyncTime,
     Object? statusMessage = _keep,
+    String? localDeviceName,
+    String? localDeviceId,
   }) {
     return SyncState(
       peers: peers ?? this.peers,
@@ -113,12 +122,14 @@ class SyncState extends Equatable {
       isSyncing: isSyncing ?? this.isSyncing,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
       statusMessage: statusMessage == _keep ? this.statusMessage : statusMessage as String?,
+      localDeviceName: localDeviceName ?? this.localDeviceName,
+      localDeviceId: localDeviceId ?? this.localDeviceId,
     );
   }
 
   @override
   List<Object?> get props =>
-      [peers, isDiscoveryRunning, isMaster, isServerRunning, isSyncing, lastSyncTime, statusMessage];
+      [peers, isDiscoveryRunning, isMaster, isServerRunning, isSyncing, lastSyncTime, statusMessage, localDeviceName, localDeviceId];
 }
 
 // ─── Bloc ─────────────────────────────────────────────────────────────────────
@@ -158,7 +169,38 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<RestartDiscovery>(_onRestartDiscovery);
   }
 
+  String _announcedName = 'This device';
+  String _hardwareId = '';
+
+  Future<void> _loadLocalIdentity() async {
+    if (_hardwareId.isNotEmpty) return;
+    try {
+      final details = await DeviceInfoService.getDeviceDetails();
+      final brand = '${details['brand'] ?? ''}'.trim();
+      final model = '${details['model'] ?? ''}'.trim();
+      final parts = [brand, model]
+          .where((part) => part.isNotEmpty && part.toUpperCase() != 'UNKNOWN')
+          .toList();
+      _announcedName = parts.isEmpty ? 'This device' : parts.join(' ');
+      final suffix = '${details['deviceSuffix'] ?? details['deviceId'] ?? deviceId}'.trim();
+      _hardwareId = _confirmCode(suffix.isEmpty ? deviceId : suffix);
+    } catch (e) {
+      debugPrint('SyncBloc: device identity unavailable: $e');
+      _announcedName = 'This device';
+      _hardwareId = _confirmCode(deviceId);
+    }
+  }
+
+  /// Same 6-character code on this card, on Wi-Fi announcements, and in the BLE name.
+  static String _confirmCode(String raw) {
+    final clean = raw.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (clean.isEmpty) return '';
+    if (clean.length <= 6) return clean;
+    return clean.substring(clean.length - 6);
+  }
+
   Future<void> _onInitialize(InitializeSync event, Emitter<SyncState> emit) async {
+    await _loadLocalIdentity();
     // Sanitize legacy records: backfill syncId and updatedAt for any records missing them
     if (!kIsWeb) await _backfillSyncIds();
 
@@ -168,6 +210,8 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     emit(state.copyWith(
       isMaster: isMaster,
       lastSyncTime: meta?.lastSyncTime,
+      localDeviceName: _announcedName,
+      localDeviceId: _hardwareId,
     ));
 
     final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
@@ -176,10 +220,10 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
       return;
     }
 
-    if (isMaster) {
+    if (!isMaster) {
       if (!kIsWeb) await syncServer.start(8080);
-      await bluetoothSyncServer.start();
     }
+    await bluetoothSyncServer.start(confirmId: _hardwareId);
 
     _statusSubscription?.cancel();
     _statusSubscription = syncManager.statusStream.listen((isSyncing) {
@@ -241,6 +285,13 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onStartDiscovery(StartDiscoveryRequested event, Emitter<SyncState> emit) async {
+    await _loadLocalIdentity();
+    if (state.localDeviceId.isEmpty) {
+      emit(state.copyWith(
+        localDeviceName: _announcedName,
+        localDeviceId: _hardwareId,
+      ));
+    }
     final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
     if (!isOnline) {
       emit(state.copyWith(
@@ -250,20 +301,23 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
       return;
     }
 
+    emit(state.copyWith(isDiscoveryRunning: true));
+
     if (!kIsWeb) {
       await discoveryService.startDiscovery(
         deviceId: deviceId,
-        deviceName: 'Device $deviceId',
+        deviceName: _announcedName,
+        hardwareId: _hardwareId,
         isMaster: state.isMaster,
         authToken: syncServer.secretToken,
       );
     }
 
-    await bluetoothDiscoveryService.startDiscovery(
+    unawaited(bluetoothDiscoveryService.startDiscovery(
       deviceId: deviceId,
-      deviceName: 'Device $deviceId',
+      deviceName: _announcedName,
       isMaster: state.isMaster,
-    );
+    ));
 
     _peerSubscription?.cancel();
     
@@ -275,14 +329,18 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
       bluetoothDiscoveryService.peerStream,
     ]).listen((peers) {
       for (final peer in peers) {
-        combinedPeers[peer.deviceId] = peer;
+        final key = peer.confirmId.trim().isEmpty ? peer.deviceId : peer.confirmId.trim();
+        final existing = combinedPeers[key];
+        if (existing == null || (!peer.isBluetooth && existing.isBluetooth)) {
+          combinedPeers[key] = peer;
+        }
       }
       // Clean up stale peers (if needed, though services handle it mostly)
       combinedPeers.removeWhere((id, peer) => !peer.isOnline);
       add(SyncPeersUpdated(combinedPeers.values.toList()));
     });
 
-    syncManager.startAutoSync();
+    syncManager.startAutoSync(pullFromClients: state.isMaster);
 
     emit(state.copyWith(isDiscoveryRunning: true));
   }
@@ -312,38 +370,36 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
 
     // 1. Stop current
     add(StopDiscoveryRequested());
-    if (state.isMaster) {
-      if (!kIsWeb) syncServer.stop();
-      await bluetoothSyncServer.stop();
-    }
+    if (!kIsWeb) syncServer.stop();
+    await bluetoothSyncServer.stop();
 
     // 2. Update DB
     if (!kIsWeb) {
       await syncRepository.saveSyncMeta(SyncMetaCompanion(
         deviceId: Value(deviceId),
-        deviceName: Value('Device $deviceId'),
+        deviceName: Value(_announcedName),
         isMaster: Value(event.isMaster),
       ));
     }
 
     // 3. Start new
     emit(state.copyWith(isMaster: event.isMaster));
-    if (event.isMaster) {
-      if (!kIsWeb) await syncServer.start(8080);
-      await bluetoothSyncServer.start();
+    await bluetoothSyncServer.start(confirmId: _hardwareId);
+    if (!event.isMaster && !kIsWeb) {
+      await syncServer.start(8080);
     }
     add(StartDiscoveryRequested());
   }
 
   void _onPeersUpdated(SyncPeersUpdated event, Emitter<SyncState> emit) {
-    // Only update peers — deliberately NOT inheriting statusMessage to avoid stale toasts.
-    emit(SyncState(
+    if (state.isMaster) {
+      syncManager.notePeers(event.peers);
+    }
+    // Keep this phone's name and confirm code. A fresh SyncState was clearing them
+    // every time a nearby device arrived, so the card fell back to a dash.
+    emit(state.copyWith(
       peers: event.peers,
-      isDiscoveryRunning: state.isDiscoveryRunning,
-      isMaster: state.isMaster,
-      isServerRunning: state.isServerRunning,
-      lastSyncTime: state.lastSyncTime,
-      statusMessage: null, // Always clear on peer update — prevents repeated toasts
+      statusMessage: null,
     ));
   }
 
@@ -356,7 +412,22 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
       return;
     }
 
-    emit(state.copyWith(statusMessage: 'Syncing...'));
+    if (!state.isMaster) {
+      emit(state.copyWith(statusMessage: 'The master pulls data from this phone.'));
+      await Future.delayed(const Duration(seconds: 2));
+      emit(state.copyWith(statusMessage: null));
+      return;
+    }
+    final clients = state.peers.where((peer) => !peer.isMaster && peer.isOnline).toList();
+    if (clients.isEmpty) {
+      emit(state.copyWith(statusMessage: 'No client device is nearby.'));
+      await Future.delayed(const Duration(seconds: 2));
+      emit(state.copyWith(statusMessage: null));
+      return;
+    }
+
+    emit(state.copyWith(statusMessage: 'Pulling data from clients...'));
+    syncManager.notePeers(clients);
     await syncManager.syncNow();
     final meta = await syncRepository.getSyncMeta();
     emit(state.copyWith(
@@ -379,10 +450,11 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     emit(state.copyWith(statusMessage: 'Syncing with ${event.peerName}...'));
     try {
       await syncManager.syncWithPeer(
-        event.ip, 
+        event.ip,
         event.port,
         bluetoothId: event.bluetoothId,
         isBluetooth: event.isBluetooth,
+        authToken: event.authToken,
       );
       final meta = await syncRepository.getSyncMeta();
       emit(state.copyWith(

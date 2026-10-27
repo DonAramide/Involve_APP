@@ -79,6 +79,23 @@ describe('Phase 33 tenant billing collections', () => {
     expect(obligation.amountOutstandingKobo).toBe(25000000);
   });
 
+  it('refuses a second installment plan while the tenant still has outstanding financing', () => {
+    const s = svc();
+    const input = {
+      tenantId: 't1' as const,
+      deviceId: 'box-1',
+      description: 'Box',
+      purchasePriceKobo: 30000000,
+      downPaymentKobo: 5000000,
+      installmentKobo: 2500000,
+      firstDueDate: '2026-05-10',
+      actor: finance,
+      now: '2026-04-01' as const,
+    };
+    s.createDeviceInstallmentPlan(input);
+    expect(() => s.createDeviceInstallmentPlan({ ...input, deviceId: 'box-2' })).toThrow(/ongoing installment or pending payment/);
+  });
+
   it('applies a full installment payment', async () => {
     const s = svc();
     const plan = s.createDeviceInstallmentPlan({

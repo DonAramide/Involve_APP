@@ -165,7 +165,7 @@ import { useCurrency } from '../../../../composables/useCurrency';
 import { useTenantTransactionStore } from '../stores/tenantTransactionStore';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 
 const { currentCurrency } = useCurrency();
 const $q = useQuasar();
@@ -305,8 +305,15 @@ const columns = [
   { name: 'actions', label: 'AUDIT ACTIONS', align: 'center' }
 ];
 
+let ledgerTimer = null;
+
 onMounted(() => {
-  store.loadTransactions();
+  store.loadTransactions(true);
+  ledgerTimer = setInterval(() => store.loadTransactions(true), 12000);
+});
+
+onUnmounted(() => {
+  if (ledgerTimer) clearInterval(ledgerTimer);
 });
 
 const getStatusColor = (status) => {

@@ -49,4 +49,19 @@ describe('PosPackager (Invify Accelerex / jPOS IFA_BINARY)', () => {
     expect(Buffer.isBuffer(unpacked[128]) ? (unpacked[128] as Buffer).toString('hex').toUpperCase() : '').toBe(macHex);
     expect(String(unpacked[55])).toContain('9F34');
   });
+
+  it('unpacks NIBSS field 120 geo data without losing STAN and RRN', () => {
+    const geo = '010806.524400209003.37921';
+    const fields = {
+      0: '0200',
+      11: '123456',
+      37: '622200123456',
+      41: '204435SA',
+      120: geo,
+    };
+    const unpacked = unpackPosMessage(packPosMessage(fields));
+    expect(unpacked[11]).toBe('123456');
+    expect(unpacked[37]).toBe('622200123456');
+    expect(unpacked[120]).toBe(geo);
+  });
 });

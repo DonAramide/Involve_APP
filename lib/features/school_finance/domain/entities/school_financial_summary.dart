@@ -20,6 +20,12 @@ class SchoolFinancialSummary extends Equatable {
   final double invifyLoggedVa;
   /// ok | quasar_ahead | invify_overstated
   final String quasarBalanceStatus;
+  /// Card and virtual-account money already used on a bill, after payouts.
+  final double withdrawable;
+  /// Successful remittances already taken from the Quasar pool.
+  final double quasarRemitted;
+  /// True when [withdrawable] came from the shared server balance.
+  final bool sharedWithdrawable;
 
   const SchoolFinancialSummary({
     required this.totalRevenue,
@@ -35,12 +41,36 @@ class SchoolFinancialSummary extends Equatable {
     this.quasarLiveBalance,
     this.invifyLoggedVa = 0,
     this.quasarBalanceStatus = 'ok',
+    this.withdrawable = 0,
+    this.quasarRemitted = 0,
+    this.sharedWithdrawable = false,
   });
 
   bool get needsVaInvestigation => quasarBalanceStatus == 'invify_overstated';
 
-  double get quasarCardAndTransfer =>
-      quasarCollected > 0.001 ? quasarCollected : cardCollected + vaTransferCollected;
+  SchoolFinancialSummary withSharedWithdrawable(double amount) {
+    return SchoolFinancialSummary(
+      totalRevenue: totalRevenue,
+      outstandingFees: outstandingFees,
+      paidStudentsCount: paidStudentsCount,
+      owingStudentsCount: owingStudentsCount,
+      totalStudents: totalStudents,
+      lastUpdated: lastUpdated,
+      cardCollected: cardCollected,
+      vaTransferCollected: vaTransferCollected,
+      cashCollected: cashCollected,
+      quasarCollected: quasarCollected,
+      quasarLiveBalance: quasarLiveBalance,
+      invifyLoggedVa: invifyLoggedVa,
+      quasarBalanceStatus: quasarBalanceStatus,
+      withdrawable: amount,
+      quasarRemitted: quasarRemitted,
+      sharedWithdrawable: true,
+    );
+  }
+
+  /// Card plus the live virtual-account balance shown beside it.
+  double get quasarCardAndTransfer => cardCollected + vaTransferCollected;
 
   @override
   List<Object?> get props => [
@@ -57,5 +87,8 @@ class SchoolFinancialSummary extends Equatable {
         quasarLiveBalance,
         invifyLoggedVa,
         quasarBalanceStatus,
+        withdrawable,
+        quasarRemitted,
+        sharedWithdrawable,
       ];
 }

@@ -65,23 +65,20 @@ class _ParentCreditBreakdownPageState extends State<ParentCreditBreakdownPage> {
       );
     }
 
-    final parts = ParentCreditParts.fromPayments(
-      quasarBalance: quasar,
+    final quasarForParent = ParentCreditParts.parentQuasarBalance(
+      liveBalance: quasar,
       payments: payments,
     );
-    var saved = false;
-    if (parent.id != null && (parent.creditBalance - parts.recalculated).abs() > 0.009) {
-      await widget.schoolRepository.updateParent(
-        parent.copyWith(creditBalance: parts.recalculated),
-      );
-      saved = true;
-    }
+    final parts = ParentCreditParts.fromPayments(
+      quasarBalance: quasarForParent,
+      payments: payments,
+    );
     return _BreakdownView(
       payments: payments,
       parts: parts,
       accountNumber: account,
       error: null,
-      saved: saved,
+      saved: false,
     );
   }
 
@@ -123,7 +120,7 @@ class _ParentCreditBreakdownPageState extends State<ParentCreditBreakdownPage> {
             padding: const EdgeInsets.all(16),
             children: [
               Text(
-                'Recalculated credit',
+                'Local rail estimate (display only)',
                 style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade700),
               ),
               const SizedBox(height: 4),
@@ -131,14 +128,13 @@ class _ParentCreditBreakdownPageState extends State<ParentCreditBreakdownPage> {
                 money(parts.recalculated),
                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
               ),
-              if (view.saved)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Updated from ${money(widget.parent.creditBalance)}.',
-                    style: TextStyle(color: Colors.green.shade700),
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Authoritative credit ${money(widget.parent.creditBalance)} was not overwritten.',
+                  style: TextStyle(color: Colors.blueGrey.shade700),
                 ),
+              ),
               const SizedBox(height: 16),
               _amountCard(
                 title: 'Quasar balance',

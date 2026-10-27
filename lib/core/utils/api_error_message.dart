@@ -90,6 +90,19 @@ String? _mapNetworkish(String text) {
 }
 
 /// Auth / payment-gateway internals that must never appear on device screens.
+String? _mapMfa(String text) {
+  switch (text.trim()) {
+    case 'MFA_REQUIRED':
+      return 'Enter the 6-digit code from your authenticator app.';
+    case 'MFA_NOT_ENABLED':
+      return 'Turn on 2FA in System Setup before this action.';
+    case 'INVALID_MFA':
+      return 'That authenticator code was not accepted. Use the current code.';
+    default:
+      return null;
+  }
+}
+
 String? _mapSensitive(String text) {
   final t = text.toLowerCase();
   if (t.contains('authorization header') ||
@@ -108,6 +121,11 @@ String? _mapSensitive(String text) {
       t.contains('unprovisioned')) {
     return 'Virtual accounts need the Financial Platform activated for this school first. '
         'On Invify Admin (super admin or tenant admin), open this school → Financial Platform → Activate Platform, then try again.';
+  }
+  if (t.contains('platformtransfersettings') ||
+      t.contains('no metadata for')) {
+    return 'Quasar cannot send this withdrawal to the bank right now. '
+        'Bank transfer settings are missing on the payment provider. No money was sent.';
   }
   if (t.contains('invalid api key') ||
       t.contains('api key') ||
@@ -182,7 +200,7 @@ String? extractApiErrorBody(dynamic data) {
   if (data is String) {
     final t = data.trim();
     if (t.isEmpty) return null;
-    final mapped = _mapNetworkish(t) ?? _mapSensitive(t);
+    final mapped = _mapNetworkish(t) ?? _mapSensitive(t) ?? _mapMfa(t);
     if (mapped != null) return mapped;
     if (_looksTechnical(t)) return null;
     // Avoid dumping HTML error pages
@@ -198,7 +216,7 @@ String? extractApiErrorBody(dynamic data) {
     for (final key in ['error', 'message', 'detail', 'msg', 'title', 'responseMessage']) {
       final v = map[key];
       if (v is String && v.trim().isNotEmpty) {
-        final mapped = _mapNetworkish(v) ?? _mapSensitive(v);
+        final mapped = _mapNetworkish(v) ?? _mapSensitive(v) ?? _mapMfa(v);
         if (mapped != null) return mapped;
         if (!_looksTechnical(v)) return v.trim();
       }

@@ -5,6 +5,8 @@ import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
+import { WalletService } from '../services/wallet.service';
+import { creditsSchoolWallet, loadVirtualAccountKind } from '../services/virtual-account-ownership';
 import { rejectIfVaBlocked } from '../utils/free-trial-guard';
 import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
@@ -512,6 +514,9 @@ export class CustomerController {
           liveBalance: quasarBalance,
         };
       }
+      if (Number.isFinite(quasarBalance) && quasarBalance >= 0) {
+        await syncParentCreditToVaNet(tenantId, va, quasarBalance);
+      }
       return res.status(200).json(rows);
     } catch (error: any) {
       console.error('[CustomerController] getVirtualAccountTransactions Error:', error.message);
@@ -529,6 +534,16 @@ export class CustomerController {
       if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid sweep amount" });
 
       const va = String(accountNumber).trim();
+      const ownership = await loadVirtualAccountKind(va, { tenantId });
+      if (!creditsSchoolWallet(ownership.kind)) {
+        return res.status(409).json({
+          error:
+            ownership.kind === 'parent'
+              ? 'This virtual account belongs to a parent. Those funds are not swept into the school wallet.'
+              : 'This virtual account is not a proven school or staff account. Those funds were not swept into the school wallet.',
+        });
+      }
+
       const { data: wallet, error: walletErr } = await supabaseAdmin
         .from('wallets')
         .select('*')
@@ -552,47 +567,57 @@ export class CustomerController {
 
       let newBalance = Number(wallet.balance);
       if (!alreadyInWallet) {
-        newBalance = Number(wallet.balance) + Number(amount);
-        const { error: updateErr } = await supabaseAdmin
+        const idempotencyKey = `sweep-va:${tenantId}:${va}`;
+        const ledgerRef = `SWEEP-VA-${va.substring(0, 6)}`;
+        const posted = await supabaseAdmin.rpc('process_ledger_double_entry_text', {
+          p_tenant_id: tenantId,
+          p_idempotency_key: idempotencyKey,
+          p_reference: ledgerRef,
+          p_entries: [
+            { account: 'USER_WALLET', type: 'CREDIT', amount: roundNaira(Number(amount)) },
+            { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: roundNaira(Number(amount)) },
+          ],
+          p_metadata: { source: 'virtual_account_sweep', accountNumber: va }
+        });
+        if (posted.error && !String(posted.error.message || '').toLowerCase().includes('duplicate')) {
+          throw new Error(posted.error.message || 'sweep ledger failed');
+        }
+        const derived = await WalletService.getBalance(tenantId);
+        newBalance = Number(derived?.balance || 0);
+        await supabaseAdmin
           .from('wallets')
           .update({
             balance: newBalance,
             updated_at: new Date().toISOString()
           })
           .eq('id', wallet.id);
-        if (updateErr) throw updateErr;
-
-        const idempotencyKey = crypto.randomUUID();
-        const ledgerRef = `SWEEP-VA-${accountNumber.substring(0, 6)}`;
-        await supabaseAdmin.rpc('process_ledger_double_entry_text', {
-          p_tenant_id: tenantId,
-          p_idempotency_key: idempotencyKey,
-          p_reference: ledgerRef,
-          p_entries: [
-            { account: 'USER_WALLET', type: 'CREDIT', amount: Math.round(Number(amount)) },
-            { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: Math.round(Number(amount)) },
-          ],
-          p_metadata: { source: 'virtual_account_sweep', accountNumber }
-        });
       }
 
-      const reference = `SWEEP-VA-${accountNumber.substring(0, 6)}-${Date.now()}`;
-      await supabaseAdmin.from('transactions_log').insert({
-        reference,
-        tenant_id: tenantId,
-        wallet_id: wallet.id,
-        amount: Number(amount),
-        type: 'SWEEP',
-        provider: 'quasar',
-        status: 'SUCCESS',
-        metadata: {
-          virtualAccountNumber: accountNumber,
-          accountNumber,
-          source: 'virtual_account_sweep',
-          amountNaira: Number(amount),
-          alreadyInWallet,
-        },
-      });
+      const reference = `SWEEP-VA-${va}`;
+      const { data: existingSweep } = await supabaseAdmin
+        .from('transactions_log')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('reference', reference)
+        .limit(1);
+      if (!existingSweep?.length) {
+        await supabaseAdmin.from('transactions_log').insert({
+          reference,
+          tenant_id: tenantId,
+          wallet_id: wallet.id,
+          amount: Number(amount),
+          type: 'SWEEP',
+          provider: 'quasar',
+          status: 'SUCCESS',
+          metadata: {
+            virtualAccountNumber: va,
+            accountNumber: va,
+            source: 'virtual_account_sweep',
+            amountNaira: Number(amount),
+            alreadyInWallet,
+          },
+        });
+      }
 
       return res.status(200).json({
         success: true,
@@ -609,6 +634,9 @@ export class CustomerController {
 }
 
 async function lookupQuasarVaBalanceNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const recorded = await recordedParentVaNetNaira(tenantId, accountNumber);
+  const spentOnBills = await schoolWalletBillNaira(tenantId, accountNumber);
+  const net = roundNaira(Math.max(0, recorded - spentOnBills));
   try {
     const accounts = await QfsQuasarBridgeService.listAccounts(tenantId);
     const want = String(accountNumber).replace(/\D/g, '');
@@ -616,11 +644,103 @@ async function lookupQuasarVaBalanceNaira(tenantId: string, accountNumber: strin
       const got = String(row?.account_number || row?.accountNumber || '').replace(/\D/g, '');
       return got.length >= 8 && got === want;
     });
-    return match ? sandboxBalanceToNaira(match) : 0;
+    if (match) return sandboxBalanceToNaira(match);
   } catch (err: any) {
     console.warn('[CustomerController] Quasar VA balance lookup failed:', err?.message || err);
-    return 0;
   }
+  return net;
+}
+
+/** Bills already moved from this parent into the school wallet. Not part of parent credit. */
+async function schoolWalletBillNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8) return 0;
+  const { data, error } = await supabaseAdmin
+    .from('school_entities')
+    .select('payload')
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va)
+    .limit(1);
+  if (error || !data?.length) return 0;
+  const stored = Number(data[0].payload?.schoolWalletBillNaira);
+  const storedNaira = Number.isFinite(stored) && stored > 0 ? stored : 0;
+  const parentId = data[0].payload?.id;
+  let mapped = 0;
+  try {
+    const { data: pays } = await supabaseAdmin
+      .from('school_entities')
+      .select('payload')
+      .eq('tenant_id', tenantId)
+      .eq('entity_type', 'parent_payment')
+      .limit(500);
+    for (const row of pays || []) {
+      const p = row.payload || {};
+      const sameParent = parentId != null && String(p.parentId) === String(parentId);
+      const payVa = String(p.virtualAccountNumber || '').replace(/\D/g, '');
+      const sameVa = payVa.length >= 8 && payVa === va;
+      if (!sameParent && !sameVa) continue;
+      if (String(p.source || '') !== 'credit_map') continue;
+      const amt = Number(p.appliedToDebt != null ? p.appliedToDebt : p.amount);
+      if (Number.isFinite(amt) && amt > 0) mapped += amt;
+    }
+  } catch (err: any) {
+    console.warn('[CustomerController] mapped credit lookup failed:', err?.message || err);
+  }
+  return roundNaira(Math.max(storedNaira, mapped));
+}
+
+/** Save parent credit as virtual-account receipts minus bills already moved to the school wallet. */
+async function syncParentCreditToVaNet(tenantId: string, accountNumber: string, balance: number): Promise<void> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8 || !Number.isFinite(Number(balance))) return;
+  const { data, error } = await supabaseAdmin
+    .from('school_entities')
+    .select('payload')
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va)
+    .limit(1);
+  if (error || !data?.length) return;
+  const current = Number(data[0].payload?.creditBalance) || 0;
+  const gross = await recordedParentVaNetNaira(tenantId, accountNumber);
+  const spent = await schoolWalletBillNaira(tenantId, accountNumber);
+  const remaining = roundNaira(Math.max(0, Number(balance || 0) - spent));
+  const wrongGross = gross > 0 && Math.abs(current - gross) <= 0.009;
+  if (Math.abs(current - remaining) <= 0.009) return;
+  // A mapped bill payment lowers local credit. Do not write the live VA
+  // balance back over that debit unless the stored figure is still the gross VA in.
+  if (current + 0.009 < remaining && !wrongGross) return;
+  const payload = {
+    ...(data[0].payload || {}),
+    creditBalance: remaining,
+    schoolWalletBillNaira: spent,
+  };
+  await supabaseAdmin
+    .from('school_entities')
+    .update({ payload, updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
+    .eq('entity_type', 'parent')
+    .filter('payload->>virtualAccountNumber', 'eq', va);
+}
+
+/** Credits already logged for this virtual account, minus sweeps. Used when Quasar will not return the live balance. */
+async function recordedParentVaNetNaira(tenantId: string, accountNumber: string): Promise<number> {
+  const va = String(accountNumber).replace(/\D/g, '');
+  if (va.length < 8) return 0;
+  const { data, error } = await supabaseAdmin
+    .from('transactions_log')
+    .select('id, type, amount, reference, metadata, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'SUCCESS')
+    .or(`metadata->>accountNumber.eq.${va},metadata->>virtualAccountNumber.eq.${va}`)
+    .limit(500);
+  if (error || !data) return 0;
+  const pending = computePendingFundsByVa(data);
+  for (const [key, value] of pending) {
+    if (String(key).replace(/\D/g, '') === va) return roundNaira(value);
+  }
+  return 0;
 }
 
 /** Match SUCCESS txs to a staff VA number across Quasar metadata key variants. */

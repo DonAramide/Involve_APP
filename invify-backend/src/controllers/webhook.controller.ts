@@ -12,6 +12,8 @@ import { WhatsAppNotificationService } from '../services/whatsapp-notification.s
 import { FinancialDisputeService } from '../services/financial-dispute.service';
 import { isParentCustomerId, pickParentOwnedAttribution } from '../utils/parent-va-routing';
 import { WalletService } from '../services/wallet.service';
+import { parentDepositLedgerEntries, type LedgerLeg } from '../services/school-fund-ownership';
+import { creditsSchoolWallet, loadVirtualAccountKind } from '../services/virtual-account-ownership';
 import { roundNaira } from '../utils/virtual-account-funds';
 import { FeeShadowIntegration } from '../services/fee-shadow-integration';
 import { PayoutReversalService } from '../services/payout-reversal.service';
@@ -495,6 +497,11 @@ export class WebhookController {
           const { senderName, senderBank } = vaSenderFromEvent(event);
           const creditAmount = roundNaira(Number(amount));
           const isSandbox = event?.data?.sandbox === true;
+          const ownership = virtualAccountNumber
+            ? await loadVirtualAccountKind(String(virtualAccountNumber), { tenantId: resolvedTenantId })
+            : { kind: 'unknown' as const, tenantId: resolvedTenantId };
+          if (ownership.kind === 'parent') parentOwnedDeposit = true;
+          const schoolOwnedCredit = creditsSchoolWallet(ownership.kind) && !parentOwnedDeposit;
 
           if (!Number.isFinite(creditAmount)) {
             console.error(`[Webhook] Invalid amount for ${reference}:`, amount);
@@ -505,71 +512,100 @@ export class WebhookController {
           }
 
           try {
-            // Insert success deposit transaction in DB log
-            const { error: insertErr } = await supabaseAdmin
-              .from('transactions_log')
-              .insert({
-                reference,
-                tenant_id: resolvedTenantId,
-                wallet_id: resolvedWalletId,
-                amount: creditAmount,
-                type: 'CREDIT',
-                provider: 'quasar',
-                status: 'SUCCESS',
-                metadata: {
-                  virtualAccountNumber,
-                  accountNumber: virtualAccountNumber,
-                  senderName,
-                  senderBank,
-                  sandbox: isSandbox,
-                  quasarEvent: event.event,
-                  amountNaira: creditAmount,
-                  amountRaw: amount,
-                  ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
-                  ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
-                  ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
-                  ...(parentOwnedDeposit
-                    ? {
-                        paidVia: 'parent_account',
-                        ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
-                      }
-                    : {}),
-                }
-              });
-            if (insertErr) {
-              throw new Error(insertErr.message || 'transactions_log insert failed');
+            const depositEntries: LedgerLeg[] = parentOwnedDeposit
+              ? parentDepositLedgerEntries(creditAmount)
+              : schoolOwnedCredit
+                ? [
+                    { account: 'QUASAR_CLEARING', type: 'DEBIT', amount: creditAmount },
+                    { account: 'USER_WALLET', type: 'CREDIT', amount: creditAmount },
+                  ]
+                : parentDepositLedgerEntries(creditAmount);
+
+            if (!schoolOwnedCredit && !parentOwnedDeposit) {
+              console.warn(
+                `[Webhook] Unknown virtual account ${virtualAccountNumber} for ${reference}; USER_WALLET was not credited.`,
+              );
             }
 
-            if (resolvedWalletId) {
-              // Double-entry bookkeeping: DR Clearing -> CR Merchant Wallet
-              await LedgerService.createDoubleEntry({
+            if (resolvedWalletId && (schoolOwnedCredit || parentOwnedDeposit)) {
+              const posted = await LedgerService.createDoubleEntry({
                 idempotencyKey,
                 tenantId: resolvedTenantId,
                 reference,
-                entries: [
-                  { account: "QUASAR_CLEARING", type: "DEBIT", amount: creditAmount },
-                  { account: "USER_WALLET", type: "CREDIT", amount: creditAmount }
-                ],
+                entries: depositEntries,
                 actorId: 'SYSTEM_WEBHOOK',
                 provider: 'quasar',
-                metadata: { source: 'quasar_webhook', type: 'deposit', sandbox: isSandbox }
+                metadata: {
+                  source: 'quasar_webhook',
+                  type: 'deposit',
+                  sandbox: isSandbox,
+                  paidVia: parentOwnedDeposit ? 'parent_account' : schoolOwnedCredit ? 'school_account' : 'unknown_account',
+                  schoolWalletCredit: schoolOwnedCredit,
+                },
               });
-              await FeeShadowIntegration.afterVaInwardResult(true, {
-                tenantId: resolvedTenantId,
-                amountNaira: creditAmount,
-                reference,
-              });
-              try {
-                const derived = await WalletService.getBalance(resolvedTenantId);
-                await supabaseAdmin
-                  .from('wallets')
-                  .update({ balance: Number(derived?.balance || 0) })
-                  .eq('id', resolvedWalletId);
-              } catch (walletErr: any) {
-                console.warn(`[Webhook] Wallet cache refresh failed for ${resolvedTenantId}:`, walletErr?.message || walletErr);
+              if ((posted as any)?.status === 'DE-DUPLICATED' || (posted as any)?.data?.status === 'DE-DUPLICATED') {
+                return res.status(200).json({ status: 'already_processed' });
+              }
+              if (schoolOwnedCredit) {
+                await FeeShadowIntegration.afterVaInwardResult(true, {
+                  tenantId: resolvedTenantId,
+                  amountNaira: creditAmount,
+                  reference,
+                });
+                try {
+                  const derived = await WalletService.getBalance(resolvedTenantId);
+                  await supabaseAdmin
+                    .from('wallets')
+                    .update({ balance: Number(derived?.balance || 0) })
+                    .eq('id', resolvedWalletId);
+                } catch (walletErr: any) {
+                  console.warn(`[Webhook] Wallet cache refresh failed for ${resolvedTenantId}:`, walletErr?.message || walletErr);
+                }
               }
             } else {
               console.warn(`[Webhook] No Invify wallet for tenant ${resolvedTenantId}; logged deposit without ledger for ${reference}`);
+            }
+
+            const { data: existingLog } = await supabaseAdmin
+              .from('transactions_log')
+              .select('id')
+              .eq('reference', reference)
+              .limit(1);
+            if (!existingLog?.length) {
+              const { error: insertErr } = await supabaseAdmin
+                .from('transactions_log')
+                .insert({
+                  reference,
+                  tenant_id: resolvedTenantId,
+                  wallet_id: resolvedWalletId,
+                  amount: creditAmount,
+                  type: 'CREDIT',
+                  provider: 'quasar',
+                  status: 'SUCCESS',
+                  metadata: {
+                    virtualAccountNumber,
+                    accountNumber: virtualAccountNumber,
+                    senderName,
+                    senderBank,
+                    sandbox: isSandbox,
+                    quasarEvent: event.event,
+                    amountNaira: creditAmount,
+                    amountRaw: amount,
+                    schoolWalletCredit: schoolOwnedCredit,
+                    ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
+                    ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
+                    ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
+                    ...(parentOwnedDeposit
+                      ? {
+                          paidVia: 'parent_account',
+                          ...(resolvedCustomerId ? { parentKey: resolvedCustomerId } : {}),
+                        }
+                      : {}),
+                  }
+                });
+              if (insertErr && !String(insertErr.message || '').toLowerCase().includes('duplicate')) {
+                throw new Error(insertErr.message || 'transactions_log insert failed');
+              }
             }
 
             // Keep resending to this tenant until a device acknowledges the socket.

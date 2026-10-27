@@ -1,5 +1,6 @@
 import {
   isQuasarCreditEntry,
+  isSameQuasarCredit,
   quasarLedgerAmountNaira,
   quasarLedgerReference,
   selectQuasarResyncEntries,
@@ -49,5 +50,31 @@ describe('quasar ledger credit shape', () => {
     expect(isQuasarCreditEntry({ direction: 'credit' })).toBe(true);
     expect(isQuasarCreditEntry({ direction: 'debit' })).toBe(false);
     expect(quasarLedgerReference({ id: 'led-1' }, 'acct')).toBe('quasar-ledger:acct:led-1');
+  });
+});
+
+describe('isSameQuasarCredit', () => {
+  it('matches the same naira amount within two minutes', () => {
+    expect(
+      isSameQuasarCredit(
+        { amount: 200, createdAt: '2026-10-20T13:06:00.000Z' },
+        { amount: 200, createdAt: '2026-10-20T13:07:10.000Z' },
+      ),
+    ).toBe(true);
+  });
+
+  it('does not match a different amount or a later window', () => {
+    expect(
+      isSameQuasarCredit(
+        { amount: 200, createdAt: '2026-10-20T13:06:00.000Z' },
+        { amount: 30, createdAt: '2026-10-20T13:06:00.000Z' },
+      ),
+    ).toBe(false);
+    expect(
+      isSameQuasarCredit(
+        { amount: 200, createdAt: '2026-10-20T13:06:00.000Z' },
+        { amount: 200, createdAt: '2026-10-20T13:10:00.000Z' },
+      ),
+    ).toBe(false);
   });
 });

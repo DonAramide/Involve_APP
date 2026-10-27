@@ -32,6 +32,8 @@ abstract class IFinanceRemoteDataSource {
   /// GET /api/analytics  (school-level dashboard)
   Future<Map<String, dynamic>> getSchoolSummary();
 
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits);
+
   /// GET /api/finance/daily-revenue?days=
   Future<List<Map<String, dynamic>>> getDailyRevenue(int days);
 
@@ -132,6 +134,19 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
       final response = await client.get('/api/finance/executive-summary');
       return Map<String, dynamic>.from(response.data as Map);
     }
+  }
+
+  @override
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits) async {
+    final response = await client.post(
+      '/api/finance/withdrawable/sync',
+      data: {'credits': credits},
+    );
+    final body = response.data;
+    if (body is Map && body['withdrawable'] != null) {
+      return double.tryParse('${body['withdrawable']}');
+    }
+    return null;
   }
 
   @override

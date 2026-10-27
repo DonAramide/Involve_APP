@@ -15,7 +15,6 @@ import 'package:involve_app/features/services/domain/repositories/services_repos
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
-import '../bloc/finance_bloc.dart';
 
 class VirtualAccountsPage extends StatefulWidget {
   const VirtualAccountsPage({super.key});
@@ -26,15 +25,26 @@ class VirtualAccountsPage extends StatefulWidget {
 
 class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
   final _repository = sl<FinanceRepository>();
+  final _searchController = TextEditingController();
   List<Map<String, dynamic>> _accounts = [];
   bool _isLoading = true;
   bool _isSyncing = false;
   String? _statusBanner;
+  String _query = '';
+  String _filter = 'all';
+  int _parentCount = 0;
+  Set<String> _parentAccountNumbers = {};
 
   @override
   void initState() {
     super.initState();
     _fetchAccounts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   /// Local staff / students / customers that already have a VA on device.
@@ -264,6 +274,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
       _isLoading = false;
       _isSyncing = true;
     });
+    await _loadParentStats();
 
     // 2) Enrich with live balances — fail fast when server is unreachable.
     try {
@@ -278,6 +289,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
         _isSyncing = false;
         _statusBanner = null;
       });
+      await _loadParentStats();
     } catch (e) {
       if (!mounted) return;
       final msg = friendlyApiError(
@@ -475,91 +487,92 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
     );
   }
 
-  Future<void> _sweepFunds(Map<String, dynamic> account) async {
-    final amount = (account['balance'] as num?)?.toDouble() ?? 0.0;
-    if (amount <= 0) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.currency_exchange, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Sweep Funds'),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to sweep ₦${NumberFormat('#,##0.00').format(amount)} from ${account['accountName']}\'s virtual account to the business internal wallet?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('SWEEP'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
+  double get _totalFunds {
+    var total = 0.0;
+    for (final acc in _accounts) {
+      total += _balanceOf(acc);
     }
+    return total;
+  }
 
+  double _balanceOf(Map<String, dynamic> acc) =>
+      (acc['balance'] as num?)?.toDouble() ?? 0.0;
+
+  bool _isParentAccount(Map<String, dynamic> acc) {
+    final holder = (acc['holderType'] ?? '').toString();
+    final number = (acc['accountNumber'] ?? '').toString().trim();
+    return holder == 'Parent' ||
+        holder == 'Customer' ||
+        _parentAccountNumbers.contains(number);
+  }
+
+  int get _parentsWithFunds {
+    final seen = <String>{};
+    var count = 0;
+    for (final acc in _accounts) {
+      if (!_isParentAccount(acc) || _balanceOf(acc) <= 0.009) continue;
+      final number = (acc['accountNumber'] ?? '').toString().trim();
+      if (number.isEmpty || !seen.add(number)) continue;
+      count++;
+    }
+    return count;
+  }
+
+  int get _shownParentCount {
+    if (_parentCount > 0) return _parentCount;
+    final seen = <String>{};
+    for (final acc in _accounts) {
+      if (!_isParentAccount(acc)) continue;
+      final number = (acc['accountNumber'] ?? '').toString().trim();
+      if (number.isNotEmpty) seen.add(number);
+    }
+    return seen.length;
+  }
+
+  List<Map<String, dynamic>> get _visibleAccounts {
+    final query = _query.trim().toLowerCase();
+    return _accounts.where((acc) {
+      final balance = _balanceOf(acc);
+      final holder = (acc['holderType'] ?? 'Customer').toString();
+      if (_filter == 'funded' && balance <= 0.009) return false;
+      if (_filter == 'parent' && !_isParentAccount(acc)) return false;
+      if (_filter == 'staff' && holder != 'Staff') return false;
+      if (_filter == 'student' && holder != 'Student') return false;
+      if (query.isEmpty) return true;
+      final haystack = [
+        acc['accountName'],
+        acc['name'],
+        acc['accountNumber'],
+        acc['bankName'],
+        acc['phone'],
+      ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
+      return haystack.contains(query);
+    }).toList();
+  }
+
+  Future<void> _loadParentStats() async {
+    List<SchoolParent> parents = const [];
     try {
-      final res = await _repository.sweepVirtualAccount(
-        account['accountNumber'],
-        amount,
-      );
-
-      if (mounted) Navigator.pop(context);
-
-      if (res['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(res['message'] ?? 'Funds swept successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-
-        if (mounted) {
-          context.read<FinanceBloc>().add(RefreshDashboardSummary());
-        }
-
-        _fetchAccounts();
-      } else {
-        throw Exception(res['message'] ?? 'Sweep operation failed');
-      }
-    } catch (e) {
-      if (mounted) Navigator.pop(context);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(friendlyApiError(
-              e,
-              fallback: 'Could not sweep funds. Please try again.',
-            )),
-            backgroundColor: Colors.red,
-          ),
-        );
+      parents = await context.read<SchoolRepository>().getParents();
+    } catch (_) {
+      try {
+        parents = context.read<SchoolBloc>().state.parents;
+      } catch (_) {}
+    }
+    final numbers = <String>{};
+    for (final parent in parents) {
+      final canonical = (parent.virtualAccountNumber ?? '').trim();
+      if (canonical.isNotEmpty) numbers.add(canonical);
+      for (final account in parent.virtualAccounts) {
+        final number = account.accountNumber.trim();
+        if (number.isNotEmpty) numbers.add(number);
       }
     }
+    if (!mounted) return;
+    setState(() {
+      _parentCount = parents.length;
+      _parentAccountNumbers = numbers;
+    });
   }
 
   @override
@@ -570,7 +583,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
       backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'Virtual Accounts Sweep',
+          'Virtual Accounts',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -627,18 +640,148 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                       ),
                     ),
                   ),
+                if (_accounts.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? theme.colorScheme.surface
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? theme.dividerColor
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total funds',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₦${NumberFormat('#,##0.00').format(_totalFunds)}',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: _totalFunds > 0
+                                  ? (isDark
+                                      ? Colors.greenAccent
+                                      : Colors.green.shade700)
+                                  : (isDark
+                                      ? Colors.grey.shade300
+                                      : Colors.grey.shade800),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _countTile(
+                                  'Parents with funds',
+                                  '$_parentsWithFunds',
+                                  isDark,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _countTile(
+                                  'Total parents',
+                                  '$_shownParentCount',
+                                  isDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search name or account number',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
+                      filled: true,
+                      fillColor: isDark
+                          ? theme.colorScheme.surface
+                          : Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? theme.dividerColor
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? theme.dividerColor
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 48,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    children: [
+                      _filterChip('All', 'all', isDark),
+                      _filterChip('With funds', 'funded', isDark),
+                      _filterChip('Parents', 'parent', isDark),
+                      _filterChip('Staff', 'staff', isDark),
+                      _filterChip('Students', 'student', isDark),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: _accounts.isEmpty
                       ? _buildEmptyState()
-                      : RefreshIndicator(
+                      : _visibleAccounts.isEmpty
+                          ? const Center(
+                              child: Text('No accounts match this search.'),
+                            )
+                          : RefreshIndicator(
                           onRefresh: _fetchAccounts,
                           child: ListView.separated(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _accounts.length,
+                            itemCount: _visibleAccounts.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 12),
                             itemBuilder: (context, index) {
-                              final acc = _accounts[index];
+                              final acc = _visibleAccounts[index];
                               final balance =
                                   (acc['balance'] as num?)?.toDouble() ?? 0.0;
                               final holder =
@@ -750,48 +893,13 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                                                 ),
                                               ],
                                             ),
-                                            Row(
-                                              children: [
-                                                IconButton(
-                                                  icon: const Icon(
-                                                      Icons.history,
-                                                      color: Colors.blue),
-                                                  onPressed: () =>
-                                                      _showHistory(acc),
-                                                  tooltip: 'Transactions',
-                                                ),
-                                                const SizedBox(width: 4),
-                                                ElevatedButton.icon(
-                                                  onPressed: balance > 0
-                                                      ? () =>
-                                                          _sweepFunds(acc)
-                                                      : null,
-                                                  icon: const Icon(
-                                                      Icons
-                                                          .currency_exchange,
-                                                      size: 14),
-                                                  label: const Text('Sweep'),
-                                                  style: ElevatedButton
-                                                      .styleFrom(
-                                                    backgroundColor: isDark
-                                                        ? Colors.green.shade800
-                                                        : Colors.green.shade700,
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    elevation: 0,
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 16,
-                                                        vertical: 8),
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius
-                                                              .circular(10),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                            IconButton(
+                                              icon: const Icon(
+                                                  Icons.history,
+                                                  color: Colors.blue),
+                                              onPressed: () =>
+                                                  _showHistory(acc),
+                                              tooltip: 'Transactions',
                                             ),
                                           ],
                                         ),
@@ -806,6 +914,45 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _countTile(String label, String value, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip(String label, String value, bool isDark) {
+    final selected = _filter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => setState(() => _filter = value),
+        selectedColor: isDark ? Colors.indigo.shade700 : Colors.indigo.shade50,
+        labelStyle: TextStyle(
+          color: selected
+              ? (isDark ? Colors.white : Colors.indigo.shade800)
+              : (isDark ? Colors.grey.shade300 : Colors.grey.shade800),
+          fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+        ),
+      ),
     );
   }
 

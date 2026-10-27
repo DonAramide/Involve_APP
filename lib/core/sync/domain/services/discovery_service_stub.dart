@@ -9,6 +9,7 @@ class DiscoveryService {
     required String deviceId,
     required String deviceName,
     required bool isMaster,
+    String? hardwareId,
     String? authToken,
   }) async {
     // No-op on Web

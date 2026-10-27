@@ -259,6 +259,7 @@ export class PosService {
         this.tryHydrateProfilesFromLegacyJson();
       }
       this.repairNibssSecretsFromLegacy();
+      this.applyNibssHostDefaults();
       console.log(`[POS Service] Config loaded from Supabase (key_version=${data.key_version}, config_version=${data.config_version}, profiles=${this.routingConfig.tenantRoutingProfiles?.length || 0})`);
     } catch (e: any) {
       console.error('[POS Service] Failed to load config:', e.message);
@@ -865,8 +866,21 @@ export class PosService {
   //  PUBLIC API
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /** Fill blank NIBSS IP/port with production switch defaults (admin drawer shows these without Save). */
+  static applyNibssHostDefaults(): void {
+    const nibss = this.routingConfig.hosts?.find(
+      (h) => String(h.hostCode || '').toLowerCase() === 'nibss',
+    );
+    if (!nibss) return;
+    if (!String(nibss.ip || '').trim()) nibss.ip = '196.6.103.18';
+    if (!nibss.port || Number(nibss.port) <= 0 || Number(nibss.port) === 4018) {
+      nibss.port = 5001;
+    }
+  }
+
   static async getRoutingConfig() {
     this.repairNibssSecretsFromLegacy();
+    this.applyNibssHostDefaults();
     return this.routingConfig;
   }
 
@@ -1114,6 +1128,8 @@ export class PosService {
     const pan: string = params.emvData?.pan ?? params.emvData?.cardNo ?? '';
     const cardScheme = this.detectCardScheme(pan);
     const transactionType = params.emvData?.transactionType || 'PURCHASE';
+    const isBalance = /balance/i.test(String(transactionType));
+    const bookedAmount = isBalance ? 0 : params.amount;
 
     // Ensure tenant category + agent are cached before scoped profile resolution
     if (params.tenantId && params.tenantId !== 'default') {
@@ -1130,7 +1146,7 @@ export class PosService {
         terminalGroup: this.resolveTerminalGroup(),
       }
     );
-    console.log(`\n[POS Gateway] ▶ Routing ₦${params.amount} transaction → ${route.name}`);
+    console.log(`\n[POS Gateway] ▶ Routing ₦${bookedAmount} transaction → ${route.name}`);
     console.log(`[POS Gateway]   Terminal: ${params.terminalId} | Tenant: ${params.tenantId}`);
 
     // Pre-log the transaction as Pending
@@ -1141,7 +1157,7 @@ export class PosService {
       tenantId:    params.tenantId || 'Unknown',
       tenantName:  null as string | null,
       terminalId:  params.terminalId,
-      amount:      params.amount,
+      amount:      bookedAmount,
       status:      'Pending',
       statusCode:  '',
       date:        new Date().toISOString(),
@@ -1178,7 +1194,7 @@ export class PosService {
       id: pendingId,
       tenant_id: params.tenantId,
       terminal_id: params.terminalId,
-      amount: params.amount,
+      amount: bookedAmount,
       status: 'Pending',
       host: route.name,
       masked_pan: pendingEntry.maskedPan,
@@ -1188,7 +1204,7 @@ export class PosService {
       items_jsonb: params.items || [],
       raw_request: {
         terminalId: params.terminalId,
-        amount: params.amount,
+        amount: bookedAmount,
         host: route.name,
         staffName: params.staffName || 'System',
         rrn: pendingRrn,
@@ -1246,7 +1262,7 @@ export class PosService {
     await this.updateTransaction(pendingId, params, response);
     return FeeShadowIntegration.afterPosResult(response, {
       tenantId: params.tenantId,
-      amountNaira: params.amount,
+      amountNaira: bookedAmount,
       rrn: response?.rrn,
       stan: (response as any)?.stan,
       terminalId: params.terminalId,
@@ -1774,7 +1790,8 @@ export class PosService {
       ssl,
     );
 
-    // Device-packed ISO is authoritative — never invent STAN/RRN/MCC for Quasar.
+    // Device-packed ISO is authoritative. Quasar forwards packed_iso_hex unchanged.
+    // Rebuilding it (to drop field 120) also drops the MAC, and the host then closes.
     const packedHex = String(params.emvData?.packedIsoMessage || '').replace(/\s/g, '');
 
     console.log(
@@ -1790,6 +1807,12 @@ export class PosService {
 
     // Prefer DE55 from packed ISO — IsoMessageBuilder may rewrite 9F34 after EmvDetailResult.iccData
     // was snapshotted; Quasar rejects icc_token when it does not match packed field 55.
+    if (fields && !String(fields['128'] || '').trim() && !String(fields['64'] || '').trim()) {
+      throw new Error(
+        'PACKED_ISO_MAC_REQUIRED: packed ISO has no field 128 or 64. ' +
+          'The host closes the socket when the MAC is missing.',
+      );
+    }
     const iccFromPacked = String(fields?.['55'] || '').replace(/\s/g, '');
     const iccFromEmv = String(
       params.emvData?.iccData ||
@@ -1835,15 +1858,19 @@ export class PosService {
       }
     }
 
-    delete fields['55']; // Quasar injects DE55 from icc_token
     const stan = fields['11'].trim();
     const rrn = fields['37'].trim();
+    const mti = String(fields['0'] || '').trim();
+    const macField = String(fields['128'] || '').trim()
+      ? '128'
+      : String(fields['64'] || '').trim()
+        ? '64'
+        : 'in-packed-hex';
     const reference = `card_${rrn}_${stan}_${params.terminalId}`;
 
-    if (!fields['0']) fields['0'] = '0200';
-    if (!fields['41']) {
-      fields['41'] = String(params.terminalId).slice(0, 8).padEnd(8, ' ');
-    }
+    console.log(
+      `[POS Gateway] Forwarding packed ISO unchanged mti=${mti || 'unknown'} mac=${macField} f55=${iccHex.length / 2}B`,
+    );
 
     try {
       const { getQuasarService } = require('../integrations/quasar/factory');
@@ -1873,6 +1900,10 @@ export class PosService {
         result?.outcome === 'APPROVED' ||
         result?.status === 'APPROVED';
       const statusCode = String(result?.responseCode || result?.statusCode || (approved ? '00' : '05'));
+      const responseFields =
+        result?.fields || result?.isoFields || result?.iso_fields || result?.response_fields || {};
+      const field54 = responseFields?.['54'] ?? responseFields?.[54] ?? result?.field54;
+      const balance = this.additionalAmountNaira(field54);
 
       console.log(
         `[POS Gateway] ✓ Quasar card-transaction ${approved ? 'APPROVED' : 'DECLINED'} ` +
@@ -1890,6 +1921,7 @@ export class PosService {
         stan: result?.stan || stan,
         maskedPan: this.maskPan(String(params.emvData?.pan || params.emvData?.cardNo || '')),
         authCode: result?.authCode || result?.auth_code || '',
+        balance: balance || undefined,
         host: route.name as any,
         isoFields: result?.fields || result?.isoFields || undefined,
       };
@@ -1971,6 +2003,29 @@ export class PosService {
     const rrn =
       String(packed?.['37'] || emv?.rrn || (emv as any)?.field37 || '').trim() || 'N/A';
     return { rrn, stan };
+  }
+
+  /** NIBSS field 54 additional amount, formatted as naira. */
+  private static additionalAmountNaira(field54: unknown): string {
+    const raw = String(field54 || '').replace(/\s/g, '');
+    if (raw.length < 20) return '';
+    let preferred = '';
+    let fallback = '';
+    for (let index = 0; index + 20 <= raw.length; index += 20) {
+      const chunk = raw.slice(index, index + 20);
+      const amountType = chunk.slice(2, 4);
+      const sign = chunk[7];
+      const minor = Number(chunk.slice(8, 20));
+      if (!Number.isFinite(minor)) continue;
+      const signed = sign === 'D' || sign === 'd' ? -minor : minor;
+      const formatted = (signed / 100).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      if (amountType === '02' || amountType === '01') preferred = formatted;
+      else if (!fallback) fallback = formatted;
+    }
+    return preferred || fallback;
   }
 
   /**

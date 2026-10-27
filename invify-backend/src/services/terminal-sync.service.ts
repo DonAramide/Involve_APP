@@ -4,23 +4,9 @@ import { TerminalInventoryService } from './terminal-inventory.service';
 import { TerminalAuditService } from './terminal-audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { PosService } from './pos.service';
+import { resolvePosHosts } from './pos-host-endpoint';
 
 export class TerminalSyncService {
-
-  private static resolveNibssEndpoint(
-    activeHosts: any[],
-    primaryHost: any | null,
-  ): { nibssIp: string | null; nibssPort: number | null; nibssSsl: boolean } {
-    const nibssHost =
-      activeHosts.find((h: any) => String(h.hostCode || '').toLowerCase() === 'nibss') ||
-      (String(primaryHost?.hostCode || '').toLowerCase() === 'nibss' ? primaryHost : null) ||
-      null;
-    return {
-      nibssIp: nibssHost?.ip || null,
-      nibssPort: nibssHost?.port != null ? Number(nibssHost.port) : null,
-      nibssSsl: !!(nibssHost?.sslEnabled ?? (nibssHost ? true : false)),
-    };
-  }
 
   /**
    * Prefer one row when duplicates exist (maybeSingle fails on >1 with PGRST116).
@@ -309,28 +295,18 @@ export class TerminalSyncService {
     }
 
     const routingConfig = await PosService.getRoutingConfig();
-
-    const activeHosts = routingConfig.hosts
-      .filter((h: any) => h.isActive)
-      .sort((a: any, b: any) => a.priority - b.priority);
-
-    const expressPay = activeHosts.find((h: any) => h.hostCode === 'express_pay');
-    const kimono = activeHosts.find((h: any) => h.hostCode === 'kimono');
-    const activeCode = String(routingConfig.activeHost || '').toLowerCase();
-
-    // Prefer the configured activeHost, not merely the lowest priority active row
-    const primaryHost =
-      activeHosts.find((h: any) => String(h.hostCode || '').toLowerCase() === activeCode) ||
-      activeHosts[0] ||
-      null;
-    const secondaryHost = activeHosts.find((h: any) => h !== primaryHost) || null;
-    const tertiaryHost =
-      activeHosts.find((h: any) => h !== primaryHost && h !== secondaryHost) || null;
+    const {
+      expressPay,
+      kimono,
+      primaryHost,
+      secondaryHost,
+      tertiaryHost,
+      nibssEndpoint,
+    } = resolvePosHosts(routingConfig);
 
     const tenantCategory = tenantDetails?.type || 'retail';
     const agentCode = tenantDetails?.agent_code || null;
     const terminalGroup = PosService.resolveTerminalGroup();
-    const nibssEndpoint = this.resolveNibssEndpoint(activeHosts, primaryHost);
 
     let tenantPolicy = null;
     if (routingConfig.tenantRoutingProfiles) {
@@ -345,9 +321,9 @@ export class TerminalSyncService {
     console.log(
       `[TerminalSync] Profile resolve tenant=${resolvedTenantId || 'n/a'} category=${tenantCategory} ` +
         `group=${terminalGroup || 'n/a'} → ` +
-        (tenantPolicy
-          ? `${tenantPolicy.scopeType}/${tenantPolicy.targetValue || tenantPolicy.category} processOnDevice=${!!tenantPolicy.processOnDevice}`
-          : 'none (processOnDevice defaults false)'),
+          (tenantPolicy
+            ? `${tenantPolicy.scopeType}/${tenantPolicy.targetValue || tenantPolicy.category} processOnDevice=${!!tenantPolicy.processOnDevice} sendField120=${tenantPolicy.sendField120 === true}`
+            : 'none (processOnDevice defaults false, sendField120 defaults false)'),
     );
 
     const hasMpos = !!bundle?.mpos;
@@ -415,6 +391,7 @@ export class TerminalSyncService {
         failoverOrder: routingConfig.failoverOrder,
         splitThresholdNaira: routingConfig.splitThresholdNaira,
         processOnDevice: tenantPolicy?.processOnDevice ?? false,
+        sendField120: tenantPolicy?.sendField120 === true,
         webhookUrl: tenantPolicy?.webhookUrl ?? null,
         preferredHosts: tenantPolicy?.preferredHosts || [],
         fallbackHosts: tenantPolicy?.fallbackHosts || [],
@@ -485,24 +462,14 @@ export class TerminalSyncService {
     }
 
     const routingConfig = await PosService.getRoutingConfig();
-
-    const activeHosts = routingConfig.hosts
-      .filter((h: any) => h.isActive)
-      .sort((a: any, b: any) => a.priority - b.priority);
-
-    const expressPay = activeHosts.find((h: any) => h.hostCode === 'express_pay');
-    const kimono = activeHosts.find((h: any) => h.hostCode === 'kimono');
-    const activeCode = String(routingConfig.activeHost || '').toLowerCase();
-
-    // Prefer the configured activeHost, not merely the lowest priority active row
-    const primaryHost =
-      activeHosts.find((h: any) => String(h.hostCode || '').toLowerCase() === activeCode) ||
-      activeHosts[0] ||
-      null;
-    const secondaryHost = activeHosts.find((h: any) => h !== primaryHost) || null;
-    const tertiaryHost =
-      activeHosts.find((h: any) => h !== primaryHost && h !== secondaryHost) || null;
-    const nibssEndpoint = this.resolveNibssEndpoint(activeHosts, primaryHost);
+    const {
+      expressPay,
+      kimono,
+      primaryHost,
+      secondaryHost,
+      tertiaryHost,
+      nibssEndpoint,
+    } = resolvePosHosts(routingConfig);
 
     const hasMpos = !!bundle?.mpos;
     const hasPrinter = !!bundle?.printer;

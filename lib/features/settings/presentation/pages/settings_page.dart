@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -601,6 +602,19 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.cloud_download_rounded, color: Colors.orange),
+            title: const Text('Restore school data from the web'),
+            subtitle: const Text('Copy students, staff, fees, bills, classes, and results from the dashboard onto this device'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              if (state.userPlan?.hasOnlineAccess != true) {
+                showDialog(context: context, builder: (_) => const UpgradeDialog());
+                return;
+              }
+              await _restoreSchoolFromWeb();
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.cloud_sync_rounded, color: Colors.teal),
             title: const Text('Web Sync (Full Cloud Sync)'),
             subtitle: Text(
@@ -647,10 +661,32 @@ class _SettingsPageState extends State<SettingsPage> {
     return sl<FinanceApiClient>();
   }
 
+  Future<void> _restoreSchoolFromWeb() async {
+    if (!mounted) return;
+    try {
+      final restored = await ProgressDialogUtils.showDancingProgress(context, () async {
+        final client = _safeClient();
+        final db = context.read<SettingsBloc>().backupService.database;
+        return WebCloudSyncService.pullSchoolRoster(database: db, client: client);
+      });
+      if (!mounted) return;
+      context.read<SettingsBloc>().add(LoadSettings());
+      context.read<StaffBloc>().add(LoadStaffList());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(restored?.banner ?? 'No school records are on the web portal yet.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not download school data.'))),
+      );
+    }
+  }
+
   Future<void> _triggerWebCloudSync() async {
     if (!mounted) return;
     try {
-      await ProgressDialogUtils.showDancingProgress(context, () async {
+      await ProgressDialogUtils.showUpdatableProgress(context, (setMessage) async {
         final dbPath = await context.read<SettingsBloc>().backupService.getDatabasePath();
         final file = File(dbPath);
         
@@ -664,16 +700,33 @@ class _SettingsPageState extends State<SettingsPage> {
         }
 
         final client = _safeClient();
-
-        // 1. Send database backup file (full SQLite copy to backend)
-        final formData = FormData.fromMap({
-          'backup_file': await MultipartFile.fromFile(dbPath, filename: 'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db'),
-        });
-        await client.post('/api/admin/claude-backup', data: formData);
-
-        // 2. Bulk-sync local items/products to Supabase via backend
         final db = context.read<SettingsBloc>().backupService.database;
+
+        void queueClaudeBackup() {
+          unawaited(() async {
+            try {
+              final formData = FormData.fromMap({
+                'backup_file': await MultipartFile.fromFile(
+                  dbPath,
+                  filename:
+                      'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db',
+                ),
+              });
+              await client.post(
+                '/api/admin/claude-backup',
+                data: formData,
+                options: Options(
+                  sendTimeout: const Duration(seconds: 25),
+                  receiveTimeout: const Duration(seconds: 25),
+                ),
+              );
+            } catch (e) {
+              debugPrint('Claude backup skipped: $e');
+            }
+          }());
+        }
         if (db != null) {
+          setMessage('Uploading products...');
           final localItems = await db.select(db.items).get();
           
           if (localItems.isNotEmpty) {
@@ -705,6 +758,7 @@ class _SettingsPageState extends State<SettingsPage> {
           }
 
           // 3. Bulk-sync local customers to Supabase via backend
+          setMessage('Uploading customers...');
           final localCustomers = await db.select(db.customers).get();
           if (localCustomers.isNotEmpty) {
             final customerPayloads = localCustomers.map((c) => {
@@ -730,6 +784,7 @@ class _SettingsPageState extends State<SettingsPage> {
           }
 
           // 3b. Bulk-sync staff (incl. personal salary bank) to tenant admin
+          setMessage('Uploading staff...');
           try {
             final localStaff = await db.select(db.staff).get();
             if (localStaff.isNotEmpty) {
@@ -766,7 +821,17 @@ class _SettingsPageState extends State<SettingsPage> {
             debugPrint('Bulk staff sync error: $staffErr');
           }
 
-          // 4. Bulk-sync local invoices (transactions) to Supabase via backend
+          // 4. School roster first so invoice student IDs already exist on the portal
+          setMessage('Uploading school records...');
+          try {
+            await WebCloudSyncService.pushSchoolRoster(database: db, client: client);
+          } catch (schoolErr) {
+            debugPrint('School bulk sync error: $schoolErr');
+            rethrow;
+          }
+
+          // 5. Bulk-sync local invoices (transactions) to Supabase via backend
+          setMessage('Uploading invoices...');
           final localInvoices = await db.select(db.invoices).get();
           if (localInvoices.isNotEmpty) {
             final List<Map<String, dynamic>> invoicePayloads = [];
@@ -798,24 +863,28 @@ class _SettingsPageState extends State<SettingsPage> {
               );
             }
 
+            final allInvoiceItems = await db.select(db.invoiceItems).get();
+            final itemsByInvoiceId = <int, List<dynamic>>{};
+            for (final ii in allInvoiceItems) {
+              itemsByInvoiceId.putIfAbsent(ii.invoiceId, () => []).add(ii);
+            }
+            final itemById = {for (final it in localItems) it.id: it};
+
             for (final inv in localInvoices) {
-              final itemsForInv = await (db.select(db.invoiceItems)..where((ii) => ii.invoiceId.equals(inv.id))).get();
+              final itemsForInv = itemsByInvoiceId[inv.id] ?? const [];
 
-              final itemsPayload = itemsForInv.map((ii) => {
-                'invoiceItemSyncId': ii.syncId,
-                'productSyncId': null,
-                'itemId': ii.itemId.toString(),
-                'quantity': ii.quantity,
-                'unitPrice': ii.unitPrice,
-                'type': ii.type,
+              final itemsPayload = itemsForInv.map((ii) {
+                final itemId = ii.itemId as int?;
+                final localItem = itemId != null ? itemById[itemId] : null;
+                return {
+                  'invoiceItemSyncId': ii.syncId,
+                  'productSyncId': localItem?.syncId,
+                  'itemId': itemId?.toString(),
+                  'quantity': ii.quantity,
+                  'unitPrice': ii.unitPrice,
+                  'type': ii.type,
+                };
               }).toList();
-
-              for (final itemPayload in itemsPayload) {
-                final localItem = await (db.select(db.items)..where((it) => it.id.equals(int.parse(itemPayload['itemId'] as String)))).getSingleOrNull();
-                if (localItem != null) {
-                  itemPayload['productSyncId'] = localItem.syncId;
-                }
-              }
 
               final studentRow = inv.studentId != null ? studentsById[inv.studentId!] : null;
               final studentSyncId = studentRow != null ? studentCloudId(studentRow) : null;
@@ -865,7 +934,8 @@ class _SettingsPageState extends State<SettingsPage> {
             }
           }
 
-          // 4b. Service jobs + payments → tenant admin
+          // 5b. Service jobs + payments → tenant admin
+          setMessage('Uploading services...');
           try {
             final jobs = await db.select(db.serviceJobs).get();
             if (jobs.isNotEmpty) {
@@ -907,15 +977,9 @@ class _SettingsPageState extends State<SettingsPage> {
           } catch (svcErr) {
             debugPrint('Bulk services sync error: $svcErr');
           }
-
-          // 5. School-mode roster + academics → web portal
-          try {
-            await WebCloudSyncService.pushSchoolRoster(database: db, client: client);
-          } catch (schoolErr) {
-            debugPrint('School bulk sync error: $schoolErr');
-            rethrow;
-          }
         }
+
+        queueClaudeBackup();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -925,7 +989,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           );
         }
-      }, message: 'Synchronizing all data to Web Portal...');
+      }, initialMessage: 'Syncing to web portal...');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

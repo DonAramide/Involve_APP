@@ -53,7 +53,13 @@ export class FakeLedgerDb {
   private async rpcNow(fn: string, args: Row): Promise<{ data: any; error: any }> {
     this.rpcCalls.push({ fn, args });
     try {
-      if (fn === 'process_ledger_double_entry') return { data: this.processDoubleEntry(args), error: null };
+      if (fn === 'process_ledger_double_entry' || fn === 'process_ledger_double_entry_text') {
+        return { data: this.processDoubleEntry(args), error: null };
+      }
+      if (fn === 'allocate_parent_credit') {
+        return { data: this.allocateParentCredit(args), error: null };
+      }
+      if (fn === 'reserve_school_withdrawal') return { data: this.reserveWithdrawal(args), error: null };
       if (fn === 'request_payout_with_lock') return { data: this.requestPayout(args), error: null };
       if (fn === 'request_treasury_withdrawal_with_fee') return { data: this.requestTreasury(args), error: null };
       if (fn === 'post_fee_debit_guarded') return { data: this.postFeeDebit(args), error: null };
@@ -61,6 +67,33 @@ export class FakeLedgerDb {
     } catch (err: any) {
       return { data: null, error: { message: err.message } };
     }
+  }
+
+  private allocateParentCredit(args: Row) {
+    const tenantId = String(args.p_tenant_id || '').trim().toLowerCase();
+    const key = String(args.p_idempotency_key || '');
+    const amount = Number(args.p_amount);
+    if (!key.startsWith(`alloc:${tenantId}:`)) {
+      throw new Error('PARENT_ALLOC_INVALID_KEY');
+    }
+    if (!(amount > 0) || !Number.isFinite(amount) || amount !== Math.trunc(amount * 100) / 100) {
+      throw new Error('PARENT_ALLOC_INVALID_AMOUNT');
+    }
+    if (this.tables.ledgers.some((l) => l.idempotency_key === key)) {
+      return { status: 'DE-DUPLICATED' };
+    }
+    const available = this.accountBalance(tenantId, 'PARENT_LIABILITY');
+    if (amount > available) throw new Error('INSUFFICIENT_PARENT_LIABILITY');
+    return this.processDoubleEntry({
+      p_tenant_id: tenantId,
+      p_idempotency_key: key,
+      p_reference: args.p_reference,
+      p_entries: [
+        { account: 'PARENT_LIABILITY', type: 'DEBIT', amount },
+        { account: 'USER_WALLET', type: 'CREDIT', amount },
+      ],
+      p_metadata: args.p_metadata,
+    });
   }
 
   private processDoubleEntry(args: Row) {
@@ -107,6 +140,27 @@ export class FakeLedgerDb {
       else this.tables.wallets.push({ id: randomUUID(), tenant_id: p_tenant_id, balance: walletDelta });
     }
     return { status: 'CREATED', ledger_id: ledgerId };
+  }
+
+  private reserveWithdrawal(args: Row) {
+    const tenantId = args.p_tenant_id;
+    const key = String(args.p_idempotency_key || '');
+    const amount = Number(args.p_amount);
+    if (!this.tables.withdrawal_reservations) this.tables.withdrawal_reservations = [];
+    const existing = this.tables.withdrawal_reservations.find((row) => row.idempotency_key === key);
+    if (existing) return { status: 'DE-DUPLICATED' };
+    const reserved = this.tables.withdrawal_reservations
+      .filter((row) => row.tenant_id === tenantId)
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const pool = this.walletBalance(tenantId);
+    if (reserved + amount > pool) throw new Error('INSUFFICIENT_BALANCE');
+    this.tables.withdrawal_reservations.push({
+      id: randomUUID(),
+      tenant_id: tenantId,
+      idempotency_key: key,
+      amount,
+    });
+    return { status: 'RESERVED' };
   }
 
   private requestTreasury(args: Row) {
@@ -198,6 +252,14 @@ class FakeQuery implements PromiseLike<{ data: any; error: any; count?: number }
   }
   in(col: string, values: any[]) {
     this.filters.push((row) => values.includes(row[col]));
+    return this;
+  }
+  filter(expr: string, op: string, value: any) {
+    const match = expr.match(/^payload->>\s*(.+)$/);
+    if (match && op === 'eq') {
+      const key = match[1];
+      this.filters.push((row) => row.payload?.[key] === value);
+    }
     return this;
   }
   like(col: string, pattern: string) {

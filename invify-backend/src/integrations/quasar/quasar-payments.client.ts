@@ -748,6 +748,12 @@ export class QuasarPaymentsClient {
     }
   }
 
+  /** GET /school/students/{childId}/virtual-account — fetch an already-provisioned VA. */
+  async getVirtualAccount(childId: string, opts?: RequestOptions): Promise<any> {
+    const path = `/school/students/${encodeURIComponent(childId)}/virtual-account`;
+    return this.client.get(path, opts);
+  }
+
   /**
    * POST /payments/intents/{reference}/refunds
    * Existing payment-intent refund. Amount is kobo.

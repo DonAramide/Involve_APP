@@ -140,6 +140,7 @@ describe('transfer rejection classification', () => {
     ['ETIMEDOUT', () => Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }), false],
     ['statusCode 400', () => ({ statusCode: 400 }), true],
     ['QuasarApiError responseCode 400', () => ({ responseCode: '400', message: 'property destination should not exist' }), true],
+    ['PlatformTransferSettings missing', () => new Error('No metadata for "PlatformTransferSettings" was found.'), true],
     ['Quasar responseCode 99', () => ({ responseCode: '99' }), false],
   ])('%s → definitive=%s', (_label, makeErr, expected) => {
     expect(isDefinitiveTransferRejection(makeErr())).toBe(expected);

@@ -881,6 +881,8 @@
 
           <q-separator :dark="prefs.isDarkMode" />
           <q-toggle v-model="profileForm.processOnDevice" label="Process Transactions Directly on MPOS Device" color="purple-3" :dark="prefs.isDarkMode" />
+          <q-toggle v-model="profileForm.sendField120" label="Send ISO field 120 (GPS location)" color="purple-3" :dark="prefs.isDarkMode" />
+          <div class="text-caption text-grey-6 q-mb-sm">Off by default. Leave off so card payments do not include field 120.</div>
           <q-input v-if="profileForm.processOnDevice" v-model="profileForm.webhookUrl" filled label="Webhook Endpoint URL" placeholder="https://your.webhook.com/api/pos/transaction" :dark="prefs.isDarkMode" hint="Endpoint to hit after device processing succeeds/fails" />
 
           <q-slide-transition>
@@ -1121,6 +1123,7 @@ const profileForm = ref({
   preferredHosts: [],
   fallbackHosts: [],
   processOnDevice: false,
+  sendField120: false,
   webhookUrl: '',
   amountThresholds: [],
   transactionTypeRules: []
@@ -1794,6 +1797,7 @@ const openProfileDialog = (profile = null) => {
       preferredHosts: [...(profile.preferredHosts || [])],
       fallbackHosts: [...(profile.fallbackHosts || [])],
       processOnDevice: !!profile.processOnDevice,
+      sendField120: profile.sendField120 === true,
       webhookUrl: profile.webhookUrl || '',
       amountThresholds: (profile.amountThresholds || []).map(r => ({ ...r })),
       transactionTypeRules: (profile.transactionTypeRules || []).map(r => ({ ...r })),
@@ -1808,6 +1812,7 @@ const openProfileDialog = (profile = null) => {
       preferredHosts: [],
       fallbackHosts: [],
       processOnDevice: false,
+      sendField120: false,
       webhookUrl: '',
       amountThresholds: [],
       transactionTypeRules: []
@@ -1830,6 +1835,7 @@ const saveProfile = async () => {
   const payload = {
     ...profileForm.value,
     processOnDevice: !!profileForm.value.processOnDevice,
+    sendField120: profileForm.value.sendField120 === true,
     webhookUrl: profileForm.value.processOnDevice ? (profileForm.value.webhookUrl || '') : '',
     amountThresholds: [...(profileForm.value.amountThresholds || [])],
     transactionTypeRules: [...(profileForm.value.transactionTypeRules || [])],

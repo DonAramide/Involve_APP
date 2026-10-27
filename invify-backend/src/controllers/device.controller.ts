@@ -464,22 +464,6 @@ export class DeviceController {
       if (updateErr) throw updateErr;
       if (!updated) return res.status(409).json({ error: 'This activation was already reviewed' });
 
-      try {
-        await GovAuditService.logAction({
-          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          timestamp: new Date().toISOString(),
-          module: 'DEVICE',
-          action: 'APPROVE_ACTIVATION_CODE',
-          user_email: user.email,
-          user_name: user.name || user.email,
-          ip_address: req.socket.remoteAddress || '127.0.0.1',
-          target: updated.activation_code,
-          status: 'success',
-          tenant_id: updated.tenant_id,
-          metadata: { maker: row.created_by },
-        });
-      } catch (_) {}
-
       let emailSent = false;
       let emailedTo: string | null = null;
       let emailError: string | undefined;
@@ -492,6 +476,23 @@ export class DeviceController {
         emailError = mailErr?.message || 'The activation file could not be emailed.';
         console.error('[DeviceController] activation email failed:', emailError);
       }
+      await DeviceController.rememberActivationEmail(updated.id, emailedTo, emailSent);
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'APPROVE_ACTIVATION_CODE',
+          user_email: user.email,
+          user_name: user.name || user.email,
+          ip_address: req.socket.remoteAddress || '127.0.0.1',
+          target: updated.activation_code,
+          status: 'success',
+          tenant_id: updated.tenant_id,
+          metadata: { maker: row.created_by, emailedTo, emailSent },
+        });
+      } catch (_) {}
 
       return res.status(200).json({
         success: true,
@@ -543,6 +544,91 @@ export class DeviceController {
     } catch (error: any) {
       console.error('[DeviceController] rejectActivation Error:', error.message);
       return res.status(500).json({ error: error.message || 'Failed to reject activation' });
+    }
+  }
+
+  /**
+   * POST /devices/activations/:id/resend-email
+   * Sends the approved activation file to the tenant email again.
+   */
+  static async resendActivationEmail(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Activation id is required' });
+
+      const { data: row, error } = await supabaseAdmin
+        .from('device_activations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) return res.status(404).json({ error: 'Activation not found' });
+
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform && String(user?.tenantId || '') !== String(row.tenant_id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      if (row.status === 'awaiting_approval' || row.status === 'rejected' || !row.activation_code) {
+        return res.status(400).json({ error: 'Approve this activation before emailing it.' });
+      }
+
+      let emailSent = false;
+      let emailedTo: string | null = null;
+      let emailError: string | undefined;
+      try {
+        const delivery = await deliverApprovedTerminalActivation(row);
+        emailSent = delivery.sent;
+        emailedTo = delivery.to;
+        emailError = delivery.error;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'The activation file could not be emailed.';
+        console.error('[DeviceController] activation resend failed:', emailError);
+      }
+      await DeviceController.rememberActivationEmail(row.id, emailedTo, emailSent);
+
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'RESEND_ACTIVATION_EMAIL',
+          user_email: user?.email || 'unknown',
+          user_name: user?.name || user?.email || 'unknown',
+          ip_address: req.socket.remoteAddress || '127.0.0.1',
+          target: row.activation_code,
+          status: emailSent ? 'success' : 'failed',
+          tenant_id: row.tenant_id,
+          metadata: { emailedTo, emailSent, emailError: emailSent ? undefined : emailError },
+        });
+      } catch (_) {}
+
+      return res.status(emailSent ? 200 : 502).json({
+        success: emailSent,
+        id: row.id,
+        emailSent,
+        emailedTo,
+        emailedAt: emailSent ? new Date().toISOString() : null,
+        emailError: emailSent ? undefined : emailError,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] resendActivationEmail Error:', error.message);
+      return res.status(500).json({ error: error.message || 'Failed to resend activation email' });
+    }
+  }
+
+  private static async rememberActivationEmail(id: string, to: string | null, sent: boolean) {
+    if (!sent || !to) return;
+    const { error } = await supabaseAdmin
+      .from('device_activations')
+      .update({ emailed_to: to, emailed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      console.warn('[DeviceController] activation email stamp skipped:', error.message);
     }
   }
 
@@ -1292,7 +1378,7 @@ export class DeviceController {
       const rawId = String(req.params.deviceId || '').trim();
       const action = String(req.body?.action || '').trim().toLowerCase();
       const message = String(req.body?.message || '').trim();
-      const allowed = ['lock', 'unlock', 'notify', 'pull_sync'];
+      const allowed = ['lock', 'unlock', 'notify', 'pull_sync', 'restore_from_web'];
       if (!rawId) return res.status(400).json({ error: 'deviceId is required' });
       if (!allowed.includes(action)) {
         return res.status(400).json({ error: `action must be one of ${allowed.join(', ')}` });
@@ -1369,9 +1455,9 @@ export class DeviceController {
           deviceId: deviceKey,
           timestamp: new Date().toISOString(),
         });
-      } else if (action === 'pull_sync') {
+      } else if (action === 'pull_sync' || action === 'restore_from_web') {
         emitBoth('device_command', {
-          action: 'pull_sync',
+          action,
           deviceId: deviceKey,
           timestamp: new Date().toISOString(),
         });
@@ -1399,7 +1485,11 @@ export class DeviceController {
         deviceId: deviceKey,
         onlineRoom: room,
         passcode: passcode || undefined,
-        message: `Command ${action} sent to ${deviceKey}`,
+        message: action === 'restore_from_web'
+          ? `Asked ${deviceKey} to download school records from the web portal.`
+          : action === 'pull_sync'
+            ? `Asked ${deviceKey} to upload its records to the web portal.`
+            : `Command ${action} sent to ${deviceKey}`,
       });
     } catch (error: any) {
       const status = error.status || 500;

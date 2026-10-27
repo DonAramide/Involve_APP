@@ -92,6 +92,17 @@ class AppSettings extends Equatable {
         a == 'please re-adjust settings';
   }
 
+  /// Seed/demo phones (000-000, 000000) that must not block onboarding contact.
+  static bool isPlaceholderPhone(String? value) {
+    final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+    return digits.isEmpty || RegExp(r'^0+$').hasMatch(digits);
+  }
+
+  static bool isPlaceholderEmail(String? value) {
+    final e = (value ?? '').trim();
+    return e.isEmpty || !e.contains('@');
+  }
+
   const AppSettings({
     this.id,
     required this.organizationName,

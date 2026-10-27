@@ -44,6 +44,7 @@ class DashboardMenuCatalog {
     DashboardMenuOption(id: 'fees', label: 'Fees', modes: ['school']),
     DashboardMenuOption(id: 'subjects', label: 'Subjects', modes: ['school']),
     DashboardMenuOption(id: 'result_entry', label: 'Result Entry', modes: ['school']),
+    DashboardMenuOption(id: 'attendance', label: 'Attendance', modes: ['school']),
     DashboardMenuOption(id: 'lesson_notes', label: 'Lesson Notes', modes: ['school']),
     DashboardMenuOption(id: 'stock', label: 'Stock / Items', modes: ['retail']),
     DashboardMenuOption(id: 'inventory_report', label: 'Inventory Report', modes: ['retail']),

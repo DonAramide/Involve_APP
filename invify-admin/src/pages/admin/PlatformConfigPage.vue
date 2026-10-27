@@ -811,6 +811,7 @@ function extractQuasarIntegrationRows(res) {
     .map((row) => ({
       invifyTenantId: row.invifyTenantId || row.invify_tenant_id || '',
       quasarTenantId: row.quasarTenantId || row.quasar_tenant_id || '',
+      tenantName: row.tenantName || row.tenant_name || row.name || row.business_name || '',
       vertical: row.vertical || row.quasar_vertical || 'n/a',
       status: row.status || 'n/a',
     }))
@@ -819,7 +820,7 @@ function extractQuasarIntegrationRows(res) {
 
 const quasarIntegrationOptions = computed(() =>
   (Array.isArray(quasarIntegrations.value) ? quasarIntegrations.value : []).map((row) => ({
-    label: `${String(row.invifyTenantId).slice(0, 8)}… → ${String(row.quasarTenantId || '').slice(0, 8)}… (${row.vertical || 'n/a'} / ${row.status})`,
+    label: `${row.tenantName || 'Unnamed school'} · ${String(row.invifyTenantId).slice(0, 8)}… (${row.vertical || 'n/a'} / ${row.status})`,
     value: row.invifyTenantId,
     quasarTenantId: row.quasarTenantId,
   })),

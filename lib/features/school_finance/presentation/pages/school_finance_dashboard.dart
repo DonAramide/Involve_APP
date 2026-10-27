@@ -12,9 +12,26 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:flutter/services.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'dart:async';
+import 'package:involve_app/services/socket_service.dart';
 import 'virtual_accounts_page.dart';
+import '../withdrawal_confirmation_copy.dart';
+
+final TextInputFormatter _koboAmountFormatter = TextInputFormatter.withFunction((oldValue, newValue) {
+  final text = newValue.text;
+  if (text.isEmpty || RegExp(r'^\d+\.?\d{0,2}$').hasMatch(text) || RegExp(r'^\.\d{0,2}$').hasMatch(text)) {
+    return newValue;
+  }
+  return oldValue;
+});
+
+double _koboAmount(String raw) {
+  final value = double.tryParse(raw.trim()) ?? 0;
+  return (value * 100).round() / 100;
+}
 
 class SchoolFinanceDashboardPage extends StatefulWidget {
   const SchoolFinanceDashboardPage({super.key});
@@ -26,11 +43,24 @@ class SchoolFinanceDashboardPage extends StatefulWidget {
 class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage> {
   int _chartFilterDays = 7;
   FinanceDashboardLoaded? _lastDashboard;
+  StreamSubscription<double>? _withdrawableSub;
 
   @override
   void initState() {
     super.initState();
     context.read<FinanceBloc>().add(LoadSchoolDashboard());
+    _withdrawableSub = SocketService.withdrawableUpdates.stream.listen((available) {
+      if (!mounted) return;
+      final current = _lastDashboard?.summary.withdrawable;
+      if (current != null && (current - available).abs() < 0.01) return;
+      context.read<FinanceBloc>().add(RefreshDashboardSummary());
+    });
+  }
+
+  @override
+  void dispose() {
+    _withdrawableSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -159,7 +189,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                           value: CurrencyFormatter.formatWithSymbol(summary.totalRevenue),
                           icon: Icons.account_balance_wallet,
                           color: Colors.blue,
-                          subtitle: 'Current Year',
+                          subtitle: 'Billed collections',
                         ),
                         SummaryStatCard(
                           title: 'Outstanding',
@@ -318,7 +348,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
           ),
           const SizedBox(height: 2),
           Text(
-            'Live Quasar VA + card payments counted together',
+            'Card plus virtual-account transfers held with Quasar. A parent-wallet bill is not included here.',
             style: TextStyle(
               fontSize: 12,
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -433,7 +463,15 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
     
     showDialog(
       context: context,
-      builder: (_) => const InvifyLoadingIndicator(message: 'PREPARING SECURE PAYOUT...'),
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: InvifyLoadingIndicator(message: ''),
+        ),
+      ),
     );
 
     try {
@@ -511,14 +549,25 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                   const SizedBox(height: 24),
 
                   Text(
-                    'Available: ${CurrencyFormatter.formatWithSymbol(summary.totalRevenue)}',
+                    'Available: ${CurrencyFormatter.formatWithSymbol(summary.withdrawable)}',
                     style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.greenAccent : Colors.green),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Card, parent wallet, and school VA already used on bills. '
+                    'Charges come off this school wallet when you withdraw, not off the parent virtual account. '
+                    'Unused parent credit is not included.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   
                   TextField(
                     controller: amountController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [_koboAmountFormatter],
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
                       hintText: '0.00',
@@ -534,14 +583,34 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        final amt = double.tryParse(amountController.text) ?? 0;
-                        if (amt <= 0 || amt > summary.totalRevenue) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid amount or insufficient balance')));
+                      onPressed: () async {
+                        final amt = _koboAmount(amountController.text);
+                        if (amt <= 0 || amt > summary.withdrawable) {
+                          _showError('Enter an amount above zero that is not more than the available balance.');
                           return;
                         }
-                        Navigator.pop(context);
-                        _confirmWithdrawal(amt);
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const PopScope(
+                            canPop: false,
+                            child: Dialog(
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              child: InvifyLoadingIndicator(message: ''),
+                            ),
+                          ),
+                        );
+                        try {
+                          final quote = await repo.quotePayout(amt);
+                          if (mounted) Navigator.pop(context);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          _confirmWithdrawal(amt, quote, payout);
+                        } catch (e) {
+                          if (mounted) Navigator.pop(context);
+                          _showError(friendlyApiError(e, fallback: 'Could not calculate the service fee.'));
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1A1C1E),
@@ -563,35 +632,168 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
     }
   }
 
-  void _confirmWithdrawal(double amount) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Final Confirmation'),
-        content: Text('Are you sure you want to withdraw ${CurrencyFormatter.formatWithSymbol(amount)} to your saved bank account? This action cannot be reversed.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _performWithdrawal(amount);
-            },
-            child: const Text('Withdraw Now'),
-          ),
-        ],
-      ),
+  Widget _confirmAmountLine(String label, String value, Color ink) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: ink)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: ink)),
+      ],
     );
   }
 
-  Future<void> _performWithdrawal(double amount) async {
+  void _confirmWithdrawal(double amount, Map<String, dynamic> quote, Map<String, dynamic> payout) {
+    final codeController = TextEditingController();
+    final fee = double.tryParse('${quote['service_fee'] ?? 0}') ?? 0;
+    final total = double.tryParse('${quote['total_required'] ?? (amount + fee)}') ?? (amount + fee);
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final isDark = theme.brightness == Brightness.dark;
+        final ink = isDark ? theme.colorScheme.onSurface : const Color(0xFF1A1C1E);
+        final fill = isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFF1F3F5);
+        return AlertDialog(
+          titlePadding: const EdgeInsets.fromLTRB(28, 28, 28, 4),
+          contentPadding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 22),
+          title: Text(
+            'Final Confirmation',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, height: 1.2, color: ink),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _confirmAmountLine('Amount to your bank', CurrencyFormatter.formatWithSymbol(amount), ink),
+                const SizedBox(height: 16),
+                _confirmAmountLine('Service fee', CurrencyFormatter.formatWithSymbol(fee), ink),
+                const SizedBox(height: 18),
+                Text(
+                  'Total from available balance',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: ink),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  CurrencyFormatter.formatWithSymbol(total),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: ink),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'This action cannot be reversed.',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, height: 1.35, color: ink),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'Enter the 6-digit code from your authenticator app.',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, height: 1.35, color: ink),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 6,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 6,
+                    color: ink,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Authenticator code',
+                    labelStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: ink.withValues(alpha: 0.72)),
+                    floatingLabelStyle: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: ink),
+                    counterText: '',
+                    filled: true,
+                    fillColor: fill,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: ink, width: 1.6),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: ink, width: 1.8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: ink, width: 2.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                foregroundColor: ink,
+                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final code = codeController.text.trim();
+                if (code.length != 6) {
+                  _showError('Enter the 6-digit authenticator code.');
+                  return;
+                }
+                Navigator.pop(dialogContext);
+                _performWithdrawal(amount, code, quote, payout);
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                backgroundColor: const Color(0xFF1A1C1E),
+                foregroundColor: Colors.white,
+                textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Withdraw Now'),
+            ),
+          ],
+        );
+      },
+    ).whenComplete(codeController.dispose);
+  }
+
+  Future<void> _performWithdrawal(
+    double amount,
+    String otp,
+    Map<String, dynamic> quote,
+    Map<String, dynamic> payout,
+  ) async {
+    if (_isWithdrawing) return;
     setState(() => _isWithdrawing = true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (progressContext) => const PopScope(
+        canPop: false,
+        child: Dialog(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: InvifyLoadingIndicator(message: 'SENDING WITHDRAWAL...'),
+          ),
+        ),
+      ),
+    );
     try {
-      await context.read<FinanceRepository>().initiatePayout(amount);
+      final result = await context.read<FinanceRepository>().initiatePayout(amount, otp: otp);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Withdrawal initiated successfully!'), backgroundColor: Colors.green));
         context.read<FinanceBloc>().add(RefreshDashboardSummary());
+        _showWithdrawalSuccess(amount: amount, quote: quote, payout: payout, result: result);
       }
     } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (mounted) {
         _showError(friendlyApiError(e, fallback: 'Withdrawal failed. Please try again.'));
       }
@@ -600,7 +802,277 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
     }
   }
 
+  void _showWithdrawalSuccess({
+    required double amount,
+    required Map<String, dynamic> quote,
+    required Map<String, dynamic> payout,
+    required Map<String, dynamic> result,
+  }) {
+    final fee = double.tryParse('${result['service_fee'] ?? quote['service_fee'] ?? 0}') ?? 0;
+    final bank = (payout['bank_name'] ?? payout['bankName'] ?? '').toString().trim();
+    final accountName = (payout['account_name'] ?? payout['accountName'] ?? '').toString().trim();
+    final accountNumber = (payout['account_number'] ?? payout['accountNumber'] ?? '').toString().trim();
+    final reference = (result['reference'] ?? '').toString().trim();
+    final status = (result['status'] ?? 'PENDING').toString().trim();
+    final rawWhen = result['created_at'] ?? result['createdAt'];
+    final whenAt = DateTime.tryParse('$rawWhen') ?? DateTime.now();
+    final when = DateFormat('d MMM yyyy, h:mm a').format(whenAt);
+    final displayAmount = double.tryParse('${result['requested_amount'] ?? result['amount'] ?? amount}') ?? amount;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final isDark = theme.brightness == Brightness.dark;
+        final pending = WithdrawalConfirmationCopy.isPendingApproval(status);
+        final failed = WithdrawalConfirmationCopy.isFailed(status);
+        final statusColor = failed
+            ? Colors.red.shade700
+            : pending
+                ? Colors.orange.shade800
+                : Colors.green.shade800;
+        final statusFill = failed
+            ? Colors.red.shade50
+            : pending
+                ? Colors.orange.shade50
+                : Colors.green.shade50;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: isDark ? theme.colorScheme.surface : Colors.white,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.86,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(dialogContext),
+                      icon: Icon(
+                        Icons.close,
+                        color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: failed ? Colors.red.shade50 : Colors.green.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      failed ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+                      size: 44,
+                      color: failed ? Colors.red.shade700 : Colors.green.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    WithdrawalConfirmationCopy.title(status),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                      color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    WithdrawalConfirmationCopy.message(status),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _receiptRow(
+                    Icons.payments_outlined,
+                    'Amount',
+                    CurrencyFormatter.formatWithSymbol(displayAmount),
+                  ),
+                  _receiptRow(
+                    Icons.payments_outlined,
+                    'Service fee',
+                    CurrencyFormatter.formatWithSymbol(fee),
+                  ),
+                  _receiptRow(
+                    Icons.account_balance_outlined,
+                    'Bank',
+                    bank.isEmpty ? 'Saved bank' : bank,
+                  ),
+                  _receiptRow(
+                    Icons.person_outline,
+                    'Account name',
+                    accountName.isEmpty ? '—' : accountName,
+                  ),
+                  _receiptRow(
+                    Icons.credit_card_outlined,
+                    'Account number',
+                    accountNumber.isEmpty ? '—' : accountNumber,
+                  ),
+                  _receiptRow(
+                    Icons.calendar_today_outlined,
+                    'Date and time',
+                    when,
+                  ),
+                  _receiptRow(
+                    Icons.receipt_long_outlined,
+                    'Reference',
+                    reference.isEmpty ? '—' : reference,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          size: 18,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Status',
+                            style: TextStyle(
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? statusColor.withValues(alpha: 0.18) : statusFill,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.schedule, size: 14, color: statusColor),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    WithdrawalConfirmationCopy.statusLabel(status),
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('OK'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      Navigator.pushNamed(context, '/payout_history');
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('View transaction details'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isDark ? Colors.teal.shade200 : const Color(0xFF0F766E),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _receiptRow(IconData icon, String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 5,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                height: 1.3,
+                color: isDark ? Colors.white : const Color(0xFF1A1C1E),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Withdrawal failed'),
+        content: SingleChildScrollView(child: Text(msg)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 }

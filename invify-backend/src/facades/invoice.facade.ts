@@ -3,11 +3,10 @@ import { supabaseAdmin } from '../db/supabase';
 import { io } from '../app';
 import { GovAuditService } from '../services/gov-audit.service';
 import { randomUUID } from 'crypto';
-import { getClient } from '../db/pg';
-import { LedgerService } from '../services/ledger.service';
 import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 import { TenantAlertService } from '../services/tenant-alert.service';
 import { presentInvoice } from '../utils/present-invoice';
+import { InvoicePaymentService } from '../services/invoice-payment.service';
 
 export class InvoiceFacade {
   static presentInvoice = presentInvoice;
@@ -16,27 +15,29 @@ export class InvoiceFacade {
    * The canonical entry point for creating an invoice, shared by REST and Sync.
    * Delegates the actual ACID transaction to InvoiceApplicationService.
    */
-  static async createInvoice(payload: any, context: { tenantId: string; deviceId?: string; skipTenantEmail?: boolean }, idempotencyKey: string, correlationId?: string) {
+  static async createInvoice(payload: any, context: { tenantId: string; deviceId?: string; skipTenantEmail?: boolean; skipNotify?: boolean }, idempotencyKey: string, correlationId?: string) {
     const processed = await InvoiceApplicationService.processOfflineInvoice(payload, context, idempotencyKey, correlationId);
     
     io.to(`tenant:${context.tenantId}`).emit('finance.invoice.created', payload);
 
     // 3. WhatsApp invoice notification (non-fatal — never rolls back invoice persistence)
-    try {
-      const invoiceId = String(payload.id || payload.invoiceId || payload.syncId || idempotencyKey);
-      WhatsAppNotificationService.notifyInvoiceCreated({
-        tenantId: context.tenantId,
-        customerId: payload.customerId || payload.customer_id || null,
-        invoiceId,
-        invoiceNumber: payload.invoiceNumber || payload.localInvoiceNumber || invoiceId,
-        amount: payload.totalAmount ?? payload.total_amount ?? payload.amount,
-        currency: payload.currency || 'NGN',
-        recipientPhone: payload.customerPhone || payload.customer_phone || null,
-        customerName: payload.customerName || payload.customer_name,
-        dueDate: payload.dueDate || payload.due_date,
-      });
-    } catch (e: any) {
-      console.error('[InvoiceFacade] WhatsApp invoice notify failed (non-fatal):', e?.message || e);
+    if (!context.skipNotify) {
+      try {
+        const invoiceId = String(payload.id || payload.invoiceId || payload.syncId || idempotencyKey);
+        WhatsAppNotificationService.notifyInvoiceCreated({
+          tenantId: context.tenantId,
+          customerId: payload.customerId || payload.customer_id || null,
+          invoiceId,
+          invoiceNumber: payload.invoiceNumber || payload.localInvoiceNumber || invoiceId,
+          amount: payload.totalAmount ?? payload.total_amount ?? payload.amount,
+          currency: payload.currency || 'NGN',
+          recipientPhone: payload.customerPhone || payload.customer_phone || null,
+          customerName: payload.customerName || payload.customer_name,
+          dueDate: payload.dueDate || payload.due_date,
+        });
+      } catch (e: any) {
+        console.error('[InvoiceFacade] WhatsApp invoice notify failed (non-fatal):', e?.message || e);
+      }
     }
 
     if (!context.skipTenantEmail && !processed?.alreadyExists) {
@@ -112,6 +113,12 @@ export class InvoiceFacade {
   }
 
   static async recordPayment(tenantId: string, id: string, payload: any) {
+    const result = await InvoicePaymentService.apply(tenantId, id, payload);
+    if (result.ack === 'rejected') {
+      const err: any = new Error(result.reason || 'payment_rejected');
+      err.status = 409;
+      throw err;
+    }
     const applySideEffects = async (newStatus: string, newBalance: number) => {
       io.to(`tenant:${tenantId}`).emit('finance.invoice.payment_recorded', {
         invoiceId: id,
@@ -153,54 +160,10 @@ export class InvoiceFacade {
         console.error('[InvoiceFacade] WhatsApp receipt notify failed (non-fatal):', e?.message || e);
       }
 
-      return { success: true, newStatus, newBalance };
+      return { success: true, ack: result.ack, newStatus, newBalance, amountPaid: result.amountPaid };
     };
 
-    // Staging/containers often omit DATABASE_URL; use service-role REST path (same as invoice create).
-    if (!process.env.DATABASE_URL) {
-      const { data: inv, error: invErr } = await supabaseAdmin
-        .from('invoices')
-        .select('total_amount, amount_paid, balance_amount, payment_status')
-        .eq('id', id)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-      if (invErr || !inv) throw new Error('Invoice not found');
-
-      const newAmountPaid = Number(inv.amount_paid) + Number(payload.amount);
-      const newBalance = Number(inv.total_amount) - newAmountPaid;
-      const newStatus = newBalance <= 0 ? 'Paid' : 'Partial';
-
-      const { error: updErr } = await supabaseAdmin
-        .from('invoices')
-        .update({
-          amount_paid: newAmountPaid,
-          balance_amount: newBalance,
-          payment_status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .eq('tenant_id', tenantId);
-      if (updErr) throw new Error(`Invoice payment update failed: ${updErr.message}`);
-
-      try {
-        await LedgerService.createDoubleEntry({
-          idempotencyKey: randomUUID(),
-          tenantId,
-          reference: `PAY-${id}-${Date.now()}`,
-          entries: [
-            { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amount },
-            { account: 'USER_WALLET', type: 'CREDIT', amount: payload.amount },
-          ],
-          metadata: {
-            source: 'invoice_payment',
-            invoiceId: id,
-            paymentMethod: payload.paymentMethod,
-          },
-        });
-      } catch (ledgerErr: any) {
-        console.warn('[InvoiceFacade] Ledger recording skipped (non-critical):', ledgerErr?.message || ledgerErr);
-      }
-
+    if (result.ack === 'accepted' && result.confirmation !== 'unconfirmed') {
       await GovAuditService.logAction({
         id: `gov-${Date.now()}-${randomUUID().slice(0, 5)}`,
         timestamp: new Date().toISOString(),
@@ -211,63 +174,12 @@ export class InvoiceFacade {
         ip_address: payload.ip || '127.0.0.1',
         target: id,
         status: 'success',
-        metadata: { amount: payload.amount, method: payload.paymentMethod },
+        metadata: { amount: payload.amount, method: payload.paymentMethod, ack: result.ack },
       });
-
-      return applySideEffects(newStatus, newBalance);
     }
 
-    const client = await getClient();
-    try {
-      await client.query('BEGIN');
-      
-      const { rows } = await client.query('SELECT total_amount, amount_paid, balance_amount, payment_status FROM invoices WHERE id = $1 AND tenant_id = $2 FOR UPDATE', [id, tenantId]);
-      if (rows.length === 0) throw new Error('Invoice not found');
-      
-      const inv = rows[0];
-      const newAmountPaid = Number(inv.amount_paid) + Number(payload.amount);
-      const newBalance = Number(inv.total_amount) - newAmountPaid;
-      const newStatus = newBalance <= 0 ? 'Paid' : 'Partial';
-      
-      await client.query('UPDATE invoices SET amount_paid = $1, balance_amount = $2, payment_status = $3, updated_at = NOW() WHERE id = $4', [newAmountPaid, newBalance, newStatus, id]);
-      
-      // Ledger entry for manual payment
-      await LedgerService.createDoubleEntry({
-        idempotencyKey: randomUUID(),
-        tenantId,
-        reference: `PAY-${id}-${Date.now()}`,
-        entries: [
-          { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amount },
-          { account: 'USER_WALLET', type: 'CREDIT', amount: payload.amount }
-        ],
-        metadata: {
-          source: 'invoice_payment',
-          invoiceId: id,
-          paymentMethod: payload.paymentMethod
-        }
-      }, { pgClient: client });
-      
-      await GovAuditService.logAction({
-        id: `gov-${Date.now()}-${randomUUID().slice(0, 5)}`,
-        timestamp: new Date().toISOString(),
-        module: 'FINANCIAL',
-        action: 'INVOICE_PAYMENT_RECORDED',
-        user_email: payload.userEmail || 'system',
-        user_name: payload.userName || 'System',
-        ip_address: payload.ip || '127.0.0.1',
-        target: id,
-        status: 'success',
-        metadata: { amount: payload.amount, method: payload.paymentMethod }
-      });
-      
-      await client.query('COMMIT');
-      return applySideEffects(newStatus, newBalance);
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
+    const side = await applySideEffects(result.newStatus, result.newBalance);
+    return { ...side, ack: result.ack, reason: result.reason, confirmation: result.confirmation, amountPaid: result.amountPaid };
   }
 
   static async getTimeline(tenantId: string, id: string) {

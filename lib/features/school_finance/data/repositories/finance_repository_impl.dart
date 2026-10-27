@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../domain/entities/wallet.dart';
 import '../../domain/entities/financial_transaction.dart';
 import '../../domain/entities/student_finance_profile.dart';
@@ -75,16 +77,28 @@ class FinanceRepositoryImpl implements IFinanceRepository {
     final sales = data['salesSummary'] is Map
         ? Map<String, dynamic>.from(data['salesSummary'] as Map)
         : <String, dynamic>{};
-    final card = _n(data['cardCollected'] ?? sales['card']);
-    final va = _n(
-      data['vaTransferCollected'] ??
-          data['pendingVirtualAccountFunds'] ??
-          sales['vaTransfer'],
+    final invoiceCard = _n(sales['card'] ?? data['cardCollected']);
+    final invoiceVa = _n(sales['vaTransfer']);
+    final live = data['quasarLiveBalance'] == null ? null : _n(data['quasarLiveBalance']);
+    final billedCard = invoiceCard;
+    final billedVa = invoiceVa;
+    final quasar = billedCard + billedVa;
+    final invoiceCollected = _n(
+      sales['recordedCollected'] ?? sales['totalCollected'] ?? data['totalCollected'],
     );
-    final quasar = _n(data['quasarCollected'] ?? data['totalQuasarCollected']);
+    final wallet = _n(sales['wallet']);
+    final cashRail = _n(sales['cash'] ?? data['cashCollected']);
+    final remitted = _n(data['totalQuasarRemitted']);
+    final railBilled = cashRail + wallet + billedCard + billedVa;
+    var billedCollected = math.max(invoiceCollected, railBilled);
+    // Old APIs stuffed live leftover VA into totalRevenue. Never treat that as billed.
+    if (live != null && live > 0.009 && billedCollected + 0.01 >= railBilled + live) {
+      billedCollected = railBilled;
+    }
     final status = '${data['quasarBalanceStatus'] ?? 'ok'}';
+    final shared = data.containsKey('withdrawable');
     return SchoolFinancialSummary(
-      totalRevenue: _n(data['totalRevenue'] ?? data['totalCollected']),
+      totalRevenue: billedCollected,
       outstandingFees: _n(
         data['outstandingFees'] ?? data['outstanding'] ?? sales['totalPending'],
       ),
@@ -92,16 +106,24 @@ class FinanceRepositoryImpl implements IFinanceRepository {
       owingStudentsCount: _i(data['owingStudentsCount'] ?? metrics['owing']),
       totalStudents: _i(data['totalStudents'] ?? metrics['total']),
       lastUpdated: DateTime.tryParse('${data['lastUpdated'] ?? ''}') ?? DateTime.now(),
-      cardCollected: card,
-      vaTransferCollected: va,
+      cardCollected: billedCard,
+      vaTransferCollected: billedVa,
       cashCollected: _n(data['cashCollected'] ?? sales['cash']),
-      quasarCollected: quasar > 0.001 ? quasar : card + va,
+      quasarCollected: quasar,
       quasarLiveBalance: data['quasarLiveBalance'] == null
           ? null
           : _n(data['quasarLiveBalance']),
       invifyLoggedVa: _n(data['invifyLoggedVa']),
       quasarBalanceStatus: status,
+      withdrawable: shared ? _n(data['withdrawable']) : 0,
+      quasarRemitted: remitted,
+      sharedWithdrawable: shared,
     );
+  }
+
+  @override
+  Future<double?> syncWithdrawableCredits(List<Map<String, dynamic>> credits) {
+    return remoteDataSource.syncWithdrawableCredits(credits);
   }
 
   double _n(dynamic v) {

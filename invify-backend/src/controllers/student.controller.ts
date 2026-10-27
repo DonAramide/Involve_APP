@@ -6,6 +6,11 @@ import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { isUuid, toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
 import { rejectIfVaBlocked } from '../utils/free-trial-guard';
+import {
+  isExistingVaError,
+  last10PhoneDigits,
+  pickAccountFields,
+} from '../utils/virtual-account-recover';
 
 export class StudentController {
   /**
@@ -25,13 +30,14 @@ export class StudentController {
         return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       }
 
-      // Fee lines and local school ids are not cloud student UUIDs.
-      // Returning null lets the ledger open instead of failing the whole page.
+      if (await rejectIfVaBlocked(res, tenantId)) return;
+
+      // Local school ids / parent keys (par-*, stu-*) are not cloud student UUIDs.
       if (!isUuid(studentId)) {
+        const recovered = await StudentController.findStoredVa(tenantId, String(studentId).trim());
+        if (recovered) return res.status(200).json(recovered);
         return res.status(200).json(null);
       }
-
-      if (await rejectIfVaBlocked(res, tenantId)) return;
 
       const virtualAccount = await StudentService.getOrCreateVirtualAccount(studentId, tenantId);
       
@@ -115,36 +121,13 @@ export class StudentController {
       );
 
       // Return existing VA if already provisioned (by external key, Quasar UUID, or admission)
-      const { data: existingByExt } = await supabaseAdmin
-        .from('customers')
-        .select('virtual_account_number, virtual_account_bank, virtual_account_name, name')
-        .eq('id', invifyCustomerId)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
-      if (existingByExt?.virtual_account_number) {
-        return res.status(200).json({
-          accountNumber: existingByExt.virtual_account_number,
-          bankName: existingByExt.virtual_account_bank || 'Quasar Sandbox Bank',
-          accountName: existingByExt.virtual_account_name || existingByExt.name || fullName,
-        });
-      }
-
-      if (quasarChildId !== invifyCustomerId) {
-        const { data: existingByUuid } = await supabaseAdmin
-          .from('customers')
-          .select('virtual_account_number, virtual_account_bank, virtual_account_name, name')
-          .eq('id', quasarChildId)
-          .eq('tenant_id', tenantId)
-          .maybeSingle();
-        if (existingByUuid?.virtual_account_number) {
-          return res.status(200).json({
-            accountNumber: existingByUuid.virtual_account_number,
-            bankName: existingByUuid.virtual_account_bank || 'Quasar Sandbox Bank',
-            accountName: existingByUuid.virtual_account_name || existingByUuid.name || fullName,
-          });
-        }
-      }
+      const stored = await StudentController.findStoredVa(tenantId, externalKey, {
+        invifyCustomerId,
+        quasarChildId,
+        phone: phoneE164,
+        fullName,
+      });
+      if (stored) return res.status(200).json(stored);
 
       const { data: existingStudent } = isParentAccount
         ? { data: null }
@@ -166,32 +149,46 @@ export class StudentController {
       const quasar = await getQuasarService(tenantId);
       const reference = `VA-STU-${quasarChildId.substring(0, 8)}-${Date.now()}`;
 
-      const quasarAccount = await quasar.createVirtualAccount({
-        childId: quasarChildId,
-        parentId: tenantId,
-        email: fallbackEmail,
-        phone: phoneE164,
-        firstName: first,
-        lastName: last,
-        parentShareBps: 0,
-        metadata: {
-          type: String(externalKey).startsWith('par-') ? 'parent_account' : 'student_account',
-          tenantId,
-          admissionNumber: admission,
+      let quasarAccount: any;
+      try {
+        quasarAccount = await quasar.createVirtualAccount({
+          childId: quasarChildId,
+          parentId: tenantId,
+          email: fallbackEmail,
           phone: phoneE164,
-          phoneNumber: phoneE164,
-          customerPhone: phoneE164,
-          source: String(externalKey).startsWith('par-')
-            ? 'school_parent_provisioning'
-            : 'school_student_provisioning',
-          externalStudentKey: externalKey,
-          invifyCustomerId,
-        },
-      });
+          firstName: first,
+          lastName: last,
+          parentShareBps: 0,
+          metadata: {
+            type: String(externalKey).startsWith('par-') ? 'parent_account' : 'student_account',
+            tenantId,
+            admissionNumber: admission,
+            phone: phoneE164,
+            phoneNumber: phoneE164,
+            customerPhone: phoneE164,
+            source: String(externalKey).startsWith('par-')
+              ? 'school_parent_provisioning'
+              : 'school_student_provisioning',
+            externalStudentKey: externalKey,
+            invifyCustomerId,
+          },
+        });
+      } catch (createErr: any) {
+        const msg = String(createErr?.message || '');
+        const fromBody = pickAccountFields(createErr?.response?.data || createErr?.data);
+        const fromGet = await StudentController.fetchQuasarVa(quasar, quasarChildId);
+        const recovered = fromBody || fromGet;
+        if (!recovered?.accountNumber || !isExistingVaError(msg)) throw createErr;
+        console.log(
+          `[StudentController] Reattached existing Quasar VA ${recovered.accountNumber} for ${externalKey}`,
+        );
+        quasarAccount = recovered;
+      }
 
-      const accountNumber = quasarAccount.accountNumber;
-      const bankName = quasarAccount.bankName;
-      const accountName = (quasarAccount as any).accountName || fullName;
+      const mapped = pickAccountFields(quasarAccount) || quasarAccount;
+      const accountNumber = mapped.accountNumber;
+      const bankName = mapped.bankName || 'Quasar';
+      const accountName = mapped.accountName || (quasarAccount as any).accountName || fullName;
 
       // Prefer UUID row for students table (often uuid-typed); keep stu- key on customers for webhooks.
       // Parent accounts are never stored as child rows — they live on customers as par-*.
@@ -299,9 +296,112 @@ export class StudentController {
       const uuidHint = /uuid is expected/i.test(msg)
         ? ' Quasar requires a UUID child id; ensure the backend maps stu-* keys via toQuasarChildUuid.'
         : '';
+      if (isExistingVaError(msg)) {
+        try {
+          const tenant = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+          const key = String(req.params.studentId || '').trim();
+          const quasar = await getQuasarService(tenant);
+          const recovered = await StudentController.fetchQuasarVa(
+            quasar,
+            toQuasarChildUuid(tenant, key),
+          );
+          if (recovered?.accountNumber) {
+            return res.status(200).json(recovered);
+          }
+        } catch (recoverErr: any) {
+          console.warn('[StudentController] existing-VA recover failed:', recoverErr?.message);
+        }
+      }
       return res.status(500).json({
         error: (error.message || 'Failed to provision student virtual account') + scopeHint + uuidHint,
       });
     }
+  }
+
+  static async fetchQuasarVa(
+    quasar: any,
+    childId: string,
+  ): Promise<{ accountNumber: string; bankName: string; accountName?: string } | null> {
+    try {
+      const raw = await quasar.getVirtualAccount(childId);
+      return pickAccountFields(raw);
+    } catch (err: any) {
+      console.warn('[StudentController] getVirtualAccount miss:', err?.message || err);
+      return null;
+    }
+  }
+
+  static async findStoredVa(
+    tenantId: string,
+    externalKey: string,
+    extra?: {
+      invifyCustomerId?: string;
+      quasarChildId?: string;
+      phone?: string;
+      fullName?: string;
+    },
+  ): Promise<{ accountNumber: string; bankName: string; accountName?: string } | null> {
+    const ids = [
+      ...new Set(
+        [
+          externalKey,
+          extra?.invifyCustomerId,
+          extra?.quasarChildId,
+          extra?.quasarChildId ? `par-${extra.quasarChildId}` : '',
+          extra?.quasarChildId ? `stu-${extra.quasarChildId}` : '',
+        ].filter((id) => !!id),
+      ),
+    ];
+
+    const fromRow = (row: any, nameFallback?: string) =>
+      pickAccountFields({
+        accountNumber: row?.virtual_account_number,
+        bankName: row?.virtual_account_bank || 'Quasar',
+        accountName: row?.virtual_account_name || nameFallback || row?.name,
+      });
+
+    if (ids.length) {
+      const { data: customers } = await supabaseAdmin
+        .from('customers')
+        .select('id, name, phone, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+      for (const row of customers || []) {
+        const picked = fromRow(row, extra?.fullName);
+        if (picked) return picked;
+      }
+
+      const { data: students } = await supabaseAdmin
+        .from('students')
+        .select('id, first_name, last_name, virtual_account_number, virtual_account_bank')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+      for (const row of students || []) {
+        const picked = pickAccountFields({
+          accountNumber: row?.virtual_account_number,
+          bankName: row?.virtual_account_bank || 'Quasar',
+          accountName: `${row?.first_name || ''} ${row?.last_name || ''}`.trim() || extra?.fullName,
+        });
+        if (picked) return picked;
+      }
+    }
+
+    const want = last10PhoneDigits(extra?.phone);
+    if (want.length >= 10) {
+      const { data: byPhone } = await supabaseAdmin
+        .from('customers')
+        .select('id, name, phone, virtual_account_number, virtual_account_bank, virtual_account_name')
+        .eq('tenant_id', tenantId)
+        .not('virtual_account_number', 'is', null)
+        .ilike('phone', `%${want}%`)
+        .limit(20);
+      for (const row of byPhone || []) {
+        if (last10PhoneDigits(row?.phone) !== want) continue;
+        const picked = fromRow(row, extra?.fullName);
+        if (picked) return picked;
+      }
+    }
+
+    return null;
   }
 }

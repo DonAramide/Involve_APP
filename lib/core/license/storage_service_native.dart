@@ -24,6 +24,8 @@ class StorageService {
   static const _onlineSyncEnabledKey = 'online_sync_enabled';
   static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
   static const _linkedDashboardDefaultsKey = 'linked_device_dashboard_defaults';
+  static const _deviceLinkedKey = 'device_linked_to_tenant';
+  static const _linkedTenantModeKey = 'linked_tenant_business_mode';
 
   static const _encryptionKey = 0xAF;
 
@@ -425,6 +427,44 @@ class StorageService {
       await file.writeAsString('false');
     }
     return true;
+  }
+
+  static Future<void> markDeviceLinkedToTenant(String businessMode) async {
+    final mode = businessMode.trim();
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _deviceLinkedKey, value: 'true');
+      if (mode.isNotEmpty) {
+        await _secureStorage.write(key: _linkedTenantModeKey, value: mode);
+      }
+    } else {
+      final flag = await _getDesktopFile('device_linked_to_tenant.dat');
+      await flag.writeAsString('true');
+      if (mode.isNotEmpty) {
+        final modeFile = await _getDesktopFile('linked_tenant_business_mode.dat');
+        await modeFile.writeAsString(mode);
+      }
+    }
+  }
+
+  static Future<bool> isDeviceLinkedToTenant() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await _secureStorage.read(key: _deviceLinkedKey) == 'true';
+    }
+    final flag = await _getDesktopFile('device_linked_to_tenant.dat');
+    if (!await flag.exists()) return false;
+    return (await flag.readAsString()).trim() == 'true';
+  }
+
+  static Future<String?> getLinkedTenantBusinessMode() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _linkedTenantModeKey);
+    } else {
+      final modeFile = await _getDesktopFile('linked_tenant_business_mode.dat');
+      if (await modeFile.exists()) value = await modeFile.readAsString();
+    }
+    final mode = value?.trim() ?? '';
+    return mode.isEmpty ? null : mode;
   }
 
   static Future<File> _getDesktopFile(String fileName) async {

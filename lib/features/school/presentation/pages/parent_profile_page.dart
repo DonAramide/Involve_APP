@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,6 +27,7 @@ import 'package:involve_app/features/activation/presentation/pages/activation_pa
 import 'package:involve_app/features/settings/domain/entities/user_plan.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/widgets/system_access_auth_dialog.dart';
+import 'package:involve_app/features/settings/presentation/widgets/admin_transfer_auth_dialog.dart';
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
@@ -36,6 +36,7 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import 'parent_credit_breakdown_page.dart';
 import 'student_profile_page.dart';
+import '../widgets/parent_transaction_history.dart';
 
 class ParentProfilePage extends StatefulWidget {
   final int parentId;
@@ -47,6 +48,15 @@ class ParentProfilePage extends StatefulWidget {
 
 class _ParentProfilePageState extends State<ParentProfilePage> {
   bool _awaitingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+    });
+  }
   bool _awaitingCreditMap = false;
   bool _awaitingVa = false;
   bool _awaitingParentSave = false;
@@ -401,97 +411,23 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 20),
-              const Text('Payment history', style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              FutureBuilder<List<ParentPaymentRecord>>(
-                key: ValueKey(_historyTick),
-                future: context.read<SchoolBloc>().repository.getParentPayments(widget.parentId),
-                builder: (context, snap) {
-                  if (!snap.hasData) {
-                    return const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text('Loading payments…'),
-                    );
-                  }
-                  final payments = snap.data!;
-                  if (payments.isEmpty) {
-                    return const Text('No parent-account payments yet.');
-                  }
-                  return Column(
-                    children: payments.map((p) {
-                      return Card(
-                        child: ExpansionTile(
-                          title: Text(CurrencyFormatter.formatWithSymbol(p.amount)),
-                          subtitle: Text(
-                            '${DateFormat('dd MMM yyyy HH:mm').format(p.createdAt)}'
-                            ' · ${ParentPaymentReceiptService.methodLabel(p.source)}',
-                          ),
-                          children: [
-                            ListTile(
-                              dense: true,
-                              title: Text(
-                                'Applied ${CurrencyFormatter.formatWithSymbol(p.appliedToDebt)} · '
-                                'Credit ${CurrencyFormatter.formatWithSymbol(p.toCredit)}',
-                              ),
-                              subtitle: Text('Ref ${p.reference}'),
-                            ),
-                            ...p.allocations.map((a) {
-                              Student? child;
-                              for (final s in children) {
-                                if (s.id == a.studentId) {
-                                  child = s;
-                                  break;
-                                }
-                              }
-                              return ListTile(
-                                dense: true,
-                                title: Text(child?.fullName ?? 'Student ${a.studentId}'),
-                                subtitle: Text(
-                                  'Before ${CurrencyFormatter.formatWithSymbol(a.outstandingBefore)} → '
-                                  'allocated ${CurrencyFormatter.formatWithSymbol(a.allocated)} → '
-                                  'after ${CurrencyFormatter.formatWithSymbol(a.outstandingAfter)}',
-                                ),
-                              );
-                            }),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () => _printReceipt(
-                                        context,
-                                        payment: p,
-                                        parent: parent,
-                                        children: children,
-                                      ),
-                                      icon: const Icon(Icons.print, size: 18),
-                                      label: const Text('Print'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () => _shareOrPrintPdf(
-                                        context,
-                                        payment: p,
-                                        parent: parent,
-                                        children: children,
-                                        share: true,
-                                      ),
-                                      icon: const Icon(Icons.picture_as_pdf, size: 18),
-                                      label: const Text('PDF'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
+              ParentTransactionHistory(
+                parentId: widget.parentId,
+                children: children,
+                reloadTick: _historyTick,
+                onPrintPayment: (p) => _printReceipt(
+                  context,
+                  payment: p,
+                  parent: parent,
+                  children: children,
+                ),
+                onPdfPayment: (p) => _shareOrPrintPdf(
+                  context,
+                  payment: p,
+                  parent: parent,
+                  children: children,
+                  share: true,
+                ),
               ),
             ],
           ),
@@ -1119,15 +1055,22 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
                             return;
                           }
 
-                          final authorised = await requireSystemAccess(
-                            context,
-                            purpose: method == 'POS'
-                                ? 'Card funding requires admin confirmation. Enter the System Access password to charge this parent account.'
-                                : method == 'Company Account'
-                                    ? 'Recording a school-account transfer requires admin confirmation. Enter the System Access password to post this credit.'
-                                    : 'Funding a parent account requires admin confirmation. Enter the System Access password to record this credit.',
-                          );
-                          if (authorised != true) return;
+                          if (method == 'Company Account') {
+                            final authorised = await requireAdminCompanyTransferAuth(
+                              context,
+                              amount: CurrencyFormatter.formatWithSymbol(amount),
+                              beneficiary: settings?.organizationName,
+                            );
+                            if (authorised != true) return;
+                          } else {
+                            final authorised = await requireSystemAccess(
+                              context,
+                              purpose: method == 'POS'
+                                  ? 'Card funding requires admin confirmation. Enter the System Access password to charge this parent account.'
+                                  : 'Funding a parent account requires admin confirmation. Enter the System Access password to record this credit.',
+                            );
+                            if (authorised != true) return;
+                          }
 
                           if (method == 'POS') {
                             if (config == null ||

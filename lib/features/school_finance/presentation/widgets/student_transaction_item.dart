@@ -10,6 +10,8 @@ class StudentTransactionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isCredit = transaction.amount > 0;
     final isDiscount = transaction.metadata['type'] == 'discount';
     
@@ -17,9 +19,9 @@ class StudentTransactionItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.cardColor : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: isDark ? theme.dividerColor : Colors.grey.shade100),
       ),
       child: Row(
         children: [
@@ -48,9 +50,10 @@ class StudentTransactionItem extends StatelessWidget {
               children: [
                 Text(
                   transaction.description ?? (isCredit ? "Payment" : "Charge"),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -64,7 +67,7 @@ class StudentTransactionItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildStatusTag(transaction.channel),
+                    _buildStatusTag(transaction.channel, isDark),
                   ],
                 ),
               ],
@@ -79,7 +82,7 @@ class StudentTransactionItem extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: isDiscount 
                       ? Colors.orange 
-                      : (isCredit ? Colors.green : Colors.black87),
+                      : (isCredit ? Colors.green : (isDark ? Colors.white : Colors.black87)),
                   fontSize: 15,
                 ),
               ),
@@ -99,11 +102,11 @@ class StudentTransactionItem extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusTag(String channel) {
+  Widget _buildStatusTag(String channel, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: isDark ? Colors.white12 : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -111,7 +114,7 @@ class StudentTransactionItem extends StatelessWidget {
         style: TextStyle(
           fontSize: 8,
           fontWeight: FontWeight.bold,
-          color: Colors.grey.shade600,
+          color: isDark ? Colors.grey.shade300 : Colors.grey.shade600,
         ),
       ),
     );

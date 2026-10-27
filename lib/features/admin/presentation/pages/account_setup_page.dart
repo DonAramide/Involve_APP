@@ -77,6 +77,9 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     _loadPersistedToggles();
     _loadUserProfile();
     _loadFormDraft();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _hydrateContactFromCloud();
+    });
   }
 
   Future<void> _loadFormDraft() async {
@@ -96,9 +99,15 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     final data = {
       'ownerName': _userNameController.text,
       'businessName': _businessNameController.text,
-      'phone': _phoneController.text,
-      'email': _emailController.text,
-      'address': _addressController.text,
+      'phone': AppSettings.isPlaceholderPhone(_phoneController.text)
+          ? ''
+          : _phoneController.text,
+      'email': AppSettings.isPlaceholderEmail(_emailController.text)
+          ? ''
+          : _emailController.text,
+      'address': AppSettings.isPlaceholderAddress(_addressController.text)
+          ? ''
+          : _addressController.text,
       'cac': _cacController.text,
       'taxId': _taxIdController.text,
       'description': _businessDescriptionController.text,
@@ -108,8 +117,72 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
 
   String _draftOr(String key, String fallback) {
     final v = _formDraft[key];
-    if (v != null && v.trim().isNotEmpty) return v;
-    return fallback;
+    if (v == null || v.trim().isEmpty) return fallback;
+    if (key == 'phone' && AppSettings.isPlaceholderPhone(v)) return fallback;
+    if (key == 'email' && AppSettings.isPlaceholderEmail(v)) return fallback;
+    if (key == 'address' && AppSettings.isPlaceholderAddress(v)) return fallback;
+    return v;
+  }
+
+  void _fillIfEmpty(TextEditingController controller, String incoming, {bool Function(String)? vacant}) {
+    final value = incoming.trim();
+    if (value.isEmpty) return;
+    final current = controller.text;
+    final isVacant = vacant?.call(current) ?? current.trim().isEmpty;
+    if (isVacant) controller.text = value;
+  }
+
+  Future<void> _hydrateContactFromCloud() async {
+    try {
+      final client = sl<FinanceRepository>().apiClient;
+      final response = await client.get('/api/admin/profile');
+      final data = response.data;
+      if (data is! Map) return;
+      final profile = Map<String, dynamic>.from(data);
+      final email = '${profile['email'] ?? ''}'.trim();
+      final phone = PhoneNumberInput.clamp('${profile['phone'] ?? ''}');
+      final address = '${profile['address'] ?? profile['streetAddress'] ?? ''}'.trim();
+      final ownerName = '${profile['ownerName'] ?? ''}'.trim();
+      if (!mounted) return;
+      setState(() {
+        _fillIfEmpty(
+          _emailController,
+          email,
+          vacant: AppSettings.isPlaceholderEmail,
+        );
+        _fillIfEmpty(
+          _phoneController,
+          phone,
+          vacant: AppSettings.isPlaceholderPhone,
+        );
+        _fillIfEmpty(
+          _addressController,
+          address,
+          vacant: AppSettings.isPlaceholderAddress,
+        );
+        if (ownerName.isNotEmpty &&
+            (_userNameController.text.trim().isEmpty ||
+                _userNameController.text.trim() == 'Administrator')) {
+          _userNameController.text = ownerName;
+        }
+      });
+      await _persistFormDraft();
+      if (!mounted) return;
+      final settings = context.read<SettingsBloc>().state.settings;
+      if (settings != null) {
+        context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(
+              email: AppSettings.isPlaceholderEmail(_emailController.text)
+                  ? settings.email
+                  : _emailController.text.trim(),
+              phone: AppSettings.isPlaceholderPhone(_phoneController.text)
+                  ? settings.phone
+                  : _phoneController.text.trim(),
+              address: AppSettings.isPlaceholderAddress(_addressController.text)
+                  ? settings.address
+                  : _addressController.text.trim(),
+            )));
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUserProfile() async {
@@ -274,9 +347,19 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
               state.settings!.organizationName,
             );
             _phoneController.text = PhoneNumberInput.clamp(
-              _draftOr('phone', state.settings!.phone),
+              _draftOr(
+                'phone',
+                AppSettings.isPlaceholderPhone(state.settings!.phone)
+                    ? ''
+                    : state.settings!.phone,
+              ),
             );
-            _emailController.text = _draftOr('email', state.settings!.email ?? '');
+            _emailController.text = _draftOr(
+              'email',
+              AppSettings.isPlaceholderEmail(state.settings!.email)
+                  ? ''
+                  : (state.settings!.email ?? ''),
+            );
             final savedAddress = AppSettings.isPlaceholderAddress(state.settings!.address)
                 ? ''
                 : state.settings!.address;

@@ -207,6 +207,8 @@ export interface PosTransactionResult {
   stan?: string;
   maskedPan?: string;
   authCode?: string;
+  /** Available balance from ISO field 54, for balance inquiry. */
+  balance?: string;
   rawHex?: string;                  // Only for Medusa/NIBSS TCP route
   isoFields?: Record<string, any>;  // Decoded ISO8583 field map (Medusa/NIBSS routes)
   kimonoResponse?: any;             // Full JSON from Cpoint for Kimono route

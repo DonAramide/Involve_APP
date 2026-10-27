@@ -80,17 +80,21 @@ class _InvifyLoadingIndicatorState extends State<InvifyLoadingIndicator> with Si
             );
           },
         ),
-        const SizedBox(height: 24),
-        Text(
-          widget.message ?? 'LOADING SECURE INVENTORY...',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-            color: isDark ? Colors.white70 : Colors.blueGrey[700],
+        if ((widget.message ?? '').isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            widget.message ?? 'LOADING SECURE INVENTORY...',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              color: isDark ? Colors.white70 : Colors.blueGrey[700],
+              decoration: TextDecoration.none,
+              decorationColor: Colors.transparent,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

@@ -87,10 +87,14 @@ export class ReconciliationService {
         ledgerBatchId: c.ledger_batch_id,
         expectedAmount: c.expected_amount,
         actualAmount: c.actual_amount,
+        amount: Number(c.actual_amount ?? c.expected_amount ?? 0),
         difference: c.difference_amount,
         status: c.status,
         riskScore: c.risk_score,
-        createdDate: c.created_at
+        createdDate: c.created_at,
+        createdAt: c.created_at,
+        reference: c.transaction_reference || c.case_number,
+        studentName: c.transaction_reference || 'Reconciliation case',
       }));
 
       // Clean Quasar VA credits are already posted to transactions_log + ledger.
@@ -115,10 +119,14 @@ export class ReconciliationService {
           ledgerBatchId: tx.reference,
           expectedAmount: Number(tx.amount || 0),
           actualAmount: Number(tx.amount || 0),
+          amount: Number(tx.amount || 0),
           difference: 0,
           status: 'MATCHED',
           riskScore: 0,
           createdDate: tx.created_at,
+          createdAt: tx.created_at,
+          reference: tx.reference,
+          studentName: tx.provider ? `Quasar credit · ${tx.provider}` : 'Quasar credit',
         }));
 
       summary.matched += liveRows.length;
@@ -127,9 +135,12 @@ export class ReconciliationService {
         summary.reconciliationRate = Number(((summary.matched / summary.totalPayments) * 100).toFixed(1));
       }
 
+      const statusKey = String(status || 'all').toLowerCase();
+      const includeLive = !statusKey || statusKey === 'all' || statusKey === 'matched';
+
       return {
         summary,
-        data: [...liveRows, ...caseRows],
+        data: includeLive ? [...liveRows, ...caseRows] : caseRows,
         pagination: {
           total: (count || 0) + liveRows.length,
           limit,

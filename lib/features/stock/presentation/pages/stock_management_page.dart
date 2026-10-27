@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
@@ -14,8 +15,9 @@ import 'package:involve_app/features/stock/presentation/pages/stock_history_page
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/profit_report_page.dart';
 import 'package:involve_app/features/stock/presentation/widgets/log_expense_dialog.dart';
-import 'package:collection/collection.dart';
 import '../../../../core/utils/terminology.dart';
+import 'package:involve_app/features/stock/domain/catalog_category.dart';
+import 'package:involve_app/features/stock/domain/entities/category.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/stock/presentation/widgets/stock_up_dialog.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -32,18 +34,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
   String _selectedCategoryFilter = 'All';
 
   String _getCategoryName(Item item, List<dynamic> categories) {
-    if (item.categoryId != null) {
-      final cat = categories.firstWhereOrNull((c) => c.id == item.categoryId);
-      return cat?.name ?? 'Uncategorized';
-    }
-    final name = item.name.toLowerCase();
-    if (name.contains('rice') || name.contains('beans') || name.contains('food')) {
-      return 'Grains & Food';
-    }
-    if (name.contains('book') || name.contains('fee') || name.contains('tuition')) {
-      return 'Education';
-    }
-    return 'General Store';
+    return catalogCategoryLabel(
+      item,
+      categories.whereType<Category>().toList(),
+    );
   }
 
   Widget _buildActionButton({

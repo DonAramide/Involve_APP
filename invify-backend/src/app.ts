@@ -570,6 +570,7 @@ import servicesRoutes from './routes/services.routes';
 import syncRoutes from './routes/sync.routes';
 import crmRoutes from './routes/crm.routes';
 import inventoryRoutes from './routes/inventory.routes';
+import catalogRoutes from './routes/catalog.routes';
 import operationsRoutes from './routes/operations.routes';
 import financialPlatformRoutes from './routes/financial-platform.routes';
 import observabilityRoutes from './routes/observability.routes';
@@ -587,6 +588,9 @@ app.use('/services', authenticate, servicesRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/crm', authenticate, crmRoutes);
 app.use('/api/inventory', authenticate, inventoryRoutes);
+app.use('/inventory', authenticate, inventoryRoutes);
+app.use('/api/v1/catalog', authenticate, catalogRoutes);
+app.use('/v1/catalog', authenticate, catalogRoutes);
 app.use('/api/v1', authenticate, operationsRoutes);
 app.use('/api/v1', financialPlatformRoutes);
 app.use('/api/admin/observability', observabilityRoutes);
@@ -878,11 +882,31 @@ app.get('/referrals/stats', authenticate, ReferralController.getStats);
 app.post('/referrals/send', authenticate, ReferralController.sendInvite);
 
 // Attendance System
-app.get('/attendance/students', authenticate, AttendanceController.listStudents);
-app.post('/attendance/enroll', authenticate, AttendanceController.enroll);
-app.post('/attendance/save', authenticate, AttendanceController.autoSave);
-app.post('/attendance/bulk-present', authenticate, AttendanceController.bulkPresent);
-app.get('/attendance/history', authenticate, AttendanceController.getHistory);
+const registerAttendanceRoute = (method: 'get' | 'post' | 'put' | 'delete', path: string, ...handlers: any[]) => {
+  (app as any)[method](path, ...handlers);
+  (app as any)[method](`/api${path}`, ...handlers);
+};
+
+registerAttendanceRoute('get', '/attendance/students', authenticate, AttendanceController.listStudents);
+registerAttendanceRoute('post', '/attendance/enroll', authenticate, AttendanceController.enroll);
+registerAttendanceRoute('get', '/attendance/settings', authenticate, AttendanceController.getSettings);
+registerAttendanceRoute('put', '/attendance/settings', authenticate, AttendanceController.updateSettings);
+registerAttendanceRoute('get', '/attendance/calendar', authenticate, AttendanceController.listCalendarExceptions);
+registerAttendanceRoute('post', '/attendance/calendar', authenticate, AttendanceController.addCalendarException);
+registerAttendanceRoute('delete', '/attendance/calendar/:id', authenticate, AttendanceController.deleteCalendarException);
+registerAttendanceRoute('get', '/attendance/assignments', authenticate, AttendanceController.listAssignments);
+registerAttendanceRoute('post', '/attendance/assignments', authenticate, AttendanceController.createAssignment);
+registerAttendanceRoute('delete', '/attendance/assignments/:id', authenticate, AttendanceController.deleteAssignment);
+registerAttendanceRoute('get', '/attendance/register', authenticate, AttendanceController.getRegister);
+registerAttendanceRoute('post', '/attendance/save', authenticate, AttendanceController.saveRegister);
+registerAttendanceRoute('post', '/attendance/bulk-present', authenticate, AttendanceController.bulkPresent);
+registerAttendanceRoute('post', '/attendance/correct', authenticate, AttendanceController.correctEntry);
+registerAttendanceRoute('get', '/attendance/report', authenticate, AttendanceController.getClassReport);
+registerAttendanceRoute('get', '/attendance/report/pdf', authenticate, AttendanceController.exportClassReportPdf);
+registerAttendanceRoute('get', '/attendance/register/pdf', authenticate, AttendanceController.exportRegisterPdf);
+registerAttendanceRoute('get', '/attendance/student-history/:studentId', authenticate, AttendanceController.getStudentHistory);
+registerAttendanceRoute('get', '/attendance/history', authenticate, AttendanceController.getHistory);
+registerAttendanceRoute('get', '/attendance/audit-log', authenticate, AttendanceController.getAuditLog);
 
 // Class Insights
 app.get('/insights/class', authenticate, InsightsController.getClassInsights);

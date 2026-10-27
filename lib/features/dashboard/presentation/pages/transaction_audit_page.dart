@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
@@ -260,73 +261,83 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
       invoices.sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
 
       final Map<String, _TxRow> byKey = {};
+      final skippedRefs = <String>{};
 
       for (final inv in invoices.take(300)) {
         // Service jobs are mirrored into getAllInvoices(). List them from
         // real payments / outstanding balance below so a new unpaid job is
         // not shown as Cash · Paid.
         if (inv.invoiceNumber.startsWith('INV-SRV')) continue;
+        if (inv.isRolledForward || inv.isPaymentSlip || !inv.countsTowardSales) {
+          skippedRefs.add(inv.invoiceNumber.trim());
+          continue;
+        }
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final collected = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        final pending = billed - collected;
+        if (collected <= 1e-9 && pending <= 1e-9) continue;
 
-        final noMoneyIn = inv.amountPaid <= 1e-9;
         final methodRaw = (inv.paymentMethod ?? '').trim();
         final statusRaw = (inv.paymentStatus ?? '').trim().toLowerCase();
         final awaitingTransfer = methodRaw.toLowerCase().contains('transfer') ||
             methodRaw.toLowerCase().contains('virtual') ||
             statusRaw.contains('pend') ||
             statusRaw.contains('await');
+        final items = inv.items
+            .map((i) => {
+                  'name': i.item.name,
+                  'quantity': i.quantity,
+                })
+            .toList();
+        final customerName = inv.customerName ??
+            (inv.admissionNumber != null
+                ? 'Student ${inv.admissionNumber}'
+                : 'Walk-in');
 
-        final String method;
-        final String status;
-        final double amount;
-        if (noMoneyIn) {
-          if (awaitingTransfer) {
-            method = _normalizeMethod(methodRaw);
-            status = 'Pending';
-          } else if (_isCommittedOnAccount(methodRaw)) {
-            method = 'Credit';
-            status = 'Customer Debit';
-          } else {
-            method = methodRaw.isEmpty ? 'Unpaid' : _normalizeMethod(methodRaw);
-            status = 'Payment Pending';
-          }
-          amount =
-              inv.balanceAmount > 1e-9 ? inv.balanceAmount : inv.totalAmount;
-        } else {
-          method = _normalizeMethod(inv.paymentMethod);
-          status = _normalizeStatus(inv.paymentStatus);
-          amount = inv.amountPaid;
+        void addSlice(String suffix, double amount, String method, String status) {
+          if (amount <= 1e-9) return;
+          final key = 'inv:${inv.id ?? inv.invoiceNumber}:$suffix';
+          byKey[key] = _TxRow(
+            invoice: inv,
+            audit: TransactionAuditModel(
+              id: '${inv.id ?? inv.invoiceNumber}:$suffix',
+              type: 'INVOICE',
+              paymentMethod: method,
+              amount: amount,
+              status: status,
+              staffName: inv.staffName ?? 'System',
+              date: inv.dateCreated,
+              items: items,
+              customerName: customerName,
+              reference: inv.invoiceNumber,
+            ),
+          );
         }
 
-        final key = 'inv:${inv.id ?? inv.invoiceNumber}';
-        byKey[key] = _TxRow(
-          invoice: inv,
-          audit: TransactionAuditModel(
-            id: inv.id?.toString() ?? inv.invoiceNumber,
-            type: 'INVOICE',
-            paymentMethod: method,
-            amount: amount,
-            status: status,
-            staffName: inv.staffName ?? 'System',
-            date: inv.dateCreated,
-            items: inv.items
-                .map((i) => {
-                      'name': i.item.name,
-                      'quantity': i.quantity,
-                    })
-                .toList(),
-            customerName: inv.customerName ??
-                (inv.admissionNumber != null
-                    ? 'Student ${inv.admissionNumber}'
-                    : 'Walk-in'),
-            reference: inv.invoiceNumber,
-          ),
-        );
+        if (collected > 1e-9) {
+          addSlice('paid', collected, _normalizeMethod(inv.paymentMethod), 'Paid');
+        }
+        if (pending > 1e-9) {
+          if (collected <= 1e-9 && awaitingTransfer) {
+            addSlice('due', pending, _normalizeMethod(methodRaw), 'Pending');
+          } else if (collected <= 1e-9 && _isCommittedOnAccount(methodRaw)) {
+            addSlice('due', pending, 'Credit', 'Customer Debit');
+          } else {
+            addSlice(
+              'due',
+              pending,
+              methodRaw.isEmpty ? 'Unpaid' : _normalizeMethod(methodRaw),
+              'Payment Pending',
+            );
+          }
+        }
       }
 
       try {
         final remote = await financeRepo.getTransactionAuditLedger();
         for (final tx in remote) {
           final ref = tx.reference.trim();
+          if (skippedRefs.contains(ref)) continue;
           final already = byKey.values.any((row) {
             final r = row.audit.reference.trim();
             return (ref.isNotEmpty && r == ref) ||
@@ -490,6 +501,8 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
         final status = _effectiveStatus(row.audit);
         if (status == 'Failed' ||
             status == 'Payment Pending' ||
+            status == 'Pending' ||
+            status == 'Unsettled' ||
             status == 'Customer Debit') {
           return sum;
         }
@@ -866,7 +879,7 @@ class _TransactionAuditPageState extends State<TransactionAuditPage> {
                 ),
               ),
               Text(
-                'Other ${CurrencyFormatter.formatWithSymbol(pending < 0 ? 0 : pending)}',
+                'Pending ${CurrencyFormatter.formatWithSymbol(pending < 0 ? 0 : pending)}',
                 style: TextStyle(
                   color: Colors.orange.shade800,
                   fontWeight: FontWeight.w600,

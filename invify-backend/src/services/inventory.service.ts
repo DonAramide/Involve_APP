@@ -1,4 +1,6 @@
 import { supabase, supabaseAdmin } from '../db/supabase';
+import { deviceInsertRow, deviceUpdateRow } from '../catalog/catalog-bulk-sync';
+import { isShopCatalogItem, presentCatalogItems, stripCostPrice } from '../catalog/catalog-payload';
 
 export interface ItemDTO {
   id: string;
@@ -59,6 +61,23 @@ export class InventoryService {
     return { items: data || [] };
   }
 
+  static async listShopCatalog(tenantId: string): Promise<{ items: ItemDTO[] }> {
+    if (!tenantId || tenantId === 'undefined' || tenantId === 'null') {
+      return { items: [] };
+    }
+    const { data, error } = await supabase.from('items').select('*').eq('tenant_id', tenantId);
+    if (error) { console.warn('[inventory.listShopCatalog]', error.message); return { items: [] }; }
+    return { items: (data || []).filter((row: any) => isShopCatalogItem(row)) };
+  }
+
+  static presentItems(items: any[], includeCost: boolean) {
+    return presentCatalogItems(items || [], { includeCost });
+  }
+
+  static presentItem(item: any, includeCost: boolean) {
+    return includeCost ? item : stripCostPrice(item);
+  }
+
   static async getItem(tenantId: string, id: string): Promise<ItemDTO> {
     const { data, error } = await supabase.from('items').select('*').eq('tenant_id', tenantId).eq('id', id).single();
     if (error) throw error;
@@ -99,46 +118,47 @@ export class InventoryService {
 
     if (items.length === 0) return { synced: 0, errors: [] };
 
-    // Only send columns that exist in the current table schema
-    const toRow = (item: Partial<ItemDTO>) => ({
-      id: (item as any).id || undefined,
-      tenant_id: tenantId,
-      name: item.name || 'Unknown',
-      sku: item.sku || null,
-      barcode: item.barcode || null,
-      stock_qty: item.stock_qty ?? 0,
-      min_stock_qty: item.min_stock_qty ?? 0,
-      price: item.price ?? 0,
-      status: (item as any).status || 'active',
-      type: item.type || 'product',
-      updated_at: new Date().toISOString(),
-    });
-
-    // 1. Get all SKUs already in the DB for this tenant
-    const { data: existingRows, error: fetchErr } = await supabaseAdmin
-      .from('items')
-      .select('id, sku')
-      .eq('tenant_id', tenantId)
-      .not('sku', 'is', null);
+    // 1. Get existing catalog rows (price is locked once web-published)
+    let existingRows: any[] | null = null;
+    let fetchErr: any = null;
+    {
+      const first = await supabaseAdmin
+        .from('items')
+        .select('id, sku, price, cost_price, catalog_version, name')
+        .eq('tenant_id', tenantId)
+        .not('sku', 'is', null);
+      if (first.error && /catalog_version|schema cache|does not exist/i.test(first.error.message || '')) {
+        const fallback = await supabaseAdmin
+          .from('items')
+          .select('id, sku, price, cost_price, name')
+          .eq('tenant_id', tenantId)
+          .not('sku', 'is', null);
+        existingRows = fallback.data;
+        fetchErr = fallback.error;
+      } else {
+        existingRows = first.data;
+        fetchErr = first.error;
+      }
+    }
 
     if (fetchErr) {
       return { synced: 0, errors: [`Failed to fetch existing items: ${fetchErr.message}`] };
     }
 
-    const existingSkuMap = new Map<string, string>( // sku → id
-      (existingRows || []).filter(r => r.sku).map(r => [r.sku as string, r.id as string])
+    const existingBySku = new Map<string, any>(
+      (existingRows || []).filter((r) => r.sku).map((r) => [r.sku as string, r]),
     );
 
     const toInsert: any[] = [];
     const toUpdate: Array<{ id: string; row: any }> = [];
 
     for (const item of items) {
-      const row = toRow(item);
-      const existingId = row.sku ? existingSkuMap.get(row.sku) : undefined;
-      if (existingId) {
-        toUpdate.push({ id: existingId, row });
+      const sku = item.sku || null;
+      const existing = sku ? existingBySku.get(sku) : undefined;
+      if (existing) {
+        toUpdate.push({ id: existing.id, row: deviceUpdateRow(existing, item as any) });
       } else {
-        toInsert.push(row);
+        toInsert.push(deviceInsertRow(tenantId, item as any));
       }
     }
 
@@ -146,7 +166,13 @@ export class InventoryService {
     const BATCH = 50;
     for (let i = 0; i < toInsert.length; i += BATCH) {
       const batch = toInsert.slice(i, i + BATCH);
-      const { data, error } = await supabaseAdmin.from('items').insert(batch).select();
+      let { data, error } = await supabaseAdmin.from('items').insert(batch).select();
+      if (error && /catalog_kind|catalog_version|schema cache|does not exist/i.test(error.message || '')) {
+        const stripped = batch.map(({ catalog_kind, catalog_version, ...row }) => row);
+        const retry = await supabaseAdmin.from('items').insert(stripped).select();
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) {
         errors.push(`Insert batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
       } else {
@@ -287,6 +313,36 @@ export class InventoryService {
       return { categories: [] };
     }
     return { categories: data || [] };
+  }
+
+  static async createCategory(tenantId: string, payload: Partial<CategoryDTO> & { name: string }): Promise<CategoryDTO> {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([{
+        tenant_id: tenantId,
+        name: payload.name,
+        description: payload.description || null,
+        is_active: payload.is_active !== false,
+      }])
+      .select()
+      .single();
+    if (error) throw new Error(`Failed to create category: ${error.message}`);
+    return data;
+  }
+
+  static async updateCategory(tenantId: string, id: string, payload: Partial<CategoryDTO>): Promise<CategoryDTO> {
+    const { data, error } = await supabase
+      .from('categories')
+      .update({
+        ...payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(`Failed to update category: ${error.message}`);
+    return data;
   }
 
   // ==========================================

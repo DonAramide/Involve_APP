@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:get_it/get_it.dart';
 import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
+import 'package:involve_app/features/printer/domain/pos_host_endpoint.dart';
 
 /// Terminal configuration synced from the Invify backend.
 class TerminalConfig {
@@ -146,11 +147,13 @@ class TerminalConfig {
       activeHost: json['activeHost']?.toString(),
       expressPayHost: json['expressPayHost']?.toString(),
       expressPayPort: (json['expressPayPort'] as num?)?.toInt(),
-      nibssIp: json['nibssIp']?.toString() ??
-          (json['primaryHost'] is Map ? (json['primaryHost'] as Map)['ip']?.toString() : null),
-      nibssPort: (json['nibssPort'] as num?)?.toInt() ??
+      nibssIp: PosHostEndpoint.nonEmpty(json['nibssIp']) ??
           (json['primaryHost'] is Map
-              ? ((json['primaryHost'] as Map)['port'] as num?)?.toInt()
+              ? PosHostEndpoint.ipFromHost(Map<String, dynamic>.from(json['primaryHost'] as Map))
+              : null),
+      nibssPort: PosHostEndpoint.parsePort(json['nibssPort']) ??
+          (json['primaryHost'] is Map
+              ? PosHostEndpoint.parsePort((json['primaryHost'] as Map)['port'])
               : null),
       nibssSsl: json['nibssSsl'] == true ||
           (json['primaryHost'] is Map && (json['primaryHost'] as Map)['sslEnabled'] == true),
@@ -487,6 +490,12 @@ class TerminalSyncService {
   static Future<bool> linkedDeviceBootstrapPending() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_linkedBootstrapKey) == true;
+  }
+
+  /// True after a QR link, including after the one-time admin bootstrap finishes.
+  static Future<bool> wasLinkedViaDeviceLink() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(_linkedBootstrapKey);
   }
 
   /// Pull portal users (with sign-in codes) and the admin password onto this tablet.

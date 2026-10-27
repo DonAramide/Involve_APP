@@ -1,6 +1,7 @@
 // invify-backend/src/services/ledger.service.ts
 import { supabase, supabaseAdmin } from "../db/supabase";
 import { PoolClient } from "pg";
+import { canonicalTenantId } from "./virtual-account-ownership";
 
 export type LedgerEntryType = "DEBIT" | "CREDIT";
 
@@ -15,6 +16,7 @@ export const PRINCIPAL_LEDGER_ACCOUNTS = [
   "REFUNDS",
   "CHARGEBACKS",
   "ADJUSTMENTS",
+  "PARENT_LIABILITY",
 ] as const;
 
 export const FEE_LEDGER_ACCOUNTS = [
@@ -124,7 +126,64 @@ export class LedgerService {
       throw new Error(`Financial recording failure: ${error.message}`);
     }
 
+    if (data?.status === 'DE-DUPLICATED') {
+      return { status: 'DE-DUPLICATED', data };
+    }
     return { status: 'CREATED', data };
+  }
+
+  /**
+   * Tenant-scoped PARENT_LIABILITY debit with an advisory lock inside
+   * allocate_parent_credit. Fail closed if the RPC is not installed.
+   */
+  static async allocateParentCredit(params: {
+    idempotencyKey: string;
+    tenantId: string;
+    reference: string;
+    amountNaira: number;
+    metadata?: any;
+  }, options?: { pgClient?: PoolClient }) {
+    const args = {
+      p_tenant_id: canonicalTenantId(params.tenantId),
+      p_idempotency_key: params.idempotencyKey,
+      p_reference: params.reference,
+      p_amount: params.amountNaira,
+      p_metadata: params.metadata || {},
+    };
+    let data: any;
+    let error: any;
+    if (options?.pgClient) {
+      try {
+        const res = await options.pgClient.query(
+          'SELECT allocate_parent_credit($1::varchar, $2::varchar, $3::varchar, $4::numeric, $5::jsonb) as result',
+          [args.p_tenant_id, args.p_idempotency_key, args.p_reference, args.p_amount, JSON.stringify(args.p_metadata)],
+        );
+        data = res.rows[0]?.result;
+      } catch (err: any) {
+        error = err;
+      }
+    } else {
+      const rpcRes = await supabaseAdmin.rpc('allocate_parent_credit', args);
+      data = rpcRes.data;
+      error = rpcRes.error;
+    }
+    if (error) {
+      const message = String(error.message || error);
+      if (/does not exist|unknown rpc|allocate_parent_credit/i.test(message) && /does not exist|unknown rpc/i.test(message)) {
+        const err: any = new Error('parent_alloc_rpc_unavailable');
+        err.status = 503;
+        throw err;
+      }
+      if (/INSUFFICIENT_PARENT_LIABILITY/i.test(message)) {
+        const err: any = new Error('insufficient_parent_credit');
+        err.code = 'INSUFFICIENT_PARENT_LIABILITY';
+        err.status = 409;
+        throw err;
+      }
+      throw new Error(`Financial recording failure: ${message}`);
+    }
+    if (data?.status === 'DE-DUPLICATED') return { status: 'DE-DUPLICATED' as const, data };
+    return { status: 'CREATED' as const, data };
   }
 
   /**

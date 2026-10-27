@@ -2219,7 +2219,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           await StorageService.saveTrialStartDate(DateTime.now());
           await StorageService.markLinkedDeviceDashboardDefaultsPending();
           if (linkedBusinessMode != null && linkedBusinessMode.isNotEmpty) {
+            await StorageService.markDeviceLinkedToTenant(linkedBusinessMode);
             await OnboardingNavigator.persistOnboardingPreferences(industry: linkedBusinessMode);
+          } else {
+            await StorageService.markDeviceLinkedToTenant('');
           }
           settingsBloc.add(LoadSettings(
             linkedBusinessName: linkedBusinessName,

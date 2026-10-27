@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { canApproveAsSupport } from '../utils/support-approver';
 
-export type MakerCheckerDomain = 'pos_switchboard' | 'staff_management';
+export type MakerCheckerDomain = 'pos_switchboard' | 'staff_management' | 'tenant_billing';
 
 export type MakerCheckerAction =
   | 'routing_config'
@@ -13,7 +13,9 @@ export type MakerCheckerAction =
   | 'user_update'
   | 'user_reset_mfa'
   | 'user_reset_password'
-  | 'staff_invite';
+  | 'staff_invite'
+  | 'create_plan'
+  | 'post_payment';
 
 type MakerSnapshot = {
   id: string;
@@ -146,6 +148,10 @@ export class MakerCheckerService {
     return rows.filter((row) => row.domain === domain);
   }
 
+  static peek(id: string): MakerCheckerRequest | undefined {
+    return readQueue().find((item) => item.id === id);
+  }
+
   static async approve(id: string, actorEmail: string) {
     const rows = readQueue();
     const row = rows.find((item) => item.id === id);
@@ -178,7 +184,26 @@ export class MakerCheckerService {
     row.decidedAt = new Date().toISOString();
     row.checkerEmail = String(actorEmail || '').trim().toLowerCase();
     writeQueue(rows);
+    void MakerCheckerService.notifyRejectedBilling(row).catch((e: any) =>
+      console.warn('[maker-checker] reject notify failed:', e?.message || e),
+    );
     return makerCheckerPublicView(row);
+  }
+
+  static async notifyRejectedBilling(row: MakerCheckerRequest) {
+    if (row.domain !== 'tenant_billing' || row.action !== 'post_payment') return;
+    const { notifyTenantBillingPayment } = await import('../modules/tenant-billing/notify');
+    const amountNaira = row.body?.amountNaira != null ? Number(row.body.amountNaira) : null;
+    await notifyTenantBillingPayment({
+      tenantId: String(row.body?.tenantId || ''),
+      stage: 'rejected',
+      amountLabel:
+        amountNaira != null && Number.isFinite(amountNaira)
+          ? `₦${amountNaira.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : undefined,
+      amountKobo: row.body?.amountKobo != null ? Number(row.body.amountKobo) : undefined,
+      reference: row.body?.reference,
+    });
   }
 }
 
@@ -248,7 +273,9 @@ async function applyRequest(row: MakerCheckerRequest) {
     body: row.body || {},
     params: row.params || {},
     query: {},
-    headers: {},
+    headers: { 'x-forwarded-for': 'maker-checker' },
+    socket: { remoteAddress: 'maker-checker' },
+    ip: 'maker-checker',
     user: {
       id: row.maker.id,
       email: row.maker.email,
@@ -279,6 +306,12 @@ async function applyRequest(row: MakerCheckerRequest) {
   } else if (row.action === 'staff_invite') {
     const { InviteController } = await import('../controllers/invite.controller');
     await InviteController.sendInvite(req, res as any);
+  } else if (row.action === 'create_plan') {
+    const { TenantBillingController } = await import('../controllers/tenant-billing.controller');
+    await TenantBillingController.createPlan(req, res as any);
+  } else if (row.action === 'post_payment') {
+    const { TenantBillingController } = await import('../controllers/tenant-billing.controller');
+    await TenantBillingController.postPayment(req, res as any);
   } else {
     out.statusCode = 400;
     out.body = { error: 'Unknown change type.' };

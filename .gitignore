@@ -118,3 +118,16 @@ invify-backend/audit-phase4.js
 invify-production-audit-v2.ps1
 config/app_targets/production.local.json
 config/app_targets/staging.local.json
+artifacts/
+*.tgz
+tmp-*.sh
+tmp-deploy-billing.sh
+invify-backend/COMMIT
+invify-backend/ARTIFACT_META.txt
+invify-backend/maker-checker-queue-staging.json
+invify-backend/scripts/_p*.sh
+invify-backend/scripts/_p*.ts
+invify-backend/scripts/_p*.py
+invify-backend/scripts/_p*.js
+invify-backend/scripts/_record_attendance_migration.js
+

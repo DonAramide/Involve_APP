@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
 import '../core/mpos/mpos_device_type.dart';
+import '../core/services/finance_api_client.dart';
+import 'terminal_sync_service.dart';
 
 class MposService {
   static const MethodChannel _channel = MethodChannel('com.invify.app/mpos');
@@ -20,6 +24,17 @@ class MposService {
 
   String _deviceTypeArg(String? deviceType) =>
       deviceType ?? MposDeviceType.channelValue(MposDeviceFamily.aisino);
+
+  /// Terminal profile `sendField120`. Missing or false means do not send ISO field 120.
+  Future<bool> _profileSendField120() async {
+    try {
+      final config = await TerminalSyncService.loadCachedConfig();
+      if (config == null) return false;
+      if (config.routingRules?['sendField120'] == true) return true;
+      if (config.tenantPolicy?['sendField120'] == true) return true;
+    } catch (_) {}
+    return false;
+  }
 
   /// Initiates pairing with the assigned MPOS (Aisino VM30 or MoreFun MP63).
   Future<MposResult> pairDevice({
@@ -93,8 +108,10 @@ class MposService {
     String? originalStan,
     double? latitude,
     double? longitude,
+    bool? sendField120,
   }) async {
     try {
+      final profileSendField120 = sendField120 ?? await _profileSendField120();
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
         'initiatePayment',
         {
@@ -109,6 +126,7 @@ class MposService {
           if (originalStan != null) 'originalStan': originalStan,
           if (latitude != null) 'latitude': latitude,
           if (longitude != null) 'longitude': longitude,
+          'sendField120': profileSendField120,
         },
       );
       
@@ -140,6 +158,48 @@ class MposService {
         error: MposErrorData(message: e.message),
       );
     }
+  }
+
+  /// Sends the terminal's packed ISO (field 55 and MAC included) through Invify
+  /// to Quasar POST /pos/card-transaction. The terminal must not dial the host itself.
+  Future<MposTransactionResponse> forwardPackedCardToQuasar({
+    required String? terminalId,
+    required double amount,
+    required EmvData emvData,
+  }) async {
+    final client = GetIt.I<FinanceApiClient>();
+    final posRes = await client.post(
+      '/api/pos/transaction',
+      data: {
+        'terminalId': terminalId,
+        'amount': amount,
+        'emvData': emvData.toJson(),
+      },
+      options: Options(
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 90),
+      ),
+    );
+    final body = posRes.data is Map
+        ? Map<String, dynamic>.from(posRes.data as Map)
+        : <String, dynamic>{};
+    final approved = body['paymentSuccess'] == true || body['statusCode']?.toString() == '00';
+    final message = body['message']?.toString() ?? body['error']?.toString();
+    return MposTransactionResponse(
+      status: approved ? 'payment_success' : 'payment_failed',
+      error: approved ? null : MposErrorData(message: message ?? 'Host did not approve'),
+      transaction: MposTransactionData(
+        paymentSuccess: approved,
+        statusCode: body['statusCode']?.toString(),
+        message: message,
+        rrn: body['rrn']?.toString(),
+        stan: body['stan']?.toString(),
+        authCode: body['authCode']?.toString(),
+        maskedPan: body['maskedPan']?.toString(),
+        balance: body['balance']?.toString(),
+        transactionType: emvData.toJson()['transactionType']?.toString(),
+      ),
+    );
   }
 
   /// Gets the physical serial number of the paired MPOS device.

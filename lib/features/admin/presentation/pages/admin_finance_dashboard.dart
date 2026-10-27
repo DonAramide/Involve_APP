@@ -12,7 +12,9 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/invoice_payment_legs.dart';
 import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/sales_period_totals.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
@@ -35,6 +37,13 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
     context.read<HistoryBloc>().add(LoadHistory());
     context.read<AdminBloc>().add(LoadAdminDashboard());
     _loadQuasarLedger();
+  }
+
+  String _ledgerMethodLabel(Invoice invoice) {
+    final legs = displayPaymentLegs(invoice);
+    if (legs.isEmpty) return paymentRailChannelLabel(invoice.paymentMethod);
+    final labels = legs.map((leg) => paymentRailChannelLabel(leg.method)).toSet();
+    return labels.join(' + ');
   }
 
   double _n(dynamic v) {
@@ -151,46 +160,26 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
           builder: (context, historyState) {
             final invoices = historyState is HistoryLoaded ? historyState.invoices : <Invoice>[];
 
-            double totalWallet = 0.0;
-            double cashOnHand = 0.0;
-            double pendingQuasarLocal = 0.0;
-
-            for (final inv in invoices) {
-              final rail = classifyInvoicePaymentRail(inv.paymentMethod);
-              final amount = inv.amountPaid;
-              switch (rail) {
-                case InvoicePaymentRail.cash:
-                  cashOnHand += amount;
-                  break;
-                case InvoicePaymentRail.wallet:
-                  totalWallet += amount;
-                  break;
-                case InvoicePaymentRail.card:
-                case InvoicePaymentRail.vaTransfer:
-                  pendingQuasarLocal += amount;
-                  break;
-                case InvoicePaymentRail.bankTransfer:
-                case InvoicePaymentRail.other:
-                  break;
-              }
-            }
+            final rails = salesRailTotals(invoices);
+            double totalWallet = rails.wallet;
+            final cashOnHand = rails.cash;
+            final pendingQuasarLocal = rails.card + rails.vaTransfer;
 
             final sales = _exec?['salesSummary'] is Map
                 ? Map<String, dynamic>.from(_exec!['salesSummary'] as Map)
                 : const <String, dynamic>{};
             final apiWallet = _n(_exec?['walletBalance'] ?? adminState.metrics['internal_wallet']);
             if (apiWallet > totalWallet) totalWallet = apiWallet;
-            final apiCash = _n(sales['cash']);
-            if (apiCash > cashOnHand) cashOnHand = apiCash;
-            final pendingQuasar = [
-              _n(_exec?['pendingQuasarRemittance']),
-              _n(_exec?['pendingVirtualAccountFunds']),
-              _n(_exec?['unsweptVirtualAccount'] is Map
-                  ? (_exec!['unsweptVirtualAccount'] as Map)['parent']
-                  : 0),
-              pendingQuasarLocal,
-              _n(adminState.metrics['pending_quasar']),
-            ].fold<double>(0, (m, v) => v > m ? v : m);
+            // Same figure as the finance screen Quasar tile: live funds at Quasar
+            // (virtual account) plus card. Do not use the larger all-time credit log.
+            final liveRaw = _exec?['quasarLiveBalance'];
+            final liveVa = liveRaw != null
+                ? _n(liveRaw)
+                : _n(_exec?['pendingVirtualAccountFunds']);
+            final cardCollected = _n(sales['card']);
+            final pendingQuasar = _exec != null
+                ? liveVa + cardCollected
+                : pendingQuasarLocal;
 
             return Scaffold(
               appBar: AppBar(title: const Text('Internal Ledger Analytics')),
@@ -359,8 +348,11 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
                 }
 
                 final recentCloud = _cloudEntries.take(10).toList();
-                final recentInvoices = invoices.take(10).toList();
-                final useCloud = recentCloud.isNotEmpty;
+                final recentInvoices = invoices
+                    .where((inv) => inv.countsTowardSales && !inv.isRolledForward)
+                    .take(10)
+                    .toList();
+                final useCloud = recentInvoices.isEmpty && recentCloud.isNotEmpty;
 
                 return ListView.separated(
                   shrinkWrap: true,
@@ -403,18 +395,32 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
 
                     final invoice = recentInvoices[index];
                     final dateStr = DateFormat('MMM dd, hh:mm a').format(invoice.dateCreated);
-                    final method = paymentRailChannelLabel(invoice.paymentMethod);
-                    
+                    final method = _ledgerMethodLabel(invoice);
+                    final collected = invoice.collectedAmount;
+                    final confirmed = collected > 0.001;
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Colors.blue.withOpacity(0.1),
-                        child: const Icon(Icons.receipt_long, color: Colors.blue, size: 20),
+                        backgroundColor: (confirmed ? Colors.green : Colors.orange).withOpacity(0.1),
+                        child: Icon(
+                          confirmed ? Icons.check_circle_outline : Icons.hourglass_empty,
+                          color: confirmed ? Colors.green : Colors.orange,
+                          size: 20,
+                        ),
                       ),
                       title: Text('$label #${invoice.invoiceNumber}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                      subtitle: Text('$method • $dateStr', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      subtitle: Text(
+                        '${confirmed ? method : invoice.displayPaymentStatus} • $dateStr',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                       trailing: Text(
-                        '+${formatter.format(invoice.totalAmount)}', 
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 14),
+                        confirmed
+                            ? '+${formatter.format(collected)}'
+                            : formatter.format(invoice.outstandingAmount),
+                        style: TextStyle(
+                          color: confirmed ? Colors.green : Colors.orange.shade800,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       onTap: () {
                         // Open stunning transaction details popup

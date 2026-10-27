@@ -140,6 +140,11 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   }
 
   void _onUpdateDiscount(UpdateDiscount event, Emitter<InvoiceState> emit) {
+    final subtotal = calculationService.calculateSubtotal(state.items);
+    final tax = calculationService.calculateTax(subtotal, state.taxRate, state.taxEnabled);
+    if (calculationService.discountExceedsCost(subtotal, tax, event.discount, event.type)) {
+      return;
+    }
     _emitUpdatedState(state.items, event.discount, event.type, emit);
   }
 
@@ -156,11 +161,15 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   Future<void> _onSaveInvoice(SaveInvoice event, Emitter<InvoiceState> emit) async {
     emit(state.copyWith(isSaving: true));
     try {
-      final amountPaid = event.amountPaid ?? (state.paymentMethod == 'Deferred' ? 0.0 : state.total);
+      final amountPaid = state.paymentMethod == 'Deferred'
+          ? 0.0
+          : (event.amountPaid ?? state.total);
       final balance = state.total - amountPaid;
       
       final String status;
-      if (event.paymentStatus != null) {
+      if (state.paymentMethod == 'Deferred') {
+        status = 'Unpaid';
+      } else if (event.paymentStatus != null) {
         status = event.paymentStatus!;
       } else {
         if (state.paymentMethod == 'Transfer' || state.paymentMethod == 'VirtualAccount') {
@@ -301,6 +310,9 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   void _emitUpdatedState(List<InvoiceItem> items, double discount, DiscountType discountType, Emitter<InvoiceState> emit) {
     final subtotal = calculationService.calculateSubtotal(items);
     final tax = calculationService.calculateTax(subtotal, state.taxRate, state.taxEnabled);
+    if (calculationService.discountExceedsCost(subtotal, tax, discount, discountType)) {
+      discount = 0;
+    }
     final total = calculationService.calculateTotal(subtotal, tax, discount, discountType);
 
     emit(state.copyWith(

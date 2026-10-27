@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invify x FCMB Smart mPOS Presentation</title>
+<style>
+  :root {
+    --primary: #0A2540;
+    --accent: #F5A623;
+    --blue: #0070BA;
+    --dark: #1E293B;
+    --light-bg: #F8FAFC;
+    --card-bg: #FFFFFF;
+    --border: #E2E8F0;
+    --text: #334155;
+    --muted: #64748B;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { background: #0B132B; color: var(--text); padding: 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+  .slide {
+    width: 100%;
+    max-width: 1040px;
+    min-height: 585px;
+    background: var(--light-bg);
+    border-radius: 14px;
+    box-shadow: 0 20px 45px rgba(0,0,0,0.3);
+    padding: 44px 50px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .slide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+  }
+  .slide-speaker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #E2E8F0;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .slide-title { font-size: 26px; font-weight: 800; color: var(--primary); }
+  .slide-subtitle { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+  }
+  .card h3 { font-size: 17px; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .card ul li { font-size: 13.5px; line-height: 1.45; color: var(--text); position: relative; padding-left: 18px; }
+  .card ul li::before { content: "•"; position: absolute; left: 4px; color: var(--blue); font-weight: bold; font-size: 16px; }
+  .slide-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .logo-bar { display: flex; align-items: center; gap: 14px; }
+  .brand-badge {
+    background: var(--primary);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .brand-fcmb {
+    background: #5C068C;
+    color: #FFB81C;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .img-box {
+    width: 100%;
+    max-height: 330px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 6px;
+  }
+  .diagram-box {
+    background: #0f172a;
+    color: #38bdf8;a
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11.5px;
+    line-height: 1.35;
+    padding: 16px;
+    border-radius: 8px;
+    white-space: pre;
+    overflow-x: auto;
+    border-left: 4px solid var(--accent);
+  }
+  .highlight-stat {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--blue);
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1 -->
+<div class="slide">
+  <div class="slide-header">
+    <div class="logo-bar">
+      <img src="image_74405d.png" alt="Invify" style="height: 38px;">
+      <span class="brand-fcmb">FCMB</span>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <h1 style="font-size: 34px; color: var(--primary); font-weight: 900; line-height: 1.15; margin-bottom: 14px;">
+        Smart mPOS & Digital Collections Platform
+      </h1>
+      <p style="font-size: 16px; color: var(--muted); margin-bottom: 20px;">
+        Integrated Merchant Business Management, Invoicing & Field Payment Acceptance.
+      </p>
+      <div class="card" style="border-left: 4px solid var(--accent);">
+        <p style="font-size: 13.5px; color: var(--dark); font-weight: 600;">
+          Partnership Proposal & Product Demonstration for FCMB Acquiring & Card Services
+        </p>
+        <p style="font-size: 12px; color: var(--muted); margin-top: 6px;">
+          Integrated Independent Products & Services (IIPS) • Invify Technologies Limited
+        </p>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <img src="comer page.png" alt="Invify Ecosystem" class="img-box">
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 1 of 22 • Welcome & Executive Positioning</span>
+    <span>www.invify.org • support@iipa.app</span>
+  </div>
+</div>
+
+<!-- SLIDE 2 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Today's Discussion & Demonstration Flow</div>
+      <div class="slide-subtitle">Structured roadmap for today's session with FCMB leadership</div>
+    </div>
+    
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <h3>1. Merchant Operations</h3>
+      <ul>
+        <li>Core Merchant Problem & Solution Scope</li>
+        <li>Live Walkthrough: Educational Billing Workflows</li>
+        <li>Fee Setup, Cart Selection & Student Roster</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>2. Hardware & Security</h3>
+      <ul>
+        <li>Decoupled Smart mPOS: Samsung Tab + AISINO VM30</li>
+        <li>Dotroid Managed Security & Kiosk Lock</li>
+        <li>Fleet Telemetry, Diagnostics & Remote Recovery</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>3. Banking & Partnership</h3>
+      <ul>
+        <li>Double-Entry Ledger & Multi-Channel Clearing</li>
+        <li>Reconciliation, Dynamic Virtual Accounts & Payouts</li>
+        <li>FCMB Acquiring, TID/MID Provisioning & Pilot Plan</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 2 of 22 • Session Roadmap</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 3 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Who We Are: Integrated Independent Products & Services</div>
+      <div class="slide-subtitle">Bridging daily commercial operations with formal financial infrastructure</div>
+    </div>
+ 
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 14px;">
+        <h3>Operational Vision</h3>
+        <p style="font-size: 13.5px; line-height: 1.5; color: var(--text);">
+          IIPS created Invify to bridge the divide between business management and digital payment collections. We empower SMEs, schools, and merchants by providing tools that connect every transaction directly to operational records.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Corporate Credentials</h3>
+        <ul>
+          <li><strong>Entity:</strong> Integrated Independent Products & Services (IIPS)</li>
+          <li><strong>Brand:</strong> Invify Technologies Limited</li>
+          <li><strong>Address:</strong> 57D TOS Benson Estate, Owutu Agric, Ikorodu, Lagos</li>
+          <li><strong>Digital Hub:</strong> www.invify.org • support@iipa.app</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="background: #F1F5F9;">
+      <h3 style="color: var(--blue);">The Core Belief</h3>
+      <p style="font-size: 14px; line-height: 1.6; color: var(--dark); font-style: italic;">
+        "Payment processing must never live in a vacuum. A payment is simply the final step of a business event. True merchant stickiness occurs when the bank controls the ledger of record, not just the card swipe."
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 3 of 22 • Vision & Corporate Identity</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 4 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">The Fundamental Merchant Disconnect</div>
+      <div class="slide-subtitle">Why traditional standalone payment terminals fail modern businesses</div>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-2">
+    <div class="card" style="border-left: 4px solid #EF4444;">
+      <h3 style="color: #EF4444;">Traditional Isolated POS</h3>
+      <ul>
+        <li>Shows: ₦150,000 APPROVED - AUTH: 893201</li>
+        <li><strong>Unknown:</strong> Which student or customer made the payment?</li>
+        <li><strong>Unknown:</strong> Did this cover 1st Term Tuition, Books, or Uniforms?</li>
+        <li><strong>Unknown:</strong> What is the outstanding term balance?</li>
+        <li><strong>Result:</strong> Hours wasted manually matching paper slips and bank SMS alerts.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 4px solid #10B981;">
+      <h3 style="color: #10B981;">The Invify Connected Model</h3>
+      <ul>
+        <li>Shows: INV-2026924-439 paid in full for Pelumi Dan.</li>
+        <li><strong>Recorded:</strong> Monday Wears + Sport Wears + Science Books.</li>
+        <li><strong>Updated:</strong> Student balance immediately set to ₦0.00 owing.</li>
+        <li><strong>Reconciled:</strong> Logged into internal double-entry ledger instantly.</li>
+        <li><strong>Result:</strong> Real-time financial clarity for proprietor and bank.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 4 of 22 • The Problem Landscape</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 5 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Invify Platform at a Glance</div>
+      <div class="slide-subtitle">Touch-optimized operational dashboard engineered for high-density environments</div>
+    </div>
+   
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3>Comprehensive Module Suite</h3>
+        <ul>
+          <li><strong>Academic Management:</strong> Rosters, Setup, Classes & Subjects.</li>
+          <li><strong>Billing Engine:</strong> Itemized Carts, Discounts & Term Invoicing.</li>
+          <li><strong>Collections & Receipts:</strong> Multi-channel acceptance & thermal printing.</li>
+          <li><strong>Reconciliation:</strong> Automated ledger cross-matching & requery.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Native Architecture</h3>
+        <p style="font-size: 13px; line-height: 1.45; color: var(--text);">
+          Built natively for Android 9.0+ tablet touchscreens, ensuring high-speed interaction for front-desk operators, bursars, and cashiers.
+        </p>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <img src="Screenshot_20260924-105607.jpg" alt="Invify Launcher" class="img-box">
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 5 of 22 • Native Application Hub</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 6 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Primary Use Case: Educational Billing & Cart Building</div>
+      <div class="slide-subtitle">Intuitive billing workflows linking catalog items directly to student profiles</div>
+    </div>
+ 
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 14px;">
+        <h3>Dynamic Checkout Workflow</h3>
+        <ul>
+          <li><strong>Visual Catalog:</strong> Itemized fee categories for Uniforms, Books, Tuition.</li>
+          <li><strong>Live Cart:</strong> Real-time subtotal, configurable tax, and discount adjustments.</li>
+          <li><strong>Student Binding:</strong> Direct lookup from school roster or external payers.</li>
+          <li><strong>Instant Dispatch:</strong> One-tap handoff to Smart mPOS card reader.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left: 4px solid var(--accent);">
+        <p style="font-size: 13px; font-weight: 600; color: var(--dark);">
+          Term Selection: First Term 2026/2027 • Automated invoice numbering and student balance tracking.
+        </p>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <img src="Screenshot_20260827-174028.jpg" alt="Billing Cart" class="img-box">
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 6 of 22 • Billing & Cart Management</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 7 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Cohort Visibility & Executive Student Analytics</div>
+      <div class="slide-subtitle">Proprietor-level insight into collections, defaults, and term performance</div>
+    </div>
+ 
+  </div>
+  <div class="slide-content grid-2">
+    <div style="text-align: center;">
+      <img src="imgtab001.jpg" alt="Student Analytics" class="img-box">
+    </div>
+    <div>
+      <div class="grid-3" style="margin-bottom: 16px;">
+        <div class="card" style="text-align: center; padding: 12px;">
+          <div class="highlight-stat">21</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--muted);">STUDENTS</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 12px;">
+          <div class="highlight-stat" style="color: #10B981;">100%</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--muted);">FULLY PAID</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 12px;">
+          <div class="highlight-stat" style="color: #EF4444;">0</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--muted);">OWING</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Executive Monitoring</h3>
+        <ul>
+          <li><strong>Cohort Breakdown:</strong> Real-time payment compliance across JSS1 through SSS3.</li>
+          <li><strong>Collection Trajectory:</strong> Historical velocity tracking identifying fee recovery peaks.</li>
+          <li><strong>Audit Defense:</strong> Direct access to fully paid vs. outstanding student profiles.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 7 of 22 • Student Analytics</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 8 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Cross-Sector Scalability: Retail & Service Hubs</div>
+      <div class="slide-subtitle">Modular framework extending effortlessly to retail bars, restaurants, and artisans</div>
+    </div>
+    
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <h3 style="color: var(--blue);">1. Educational Hubs</h3>
+      <ul>
+        <li>Tuition & Term Fee Tracking</li>
+        <li>Uniform & Book Bundling</li>
+        <li>Parent & Student Rosters</li>
+        <li>Automated Terminal Receipts</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color: #10B981;">2. Retail & Hospitality</h3>
+      <ul>
+        <li>Live Inventory Tracking</li>
+        <li>Barcode / SKU Sales Support</li>
+        <li>Table / Counter Billing</li>
+        <li><strong>Pilot:</strong> Odies Bar, Ikorodu (v1.0)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--accent);">3. Service Artisans</h3>
+      <ul>
+        <li>Job Cards & Work Orders</li>
+        <li>Part Payment & Deposits</li>
+        <li>Direct Bank Transfers</li>
+        <li>Customer Repair History</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 8 of 22 • Sector Adaptability</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 9 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Smart mPOS: The Coordinated Hardware Trio</div>
+      <div class="slide-subtitle">Combining enterprise touchscreen interactions with certified PIN pad acceptance</div>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3>The Tripartite Hardware Kit</h3>
+        <ul>
+          <li><strong>1. Samsung Enterprise Tablet:</strong> Large touchscreen running full Invify operations, stock, and billing.</li>
+          <li><strong>2. AISINO VM30 mPOS:</strong> Dedicated Vanstone PCI-PTS certified cryptographic reader for EMV Chip & PIN.</li>
+          <li><strong>3. Thermal Receipt Printer:</strong> High-speed Bluetooth printer delivering branded customer receipts.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left: 4px solid var(--blue);">
+        <p style="font-size: 13px; color: var(--dark); font-weight: 600;">
+          Eliminates tiny-screen ergonomics while keeping cardholder data isolated inside certified reader firmware.
+        </p>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <img src="Invify.jpg" alt="Invify Hardware Kit" class="img-box">
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 9 of 22 • Hardware Engineering</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 10 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Hardware Interoperability & Field Validation</div>
+      <div class="slide-subtitle">Rigorous testing across multiple hardware ecosystems and Android OS kernels</div>
+    </div>
+ 
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card" style="text-align: center;">
+      <div class="highlight-stat">15+</div>
+      <h3 style="justify-content: center;">DEVICES TESTED</h3>
+      <p style="font-size: 13px; color: var(--muted); margin-top: 8px;">
+        Extensive endurance testing under volatile network conditions.
+      </p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="highlight-stat" style="color: #10B981;">6 BRANDS</div>
+      <h3 style="justify-content: center;">POS EVALUATED</h3>
+      <p style="font-size: 13px; color: var(--muted); margin-top: 8px;">
+        3 actively confirmed lines including Vanstone AISINO series.
+      </p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="highlight-stat" style="color: var(--accent);">ANDROID 9+</div>
+      <h3 style="justify-content: center;">OS COMPLIANCE</h3>
+      <p style="font-size: 13px; color: var(--muted); margin-top: 8px;">
+        Universal support across modern tablet platforms.
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 10 of 22 • Laboratory & Field Stress Testing</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 11 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Multi-Channel Invoicing & Collections Feeds</div>
+      <div class="slide-subtitle">Unified transaction records mapping Card, Virtual Accounts, and Bank Transfers</div>
+    </div>
+   
+  </div>
+  <div class="slide-content grid-2">
+    <div style="text-align: center;">
+      <img src="Screenshot_20260924-105906.jpg" alt="Invoice History" class="img-box">
+    </div>
+    <div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3>Omni-Channel Ingestion</h3>
+        <ul>
+          <li><strong>Virtual Accounts:</strong> Auto-matched against dynamic accounts (e.g., INV-2026924-26).</li>
+          <li><strong>Direct Transfer:</strong> Instant logging for direct bank transfers (e.g., INV-2026924-919).</li>
+          <li><strong>Cash Acceptance:</strong> Audited counter recording (e.g., INV-2026924-439).</li>
+          <li><strong>Smart mPOS Card:</strong> EMV Chip & PIN authorization via terminal rails.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Automated Matching</h3>
+        <p style="font-size: 13px; color: var(--text); line-height: 1.45;">
+          Every incoming stream automatically resolves pending student balances without operator guesswork.
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 11 of 22 • Multi-Channel Tracking</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 12 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Internal Ledger: Single Source of Merchant Truth</div>
+      <div class="slide-subtitle">Real-time double-entry record balancing digital collections against cash on hand</div>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3>Real-Time Ledger Balances</h3>
+        <ul>
+          <li><strong>Digital Collections Wallet:</strong> Tracked digital receipts across channels.</li>
+          <li><strong>Cash on Hand:</strong> Physical drawer balance verification.</li>
+          <li><strong>Revenue Velocity:</strong> +18.4% performance tracking against prior cycles.</li>
+          <li><strong>Itemized Ledger Entries:</strong> Cryptographically logged timestamps.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left: 4px solid #10B981;">
+        <p style="font-size: 13px; font-weight: 600; color: var(--dark);">
+          Guarantees exact matching between bank settlement payouts and counter billing logs.
+        </p>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <img src="Screenshot_20260924-110046.jpg" alt="Internal Ledger" class="img-box">
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 12 of 22 • Ledger Engine & Double-Entry Accounting</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 13 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">End-to-End Financial & Settlement Architecture</div>
+      <div class="slide-subtitle">Clean separation of regulated banking rails and merchant operational context</div>
+    </div>
+   
+  </div>
+  <div class="slide-content">
+    <div class="diagram-box">
+                             ┌───────────────────────────┐
+                             │           FCMB            │
+                             └─────────────┬─────────────┘
+                                           │ Banking / Acquiring Infrastructure
+                                           ▼
+                             ┌───────────────────────────┐
+                             │      INVIFY PLATFORM      │
+                             └─────────────┬─────────────┘
+                                           │
+                  ┌────────────────────────┼────────────────────────┐
+                  │                        │                        │
+         Payment Acceptance       Digital Collections      Business Operations
+            (Card / POS)        (Virtual Accts / Links)      (Invoicing & Hub)
+                  │                        │                        │
+                  └────────────────────────┼────────────────────────┘
+                                           │
+                                           ▼
+                             ┌───────────────────────────┐
+                             │  AUTOMATED RECONCILIATION │
+                             │  Matches to Student / ID  │
+                             └───────────────────────────┘</div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 13 of 22 • Financial Architecture</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 14 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Dotroid: Enterprise Managed Device Security Layer</div>
+      <div class="slide-subtitle">Hardening merchant Android hardware into an uncompromised enterprise asset</div>
+    </div>
+   
+  </div>
+  <div class="slide-content grid-2">
+    <div>
+      <div class="card" style="margin-bottom: 12px;">
+        <h3>Core Security Capabilities</h3>
+        <ul>
+          <li><strong>Kiosk Lockdown:</strong> Restricts host device solely to Invify operations.</li>
+          <li><strong>Device Owner Mode:</strong> Blocks factory resets and unauthorized APK sideloading.</li>
+          <li><strong>Fleet Heartbeat:</strong> Real-time battery, network, and hardware telemetry.</li>
+          <li><strong>Remote Recovery:</strong> Geolocation tracking, remote wipe, and OTA updates.</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left: 4px solid var(--accent);">
+        <p style="font-size: 13px; color: var(--dark); font-weight: 600;">
+          Ensures that FCMB terminal keys and merchant financial software remain secure in the field.
+        </p>
+      </div>
+    </div>
+    <div class="diagram-box" style="font-size: 11px;">
+       ┌────────────────────────┐
+       │   DOTROID CONTROLLER   │
+       └───────────┬────────────┘
+                   │ Fleet Policies
+       ┌───────────▼────────────┐
+       │     SAMSUNG TABLET     │
+       │  • Kiosk Mode Active   │
+       │  • Factory Reset Block │
+       │  • GPS / Telemetry     │
+       └────────────────────────┘
+                   │ USB / BT
+       ┌───────────▼────────────┐
+       │   AISINO VM30 READER   │
+       │  • PCI-PTS Certified   │
+       │  • Encrypted PIN Pad   │
+       └────────────────────────┘</div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 14 of 22 • Dotroid Security Architecture</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 15 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Strategic Value of the Decoupled Tablet Architecture</div>
+      <div class="slide-subtitle">Why separating the workflow screen from the cryptographic PIN pad wins</div>
+    </div>
+   
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <h3 style="color: var(--blue);">1. Reduced PCI Scope</h3>
+      <p style="font-size: 13px; line-height: 1.5; color: var(--text);">
+        The tablet never touches plaintext card PIN data. All cryptographic operations remain quarantined inside the AISINO VM30.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="color: #10B981;">2. Lower Maintenance Cost</h3>
+      <p style="font-size: 13px; line-height: 1.5; color: var(--text);">
+        Screen damage or tablet replacement does not require expensive re-keying or cryptographic recertification of the payment device.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--accent);">3. Rich UI Ergonomics</h3>
+      <p style="font-size: 13px; line-height: 1.5; color: var(--text);">
+        Operators manage complex class rosters, term bills, and inventories on a comfortable screen instead of a cramped 2-inch keypad.
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 15 of 22 • System Design Rationale</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 16 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Market Opportunity & Commercial Strategy</div>
+      <div class="slide-subtitle">Capturing sticky deposits and acquiring volumes across target sectors</div>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <div class="highlight-stat">10,000+</div>
+      <h3>PRIVATE SCHOOLS</h3>
+      <p style="font-size: 13px; color: var(--text); line-height: 1.45;">
+        High-density educational clusters in Lagos and major commercial states burdened by manual fee reconciliation.
+      </p>
+    </div>
+    <div class="card">
+      <div class="highlight-stat" style="color: #10B981;">50,000+</div>
+      <h3>ORGANIZED SMES</h3>
+      <p style="font-size: 13px; color: var(--text); line-height: 1.45;">
+        Pharmacies, retail stores, and service lounges requiring billing linked to inventory and card collections.
+      </p>
+    </div>
+    <div class="card">
+      <div class="highlight-stat" style="color: var(--accent);">₦ BILLIONS</div>
+      <h3>FLOAT & VOLUMES</h3>
+      <p style="font-size: 13px; color: var(--text); line-height: 1.45;">
+        Massive recurring seasonal collection float settling directly into FCMB commercial accounts.
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 16 of 22 • Market Sizing & Opportunity</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 17 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Commercial Architecture & Revenue Mechanics</div>
+      <div class="slide-subtitle">Sustainable multi-tiered revenue generation for bank and technology provider</div>
+    </div>
+  
+  </div>
+  <div class="slide-content grid-2">
+    <div class="card">
+      <h3>Revenue Streams</h3>
+      <ul>
+        <li><strong>Hardware Outlay:</strong> Commercial hardware sales/lease of the Smart mPOS kit.</li>
+        <li><strong>Monthly Software SaaS:</strong> Predictable recurring subscription for billing & analytics.</li>
+        <li><strong>Acquiring Transaction Fees:</strong> Standard MSC split on all card and digital transactions.</li>
+        <li><strong>Enterprise Licensing & Support:</strong> Custom SLAs for large educational networks.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--blue);">
+      <h3>Bank Commercial Alignment</h3>
+      <p style="font-size: 13.5px; line-height: 1.5; color: var(--text); margin-bottom: 12px;">
+        Invify does not compete with FCMB’s acquiring revenue. Instead, we drive transaction volume, expand the bank's POS network, and lock in valuable low-cost operational float.
+      </p>
+      <p style="font-size: 12px; color: var(--muted);">
+        Commercial economics to be structured collaboratively during technical alignment.
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 17 of 22 • Business Model</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 18 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">The Strategic Synergy: FCMB × Invify</div>
+      <div class="slide-subtitle">A balanced partnership creating defensible competitive moats</div>
+    </div>
+ 
+  </div>
+  <div class="slide-content grid-2">
+    <div class="card" style="border-left: 4px solid #5C068C;">
+      <h3 style="color: #5C068C;">FCMB Delivers</h3>
+      <ul>
+        <li>Regulated Banking & Settlement Rails</li>
+        <li>Card Acquiring & ISO 8583 Switching Infrastructure</li>
+        <li>Terminal Identification (TID) & MID Provisioning</li>
+        <li>Institutional Trust & Branch Distribution Network</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--blue);">
+      <h3 style="color: var(--blue);">Invify Delivers</h3>
+      <ul>
+        <li>Front-End Business Management & Invoicing Software</li>
+        <li>Automated Double-Entry Reconciliation Engine</li>
+        <li>Dotroid Managed Device & Kiosk Security Layer</li>
+        <li>Turnkey Hardware Packaging & Merchant Onboarding</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 18 of 22 • Partnership Synergy</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 19 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">The Concrete Request to FCMB</div>
+      <div class="slide-subtitle">Six operational workstreams to enable technical integration and pilot launch</div>
+    </div>
+
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <h3>1. Acquiring Rails</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Switch endpoints and acquiring channels to process AISINO VM30 card transactions.
+      </p>
+    </div>
+    <div class="card">
+      <h3>2. TID / MID Allocation</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Streamlined issuance of terminal and merchant identification profiles.
+      </p>
+    </div>
+    <div class="card">
+      <h3>3. Banking APIs</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Automated settlement webhooks, transaction requery, and virtual account generation.
+      </p>
+    </div>
+    <div class="card">
+      <h3>4. Certification</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Technical guidance on terminal key injection and payment compliance protocols.
+      </p>
+    </div>
+    <div class="card">
+      <h3>5. Merchant Accounts</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Fast-track commercial settlement account onboarding for deployed merchants.
+      </p>
+    </div>
+    <div class="card">
+      <h3>6. Joint Pilot</h3>
+      <p style="font-size: 13px; color: var(--text);">
+        Approval for a controlled initial deployment across selected target schools.
+      </p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 19 of 22 • Partnership Engagement Scope</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 20 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">Phased Pilot Implementation Framework</div>
+      <div class="slide-subtitle">A structured, low-risk roadmap to full commercial deployment</div>
+    </div>
+    
+  </div>
+  <div class="slide-content">
+    <div class="diagram-box">
+ PHASE 1: Technical & Key Alignment (Weeks 1–3)
+ ├── Terminal management system (TMS) key injection alignment for AISINO VM30
+ ├── ISO 8583 switch endpoint and requery API sandbox validation
+ └── Settlement webhook testing and security sign-off
+
+ PHASE 2: Controlled Field Pilot (Weeks 4–8)
+ ├── Staged deployment of Smart mPOS kits across selected target schools
+ ├── Real-time monitoring via Dotroid telemetry & fleet heartbeat
+ └── Operator training, bursar onboarding, and live transaction auditing
+
+ PHASE 3: Commercial Review & Scale (Weeks 9–12)
+ ├── Audit of transaction performance, settlement speed, and reconciliation metrics
+ └── Finalize joint commercial model and initiate nationwide school onboarding</div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 20 of 22 • Implementation Roadmap</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 21 -->
+<div class="slide">
+  <div class="slide-header">
+    <div>
+      <div class="slide-title">The Multidisciplinary Invify Team</div>
+      <div class="slide-subtitle">Experienced fintech, embedded systems, and product leaders</div>
+    </div>
+     
+  </div>
+  <div class="slide-content grid-3">
+    <div class="card">
+      <h3>Aramide Adebayo</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">CEO & ARCHITECT</p>
+      <p style="font-size: 13px; color: var(--text);">Product vision, business architecture, and overall strategy.</p>
+    </div>
+    <div class="card">
+      <h3>Oluwele Temitope</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">OPERATIONS & PARTNERSHIPS</p>
+      <p style="font-size: 13px; color: var(--text);">Stakeholder relations and institutional delivery.</p>
+    </div>
+    <div class="card">
+      <h3>Saliu Sheriffdeen</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">PRODUCT MANAGEMENT</p>
+      <p style="font-size: 13px; color: var(--text);">Merchant UX, school workflows, and application lifecycle.</p>
+    </div>
+    <div class="card">
+      <h3>Adekunle Matthew</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">HARDWARE & SECURITY</p>
+      <p style="font-size: 13px; color: var(--text);">Terminal integration, AISINO drivers, and Dotroid MDM.</p>
+    </div>
+    <div class="card">
+      <h3>Adewunmi Oduleye</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">FINTECH & PAYMENTS</p>
+      <p style="font-size: 13px; color: var(--text);">Payment rails, clearing flows, and internal ledger architecture.</p>
+    </div>
+    <div class="card">
+      <h3>Okafor Helen</h3>
+      <p style="font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 6px;">GROWTH & ALLIANCES</p>
+      <p style="font-size: 13px; color: var(--text);">Commercialization, GTM strategy, and institutional growth.</p>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 21 of 22 • Leadership Team</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+<!-- SLIDE 22 -->
+<div class="slide">
+  <div class="slide-header">
+    <div class="logo-bar">
+      <img src="image_74405d.png" alt="Invify" style="height: 38px;">
+      <span class="brand-fcmb">FCMB</span>
+    </div>
+     </div>
+  <div class="slide-content grid-2">
+    <div>
+      <h2 style="font-size: 32px; color: var(--primary); font-weight: 900; line-height: 1.2; margin-bottom: 14px;">
+        Thank You for Your Time & Strategic Partnership
+      </h2>
+      <p style="font-size: 15px; color: var(--muted); margin-bottom: 20px;">
+        Together, we can modernize merchant billing and digital payment collections across Nigeria.
+      </p>
+      <div class="card" style="border-left: 4px solid #10B981;">
+        <h3>Open for Questions & Live Demo</h3>
+        <p style="font-size: 13.5px; color: var(--text); line-height: 1.5;">
+          We invite the FCMB team to test card transactions on the AISINO VM30 and explore the live Invify platform.
+        </p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Corporate Information</h3>
+      <ul>
+        <li><strong>Company:</strong> Integrated Independent Products & Services (IIPS)</li>
+        <li><strong>Platform:</strong> Invify Technologies Limited</li>
+        <li><strong>Address:</strong> 57D TOS Benson Estate, Owutu Agric, Ikorodu, Lagos</li>
+        <li><strong>Phone:</strong> 0802355332</li>
+        <li><strong>Email:</strong> support@iipa.app</li>
+        <li><strong>Web:</strong> www.invify.org</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <span>Slide 22 of 22 • Conclusion & Technical Q&A</span>
+    <span>Invify × FCMB</span>
+  </div>
+</div>
+
+</body>
+</html>

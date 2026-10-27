@@ -14,4 +14,6 @@ data class PaymentRequest(
     val originalStan: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** From terminal profile. Default false: do not put GPS in ISO field 120. */
+    val sendField120: Boolean = false,
 )

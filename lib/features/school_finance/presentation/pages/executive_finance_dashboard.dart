@@ -12,8 +12,12 @@ import 'package:involve_app/features/invoicing/presentation/history/bloc/history
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/invoice_payment_rail.dart';
+import 'package:involve_app/core/utils/student_invoice_settlement.dart';
+import 'package:involve_app/features/school/domain/services/parent_credit_breakdown.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'reconciliation_page.dart';
@@ -81,6 +85,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   Future<Map<String, dynamic>> _localFinanceSnapshot() async {
     double collected = 0;
     double invoiceOutstanding = 0;
+    double cardOnBills = 0;
+    double parentWalletOnBills = 0;
+    double staffVaOnBills = 0;
     final monthCollected = List<double>.filled(6, 0);
     final now = DateTime.now();
     List<Invoice> invoices = const [];
@@ -93,14 +100,31 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             inv.dateCreated.isAfter(_endDate!.add(const Duration(days: 1)))) {
           continue;
         }
-        collected += inv.amountPaid;
-        final owing = inv.totalAmount - inv.amountPaid;
-        if (owing > 0.01) invoiceOutstanding += owing;
+        if (!inv.countsTowardSales || inv.isRolledForward) continue;
+        final billed = inv.totalAmount < 0 ? 0.0 : inv.totalAmount;
+        final got = inv.collectedAmount > billed ? billed : inv.collectedAmount;
+        collected += got;
+        invoiceOutstanding += billed - got;
+        switch (classifyInvoicePaymentRail(inv.paymentMethod)) {
+          case InvoicePaymentRail.card:
+            cardOnBills += got;
+            break;
+          case InvoicePaymentRail.wallet:
+            parentWalletOnBills += got;
+            break;
+          case InvoicePaymentRail.vaTransfer:
+            staffVaOnBills += got;
+            break;
+          case InvoicePaymentRail.cash:
+          case InvoicePaymentRail.bankTransfer:
+          case InvoicePaymentRail.other:
+            break;
+        }
 
         final monthsAgo =
             (now.year - inv.dateCreated.year) * 12 + now.month - inv.dateCreated.month;
         if (monthsAgo >= 0 && monthsAgo < 6) {
-          monthCollected[5 - monthsAgo] += inv.amountPaid;
+          monthCollected[5 - monthsAgo] += got;
         }
       }
     } catch (e) {
@@ -117,17 +141,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         final students =
             await context.read<SchoolRepository>().getStudentSummaries();
         total = students.length;
-        for (final s in students) {
-          if (s.balance > 0.01) {
-            owingCount++;
-            outstanding += s.balance;
-          } else {
-            paidCount++;
-          }
-        }
-        if (outstanding < 0.01 && invoiceOutstanding > 0.01) {
-          outstanding = invoiceOutstanding;
-        }
+        final ids = students.map((s) => s.id).whereType<int>();
+        final payStatus = countStudentPayStatus(studentIds: ids, invoices: invoices);
+        owingCount = payStatus.owing;
+        paidCount = payStatus.paid;
+        outstanding = payStatus.owingValue > 0.01 ? payStatus.owingValue : invoiceOutstanding;
       } catch (e) {
         debugPrint('[ExecutiveDashboard] school ledger failed: $e');
         outstanding = invoiceOutstanding;
@@ -154,6 +172,23 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       }
     }
 
+    var parentVaGross = 0.0;
+    try {
+      final school = context.read<SchoolRepository>();
+      final parents = await school.getParents();
+      final payments = <ParentPaymentRecord>[];
+      for (final parent in parents) {
+        final id = parent.id;
+        if (id == null) continue;
+        payments.addAll(await school.getParentPayments(id));
+      }
+      parentVaGross = ParentCreditParts.grossVirtualAccount(payments);
+    } catch (e) {
+      debugPrint('[ExecutiveDashboard] parent VA total skipped: $e');
+    }
+    final schoolWallet = cardOnBills + parentWalletOnBills + staffVaOnBills;
+    final pendingAtQuasar = cardOnBills + parentVaGross + staffVaOnBills;
+
     final recent = invoices.take(8).map((inv) {
       return {
         'created_at': inv.dateCreated.toIso8601String(),
@@ -174,6 +209,8 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       'owing': owingCount,
       'monthCollected': monthCollected,
       'recent': recent,
+      'schoolWallet': schoolWallet,
+      'pendingAtQuasar': pendingAtQuasar,
     };
   }
 
@@ -192,14 +229,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       );
       final history = await _repository.getPayoutHistory(limit: 5);
 
-      final apiCollected = (summary['totalCollected'] is num)
-          ? (summary['totalCollected'] as num).toDouble()
-          : double.tryParse('${summary['totalCollected']}') ?? 0.0;
       final localCollected = (local['collected'] as num?)?.toDouble() ?? 0.0;
 
       // Local sales land here immediately; cloud catch-up can lag behind device invoices.
-      summary['totalCollected'] = math.max(apiCollected, localCollected);
+      summary['totalCollected'] = localCollected;
       summary['outstanding'] = local['outstanding'];
+      summary['walletBalance'] = local['schoolWallet'];
+      summary['pendingQuasarRemittance'] = local['schoolWallet'];
+      summary['pendingVirtualAccountFunds'] = local['pendingAtQuasar'];
       summary['studentMetrics'] = {
         'total': local['total'],
         'paid': local['paid'],
@@ -221,13 +258,13 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     } catch (e) {
       setState(() {
         _summary = {
-          'walletBalance': 0.0,
+          'walletBalance': local['schoolWallet'],
           'totalCollected': local['collected'],
           'revenueInRange': local['collected'],
           'totalQuasarCollected': 0.0,
           'totalQuasarRemitted': 0.0,
-          'pendingQuasarRemittance': 0.0,
-          'pendingVirtualAccountFunds': 0.0,
+          'pendingQuasarRemittance': local['schoolWallet'],
+          'pendingVirtualAccountFunds': local['pendingAtQuasar'],
           'outstanding': local['outstanding'],
           'alerts': {
             'unmatchedCount': 0,

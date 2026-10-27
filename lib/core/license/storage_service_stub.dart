@@ -35,4 +35,7 @@ class StorageService {
   static Future<bool> isOnlineInvoiceUpdateEnabled() async => true;
   static Future<void> markLinkedDeviceDashboardDefaultsPending() async {}
   static Future<bool> consumeLinkedDeviceDashboardDefaultsPending() async => false;
+  static Future<void> markDeviceLinkedToTenant(String businessMode) async {}
+  static Future<bool> isDeviceLinkedToTenant() async => false;
+  static Future<String?> getLinkedTenantBusinessMode() async => null;
 }

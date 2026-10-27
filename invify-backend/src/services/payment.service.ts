@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 import { getQuasarService } from "../integrations/quasar/factory";
 import { QuasarProvisioningService } from "../integrations/quasar/quasar-provisioning.service";
 import { supabase, supabaseAdmin } from "../db/supabase";
@@ -8,6 +8,7 @@ import { WalletService } from "./wallet.service";
 import { isDefinitiveTransferRejection, PayoutReversalService } from "./payout-reversal.service";
 import { isSandboxPayoutAllowed } from "./fee-live-gate";
 import { TreasuryFeeService } from "./treasury-fee.service";
+import { nairaToKobo, parentCreditLandedOnSchoolWallet, spendableSchoolKobo, koboToNaira } from "./school-fund-ownership";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -126,7 +127,7 @@ export class PaymentService {
     }
 
     // 1. Generate unique payment reference (UUID primary; timestamp only as prefix)
-    const reference = `QNX-${crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+    const reference = `QNX-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
 
     // 2. Fetch tenant & Call QuasarService (ApiKey lookup happens in factory)
     // 3. Call QuasarService.createPaymentIntent
@@ -203,52 +204,73 @@ export class PaymentService {
     };
   }
 
+  /** Posted USER_WALLET minus parent deposits that were credited onto it. */
+  static async spendableSchoolNaira(tenantId: string): Promise<number> {
+    const balance = await WalletService.getBalance(tenantId);
+    const walletKobo = nairaToKobo(Number(balance?.balance || 0));
+    const { data } = await supabaseAdmin
+      .from('transactions_log')
+      .select('amount, metadata, type, status')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'SUCCESS')
+      .limit(5000);
+    let parentKobo = 0;
+    for (const row of data || []) {
+      const metadata = (row as any).metadata || {};
+      if (!parentCreditLandedOnSchoolWallet(metadata)) continue;
+      parentKobo += nairaToKobo(Number((row as any).amount || 0));
+    }
+    return koboToNaira(spendableSchoolKobo(walletKobo, parentKobo));
+  }
+
   /**
-   * Card payments and virtual-account money already used on a bill are the
-   * tenant's withdrawable funds. The school wallet can still be ₦0 until that
-   * amount is recognized, so a payout of those funds credits the shortfall
-   * and the treasury lock then debits it.
+   * School withdrawals may spend only the posted school-owned settlement pool.
+   * A low cached wallet balance must not create a USER_WALLET credit.
    */
   private static async fundQuasarWithdrawal(
     tenantId: string,
     quote: { total_required: number; service_fee: number; requested_amount: number },
-    idempotencyKey: string,
+    _idempotencyKey: string,
   ) {
     const { QuasarWithdrawableService } = await import('./quasar-withdrawable.service');
     const settleable = await QuasarWithdrawableService.available(tenantId);
     const round2 = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-    if (round2(settleable) + 0.009 < round2(quote.total_required)) {
+    const spendable = await PaymentService.spendableSchoolNaira(tenantId);
+    const proven = Math.min(round2(settleable), round2(spendable));
+    if (proven + 0.009 < round2(quote.total_required)) {
       const err: any = new Error(
-        `Insufficient balance for requested amount plus service fee. Available ₦${settleable.toFixed(2)}, this withdrawal needs ₦${quote.total_required} (₦${quote.requested_amount} plus ₦${quote.service_fee} fee).`,
+        `Insufficient proven school-owned funds. Available ₦${proven.toFixed(2)}, this withdrawal needs ₦${quote.total_required} (₦${quote.requested_amount} plus ₦${quote.service_fee} fee).`,
       );
       err.status = 402;
       err.code = 'INSUFFICIENT_BALANCE';
-      err.quote = { ...quote, available_balance: settleable, sufficient: false };
+      err.quote = { ...quote, available_balance: proven, sufficient: false };
       throw err;
     }
+    await PaymentService.reserveSchoolWithdrawal(tenantId, _idempotencyKey, round2(quote.total_required));
+  }
 
-    const { data: walletRow } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    const walletBalance = Number(walletRow?.balance || 0);
-    const shortfall = round2(Math.max(0, quote.total_required - walletBalance));
-    if (shortfall <= 0.009) return;
-
-    const { error } = await supabaseAdmin.rpc('process_ledger_double_entry_text', {
+  /**
+   * Cross-instance reservation. The database function is proposal-only until
+   * a separate migration is approved. A missing function fails the payout.
+   * It must not credit USER_WALLET.
+   */
+  private static async reserveSchoolWithdrawal(tenantId: string, idempotencyKey: string, amount: number) {
+    const { error } = await supabaseAdmin.rpc('reserve_school_withdrawal', {
       p_tenant_id: tenantId,
-      p_idempotency_key: `quasar-settle:${idempotencyKey}`,
-      p_reference: `QSET-${idempotencyKey.replace(/[^A-Za-z0-9]/g, '').slice(-16)}`,
-      p_entries: [
-        { account: 'USER_WALLET', type: 'CREDIT', amount: shortfall },
-        { account: 'QUASAR_SETTLEMENT', type: 'DEBIT', amount: shortfall },
-      ],
-      p_metadata: { source: 'quasar_withdrawable', quasarCap: true, amount: shortfall },
+      p_idempotency_key: idempotencyKey,
+      p_amount: amount,
     });
-    if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
-      throw new Error(`Could not apply withdrawable funds: ${error.message}`);
-    }
+    if (!error) return;
+    const message = String(error.message || '');
+    const insufficient = message.includes('INSUFFICIENT_BALANCE');
+    const err: any = new Error(
+      insufficient
+        ? message
+        : 'School withdrawal reservation is not available. Keep FEATURE_REAL_MONEY_PAYOUTS off until the reservation function is approved and applied.',
+    );
+    err.status = insufficient ? 402 : 503;
+    err.code = insufficient ? 'INSUFFICIENT_BALANCE' : 'RESERVATION_UNAVAILABLE';
+    throw err;
   }
 
   /**
@@ -314,7 +336,7 @@ export class PaymentService {
 
     // 2. Generate unique payout reference + client/server idempotency key
     const prefix = payoutType === 'staff_salary' ? 'SAL' : 'POUT';
-    const reference = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+    const reference = `${prefix}-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
     const idempotencyKey = options?.idempotencyKey
       ? `payout:${tenantId}:${options.idempotencyKey}`
       : `payout:${reference}`;
@@ -325,8 +347,20 @@ export class PaymentService {
         const version = quote.fee_profile_version_id ? await TreasuryFeeService.resolve(tenantId) : null;
         const feeEntries = version ? TreasuryFeeService.feeCreditEntriesNaira(version, quote.service_fee) : [];
 
+        const spendable = await PaymentService.spendableSchoolNaira(tenantId);
+        if (round2(spendable) + 0.009 < round2(quote.total_required)) {
+          const err: any = new Error(
+            `Treasury cannot spend unproven or parent-owned funds. School-owned available ₦${spendable.toFixed(2)}. This payout needs ₦${quote.total_required}.`,
+          );
+          err.status = 402;
+          err.code = 'INSUFFICIENT_BALANCE';
+          err.quote = { ...quote, available_balance: spendable, sufficient: false };
+          throw err;
+        }
         if (options?.metadata?.quasarCap === true) {
           await PaymentService.fundQuasarWithdrawal(tenantId, quote, idempotencyKey);
+        } else {
+          await PaymentService.reserveSchoolWithdrawal(tenantId, idempotencyKey, round2(quote.total_required));
         }
 
         // 3. Atomic lock: balance >= requested + treasury fee. External amount stays requested.
@@ -437,7 +471,13 @@ export class PaymentService {
         ledgerId: (ledgerRes as any)?.ledger_id || null,
         error,
       });
-      throw new Error(`Failed to initiate transfer with Quasar: ${error.message}`);
+      const providerMessage = String(error?.message || 'unknown error');
+      if (/PlatformTransferSettings|No metadata for/i.test(providerMessage)) {
+        throw new Error(
+          'Quasar cannot send this withdrawal to the bank right now. Bank transfer settings are missing on the payment provider. No money was sent.',
+        );
+      }
+      throw new Error(`Failed to initiate transfer with Quasar: ${providerMessage}`);
     }
 
     // 5. Store transaction record — open until transfer.success / GET SUCCESS.
@@ -696,12 +736,30 @@ export class PaymentService {
       throw new Error(`Transaction not found: ${reference}`);
     }
 
-    if (amount <= 0 || amount > transaction.amount) {
+    const refundAmount = Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
+    if (refundAmount <= 0 || refundAmount > Number(transaction.amount)) {
       const amountErr: any = new Error(
         `Invalid refund amount: ${amount}. Must be greater than 0 and less than or equal to original amount ${transaction.amount}.`,
       );
       amountErr.status = 400;
       throw amountErr;
+    }
+
+    const refundMeta = (transaction.metadata || {}) as Record<string, unknown>;
+    if (refundMeta.paidVia === 'parent_account' || refundMeta.schoolWalletCredit === false) {
+      const err: any = new Error('Parent-owned or unproven deposits cannot be refunded from the school wallet.');
+      err.status = 409;
+      err.code = 'PARENT_OWNED_REFUND_BLOCKED';
+      throw err;
+    }
+    const spendableForRefund = await PaymentService.spendableSchoolNaira(transaction.tenant_id);
+    if (spendableForRefund + 0.009 < refundAmount) {
+      const err: any = new Error(
+        `Refund blocked. Proven school-owned funds ₦${spendableForRefund.toFixed(2)} are below ₦${refundAmount.toFixed(2)}.`,
+      );
+      err.status = 402;
+      err.code = 'INSUFFICIENT_BALANCE';
+      throw err;
     }
 
     if (clientIdempotencyKey) {
@@ -739,14 +797,14 @@ export class PaymentService {
     }
 
     // Record the refund in transactions_log only after provider confirmation
-    const refundRef = `REF-${transaction.reference}-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    const refundRef = `REF-${transaction.reference}-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
     const { data: refundTx, error: refundTxErr } = await supabaseAdmin
       .from('transactions_log')
       .insert({
         reference: refundRef,
         tenant_id: transaction.tenant_id,
         wallet_id: transaction.wallet_id,
-        amount: Math.round(amount),
+        amount: refundAmount,
         provider: "quasar",
         type: "refund",
         status: "SUCCESS",
@@ -771,8 +829,8 @@ export class PaymentService {
       tenantId: transaction.tenant_id,
       reference: refundRef,
       entries: [
-        { account: 'USER_WALLET', type: 'DEBIT', amount: Math.round(amount) },
-        { account: 'REFUNDS', type: 'CREDIT', amount: Math.round(amount) }
+        { account: 'USER_WALLET', type: 'DEBIT', amount: refundAmount },
+        { account: 'REFUNDS', type: 'CREDIT', amount: refundAmount }
       ],
       metadata: { originalReference: transaction.reference, reason }
     });

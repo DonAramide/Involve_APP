@@ -236,6 +236,7 @@ export class TenantBillingService {
     const purchase = assertKobo(input.purchasePriceKobo, 'purchase');
     const down = assertKobo(input.downPaymentKobo, 'down payment');
     if (down > purchase) throw new BillingInvariantError('down payment exceeds purchase price');
+    this.assertCanCreateDevicePlan(input.tenantId);
     const remaining = purchase - down;
     const obligation = this.createObligation({
       tenantId: input.tenantId,
@@ -769,6 +770,30 @@ export class TenantBillingService {
       if (ob?.status === 'CANCELLED') throw new BillingInvariantError('cancelled obligation cannot receive payment');
     }
     return rows;
+  }
+
+  assertCanCreateDevicePlan(tenantId: string) {
+    if (!tenantId) throw new BillingInvariantError('tenantId is required');
+    const openObs = [...this.store.obligations.values()].filter(
+      (o) =>
+        o.tenantId === tenantId &&
+        o.type === 'DEVICE_INSTALLMENT' &&
+        o.status !== 'CANCELLED' &&
+        o.status !== 'PAID' &&
+        o.amountOutstandingKobo > 0,
+    );
+    const openInst = [...this.store.installments.values()].filter(
+      (i) => i.tenantId === tenantId && !i.cancelled && i.outstandingKobo > 0,
+    );
+    const pendingPay = [...this.store.payments.values()].filter(
+      (p) => p.tenantId === tenantId && p.status === 'PENDING',
+    );
+    if (openObs.length || openInst.length || pendingPay.length) {
+      throw new BillingInvariantError(
+        'This tenant already has an ongoing installment or pending payment. Finish, collect, or reverse it before creating another plan.',
+        'ONGOING_PLAN',
+      );
+    }
   }
 
   private assertTenant(actual: string, expected: string) {

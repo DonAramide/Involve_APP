@@ -223,8 +223,8 @@ export const adminApi = {
   getGlobalSettings: () => api.get('/api/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/api/admin/settings', data),
   listMakerChecker: (domain) => api.get('/api/admin/maker-checker', { params: { domain } }),
-  approveMakerChecker: (id) => api.post(`/api/admin/maker-checker/${id}/approve`),
-  rejectMakerChecker: (id) => api.post(`/api/admin/maker-checker/${id}/reject`),
+  approveMakerChecker: (id, data) => api.post(`/api/admin/maker-checker/${id}/approve`, data || {}),
+  rejectMakerChecker: (id, data) => api.post(`/api/admin/maker-checker/${id}/reject`, data || {}),
   listQuasarIntegrations: () => api.get('/api/admin/quasar/integrations'),
   getQuasarHealth: () => api.get('/api/admin/quasar/health'),
   pingQuasar: () => api.get('/api/admin/quasar/health/live'),
@@ -344,6 +344,7 @@ export const billingApi = {
 
 export const financeApi = {
   getExecutiveSummary: () => api.get('/api/v1/finance/executive-summary'),
+  getCollectionSummary: (params) => api.get('/api/v1/finance/invoices/collection-summary', { params }),
   resyncQuasar: () => api.post('/api/v1/finance/quasar-resync'),
   getWalletBalance: () => api.get('/api/v1/wallet'),
   getWalletTransactions: () => api.get('/api/v1/wallet/transactions'),
@@ -383,9 +384,25 @@ export const inventoryApi = {
 export const attendanceApi = {
   listStudents: (params) => api.get('/attendance/students', { params }),
   enroll: (data) => api.post('/attendance/enroll', data),
+  getSettings: () => api.get('/attendance/settings'),
+  updateSettings: (data) => api.put('/attendance/settings', data),
+  listCalendar: () => api.get('/attendance/calendar'),
+  addCalendar: (data) => api.post('/attendance/calendar', data),
+  deleteCalendar: (id) => api.delete(`/attendance/calendar/${id}`),
+  listAssignments: () => api.get('/attendance/assignments'),
+  createAssignment: (data) => api.post('/attendance/assignments', data),
+  deleteAssignment: (id) => api.delete(`/attendance/assignments/${id}`),
+  getRegister: (params) => api.get('/attendance/register', { params }),
+  saveRegister: (data) => api.post('/attendance/save', data),
   autoSave: (data) => api.post('/attendance/save', data),
   bulkPresent: (data) => api.post('/attendance/bulk-present', data),
+  correctEntry: (data) => api.post('/attendance/correct', data),
+  getClassReport: (params) => api.get('/attendance/report', { params }),
+  downloadClassReportPdf: (params) => api.get('/attendance/report/pdf', { params, responseType: 'blob' }),
+  downloadRegisterPdf: (params) => api.get('/attendance/register/pdf', { params, responseType: 'blob' }),
+  getStudentHistory: (studentId, params) => api.get(`/attendance/student-history/${studentId}`, { params }),
   getHistory: () => api.get('/attendance/history'),
+  getAuditLog: () => api.get('/attendance/audit-log'),
 };
 
 /** School-mode roster synced from Flutter Web Sync */
@@ -398,6 +415,8 @@ export const schoolApi = {
   getPaymentDisputes: (config) => api.get('/api/school/payment-disputes', config),
   raisePaymentDispute: (data) => api.post('/api/school/payment-disputes', data),
   updatePaymentDispute: (id, data) => api.patch(`/api/school/payment-disputes/${id}`, data),
+  parentBroadcastAudience: () => api.get('/api/school/parent-broadcast/audience'),
+  sendParentBroadcast: (data) => api.post('/api/school/parent-broadcast', data),
 };
 
 export const insightsApi = {

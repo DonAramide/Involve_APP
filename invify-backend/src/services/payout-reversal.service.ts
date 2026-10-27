@@ -48,6 +48,10 @@ export function isDefinitiveTransferRejection(error: any): boolean {
   // Quasar validation failures arrive as QuasarApiError with the provider message
   // and sometimes without a numeric HTTP status. No money has left.
   const message = String(error?.message || '');
+  // Provider config missing: the transfer was never accepted, so reverse locally.
+  if (/PlatformTransferSettings|No metadata for/i.test(message)) {
+    return true;
+  }
   return /must be an object|should not exist|must be a|validation failed/i.test(message);
 }
 

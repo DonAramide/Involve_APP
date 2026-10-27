@@ -7,6 +7,7 @@ import { FeeShadowIntegration } from './fee-shadow-integration';
 import { LedgerService } from './ledger.service';
 import { WalletService } from './wallet.service';
 import { roundNaira } from '../utils/virtual-account-funds';
+import { creditsSchoolWallet, loadVirtualAccountKind } from './virtual-account-ownership';
 
 function connectedTenantIds(io: any): string[] {
   const rooms = io?.sockets?.adapter?.rooms;
@@ -20,12 +21,23 @@ function connectedTenantIds(io: any): string[] {
 }
 
 /** Device sync used to log the gross credit without a tenant wallet, so the fee debit had nowhere to land. */
-async function postSyncedCreditToWallet(tenantId: string, reference: string, amountNaira: number) {
+export async function postSyncedCreditToWallet(
+  tenantId: string,
+  reference: string,
+  amountNaira: number,
+  virtualAccountNumber?: string | null,
+) {
   const creditAmount = roundNaira(amountNaira);
-  if (!tenantId || !reference || !(creditAmount > 0)) return;
+  if (!tenantId || !reference || !(creditAmount > 0)) return { posted: false, reason: 'invalid' };
+  const ownership = virtualAccountNumber
+    ? await loadVirtualAccountKind(virtualAccountNumber, { tenantId })
+    : { kind: 'unknown' as const, tenantId };
+  if (!creditsSchoolWallet(ownership.kind)) {
+    return { posted: false, reason: ownership.kind };
+  }
   await WalletService.ensureWallet(tenantId);
   const idempotencyKey = `quasar:${reference}:credit`;
-  if (await LedgerService.exists(idempotencyKey)) return;
+  if (await LedgerService.exists(idempotencyKey)) return { posted: false, reason: 'duplicate' };
   await LedgerService.createDoubleEntry({
     idempotencyKey,
     tenantId,
@@ -36,8 +48,9 @@ async function postSyncedCreditToWallet(tenantId: string, reference: string, amo
     ],
     actorId: 'SYSTEM_DEVICE_SYNC',
     provider: 'quasar',
-    metadata: { source: 'quasar_socket_sync', type: 'deposit' },
+    metadata: { source: 'quasar_socket_sync', type: 'deposit', schoolWalletCredit: true },
   });
+  return { posted: true, reason: ownership.kind };
 }
 
 function ledgerReference(entry: any): string {
@@ -113,7 +126,7 @@ async function syncConnectedTenantCreditsOnce(io: any): Promise<number> {
           await supabaseAdmin.from('transactions_log').insert({
             reference,
             tenant_id: tenantId,
-            amount: Math.round(amount),
+            amount: roundNaira(amount),
             type: 'CREDIT',
             provider: 'quasar',
             status: 'SUCCESS',
@@ -143,13 +156,15 @@ async function syncConnectedTenantCreditsOnce(io: any): Promise<number> {
           },
         });
         try {
-          await postSyncedCreditToWallet(tenantId, reference, amount);
-          await FeeShadowIntegration.afterVaInwardResult(true, {
-            tenantId,
-            amountNaira: amount,
-            reference,
-            eventTime: new Date(),
-          });
+          const posted = await postSyncedCreditToWallet(tenantId, reference, amount, va);
+          if (posted.posted) {
+            await FeeShadowIntegration.afterVaInwardResult(true, {
+              tenantId,
+              amountNaira: amount,
+              reference,
+              eventTime: new Date(),
+            });
+          }
         } catch (feeErr: any) {
           console.warn(`[PaymentAlert] VA fee skipped ${reference}:`, feeErr?.message || feeErr);
         }

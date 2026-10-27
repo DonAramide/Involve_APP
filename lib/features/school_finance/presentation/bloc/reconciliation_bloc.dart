@@ -40,8 +40,8 @@ class ReconciliationBloc extends Bloc<ReconciliationEvent, ReconciliationState> 
         page: event.page,
       );
       emit(ReconciliationLoaded(
-        summary: report['summary'],
-        payments: report['data'],
+        summary: _summaryFrom(report),
+        payments: _paymentsFrom(report),
         currentStatus: event.status,
         currentPage: event.page,
       ));
@@ -63,8 +63,8 @@ class ReconciliationBloc extends Bloc<ReconciliationEvent, ReconciliationState> 
           page: currentState.currentPage,
         );
         emit(ReconciliationLoaded(
-          summary: report['summary'],
-          payments: report['data'],
+          summary: _summaryFrom(report),
+          payments: _paymentsFrom(report),
           currentStatus: currentState.currentStatus,
           currentPage: currentState.currentPage,
         ));
@@ -81,6 +81,38 @@ class ReconciliationBloc extends Bloc<ReconciliationEvent, ReconciliationState> 
     Emitter<ReconciliationState> emit,
   ) async {
     add(LoadReconciliation(status: event.status, page: 1));
+  }
+
+  Map<String, dynamic> _summaryFrom(Map<String, dynamic> report) {
+    final raw = report['summary'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return {
+      'totalPayments': 0,
+      'matched': 0,
+      'unmatched': 0,
+      'issues': 0,
+    };
+  }
+
+  List<Map<String, dynamic>> _paymentsFrom(Map<String, dynamic> report) {
+    final raw = report['data'];
+    if (raw is! List) return const [];
+    return raw.map(_normalizePayment).where((row) => row['reference'].toString().isNotEmpty).toList();
+  }
+
+  Map<String, dynamic> _normalizePayment(dynamic raw) {
+    if (raw is! Map) return {'reference': '', 'amount': 0.0, 'createdAt': DateTime.now().toIso8601String()};
+    final item = Map<String, dynamic>.from(raw);
+    final amount = item['amount'] ?? item['expectedAmount'] ?? item['actualAmount'] ?? 0;
+    return {
+      ...item,
+      'reference': '${item['reference'] ?? item['txnId'] ?? item['id'] ?? ''}',
+      'amount': amount is num ? amount.toDouble() : double.tryParse('$amount') ?? 0.0,
+      'createdAt': '${item['createdAt'] ?? item['createdDate'] ?? item['created_at'] ?? DateTime.now().toIso8601String()}',
+      'studentName': item['studentName'] ?? item['customerName'] ?? item['txnId'] ?? 'Matched payment',
+      'status': '${item['status'] ?? 'SUCCESS'}',
+      'issueType': item['issueType'],
+    };
   }
 
   @override

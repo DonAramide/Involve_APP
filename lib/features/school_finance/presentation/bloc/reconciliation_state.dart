@@ -15,7 +15,7 @@ class ReconciliationLoading extends ReconciliationState {}
 
 class ReconciliationLoaded extends ReconciliationState {
   final Map<String, dynamic> summary;
-  final List<dynamic> payments;
+  final List<Map<String, dynamic>> payments;
   final String? currentStatus;
   final int currentPage;
 

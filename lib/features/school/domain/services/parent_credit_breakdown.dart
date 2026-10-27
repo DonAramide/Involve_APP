@@ -56,6 +56,37 @@ class ParentCreditParts {
     );
   }
 
+  /// What the parent paid into a virtual account. School/tenant charges
+  /// are not removed from this figure.
+  static double grossVirtualAccount(List<ParentPaymentRecord> payments) {
+    var sum = 0.0;
+    for (final payment in payments) {
+      final source = payment.source
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[\s-]+'), '_');
+      if (source == 'va_deposit' ||
+          source == 'parent_account' ||
+          source == 'virtual_account' ||
+          source == 'virtualaccount' ||
+          source == 'parent_transfer') {
+        sum += payment.amount;
+      }
+    }
+    return _round(sum);
+  }
+
+  /// Parent-facing Quasar money. A lower live balance is the fee the school
+  /// pays, so the parent keeps the amount they actually sent.
+  static double parentQuasarBalance({
+    required double liveBalance,
+    required List<ParentPaymentRecord> payments,
+  }) {
+    final gross = grossVirtualAccount(payments);
+    final live = liveBalance < 0 ? 0.0 : _round(liveBalance);
+    return gross > live + 0.009 ? gross : live;
+  }
+
   /// Live Quasar balance stamped on this parent's virtual-account rows only.
   /// Returns null when the server did not send a balance.
   static double? quasarBalanceFromRows(List<dynamic> rows) {

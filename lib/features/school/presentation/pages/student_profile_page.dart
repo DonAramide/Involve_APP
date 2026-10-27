@@ -21,6 +21,8 @@ import 'package:collection/collection.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 import 'result_preview_page.dart';
+import '../../domain/entities/attendance_models.dart';
+import '../../data/services/attendance_local_storage.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
@@ -56,6 +58,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   MposTransactionData? _pendingPosTx;
   StreamSubscription<Student>? _studentCreditSub;
   StreamSubscription<SchoolParent>? _parentCreditSub;
+  StudentAttendanceSummary? _attendanceSummary;
+  bool _isLoadingAttendance = false;
 
   @override
   void initState() {
@@ -66,6 +70,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       if (!mounted || student.id != widget.studentId) return;
       context.read<SchoolBloc>().add(LoadSchoolData());
       context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+      _loadStudentAttendance();
     });
     _parentCreditSub =
         CustomerWalletCreditService.instance.onParentCredited.listen((parent) {
@@ -77,6 +82,38 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       context.read<SchoolBloc>().add(LoadSchoolData());
       context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadStudentAttendance();
+    });
+  }
+
+  Future<void> _loadStudentAttendance() async {
+    final state = context.read<SchoolBloc>().state;
+    final student = state.students.firstWhereOrNull((s) => s.id == widget.studentId);
+    if (student == null) return;
+
+    final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+    final className = sClass?.name ?? '';
+
+    setState(() => _isLoadingAttendance = true);
+    try {
+      final summary = await AttendanceLocalStorage.getStudentSummaryOnlineOffline(
+        studentId: student.id.toString(),
+        studentName: student.fullName,
+        className: className,
+        admissionNumber: student.admissionNumber,
+      );
+      if (mounted) {
+        setState(() {
+          _attendanceSummary = summary;
+          _isLoadingAttendance = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingAttendance = false);
+      }
+    }
   }
 
   @override
@@ -192,6 +229,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
         if (state.status == SchoolStatus.success && !state.isLoading) {
           final student = state.students.firstWhereOrNull((s) => s.id == widget.studentId);
+          if (student != null && _attendanceSummary == null && !_isLoadingAttendance) {
+            _loadStudentAttendance();
+          }
           if (student?.virtualAccountNumber != null) {
             setState(() => _awaitingVaProvision = false);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -517,6 +557,37 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ),
           ]),
         ],
+        const SizedBox(height: 22),
+        _buildSectionLabel('Attendance Record'),
+        const SizedBox(height: 10),
+        _buildDetailsCard([
+          _buildInfoRow(
+            icon: Icons.calendar_today_outlined,
+            label: 'Total Sessions Marked',
+            value: '${_attendanceSummary?.totalDays ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.check_circle_outline,
+            label: 'Present',
+            value: '${_attendanceSummary?.present ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.cancel_outlined,
+            label: 'Absent',
+            value: '${_attendanceSummary?.absent ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.access_time_outlined,
+            label: 'Late',
+            value: '${_attendanceSummary?.lateCount ?? 0} days',
+          ),
+          _buildInfoRow(
+            icon: Icons.pie_chart_outline_rounded,
+            label: 'Attendance Rate',
+            value: _attendanceSummary?.formattedRate ?? 'N/A',
+            showDivider: false,
+          ),
+        ]),
       ],
     );
   }
@@ -734,7 +805,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
   Widget _buildResultsTab(List<AcademicResult> results) {
     if (results.isEmpty) {
-      return const Center(child: Text('No academic results recorded yet'));
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          _buildAttendanceSummaryCard(_attendanceSummary),
+          const SizedBox(height: 48),
+          const Center(child: Text('No academic results recorded yet')),
+        ],
+      );
     }
 
     return BlocBuilder<SchoolBloc, SchoolState>(
@@ -748,6 +826,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           children: [
             if (state.studentAverage != null || state.studentPosition != null)
               _buildResultsSummary(state.studentAverage, state.classAverage, state.studentPosition, state.classSize),
+            _buildAttendanceSummaryCard(_attendanceSummary),
             if (filteredResults.isEmpty)
               const Expanded(child: Center(child: Text('No academic results for the current term.')))
             else
@@ -895,6 +974,96 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
+  Widget _buildAttendanceSummaryCard(StudentAttendanceSummary? summary) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.fact_check_outlined, size: 18, color: Theme.of(context).primaryColor),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'ATTENDANCE SUMMARY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueGrey,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+              if (_isLoadingAttendance)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                InkWell(
+                  onTap: _loadStudentAttendance,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.refresh, size: 16, color: Colors.blueGrey),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildAttendanceItem('TOTAL', '${summary?.totalDays ?? 0}', Colors.blueGrey.shade800),
+              _buildAttendanceItem('PRESENT', '${summary?.present ?? 0}', Colors.green.shade700),
+              _buildAttendanceItem('ABSENT', '${summary?.absent ?? 0}', Colors.red.shade700),
+              _buildAttendanceItem('LATE', '${summary?.lateCount ?? 0}', Colors.orange.shade800),
+              _buildAttendanceItem('RATE', summary?.formattedRate ?? 'N/A', Colors.indigo.shade700, isBold: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceItem(String label, String value, Color color, {bool isBold = false}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
   void _printResults(BuildContext context) {
     final schoolState = context.read<SchoolBloc>().state;
     final student = schoolState.students.firstWhere((s) => s.id == widget.studentId);
@@ -1035,6 +1204,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             classAverage: state.classAverage,
             studentPosition: state.studentPosition,
             classSize: state.classSize,
+            attendanceSummary: _attendanceSummary,
           ),
         ),
       );
@@ -1065,6 +1235,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         classAverage: state.classAverage,
         studentPosition: state.studentPosition,
         classSize: state.classSize,
+        attendanceSummary: _attendanceSummary,
       );
 
       printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth));
@@ -1753,10 +1924,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     }
     final vaNumber = (parent?.virtualAccountNumber ?? student.virtualAccountNumber)?.trim();
     final vaBank = (parent?.virtualAccountBank ?? student.virtualAccountBank)?.trim();
-    final hasVa = vaNumber != null &&
-        vaNumber.isNotEmpty &&
-        vaBank != null &&
-        vaBank.isNotEmpty;
+    final hasVa = vaNumber != null && vaNumber.isNotEmpty;
 
     if (!hasVa) {
       return Container(
@@ -1829,7 +1997,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     }
 
     final accountNumber = vaNumber!;
-    final bankName = vaBank!;
+    final bankName = (vaBank == null || vaBank.isEmpty) ? 'Quasar' : vaBank;
     final status = (parent?.virtualAccountStatus ?? student.virtualAccountStatus ?? 'ACTIVE').toUpperCase();
     final accountName = parent?.virtualAccountName ?? parent?.fullName ?? student.fullName;
 

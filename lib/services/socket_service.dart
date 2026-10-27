@@ -23,6 +23,8 @@ import 'package:involve_app/features/settings/data/repositories/staff_repository
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class SocketService {
+  static final StreamController<double> withdrawableUpdates =
+      StreamController<double>.broadcast();
   static final SocketService _instance = SocketService._internal();
   factory SocketService() => _instance;
   SocketService._internal();
@@ -274,6 +276,14 @@ class SocketService {
       }
     });
 
+    _socket!.on('withdrawable_updated', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data as Map) : <String, dynamic>{};
+      final available = map['available'];
+      final amount = available is num ? available.toDouble() : double.tryParse('$available');
+      if (amount == null) return;
+      if (!withdrawableUpdates.isClosed) withdrawableUpdates.add(amount);
+    });
+
     _socket!.on('payment.success', (data) {
       debugPrint('[SocketService] payment.success received: $data');
       final map = data is Map
@@ -371,6 +381,26 @@ class SocketService {
         } catch (e) {
           debugPrint('[SocketService] pull_sync failed: $e');
           _showBroadcastBanner('Sync failed: $e');
+        }
+      } else if (action == 'restore_from_web') {
+        _showBroadcastBanner('Downloading school records from the web portal…');
+        try {
+          final restored = await WebCloudSyncService.pullSchoolRoster();
+          try {
+            final sl2 = GetIt.instance;
+            if (sl2.isRegistered<StaffRepositoryImpl>()) {
+              await sl2.get<StaffRepositoryImpl>().pullCloudGovernance();
+            }
+          } catch (e) {
+            debugPrint('[SocketService] staff governance pull failed: $e');
+          }
+          if (_lastDeviceId != null && _lastDeviceId!.isNotEmpty) {
+            await TerminalSyncService.syncTerminalConfig(deviceId: _lastDeviceId!);
+          }
+          _showBroadcastBanner(restored.banner);
+        } catch (e) {
+          debugPrint('[SocketService] restore_from_web failed: $e');
+          _showBroadcastBanner('Could not download school data: $e');
         }
       }
     });

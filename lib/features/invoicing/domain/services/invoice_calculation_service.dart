@@ -18,6 +18,16 @@ class InvoiceCalculationService {
     return CurrencyFormatter.roundMoney(discount);
   }
 
+  /// True when the discount is negative or larger than subtotal + tax.
+  /// A discount equal to the cost is allowed.
+  bool discountExceedsCost(double subtotal, double tax, double discount, DiscountType type) {
+    if (discount < 0) return true;
+    if (type == DiscountType.percentage && discount > 100) return true;
+    final cost = CurrencyFormatter.roundMoney(subtotal + tax);
+    final amount = calculateDiscountAmount(subtotal, tax, discount, type);
+    return amount > cost + 0.001;
+  }
+
   double calculateTotal(double subtotal, double tax, double discount, DiscountType type) {
     final discountAmount = calculateDiscountAmount(subtotal, tax, discount, type);
     return CurrencyFormatter.roundMoney((subtotal + tax) - discountAmount);

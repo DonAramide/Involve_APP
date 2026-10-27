@@ -3,6 +3,9 @@ import { CustomerRepository } from '../repositories/customer.repository';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { InvoiceItemRepository } from '../repositories/invoice-item.repository';
 import { LedgerService, LedgerEntry } from './ledger.service';
+import { ParentAllocationService } from './parent-allocation.service';
+import { isSchoolParentWalletPayment } from './virtual-account-ownership';
+import { classifyCollectionConfirmation } from './collection-confirmation';
 import { supabaseAdmin } from '../db/supabase';
 import { asUuid, toStableUuid } from '../utils/stable-uuid';
 
@@ -111,29 +114,48 @@ export class InvoiceApplicationService {
 
       // 4. Double-Entry Accounting (create only — updates must not double-post)
       if (!alreadyExists) {
-        const entries: LedgerEntry[] = [
-          { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount },
-          { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
-        ];
-
-        if (payload.amountPaid && payload.amountPaid > 0) {
-          entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid });
-          entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid });
-        }
-
         try {
-          await LedgerService.createDoubleEntry({
-            idempotencyKey: idempotencyKey,
-            tenantId: context.tenantId,
-            reference: payload.syncId,
-            entries,
-            correlationId: correlationId,
-            metadata: {
-              source: 'flutter_outbox',
-              eventName: 'invoice.created',
-              invoiceNumber: payload.invoiceNumber
+          if (isSchoolParentWalletPayment(payload.paymentMethod, payload)) {
+            await ParentAllocationService.creditSchoolOnce({
+              tenantId: context.tenantId,
+              invoiceNumber: payload.invoiceNumber,
+              reference: payload.syncId,
+              paymentMethod: payload.paymentMethod,
+              amountNaira: Number(payload.amountPaid || 0),
+              historicalBackfill: false,
+              businessMode: payload.businessMode,
+              studentId: payload.studentId,
+            });
+          } else {
+            const entries: LedgerEntry[] = [
+              { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount },
+              { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
+            ];
+
+            if (payload.amountPaid && payload.amountPaid > 0) {
+              const confirmation = classifyCollectionConfirmation(payload.paymentMethod, {
+                confirmed: payload.confirmed === true,
+                providerReference: payload.providerReference || payload.reference,
+              });
+              if (confirmation !== 'unconfirmed') {
+                entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid });
+                entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid });
+              }
             }
-          });
+
+            await LedgerService.createDoubleEntry({
+              idempotencyKey: idempotencyKey,
+              tenantId: context.tenantId,
+              reference: payload.syncId,
+              entries,
+              correlationId: correlationId,
+              metadata: {
+                source: 'flutter_outbox',
+                eventName: 'invoice.created',
+                invoiceNumber: payload.invoiceNumber
+              }
+            });
+          }
         } catch (ledgerErr: any) {
           // Non-fatal: invoice data is already saved. Ledger reconciliation can be re-run.
           console.warn('[InvoiceApplicationService] Ledger recording skipped (non-critical):', ledgerErr.message);
@@ -213,28 +235,48 @@ export class InvoiceApplicationService {
 
       // 4. Double-Entry Accounting (create only — updates must not double-post)
       if (!alreadyExists) {
-        const entries: LedgerEntry[] = [
-          { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount }, // Receivables
-          { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
-        ];
+        if (isSchoolParentWalletPayment(payload.paymentMethod, payload)) {
+          await ParentAllocationService.creditSchoolOnce({
+            tenantId: context.tenantId,
+            invoiceNumber: payload.invoiceNumber,
+            reference: payload.syncId,
+            paymentMethod: payload.paymentMethod,
+            amountNaira: Number(payload.amountPaid || 0),
+            historicalBackfill: false,
+            businessMode: payload.businessMode,
+            studentId: payload.studentId,
+            pgClient: client,
+          });
+        } else {
+          const entries: LedgerEntry[] = [
+            { account: 'USER_WALLET', type: 'DEBIT', amount: payload.totalAmount }, // Receivables
+            { account: 'REVENUE', type: 'CREDIT', amount: payload.totalAmount }
+          ];
 
-        if (payload.amountPaid && payload.amountPaid > 0) {
-          entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid }); // Cash/Bank
-          entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid }); // Receivables reduced
-        }
-
-        await LedgerService.createDoubleEntry({
-          idempotencyKey: idempotencyKey,
-          tenantId: context.tenantId,
-          reference: invoiceId,
-          entries,
-          correlationId: correlationId,
-          metadata: {
-            source: 'flutter_outbox',
-            eventName: 'invoice.created',
-            invoiceNumber: payload.invoiceNumber
+          if (payload.amountPaid && payload.amountPaid > 0) {
+            const confirmation = classifyCollectionConfirmation(payload.paymentMethod, {
+              confirmed: payload.confirmed === true,
+              providerReference: payload.providerReference || payload.reference,
+            });
+            if (confirmation !== 'unconfirmed') {
+              entries.push({ account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amountPaid });
+              entries.push({ account: 'USER_WALLET', type: 'CREDIT', amount: payload.amountPaid });
+            }
           }
-        }, { pgClient: client });
+
+          await LedgerService.createDoubleEntry({
+            idempotencyKey: idempotencyKey,
+            tenantId: context.tenantId,
+            reference: invoiceId,
+            entries,
+            correlationId: correlationId,
+            metadata: {
+              source: 'flutter_outbox',
+              eventName: 'invoice.created',
+              invoiceNumber: payload.invoiceNumber
+            }
+          }, { pgClient: client });
+        }
       }
 
       await client.query('COMMIT');

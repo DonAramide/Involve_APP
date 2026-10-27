@@ -2,8 +2,10 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { classifyInvoicePaymentMethod } from '../utils/invoice-payment-method';
-import { collectedInvoiceAmount, outstandingInvoiceAmount } from '../utils/invoice-collection';
+import { collectedInvoiceAmount, countsTowardSales, outstandingInvoiceAmount } from '../utils/invoice-collection';
+import { collectionSummaryFromInvoices } from '../utils/invoice-collection-summary';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import {
   roundNaira,
   splitUnsweptVirtualAccountFunds,
@@ -12,14 +14,18 @@ import {
 } from '../utils/virtual-account-funds';
 import { WalletService } from '../services/wallet.service';
 import { QfsQuasarBridgeService } from '../services/qfs-quasar-bridge.service';
+import { FeeCalculator } from '../modules/fee-orchestration/FeeCalculator';
 import {
   isQuasarCreditEntry,
+  isSameQuasarCredit,
   quasarEntryTimestamp,
   quasarLedgerAmountNaira,
   quasarLedgerReference,
   QUASAR_RESYNC_DAYS,
   selectQuasarResyncEntries,
 } from '../utils/quasar-resync';
+import { PaymentAlertTrailService } from '../services/payment-alert-trail.service';
+import { postSyncedCreditToWallet } from '../services/payment-alert-quasar-sync';
 
 /** Configured fee in naira, kept to kobo. 102 kobo is ₦1.02. */
 function feeNairaFromKobo(finalFeeKobo: number): number {
@@ -28,51 +34,149 @@ function feeNairaFromKobo(finalFeeKobo: number): number {
   return Number((Math.round(kobo) / 100).toFixed(2));
 }
 
-/** Fee debits that already posted. The credit feed only stores the gross Quasar amount. */
-async function postedInwardFeeLines(tenantId: string, limit: number) {
+type PublishedChargeVersion = {
+  method: 'FLAT' | 'PERCENTAGE' | 'HYBRID';
+  percentage_bps: number;
+  flat_amount_kobo: number;
+  min_fee_kobo: number;
+  max_fee_kobo: number;
+};
+
+/** Published fee version. Does not change the profile. */
+async function publishedFeeVersion(transactionType: string): Promise<PublishedChargeVersion | null> {
   try {
-    const { data: posted, error } = await supabaseAdmin
-      .from('fee_posting_outbox')
-      .select('assessment_id')
-      .eq('tenant_id', tenantId)
-      .eq('kind', 'FEE_ASSESSMENT_POST')
-      .eq('status', 'DONE')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error || !posted?.length) return [];
-    const ids = [...new Set(posted.map((row: { assessment_id?: string }) => row.assessment_id).filter(Boolean))];
-    if (!ids.length) return [];
-    const { data: assessments, error: assessErr } = await supabaseAdmin
-      .from('fee_assessments')
-      .select('id, transaction_type, final_fee_kobo, created_at')
-      .in('id', ids);
-    if (assessErr || !assessments?.length) return [];
-    const lines = [];
-    for (const row of assessments) {
-      if (row.transaction_type !== 'VIRTUAL_ACCOUNT_INWARD_TRANSFER') continue;
-      const naira = feeNairaFromKobo(Number(row.final_fee_kobo || 0));
-      if (!(naira > 0)) continue;
-      lines.push({
-        id: `fee-${row.id}`,
-        wallet_id: 'fee',
-        amount: -naira,
-        type: 'debit',
-        reference: `fee-${String(row.id).slice(0, 8)}`,
-        description: 'Inward transfer fee',
-        balance_after: 0,
-        channel: 'Fee',
-        created_at: row.created_at,
-        metadata: {
-          student_name: 'Inward transfer fee',
-          fee: true,
-        },
-      });
-    }
-    return lines;
+    const { data: profiles, error } = await supabaseAdmin
+      .from('fee_profiles')
+      .select('id')
+      .eq('transaction_type', transactionType)
+      .limit(5);
+    if (error || !profiles?.length) return null;
+    const { data: versions } = await supabaseAdmin
+      .from('fee_profile_versions')
+      .select('method, percentage_bps, flat_amount_kobo, min_fee_kobo, max_fee_kobo, status')
+      .in('profile_id', profiles.map((row) => row.id))
+      .eq('status', 'PUBLISHED')
+      .limit(1);
+    const version = versions?.[0];
+    if (!version) return null;
+    const method = String(version.method || '');
+    if (method !== 'FLAT' && method !== 'PERCENTAGE' && method !== 'HYBRID') return null;
+    return {
+      method,
+      percentage_bps: Number(version.percentage_bps || 0),
+      flat_amount_kobo: Number(version.flat_amount_kobo || 0),
+      min_fee_kobo: Number(version.min_fee_kobo || 0),
+      max_fee_kobo: Number(version.max_fee_kobo || 0),
+    };
   } catch (err: any) {
-    console.warn('[ExecutiveFinance] inward fee lines skipped:', err?.message || err);
-    return [];
+    console.warn(`[ExecutiveFinance] ${transactionType} charge profile skipped:`, err?.message || err);
+    return null;
   }
+}
+
+async function publishedVaInwardVersion(): Promise<PublishedChargeVersion | null> {
+  return publishedFeeVersion('VIRTUAL_ACCOUNT_INWARD_TRANSFER');
+}
+
+async function publishedTreasuryWithdrawalVersion(): Promise<PublishedChargeVersion | null> {
+  return publishedFeeVersion('TREASURY_WITHDRAWAL');
+}
+
+function inwardChargeNaira(
+  amountNaira: number,
+  version: {
+    method: 'FLAT' | 'PERCENTAGE' | 'HYBRID';
+    percentage_bps: number;
+    flat_amount_kobo: number;
+    min_fee_kobo: number;
+    max_fee_kobo: number;
+  },
+): number {
+  const kobo = Math.round(Number(amountNaira) * 100);
+  if (!Number.isSafeInteger(kobo) || kobo <= 0) return 0;
+  try {
+    const calc = FeeCalculator.calculate({
+      method: version.method,
+      transactionAmountKobo: kobo,
+      percentageBps: version.percentage_bps,
+      flatAmountKobo: version.flat_amount_kobo,
+      minFeeKobo: version.min_fee_kobo,
+      maxFeeKobo: version.max_fee_kobo,
+    });
+    return feeNairaFromKobo(calc.final_fee_kobo);
+  } catch {
+    return 0;
+  }
+}
+
+/** Billed collections only. Live leftover VA is not school revenue. */
+function reportedSchoolRevenue(input: {
+  invoiceCollected: number;
+  cash: number;
+  wallet: number;
+  card: number;
+  vaTransfer: number;
+  quasarHeld: number;
+  quasarRemitted: number;
+}): number {
+  const base = Math.max(
+    input.invoiceCollected,
+    input.cash + input.wallet + input.card + input.vaTransfer,
+  );
+  return roundNaira(base);
+}
+
+function inwardChargeLine(credit: { id: string; reference: string; created_at: string }, chargeNaira: number) {
+  return {
+    id: `charge-${credit.id}`,
+    wallet_id: 'fee',
+    amount: -chargeNaira,
+    type: 'debit',
+    reference: `charge-${credit.reference}`,
+    description: 'Transfer charge',
+    balance_after: 0,
+    channel: 'Fee',
+    created_at: credit.created_at,
+    metadata: {
+      student_name: 'Transfer charge',
+      fee: true,
+    },
+  };
+}
+
+function withdrawalChargeNaira(
+  amountNaira: number,
+  meta: Record<string, any>,
+  version: PublishedChargeVersion | null,
+): number {
+  const stored = Number(meta.service_fee);
+  if (Number.isFinite(stored) && stored > 0) return roundNaira(stored);
+  const total = Number(meta.total_required);
+  if (Number.isFinite(total) && total > amountNaira) return roundNaira(total - amountNaira);
+  if (!version) return 0;
+  return inwardChargeNaira(amountNaira, version);
+}
+
+function withdrawalChargeLine(
+  payout: { id: string; reference: string; created_at: string },
+  chargeNaira: number,
+) {
+  return {
+    id: `wd-charge-${payout.id}`,
+    wallet_id: 'fee',
+    amount: -chargeNaira,
+    type: 'debit',
+    reference: `charge-${payout.reference}`,
+    description: 'Withdrawal charge',
+    balance_after: 0,
+    channel: 'Fee',
+    created_at: payout.created_at,
+    metadata: {
+      student_name: 'Withdrawal charge',
+      fee: true,
+      payout: true,
+    },
+  };
 }
 
 export class ExecutiveFinanceController {
@@ -115,7 +219,7 @@ export class ExecutiveFinanceController {
       ] = await Promise.all([
         supabaseAdmin.from('wallets').select('id, balance').eq('tenant_id', tenantId).limit(1).maybeSingle(),
         invoiceQuery,
-        supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, payment_status, total_amount, created_at').eq('tenant_id', tenantId),
+        supabaseAdmin.from('invoices').select('customer_id, invoice_number, amount_paid, payment_method, payment_status, total_amount, created_at').eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
         supabaseAdmin
           .from('transactions_log')
@@ -173,60 +277,19 @@ export class ExecutiveFinanceController {
       const unmatched = unmatchedRes.data;
       const failedPayouts = failedPayoutsRes.data;
 
-      let totalInvoiced = 0;
-      let totalCollected = 0;
-      let totalPending = 0;
-      let card = 0;
-      let vaTransfer = 0;
-      let bankTransfer = 0;
-      let cash = 0;
-      let walletAmount = 0;
-      const invoiceCount = invoices?.length || 0;
-
-      for (const inv of (invoices || [])) {
-        const amt = Number(inv.total_amount || 0);
-        const collected = collectedInvoiceAmount(inv);
-        totalInvoiced += amt;
-        totalCollected += collected;
-        totalPending += outstandingInvoiceAmount(inv);
-
-        const rail = classifyInvoicePaymentMethod(inv.payment_method);
-        if (rail === 'cash') {
-          cash += collected;
-        } else if (rail === 'va_transfer') {
-          vaTransfer += collected;
-        } else if (rail === 'bank_transfer') {
-          bankTransfer += collected;
-        } else if (rail === 'card') {
-          card += collected;
-        } else if (rail === 'wallet') {
-          walletAmount += collected;
-        }
-      }
-
-      try {
-        const { data: schoolPays } = await supabaseAdmin
-          .from('school_payment_events')
-          .select('amount, payment_method, local_invoice_number, payment_status, paid_at')
-          .eq('tenant_id', tenantId);
-        const invoiceNumbers = new Set(
-          (invoices || []).map((inv: any) => String(inv.invoice_number || '').trim()).filter(Boolean),
-        );
-        for (const pay of schoolPays || []) {
-          const num = String(pay.local_invoice_number || '').trim();
-          if (num && invoiceNumbers.has(num)) continue;
-          const rail = classifyInvoicePaymentMethod(pay.payment_method);
-          const amt = Number(pay.amount || 0);
-          if (!(amt > 0)) continue;
-          if (rail === 'cash') {
-            cash += amt;
-            totalCollected += amt;
-            totalInvoiced += amt;
-          }
-        }
-      } catch (schoolPayErr: any) {
-        console.warn('[ExecutiveFinance] school_payment_events skip:', schoolPayErr?.message || schoolPayErr);
-      }
+      const collection = collectionSummaryFromInvoices(invoices, {
+        start: startDate ? String(startDate) : null,
+        end: endDate ? String(endDate) : null,
+      });
+      const totalInvoiced = collection.invoiced;
+      const totalCollected = collection.recordedCollected;
+      const totalPending = collection.pending;
+      const card = collection.rails.card;
+      const vaTransfer = collection.rails.vaTransfer;
+      const bankTransfer = collection.rails.bankTransfer;
+      const cash = collection.rails.cash;
+      const walletAmount = collection.rails.wallet;
+      const invoiceCount = collection.invoiceCount;
 
       const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + collectedInvoiceAmount(inv), 0) || 0;
 
@@ -369,9 +432,31 @@ export class ExecutiveFinanceController {
         paidCount = Math.max(0, totalCount - owingCount);
       }
 
+      let quasarWithdrawable = 0;
+      try {
+        const { QuasarWithdrawableService } = await import('../services/quasar-withdrawable.service');
+        quasarWithdrawable = await QuasarWithdrawableService.available(tenantId);
+      } catch (withdrawableErr: any) {
+        console.warn('[ExecutiveFinance] withdrawable skip:', withdrawableErr?.message || withdrawableErr);
+      }
+
+      const reportedRevenue = reportedSchoolRevenue({
+        invoiceCollected: allTimeCollected,
+        cash,
+        wallet: walletAmount,
+        card,
+        vaTransfer,
+        quasarHeld: pendingVirtualAccountFunds,
+        quasarRemitted: totalQuasarRemitted,
+      });
+      const quasarOnHand = roundNaira(card + pendingVirtualAccountFunds);
+
       return res.status(200).json({
         walletBalance: derivedWalletBalance,
+        withdrawable: quasarWithdrawable,
         totalCollected: allTimeCollected,
+        totalRevenue: reportedRevenue,
+        quasarCollected: quasarOnHand,
         revenueInRange: totalCollected,
         /** All-time Quasar inflows (VA deposits + card invoices). Own-bank transfers excluded. */
         totalQuasarCollected,
@@ -393,17 +478,20 @@ export class ExecutiveFinanceController {
           unmapped: unsweptVa.unmapped,
         },
         salesSummary: {
-          totalInvoiced,
-          totalCollected,
-          totalPending,
-          card,
-          vaTransfer,
-          bankTransfer,
-          transfer: bankTransfer,
-          cash,
-          wallet: walletAmount,
+          timezone: collection.timezone,
+          totalInvoiced: roundNaira(totalInvoiced),
+          totalCollected: roundNaira(totalCollected),
+          recordedCollected: roundNaira(totalCollected),
+          totalPending: roundNaira(totalPending),
+          card: roundNaira(card),
+          vaTransfer: roundNaira(vaTransfer),
+          bankTransfer: roundNaira(bankTransfer),
+          transfer: roundNaira(bankTransfer),
+          cash: roundNaira(cash),
+          wallet: roundNaira(walletAmount),
           cardAndTransfer: card + vaTransfer,
-          invoiceCount
+          invoiceCount,
+          settledFundsNote: collection.settledFundsNote,
         },
         studentMetrics: {
           total: totalCount,
@@ -418,6 +506,37 @@ export class ExecutiveFinanceController {
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] Error:', error.message);
       return res.status(500).json({ error: 'Failed to generate executive summary' });
+    }
+  }
+
+  /**
+   * GET /api/v1/finance/invoices/collection-summary
+   * Authoritative period totals for Tenant Admin and tablet Invoice History.
+   */
+  static async getCollectionSummary(req: Request, res: Response) {
+    let tenantId: string;
+    try {
+      tenantId = resolveAuthoritativeTenantId(req);
+    } catch (err: any) {
+      return res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
+    }
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+    const startDate = req.query.startDate ? String(req.query.startDate) : null;
+    const endDate = req.query.endDate ? String(req.query.endDate) : null;
+    try {
+      let invoiceQuery = supabaseAdmin
+        .from('invoices')
+        .select('invoice_number, amount_paid, payment_method, payment_status, total_amount, created_at')
+        .eq('tenant_id', tenantId);
+      if (startDate) invoiceQuery = invoiceQuery.gte('created_at', startDate);
+      if (endDate) invoiceQuery = invoiceQuery.lte('created_at', endDate);
+      const { data, error } = await invoiceQuery;
+      if (error) throw error;
+      return res.status(200).json(collectionSummaryFromInvoices(data, { start: startDate, end: endDate }));
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Failed to load collection summary' });
     }
   }
 
@@ -450,18 +569,17 @@ export class ExecutiveFinanceController {
         : Number(payload.pendingVirtualAccountFunds || 0);
     return res.status(200).json({
       ...payload,
-      totalRevenue: payload.totalCollected,
+      totalRevenue: Number(payload.totalRevenue ?? payload.totalCollected ?? 0),
       outstandingFees: sales.totalPending || 0,
       paidStudentsCount: payload.studentMetrics?.paid || 0,
       owingStudentsCount: payload.studentMetrics?.owing || 0,
       totalStudents: payload.studentMetrics?.total || 0,
       lastUpdated: new Date().toISOString(),
       cardCollected: card,
-      /** Live Quasar VA sitting at the PSP — not Invify's possibly doubled tx log. */
-      vaTransferCollected: liveVa,
+      vaTransferCollected: Number(sales.vaTransfer || 0),
       cashCollected: Number(sales.cash || 0),
-      /** Quasar on this page is collectively card (POS) + live VA. */
-      quasarCollected: card + liveVa,
+      quasarCollected: card + Number(sales.vaTransfer || 0),
+      quasarLiveBalance: Number.isFinite(liveVa) ? liveVa : payload.quasarLiveBalance,
     });
   }
 
@@ -556,7 +674,7 @@ export class ExecutiveFinanceController {
     }
     const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
     try {
-      const [invoicesRes, creditsRes] = await Promise.all([
+      const [invoicesRes, creditsRes, payoutsRes] = await Promise.all([
         supabaseAdmin
           .from('invoices')
           .select(
@@ -574,7 +692,19 @@ export class ExecutiveFinanceController {
           .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
           .order('created_at', { ascending: false })
           .limit(limit),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('id, reference, amount, type, status, metadata, created_at')
+          .eq('tenant_id', tenantId)
+          .eq('type', 'payout')
+          .in('status', ['SUCCESS', 'PENDING', 'PROCESSING', 'FAILED'])
+          .order('created_at', { ascending: false })
+          .limit(limit),
       ]);
+
+      if (invoicesRes.error) console.error('Error fetching school transactions:', invoicesRes.error);
+      if (creditsRes.error) console.error('Error fetching quasar credits:', creditsRes.error);
+      if (payoutsRes.error) console.error('Error fetching withdrawals:', payoutsRes.error);
 
       const channelForRail = (rail: string) => {
         if (rail === 'card') return 'Card';
@@ -609,18 +739,23 @@ export class ExecutiveFinanceController {
         });
       }
 
+      const [chargeVersion, withdrawalFeeVersion] = await Promise.all([
+        publishedVaInwardVersion(),
+        publishedTreasuryWithdrawalVersion(),
+      ]);
       for (const tx of creditsRes.data || []) {
         const amount = transactionAmountNaira(tx);
         if (!(amount > 0)) continue;
         const meta = tx.metadata || {};
         const name = meta.senderName || meta.studentName || 'Virtual Account credit';
         const parentOwned = String(meta.paidVia || meta.paid_via || '').toLowerCase().includes('parent');
+        const reference = tx.reference || String(tx.id);
         items.push({
           id: tx.id,
           wallet_id: tx.wallet_id || 'quasar',
           amount,
           type: 'credit',
-          reference: tx.reference || String(tx.id),
+          reference,
           description: parentOwned
             ? `Parent transfer (Quasar) · ${name}`
             : `Quasar VA credit · ${name}`,
@@ -636,9 +771,53 @@ export class ExecutiveFinanceController {
             parentTransfer: parentOwned,
           },
         });
+        if (chargeVersion) {
+          const charge = inwardChargeNaira(amount, chargeVersion);
+          if (charge > 0) {
+            items.push(inwardChargeLine({ id: String(tx.id), reference, created_at: tx.created_at }, charge));
+          }
+        }
       }
 
-      items.push(...(await postedInwardFeeLines(tenantId, limit)));
+      for (const tx of payoutsRes.data || []) {
+        const amount = transactionAmountNaira(tx);
+        if (!(amount > 0)) continue;
+        const meta = tx.metadata || {};
+        const state = String(tx.status || '').toUpperCase();
+        const bank = String(meta.bank_name || '').trim();
+        const title = state === 'FAILED'
+          ? 'Withdrawal failed'
+          : state === 'SUCCESS'
+            ? 'Withdrawal'
+            : 'Withdrawal pending';
+        const reference = tx.reference || String(tx.id);
+        items.push({
+          id: tx.id,
+          wallet_id: 'quasar',
+          amount: -amount,
+          type: 'debit',
+          reference,
+          description: bank ? `${title} · ${bank}` : title,
+          balance_after: 0,
+          channel: 'Withdrawal',
+          created_at: tx.created_at,
+          metadata: {
+            student_name: bank ? `${title} · ${bank}` : title,
+            payout: true,
+            status: state,
+            bank_name: bank || null,
+            service_fee: meta.service_fee ?? null,
+            total_required: meta.total_required ?? null,
+          },
+        });
+        const charge = withdrawalChargeNaira(amount, meta, withdrawalFeeVersion);
+        if (charge > 0 && state !== 'FAILED') {
+          items.push(withdrawalChargeLine(
+            { id: String(tx.id), reference, created_at: tx.created_at },
+            charge,
+          ));
+        }
+      }
 
       items.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -660,14 +839,12 @@ export class ExecutiveFinanceController {
 
       let creditsQuery = supabaseAdmin
         .from('ledger_entries')
-        .select('amount')
-        .in('entry_type', ['CARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT'])
+        .select('amount, type, account')
         .eq('type', 'CREDIT');
 
       let debitsQuery = supabaseAdmin
         .from('ledger_entries')
-        .select('amount')
-        .eq('entry_type', 'WITHDRAWAL')
+        .select('amount, type, account')
         .eq('type', 'DEBIT');
 
       let disputesQuery = supabaseAdmin
@@ -700,17 +877,46 @@ export class ExecutiveFinanceController {
       if (disputesRes.error) console.error('Error fetching disputes:', disputesRes.error);
       if (failedRes.error) console.error('Error fetching failed cases:', failedRes.error);
 
-      const totalCredits = creditsRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
-      const totalDebits = debitsRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
+      const walletSide = (rows: any[] | null) => (rows || []).filter((row) => {
+        const account = String(row.account || '');
+        return !account || account === 'USER_WALLET';
+      });
+      const totalCredits = walletSide(creditsRes.data).reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
+      const totalDebits = walletSide(debitsRes.data).reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
 
-      // VA webhook credits land on USER_WALLET, not entry_type=VIRTUAL_ACCOUNT_CREDIT.
+      let quasarCredits = 0;
+      let quasarPayouts = 0;
+      if (tenantId && !(totalCredits > 0)) {
+        const [creditLog, payoutLog] = await Promise.all([
+          supabaseAdmin
+            .from('transactions_log')
+            .select('amount, metadata')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'SUCCESS')
+            .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT']),
+          supabaseAdmin
+            .from('transactions_log')
+            .select('amount')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'SUCCESS')
+            .eq('type', 'payout'),
+        ]);
+        quasarCredits = (creditLog.data || []).reduce((sum, tx) => sum + transactionAmountNaira(tx), 0);
+        quasarPayouts = (payoutLog.data || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      }
+
+      // VA credits often sit in transactions_log before a wallet ledger row exists.
       const pendingSettlement = Math.max(
         0,
-        walletInfo && Number.isFinite(Number(walletInfo.balance))
-          ? Number(walletInfo.balance)
-          : totalCredits - totalDebits,
+        roundNaira(
+          quasarCredits > 0
+            ? quasarCredits - quasarPayouts
+            : walletInfo && Number.isFinite(Number(walletInfo.balance)) && Number(walletInfo.balance) > 0
+              ? Number(walletInfo.balance)
+              : totalCredits - totalDebits,
+        ),
       );
-      const clearedToday = totalDebits;
+      const clearedToday = quasarPayouts > 0 ? quasarPayouts : totalDebits;
       const heldFunds = disputesRes.data?.reduce((acc: number, curr: any) => acc + Number(curr.difference_amount || 0), 0) || 0;
       const failedTransfers = failedRes.data?.length || 0;
 
@@ -889,6 +1095,31 @@ export class ExecutiveFinanceController {
             },
           };
         });
+
+      const seen = new Set(payments.map((p) => String(p.reference)));
+      const { data: pendingAlerts } = await supabaseAdmin
+        .from('payment_alert_deliveries')
+        .select('id, tenant_id, reference, amount, payload, created_at, status')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'pending')
+        .limit(50);
+      for (const row of pendingAlerts || []) {
+        const reference = String(row.reference || '').trim();
+        if (!reference || seen.has(reference)) continue;
+        seen.add(reference);
+        const payload = row.payload || {};
+        payments.push({
+          id: row.id,
+          reference,
+          amount: Number(row.amount || 0),
+          type: 'payment.success',
+          status: 'SUCCESS',
+          createdAt: row.created_at,
+          walletId: payload.walletId || null,
+          customerId: payload.customerId || null,
+          metadata: payload.metadata || {},
+        });
+      }
 
       return res.status(200).json({
         success: true,
@@ -1133,7 +1364,24 @@ export class ExecutiveFinanceController {
       const wanted = [...unique.values()];
       const references = wanted.map((c) => c.reference);
 
-      const existing = new Set<string>();
+      const existingRefs = new Set<string>();
+      const existingCredits: Array<{ reference: string; amount: number; createdAt: string }> = [];
+      const { data: logged, error: loggedErr } = await supabaseAdmin
+        .from('transactions_log')
+        .select('reference, amount, created_at, metadata')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'SUCCESS')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (loggedErr) throw loggedErr;
+      for (const row of logged || []) {
+        if (row?.reference) existingRefs.add(String(row.reference));
+        existingCredits.push({
+          reference: String(row.reference || ''),
+          amount: transactionAmountNaira(row),
+          createdAt: String(row.created_at || ''),
+        });
+      }
       for (let i = 0; i < references.length; i += 100) {
         const slice = references.slice(i, i + 100);
         if (slice.length === 0) continue;
@@ -1144,14 +1392,23 @@ export class ExecutiveFinanceController {
           .in('reference', slice);
         if (error) throw error;
         for (const row of data || []) {
-          if (row?.reference) existing.add(String(row.reference));
+          if (row?.reference) existingRefs.add(String(row.reference));
         }
       }
 
       let imported = 0;
       const errors: string[] = [];
+      let io: any = null;
+      try {
+        io = require('../app').io;
+      } catch {
+        io = null;
+      }
       for (const credit of wanted) {
-        if (existing.has(credit.reference)) continue;
+        const already =
+          existingRefs.has(credit.reference) ||
+          existingCredits.some((row) => isSameQuasarCredit(row, credit));
+        if (already) continue;
         const { error } = await supabaseAdmin.from('transactions_log').insert({
           reference: credit.reference,
           tenant_id: tenantId,
@@ -1172,7 +1429,33 @@ export class ExecutiveFinanceController {
           errors.push(error.message || credit.reference);
           continue;
         }
+        existingRefs.add(credit.reference);
+        existingCredits.push(credit);
         imported += 1;
+        try {
+          await postSyncedCreditToWallet(tenantId, credit.reference, credit.amount, credit.va);
+        } catch (walletErr: any) {
+          console.warn(`[QuasarResync] wallet skip ${credit.reference}:`, walletErr?.message || walletErr);
+        }
+        try {
+          await PaymentAlertTrailService.recordAndEmit(io, {
+            tenantId,
+            reference: credit.reference,
+            amount: credit.amount,
+            payload: {
+              metadata: {
+                virtualAccountNumber: credit.va || null,
+                accountNumber: credit.va || null,
+                senderName: 'Quasar',
+                studentName: 'Quasar',
+                sandbox: true,
+                source: 'quasar_resync',
+              },
+            },
+          });
+        } catch (alertErr: any) {
+          console.warn(`[QuasarResync] alert skip ${credit.reference}:`, alertErr?.message || alertErr);
+        }
       }
 
       return res.status(200).json({

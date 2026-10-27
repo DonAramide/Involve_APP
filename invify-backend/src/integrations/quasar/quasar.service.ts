@@ -178,6 +178,10 @@ export class QuasarService {
     }
   }
 
+  async getVirtualAccount(childId: string) {
+    return this.client.getVirtualAccount(childId);
+  }
+
   /** Normalize to +234… for Nigerian mobiles when possible. */
   static normalizeCustomerPhone(raw: string | null | undefined): string {
     const digits = String(raw || '').replace(/\D/g, '');
@@ -327,7 +331,9 @@ export class QuasarService {
   /**
    * Primary Invify → Quasar card path (iso_tcp).
    * 1) encrypt + submit ICC → icc_token
-   * 2) POST /pos/card-transaction with ISO fields (no 55) + transport
+   * 2) POST /pos/card-transaction. When packed_iso_hex is set, Quasar forwards
+   * those bytes unchanged (field 55 and the MAC stay in). Loose fields are
+   * omitted so Quasar does not rebuild the message and drop the MAC.
    */
   async executeIsoCardTransaction(params: {
     quasarTenantId: string;
@@ -382,6 +388,7 @@ export class QuasarService {
     console.log(
       `[QuasarSDK] ICC token received; executing Quasar card-transaction iso_tcp → ${params.transport.host}:${params.transport.port}`,
     );
+    const packedIsoHex = params.packedIsoHex?.replace(/\s/g, '') || '';
     return this.client.executeCardTransaction({
       tenant_id: params.quasarTenantId,
       reference: params.reference,
@@ -389,10 +396,11 @@ export class QuasarService {
       device_id: params.deviceId,
       icc_token: String(iccToken),
       transport: params.transport,
-      fields: params.fields,
-      ...(params.packedIsoHex
-        ? { packed_iso_hex: params.packedIsoHex.replace(/\s/g, '') }
-        : {}),
+      // packed_iso_hex is the message the host receives. Sending fields as well
+      // makes Quasar rebuild and drop field 128/64.
+      ...(packedIsoHex
+        ? { packed_iso_hex: packedIsoHex }
+        : { fields: params.fields }),
     });
   }
 }

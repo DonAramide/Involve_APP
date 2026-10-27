@@ -1,0 +1,66 @@
+-- DO NOT APPLY. Separate from allocate_parent_credit.
+-- Do not bundle into the parent-allocation install.
+-- Do not execute against staging or production without its own approval.
+--
+-- Why this exists
+-- ---------------
+-- Live staging (rpcjelhacmkhzguljdgi) grants EXECUTE on SECURITY DEFINER
+-- process_ledger_double_entry (varchar and uuid) to PUBLIC, anon, authenticated,
+-- postgres, and service_role. process_ledger_double_entry_text has EXECUTE for
+-- anon, authenticated, postgres, and service_role (PUBLIC already revoked).
+--
+-- Cause: PostgreSQL CREATE FUNCTION defaults EXECUTE to PUBLIC, plus schema
+-- default privileges (pg_default_acl objtype=f) grant EXECUTE (X) on new public
+-- functions to anon, authenticated, and service_role.
+--
+-- Application evidence (repository)
+-- ---------------------------------
+-- Supported callers use supabaseAdmin (service_role JWT) for
+-- process_ledger_double_entry_text, or a DATABASE_URL session for
+-- process_ledger_double_entry($1::uuid, ...). No Flutter or invify-admin
+-- caller of these three RPCs was found. anon/authenticated EXECUTE is therefore
+-- not required by a supported Invify path.
+--
+-- Dependency if applied
+-- ---------------------
+-- Keep GRANT EXECUTE TO service_role and to postgres (owner).
+-- Do not revoke from service_role. UUID wrapper must keep EXECUTE for postgres
+-- so SECURITY DEFINER allocate_parent_credit / fee guards can call varchar kobo
+-- as the owner.
+-- After CREATE OR REPLACE of these functions, re-run the REVOKEs: default ACLs
+-- can restore anon/authenticated EXECUTE on new function versions.
+--
+-- Residual
+-- --------
+-- This does not pin search_path on the existing ledger RPC.
+-- This does not change execute_sql.
+-- API access logs were not reviewed; unknown external clients calling the
+-- PostgREST ledger RPC with a user JWT would break after revoke (desired).
+
+-- BEGIN;
+-- REVOKE ALL ON FUNCTION public.process_ledger_double_entry(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM PUBLIC;
+-- REVOKE ALL ON FUNCTION public.process_ledger_double_entry(UUID, VARCHAR, VARCHAR, JSONB, JSONB) FROM PUBLIC;
+-- REVOKE ALL ON FUNCTION public.process_ledger_double_entry_text(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM PUBLIC;
+--
+-- DO $ledger_rpc_grants$
+-- BEGIN
+--     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM anon;
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry(UUID, VARCHAR, VARCHAR, JSONB, JSONB) FROM anon;
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry_text(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM anon;
+--     END IF;
+--     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM authenticated;
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry(UUID, VARCHAR, VARCHAR, JSONB, JSONB) FROM authenticated;
+--         REVOKE ALL ON FUNCTION public.process_ledger_double_entry_text(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) FROM authenticated;
+--     END IF;
+--     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+--         GRANT EXECUTE ON FUNCTION public.process_ledger_double_entry(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) TO service_role;
+--         GRANT EXECUTE ON FUNCTION public.process_ledger_double_entry(UUID, VARCHAR, VARCHAR, JSONB, JSONB) TO service_role;
+--         GRANT EXECUTE ON FUNCTION public.process_ledger_double_entry_text(VARCHAR, VARCHAR, VARCHAR, JSONB, JSONB) TO service_role;
+--     ELSE
+--         RAISE EXCEPTION 'service_role missing; abort ledger RPC grant change';
+--     END IF;
+-- END
+-- $ledger_rpc_grants$;
+-- COMMIT;

@@ -145,6 +145,7 @@ const fetchData = async (forceRefresh = false) => {
 
 onMounted(() => {
   fetchData(true);
+  financeStore.subscribe();
 });
 </script>
 

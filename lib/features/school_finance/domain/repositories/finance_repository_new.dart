@@ -279,14 +279,31 @@ class FinanceRepository {
     );
   }
 
+  /// Quotes the treasury service fee for a withdrawal amount.
+  Future<Map<String, dynamic>> quotePayout(double amount) async {
+    final response = await _client.post(
+      '/api/payout/quote',
+      data: {'amount': amount},
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return <String, dynamic>{};
+  }
+
   /// Initiates a fund sweep (withdrawal) to the saved bank account.
-  Future<void> initiatePayout(double amount) async {
-    await _client.post(
+  /// [otp] is the current 6-digit authenticator code. Withdrawal is refused without it.
+  Future<Map<String, dynamic>> initiatePayout(double amount, {required String otp}) async {
+    final response = await _client.post(
       '/api/payout/withdraw',
       data: {
         'amount': amount,
+        'otp': otp,
       },
     );
+    final body = response.data;
+    if (body is Map) return Map<String, dynamic>.from(body);
+    return <String, dynamic>{};
   }
 
   /// Fetches the history of fund sweeps (payouts).

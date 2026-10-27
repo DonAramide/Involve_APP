@@ -142,16 +142,21 @@ export function splitUnsweptVirtualAccountFunds(input: {
   const studentVas = new Set((input.studentVas || []).map((v) => String(v).trim()).filter(Boolean));
   const parentVas = new Set((input.parentVas || []).map((v) => String(v).trim()).filter(Boolean));
 
-  const customer = sumForOwners(pending, customerVas);
-  const staff = sumForOwners(pending, staffVas);
-  const student = sumForOwners(pending, studentVas);
-  const parent = sumForOwners(pending, parentVas);
-
+  // One account number can be stored as both a parent VA and a customer VA
+  // after a device pull. Count that balance once, on the most specific owner.
+  const buckets = { customer: 0, staff: 0, student: 0, parent: 0 };
   let orphanVa = 0;
   for (const [va, amount] of pending.entries()) {
-    if (customerVas.has(va) || staffVas.has(va) || studentVas.has(va) || parentVas.has(va)) continue;
-    orphanVa += amount;
+    if (parentVas.has(va)) buckets.parent += amount;
+    else if (studentVas.has(va)) buckets.student += amount;
+    else if (staffVas.has(va)) buckets.staff += amount;
+    else if (customerVas.has(va)) buckets.customer += amount;
+    else orphanVa += amount;
   }
+  const customer = roundNaira(buckets.customer);
+  const staff = roundNaira(buckets.staff);
+  const student = roundNaira(buckets.student);
+  const parent = roundNaira(buckets.parent);
 
   const unmapped = roundNaira(orphanVa + noVaNet);
   const total = roundNaira(customer + staff + student + parent + unmapped);

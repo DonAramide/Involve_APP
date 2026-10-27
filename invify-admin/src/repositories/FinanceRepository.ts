@@ -5,6 +5,7 @@ import { QueryCache } from '../cache/QueryCache';
 // DTO Interfaces (for documentation/typing purposes)
 export interface ExecutiveSummaryDTO {
   walletBalance: number;
+  withdrawable?: number;
   totalCollected: number;
   revenueInRange: number;
   totalQuasarCollected?: number;
@@ -64,6 +65,7 @@ export class FinanceRepository {
         const { data } = await financeApi.getExecutiveSummary();
         return {
           walletBalance: data.walletBalance || 0,
+          withdrawable: Number(data.withdrawable || 0),
           totalCollected: data.totalCollected || 0,
           revenueInRange: data.revenueInRange || 0,
           totalQuasarCollected: data.totalQuasarCollected || 0,
@@ -106,6 +108,11 @@ export class FinanceRepository {
       },
       options
     );
+  }
+
+  static async getCollectionSummary(params?: { startDate?: string; endDate?: string }) {
+    const { data } = await financeApi.getCollectionSummary(params);
+    return data;
   }
 
   /**

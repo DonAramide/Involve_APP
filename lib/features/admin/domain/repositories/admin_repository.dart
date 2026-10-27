@@ -7,6 +7,7 @@ abstract class IAdminRepository {
   Future<void> revokeApiKey(String keyId);
   Future<List<Map<String, dynamic>>> getAuditLogs();
   Future<Map<String, dynamic>> getDashboardStats();
+  Future<List<Map<String, dynamic>>> getInternalWalletLedger();
 }
 
 class AdminRepositoryImpl implements IAdminRepository {
@@ -91,5 +92,16 @@ class AdminRepositoryImpl implements IAdminRepository {
         'monthly_revenue': 0.0,
       };
     }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getInternalWalletLedger() async {
+    final response = await client.get('/api/v1/wallet/transactions');
+    final raw = response.data;
+    final list = raw is Map ? (raw['transactions'] as List? ?? const []) : const [];
+    return list
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
   }
 }

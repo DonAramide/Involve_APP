@@ -38,11 +38,8 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         isoMsg.set(41, terminalParameters.terminalId)
 
         if (processingCode == ISOProcCode.TERM_PARAM_DOWNLOAD_ISO_PROC_CODE) {
-            if (terminalParameters.activeHost == com.demo.mpossdk.open.ActiveHost.NIBSS) {
-                isoMsg.set(62, "01009233542415")
-            } else {
-                isoMsg.set(62, "01008".plus(terminalParameters.terminalId))
-            }
+            // 01 + length 008 + this terminal id. A fixed serial makes NIBSS ignore the request.
+            isoMsg.set(62, "01008".plus(terminalParameters.terminalId ?: ""))
             // IFA_BINARY(32) placeholder — 32 zero bytes from 64 hex zeros (Accelerex/mpos)
             isoMsg.set(64, ISOUtil.hex2byte(Constants.SIXTY_FOUR_ZEROS))
             isoMsg.recalcBitMap()
@@ -287,6 +284,10 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
             ?: sessionManager.getLatitude()?.toDoubleOrNull()
         val longitude = paymentRequest?.longitude
             ?: sessionManager.getLongitude()?.toDoubleOrNull()
+        if (paymentRequest?.sendField120 != true) {
+            android.util.Log.i(TAG, "Field 120 omitted: terminal profile sendField120 is false")
+            return
+        }
         if (latitude == null || longitude == null) {
             android.util.Log.w(TAG, "Field 120 omitted: GPS coordinates not available")
             return

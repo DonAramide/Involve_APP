@@ -217,6 +217,17 @@
               <q-btn v-if="props.row.activation_code" flat round dense icon="card_membership" color="amber-4" @click="reviewCertificate(props.row)">
                 <q-tooltip>Review Certificate</q-tooltip>
               </q-btn>
+              <q-btn
+                v-if="props.row.activation_code"
+                flat dense
+                color="amber-4"
+                icon="forward_to_inbox"
+                label="Resend"
+                :loading="resendingId === props.row.id"
+                @click="resendActivation(props.row)"
+              >
+                <q-tooltip>Email this activation file to the tenant again</q-tooltip>
+              </q-btn>
             </q-td>
           </template>
         </q-table>
@@ -746,6 +757,27 @@ const expiryClass = (value) => {
   return parsed.getTime() < Date.now() ? 'text-red-4 text-weight-bold' : 'text-indigo-3'
 }
 const reviewingId = ref(null)
+const resendingId = ref(null)
+
+const resendActivation = async (row) => {
+  resendingId.value = row.id
+  try {
+    const { data } = await deviceApi.resendActivationEmail(row.id)
+    $q.notify({
+      type: 'positive',
+      message: `Activation file emailed to ${data?.emailedTo}.`,
+      timeout: 6000,
+    })
+    await loadData()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.emailError || err?.response?.data?.error || 'Could not resend the activation email',
+    })
+  } finally {
+    resendingId.value = null
+  }
+}
 
 const activationStatusLabel = (row) => {
   if (row.is_used || row.status === 'used') return 'ACTIVATED'

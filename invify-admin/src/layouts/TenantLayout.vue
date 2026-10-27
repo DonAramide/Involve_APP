@@ -200,6 +200,8 @@ import { useQuasar } from 'quasar'
 import { adminApi, api } from '../api'
 import { logoutAuthenticatedSession } from '../auth/session'
 import InvifyLoadingState from '../components/InvifyLoadingState.vue'
+import { ensureTenantRealtime } from '../services/tenantSocket'
+import { useFinanceStore } from '../stores/finance.store'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -299,6 +301,8 @@ const industryNavigationTree = computed(() => {
       { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
+      { label: 'Attendance', path: '/tenant/attendance', icon: 'fact_check', color: 'blue-4', mode: 'SCHOOL' },
+      { label: 'Message parents', path: '/tenant/parent-messages', icon: 'campaign', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'School Payments', path: '/tenant/school-payments', icon: 'payments', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
       { label: 'Inventory', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'deep-orange-4', mode: 'SCHOOL' },
@@ -343,7 +347,11 @@ const industryNavigationTree = computed(() => {
   return []
 })
 
-onMounted(loadTenantDetails)
+onMounted(() => {
+  loadTenantDetails()
+  ensureTenantRealtime()
+  useFinanceStore().subscribe()
+})
 </script>
 
 <style scoped>

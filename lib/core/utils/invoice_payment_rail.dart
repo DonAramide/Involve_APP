@@ -1,3 +1,26 @@
+/// Pay later has no cash, transfer, card, or wallet yet — still outstanding.
+bool isPayLaterPaymentMethod(String? raw) {
+  final method = (raw ?? '')
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  if (method.isEmpty) return false;
+  if (method.contains('wallet') ||
+      method.contains('cash') ||
+      method.contains('pos') ||
+      method.contains('card') ||
+      method.contains('transfer') ||
+      method.contains('virtual')) {
+    return false;
+  }
+  return method == 'deferred' ||
+      method == 'pay_later' ||
+      method == 'paylater' ||
+      method.contains('pay_later') ||
+      method.contains('deferred');
+}
+
 /// Payment rails for dashboards. Quasar = card (POS) + virtual-account transfer.
 enum InvoicePaymentRail {
   cash,
@@ -12,8 +35,12 @@ InvoicePaymentRail classifyInvoicePaymentRail(String? raw) {
   final method = (raw ?? '')
       .trim()
       .toLowerCase()
-      .replaceAll(RegExp(r'[\s-]+'), '_');
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
   if (method.isEmpty) return InvoicePaymentRail.other;
+  if (method == 'parent_credit' || method.contains('parent_credit')) {
+    return InvoicePaymentRail.wallet;
+  }
   if (method == 'wallet' ||
       method == 'customer_wallet' ||
       method.endsWith('_wallet') ||
@@ -29,23 +56,40 @@ InvoicePaymentRail classifyInvoicePaymentRail(String? raw) {
       return InvoicePaymentRail.wallet;
     }
   }
-  if (method == 'cash') return InvoicePaymentRail.cash;
-  if (method == 'card' || method == 'pos') return InvoicePaymentRail.card;
-  if (method == 'virtualaccount' ||
-      method == 'virtual_account' ||
+  if (method.contains('virtualaccount') ||
+      method.contains('virtual_account') ||
       method == 'va' ||
-      method == 'va_transfer' ||
+      method.contains('va_transfer') ||
       method == 'parent_account' ||
       method == 'parent_transfer') {
     return InvoicePaymentRail.vaTransfer;
   }
+  if (method == 'cash') return InvoicePaymentRail.cash;
+  if (method == 'card' ||
+      method == 'pos' ||
+      method.contains('pos') ||
+      method.contains('card') ||
+      method.contains('mpos') ||
+      method.contains('nibss')) {
+    return InvoicePaymentRail.card;
+  }
   if (method == 'transfer' ||
       method == 'bank_transfer' ||
       method == 'company_bank' ||
-      method == 'company_account') {
+      method == 'company_account' ||
+      method.contains('company_bank') ||
+      method.contains('company_account') ||
+      method.contains('transfer')) {
     return InvoicePaymentRail.bankTransfer;
   }
   return InvoicePaymentRail.other;
+}
+
+/// Parent-wallet bills stay on the school wallet.
+/// VA transfer is only a virtual account created for the school or its staff.
+/// Cash and company-bank transfer stay on their own rails.
+InvoicePaymentRail classifySalesRail(String? method, {String? originRail}) {
+  return classifyInvoicePaymentRail(method);
 }
 
 bool isQuasarPaymentRail(InvoicePaymentRail rail) {

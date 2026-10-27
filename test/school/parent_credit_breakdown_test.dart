@@ -48,6 +48,22 @@ void main() {
     expect(parts.recalculated, 42.50);
   });
 
+  test('parent keeps the amount paid when Quasar live balance is lower by the school charge', () {
+    final payments = [
+      _payment(source: 'va_deposit', amount: 140, toCredit: 140),
+    ];
+    final quasar = ParentCreditParts.parentQuasarBalance(
+      liveBalance: 135,
+      payments: payments,
+    );
+    final parts = ParentCreditParts.fromPayments(
+      quasarBalance: quasar,
+      payments: payments,
+    );
+    expect(quasar, 140);
+    expect(parts.recalculated, 140);
+  });
+
   test('Quasar balance is read only from liveBalance on the parent account rows', () {
     expect(
       ParentCreditParts.quasarBalanceFromRows([

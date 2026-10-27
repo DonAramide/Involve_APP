@@ -15,6 +15,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/features/printer/domain/pos_host_endpoint.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
@@ -788,16 +789,20 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
           ? (primary?['sslEnabled'] == true ||
               (isNibss && primary?['sslEnabled'] == null))
           : (primary?['sslEnabled'] == true);
+      final endpoint = PosHostEndpoint.resolve(
+        activeHost: activeHost,
+        primaryHost: primary,
+        nibssIp: _terminalConfig?.nibssIp,
+        nibssPort: _terminalConfig?.nibssPort,
+        expressPayHost: _terminalConfig?.expressPayHost,
+        expressPayPort: _terminalConfig?.expressPayPort,
+      );
       final hostIp = usePrimaryHost
-          ? (primary?['ip']?.toString() ??
-              _terminalConfig?.nibssIp ??
-              _terminalConfig?.expressPayHost)
-          : _terminalConfig?.expressPayHost;
+          ? endpoint.ip
+          : PosHostEndpoint.nonEmpty(_terminalConfig?.expressPayHost);
       final hostPort = usePrimaryHost
-          ? (primary?['port']?.toString() ??
-              _terminalConfig?.nibssPort?.toString() ??
-              _terminalConfig?.expressPayPort?.toString())
-          : _terminalConfig?.expressPayPort?.toString();
+          ? endpoint.port
+          : PosHostEndpoint.nonEmpty(_terminalConfig?.expressPayPort?.toString());
 
       print(
         '[DownloadParams] activeHost=$activeHost terminalType=${_terminalConfig?.terminalType} '
@@ -834,25 +839,40 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
         return;
       }
 
+      final keySteps = <String>['Starting key exchange...'];
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext dialogContext) {
           return AlertDialog(
-            content: Row(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: StreamBuilder<String>(
-                    stream: _mposService.progressStream,
-                    initialData: 'Starting Key Exchange...',
-                    builder: (context, snapshot) {
-                      return Text(snapshot.data ?? 'Processing...');
-                    },
-                  ),
-                ),
-              ],
+            content: StreamBuilder<String>(
+              stream: _mposService.progressStream,
+              builder: (context, snapshot) {
+                final message = snapshot.data;
+                if (message != null && message.isNotEmpty && keySteps.last != message) {
+                  keySteps.add(message);
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(width: 20),
+                        Expanded(child: Text('Download Terminal Params')),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ...keySteps.map(
+                      (step) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(step),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           );
         },
@@ -888,6 +908,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       );
     } catch (e) {
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not load terminal params.')), backgroundColor: Colors.red),
         );
@@ -932,29 +953,36 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     try {
       final terminalId = _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId;
       final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
-      final result = isMoreFun
+      var result = isMoreFun
           ? await _mposService.checkBalance(
               terminalId: terminalId,
               deviceType: _mposDeviceType,
             )
           : await _mposService.initiatePayment(
+              // Kernel still needs a non-zero amount. The host message is a balance
+              // inquiry (MTI 0100, proc 310000, amount field zero). The screen hides it.
               amount: 2,
               terminalId: terminalId,
               activeHost: (_terminalConfig?.activeHost ?? 'NIBSS').toUpperCase(),
-              processOnDevice: true,
+              processOnDevice: false,
               deviceType: _mposDeviceType,
               transactionType: 'BALANCE',
             );
+      if (result.status == 'emv_data_ready' && result.emvData != null) {
+        result = await _mposService.forwardPackedCardToQuasar(
+          terminalId: terminalId,
+          amount: 0,
+          emvData: result.emvData!,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
 
       final ok = result.status == 'balance_success' ||
           result.status == 'payment_success' ||
           result.transaction?.statusCode == '00';
-      final balance = result.transaction?.balance?.isNotEmpty == true
-          ? result.transaction!.balance
-          : result.transaction?.amount;
-      final pan = result.transaction?.maskedPan ?? '****';
+      final balance = result.transaction?.balance;
+      final pan = _maskCardFirstLast(result.transaction?.maskedPan);
       final msg = result.error?.message ??
           result.transaction?.message ??
           (ok ? 'Balance check complete' : 'Balance check failed');
@@ -974,10 +1002,18 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                 ),
               const SizedBox(height: 8),
               Text('Card: $pan'),
+              if ((result.transaction?.stan ?? '').isNotEmpty)
+                Text('STAN ${result.transaction!.stan}'),
+              if ((result.transaction?.rrn ?? '').isNotEmpty)
+                Text('RRN ${result.transaction!.rrn}'),
               if (result.transaction?.statusCode != null)
                 Text('Code: ${result.transaction!.statusCode}'),
               const SizedBox(height: 8),
-              Text(msg),
+              Text(
+                ok && (balance == null || balance.isEmpty)
+                    ? 'Approved, but the host did not return a balance amount.'
+                    : msg,
+              ),
             ],
           ),
           actions: [
@@ -1062,12 +1098,16 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     // Validate MPOS Match
     final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && !_isDeviceNameMatch(config.posSerialNumber, _mposSerialNumber);
 
-    final hostIp = config.nibssIp ??
-        config.primaryHost?['ip']?.toString() ??
-        config.expressPayHost;
-    final hostPort = config.nibssPort?.toString() ??
-        config.primaryHost?['port']?.toString() ??
-        config.expressPayPort?.toString();
+    final endpoint = PosHostEndpoint.resolve(
+      activeHost: (config.activeHost ?? '').toString(),
+      primaryHost: config.primaryHost,
+      nibssIp: config.nibssIp,
+      nibssPort: config.nibssPort,
+      expressPayHost: config.expressPayHost,
+      expressPayPort: config.expressPayPort,
+    );
+    final hostIp = endpoint.ip;
+    final hostPort = endpoint.port;
     final hostEndpoint = (hostIp == null || hostIp.isEmpty)
         ? null
         : (hostPort != null && hostPort.isNotEmpty ? '$hostIp:$hostPort' : hostIp);
@@ -1271,6 +1311,12 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
         ),
       ],
     );
+  }
+
+  String _maskCardFirstLast(String? pan) {
+    final digits = (pan ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 8) return '****';
+    return '${digits.substring(0, 4)} **** **** ${digits.substring(digits.length - 4)}';
   }
 
   String _formatSyncTime(DateTime dt) {

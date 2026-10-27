@@ -53,7 +53,7 @@ internal class ProcessingViewModel(
     private val isoMessageBuilder: IsoMessageBuilder,
     private val socketChannel: SocketChannel
 ) : ViewModel() {
-    private val _actionTextLiveData = MutableLiveData("Processing...")
+    private val _actionTextLiveData = MutableLiveData("Checking device...")
     val actionTextLiveData = _actionTextLiveData
 
     private val _errorFlow = Channel<ErrorData?>()
@@ -90,14 +90,16 @@ internal class ProcessingViewModel(
             transactionType = paymentRequest.transactionType,
         )
 
-        val title = when {
-            normalizeTx(paymentRequest.transactionType).contains("BALANCE") -> "Balance Inquiry"
-            else -> "Transaction Amount:"
-        }
+        val balanceCheck = isBalanceRequest()
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(0, 0, title, 0x08)
-        LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(emvAmount.toString())}", 0x08)
-        LcdApi.ScrDisp_Api(2, 0, "Swipe/Insert/Tap card", 0x08)
+        if (balanceCheck) {
+            LcdApi.ScrDisp_Api(0, 0, "Check Balance", 0x08)
+            LcdApi.ScrDisp_Api(1, 0, "Swipe/Insert/Tap card", 0x08)
+        } else {
+            LcdApi.ScrDisp_Api(0, 0, "Transaction Amount:", 0x08)
+            LcdApi.ScrDisp_Api(1, 0, "NGN${AmountUtils.formatToTwoDecimalPlaces(emvAmount.toString())}", 0x08)
+            LcdApi.ScrDisp_Api(2, 0, "Swipe/Insert/Tap card", 0x08)
+        }
         LcdApi.ScrDrLogoxy_Api(162, 96, 90, 100, Constants.clLogo)
 
 
@@ -118,11 +120,12 @@ internal class ProcessingViewModel(
 
         LcdApi.LedLightOn_Api(Led.LED_YELLOW)
 
-        _actionTextLiveData.postValue("Processing...")
+        val processingLabel = if (isBalanceRequest()) "Checking balance..." else "Processing..."
+        _actionTextLiveData.postValue(processingLabel)
         _loadingLiveData.postValue(true)
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(1, 0, "Processing...", 0x08)
+        LcdApi.ScrDisp_Api(1, 0, processingLabel, 0x08)
 
         when (CardType.fromMode(result)) {
             CardType.ICC -> {
@@ -315,10 +318,11 @@ internal class ProcessingViewModel(
             return
         }
 
-        _actionTextLiveData.postValue("Processing...")
+        val onlineLabel = if (isBalanceRequest()) "Checking balance..." else "Processing..."
+        _actionTextLiveData.postValue(onlineLabel)
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(3, 0, "Processing...", Led.LED_RED)
+        LcdApi.ScrDisp_Api(3, 0, onlineLabel, Led.LED_RED)
 
         result = EmvApi.EMV_Complete_Api(
             CommonApi.ONLINE_APPROVE,
@@ -423,6 +427,8 @@ internal class ProcessingViewModel(
                     
                     if (responseIsoMsg != null) {
                         val responseCode = responseIsoMsg.getString(39)
+                        val field54 = if (responseIsoMsg.hasField(54)) responseIsoMsg.getString(54) else null
+                        val cardBalance = ISOUtils.parseAdditionalAmountNaira(field54)
                         val mposResponse = com.demo.mpossdk.open.MposTransactionResponse(
                             aid = emvDetailResult.aid,
                             amount = emvDetailResult.amountAuthorisedNumeric,
@@ -431,11 +437,19 @@ internal class ProcessingViewModel(
                             cardExpireDate = emvDetailResult.cardExpirationDate,
                             cardHolderName = emvDetailResult.cardHolderName,
                             dateTime = responseIsoMsg.getString(7),
-                            maskedPan = emvDetailResult.cardNo,
+                            maskedPan = ISOUtils.maskCardPAN(emvDetailResult.cardNo ?: ""),
                             rrn = responseIsoMsg.getString(37),
                             stan = responseIsoMsg.getString(11),
                             statusCode = responseCode,
-                            transactionType = emvDetailResult.transactionType
+                            transactionType = emvDetailResult.transactionType,
+                            balance = cardBalance.ifEmpty { null },
+                            message = if (responseCode == "00" && isBalanceRequest()) {
+                                if (cardBalance.isNotEmpty()) "Available balance ₦$cardBalance" else "00 Approved"
+                            } else if (responseCode == "00") {
+                                "00 Approved"
+                            } else {
+                                null
+                            }
                         )
                         
                         if (responseCode == "00") {
@@ -520,6 +534,9 @@ internal class ProcessingViewModel(
 
     private fun normalizeTx(raw: String?): String =
         raw.orEmpty().uppercase().replace(" ", "").replace("-", "").replace("_", "")
+
+    private fun isBalanceRequest(): Boolean =
+        normalizeTx(currentPaymentRequest?.transactionType).contains("BALANCE")
 
     private fun emvKernelAmount(request: PaymentRequest): Double {
         val type = normalizeTx(request.transactionType)
@@ -683,7 +700,11 @@ internal class ProcessingViewModel(
         _actionTextLiveData.postValue("Enter Card PIN")
 
         LcdApi.ScrCls_Api()
-        LcdApi.ScrDisp_Api(0, 0, "NGN$amount", 0x08)
+        if (isBalanceRequest()) {
+            LcdApi.ScrDisp_Api(0, 0, "Check Balance", 0x08)
+        } else {
+            LcdApi.ScrDisp_Api(0, 0, "NGN$amount", 0x08)
+        }
         LcdApi.ScrDisp_Api(1, 0, "Enter PIN:", 0x08)
 
         val pin = ByteArray(8)

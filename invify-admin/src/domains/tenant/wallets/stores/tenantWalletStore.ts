@@ -35,12 +35,14 @@ export const useTenantWalletStore = defineStore('tenantWallet', {
         }
         
         const { FinanceRepository } = await import('../../../../repositories/FinanceRepository');
-        const [balanceData, txData] = await Promise.all([
+        const [balanceData, txData, summary] = await Promise.all([
           FinanceRepository.getWalletBalance(tenantId, { refresh: true }),
-          FinanceRepository.getWalletTransactions(tenantId, { refresh: true })
+          FinanceRepository.getWalletTransactions(tenantId, { refresh: true }),
+          FinanceRepository.getExecutiveSummary(tenantId, { refresh: true }).catch(() => null),
         ]);
         
-        this.availableBalance = balanceData.balance || 0;
+        const shared = Number(summary?.withdrawable);
+        this.availableBalance = Number.isFinite(shared) ? shared : (balanceData.balance || 0);
         
         const baseLogs = txData.transactions.map(tx => ({
           id: tx.id,

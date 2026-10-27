@@ -20,24 +20,33 @@ class OutboxPublisher {
     required T payload,
     required Map<String, dynamic> Function(T) serializer,
     int eventVersion = 1,
+    String? idempotencyKey,
+    String? commandId,
   }) async {
     final appDb = db as AppDatabase;
     final tenantId = await _sessionContext.getTenantId() ?? 'UNKNOWN_TENANT';
     final deviceId = await _sessionContext.getDeviceId() ?? 'UNKNOWN_DEVICE';
     
     // In a real flow, correlation_id might be passed down from an upstream operation
-    final correlationId = _uuid.v4();
-    final idempotencyKey = _uuid.v4();
+    final correlationId = commandId ?? _uuid.v4();
+    final key = (idempotencyKey ?? commandId ?? '').trim().isEmpty
+        ? _uuid.v4()
+        : (idempotencyKey ?? commandId)!.trim();
+
+    final existing = await (appDb.select(appDb.outboxTable)
+          ..where((t) => t.idempotencyKey.equals(key)))
+        .get();
+    if (existing.isNotEmpty) return;
     
     final payloadJson = jsonEncode(serializer(payload));
 
     await appDb.into(appDb.outboxTable).insert(
       OutboxTableCompanion.insert(
-        id: _uuid.v4(),
+        id: (commandId != null && commandId.length >= 16) ? commandId : _uuid.v4(),
         tenantId: tenantId,
         deviceId: deviceId,
         correlationId: correlationId,
-        idempotencyKey: idempotencyKey,
+        idempotencyKey: key,
         aggregateType: aggregateType,
         aggregateId: aggregateId,
         eventName: eventName,

@@ -87,6 +87,7 @@ import 'package:involve_app/features/school/domain/services/ai_service_interface
 import 'package:involve_app/features/school/data/services/lesson_note_api_service.dart';
 import 'package:involve_app/features/school/presentation/bloc/lesson_note_bloc.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
+import 'package:involve_app/features/school/presentation/pages/attendance_dashboard_page.dart';
 
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository.dart';
 import 'package:involve_app/features/school_finance/data/repositories/finance_repository_impl.dart';
@@ -473,7 +474,12 @@ class AppDependencies {
     final outboxDispatcher = OutboxDispatcher();
     outboxDispatcher.register('*', FinanceApiBatchHandler(financeApiClient));
 
-    final outboxWorker = OutboxWorker(database, outboxDispatcher);
+    final outboxWorker = OutboxWorker(
+      database,
+      outboxDispatcher,
+      onFinanceAck: (commandId, ack) =>
+          invoiceRepository.applyFinanceAck(commandId: commandId, ack: ack),
+    );
 
     // Register in GetIt for legacy sl access
     final sl = GetIt.instance;
@@ -954,6 +960,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/fee_management': (_) => const FeeManagementPage(),
               '/manage_subjects': (_) => const ManageSubjectsPage(),
               '/result_entry': (_) => const ResultEntryPage(),
+              '/attendance': (_) => const AttendanceDashboardPage(),
               '/lesson_notes_list': (_) => const LessonNotesListPage(),
               '/about': (_) => const AboutPage(),
               '/help': (_) => const HelpPage(),

@@ -32,10 +32,22 @@ export class WalletService {
    * CREDIT − DEBIT. Accepts both `type` and `entry_type` column names.
    */
   static async getBalance(tenantId: string) {
-    const { data, error } = await supabaseAdmin
+    const primary = await supabaseAdmin
       .from('ledger_entries')
-      .select('amount, type, entry_type, account')
+      .select('amount, type, account')
       .eq('tenant_id', tenantId);
+
+    let data: LedgerRow[] | null = primary.data;
+    let error = primary.error;
+
+    if (error && String(error.message || '').toLowerCase().includes('account')) {
+      const fallback = await supabaseAdmin
+        .from('ledger_entries')
+        .select('amount, type')
+        .eq('tenant_id', tenantId);
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.error('[WalletService] Balance calc failed:', error.message);

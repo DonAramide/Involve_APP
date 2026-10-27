@@ -47,8 +47,9 @@ export class TreasuryFeeService {
   static testAssessmentStore: MemoryFeeAssessmentStore | null = null;
 
   static async quote(tenantId: string, requestedAmount: number): Promise<TreasuryQuote> {
-    const requested = Math.round(Number(requestedAmount));
-    if (!Number.isInteger(requested) || requested <= 0) {
+    const round2 = (value: number) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+    const requested = round2(Number(requestedAmount));
+    if (!(requested > 0)) {
       throw new TreasuryQuoteError('Valid requested amount required', 'INVALID_AMOUNT');
     }
     const available = Number((await WalletService.getBalance(tenantId)).balance || 0);
@@ -68,19 +69,19 @@ export class TreasuryFeeService {
         tenantId,
       });
       serviceFeeKobo = calc.final_fee_kobo;
-      serviceFee = koboToWalletAmount(serviceFeeKobo);
+      serviceFee = round2(koboToWalletAmount(serviceFeeKobo));
       versionId = resolved.profile_version_id;
       profileId = resolved.profile_id;
     }
-    const total = requested + serviceFee;
-    const shortfall = Math.max(0, total - available);
+    const total = round2(requested + serviceFee);
+    const shortfall = round2(Math.max(0, total - available));
     return {
       transaction_type: 'TREASURY_WITHDRAWAL',
       requested_amount: requested,
       service_fee: serviceFee,
       total_required: total,
       available_balance: available,
-      remaining_balance: shortfall > 0 ? null : available - total,
+      remaining_balance: shortfall > 0 ? null : round2(available - total),
       shortfall,
       sufficient: shortfall === 0,
       fee_profile_version_id: versionId,

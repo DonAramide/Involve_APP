@@ -148,7 +148,11 @@
           <q-btn unelevated color="red-8" icon="lock" label="Lock device" :loading="busy === 'lock'" @click="confirmLock" />
           <q-btn outline color="green-4" icon="lock_open" label="Unlock device" :loading="busy === 'unlock'" @click="runCommand('unlock')" />
           <q-btn outline color="cyan-4" icon="notifications" label="Send notification" @click="showNotify = true" />
-          <q-btn outline color="amber-5" icon="cloud_sync" label="Pull data & records" :loading="busy === 'pull_sync'" @click="runCommand('pull_sync')" />
+          <q-btn outline color="amber-5" icon="cloud_upload" label="Upload tablet to the web" :loading="busy === 'pull_sync'" @click="runCommand('pull_sync')" />
+          <q-btn unelevated color="teal-7" icon="cloud_download" label="Restore web data to device" :loading="busy === 'restore_from_web'" @click="runCommand('restore_from_web')" />
+          <div class="text-caption text-grey-5">
+            Use Restore when the original tablet is missing. It copies students, staff, fees, bills, classes, teachers, subjects, parents, and results from the web portal onto this device.
+          </div>
         </div>
         <div v-if="lastPasscode" class="q-mt-md q-pa-sm bg-red-10 text-red-2 rounded-borders text-caption">
           Lock code for this device: <span class="text-weight-bold font-mono">{{ lastPasscode }}</span>

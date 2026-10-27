@@ -1104,7 +1104,10 @@ onMounted(() => {
   }
 
   // 2. Polling Fallback — check every 2 seconds in case storage events are throttled/blocked
-  syncInterval = setInterval(loadAdminPayoutSettings, 2000)
+  syncInterval = setInterval(() => {
+    loadAdminPayoutSettings()
+    store.loadTreasuryData()
+  }, 12000)
 
   // Restore saved weekly preference
   const saved = localStorage.getItem('tenant_weekly_schedule')
