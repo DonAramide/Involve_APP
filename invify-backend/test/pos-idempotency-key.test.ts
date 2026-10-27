@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { supabaseAdmin } from '../src/db/supabase';
 import {
   FEE_SHADOW_SOURCE_POS,
   FeeShadowIntegration,
@@ -78,6 +79,15 @@ describe('R5 stable POS idempotency key', () => {
     ['stan only', { rrn: '  ', stan: 'S1' }],
   ])('returns null (no random fallback) for %s', (_label, ids) => {
     expect(posShadowIdempotencyKey({ tenantId: 't1', terminalId: 'T1', txId: randomTxId(), ...ids })).toBeNull();
+  });
+
+  it('uses the in-memory orchestrator without querying Supabase', async () => {
+    const fromSpy = jest.spyOn(supabaseAdmin, 'from');
+    const report = await FeeShadowIntegration.assessPosWithdrawalSafely({
+      tenantId: 't1', amountNaira: 1000, rrn: 'RRN-MEM', stan: 'STAN-MEM', terminalId: 'T1', txId: randomTxId(), eventTime: T0,
+    });
+    expect(report.status).toBe('ASSESSED');
+    expect(fromSpy).not.toHaveBeenCalled();
   });
 
   it('12 repeated callbacks for one transaction create exactly one assessment', async () => {
