@@ -148,6 +148,14 @@ import 'package:involve_app/features/school/presentation/pages/lesson_notes_list
 import 'package:involve_app/features/school/presentation/pages/my_id_card_page.dart';
 import 'package:involve_app/features/school/presentation/pages/id_card_admin_page.dart';
 import 'package:involve_app/features/school/presentation/pages/gate_clock_page.dart';
+import 'package:involve_app/features/health_insurance/domain/repositories/health_insurance_repository.dart';
+import 'package:involve_app/features/health_insurance/data/repositories/health_insurance_repository_impl.dart';
+import 'package:involve_app/features/health_insurance/presentation/bloc/health_insurance_bloc.dart';
+import 'package:involve_app/features/health_insurance/presentation/pages/health_wellness_home_page.dart';
+import 'package:involve_app/features/health_insurance/presentation/pages/claims_status_page.dart';
+import 'package:involve_app/features/health_insurance/presentation/pages/enrolment_flow_page.dart';
+import 'package:involve_app/features/health_insurance/presentation/pages/hmo_welcome_page.dart';
+import 'package:involve_app/features/health_insurance/presentation/pages/hmo_guided_tour_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/about_page.dart';
 import 'package:involve_app/features/help/presentation/pages/help_page.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
@@ -319,7 +327,7 @@ class AppDependencies {
   final FinanceRepository financeRepositoryNew;
   final NotificationRepository notificationRepository;
   final OutboxWorker outboxWorker;
-
+  final HealthInsuranceRepository healthInsuranceRepository;
 
   AppDependencies({
     required this.database,
@@ -380,6 +388,7 @@ class AppDependencies {
     required this.financeRepositoryNew,
     required this.notificationRepository,
     required this.outboxWorker,
+    required this.healthInsuranceRepository,
   });
 
 
@@ -507,6 +516,10 @@ class AppDependencies {
     if (!sl.isRegistered<IServicesRepository>()) {
       sl.registerSingleton<IServicesRepository>(servicesRepo);
     }
+    final healthInsuranceRepo = HealthInsuranceRepositoryImpl(financeApiClient);
+    if (!sl.isRegistered<HealthInsuranceRepository>()) {
+      sl.registerSingleton<HealthInsuranceRepository>(healthInsuranceRepo);
+    }
     CustomerWalletCreditService.instance.bind(servicesRepo);
     CustomerWalletCreditService.instance.bindSchool(schoolRepository);
     CustomerWalletCreditService.instance.bindInvoices(invoiceRepository);
@@ -598,6 +611,7 @@ class AppDependencies {
         ),
       ),
       outboxWorker: outboxWorker,
+      healthInsuranceRepository: healthInsuranceRepo,
     );
   }
 }
@@ -860,6 +874,11 @@ class _InvolveAppState extends State<InvolveApp> {
               repository: dependencies.financeRepositoryNew,
             )..add(const LoadReconciliation()),
           ),
+          BlocProvider(
+            create: (context) => HealthInsuranceBloc(
+              repository: dependencies.healthInsuranceRepository,
+            ),
+          ),
           RepositoryProvider<LessonNoteSyncService>(
             create: (_) => dependencies.lessonNoteSyncService,
           ),
@@ -968,6 +987,11 @@ class _InvolveAppState extends State<InvolveApp> {
               MyIdCardPage.routeName: (_) => const MyIdCardPage(),
               IdCardAdminPage.routeName: (_) => const IdCardAdminPage(),
               GateClockPage.routeName: (_) => const GateClockPage(),
+              HealthWellnessHomePage.routeName: (_) => const HealthWellnessHomePage(),
+              ClaimsStatusPage.routeName: (_) => const ClaimsStatusPage(),
+              EnrolmentFlowPage.routeName: (_) => const EnrolmentFlowPage(),
+              HmoWelcomePage.routeName: (_) => const HmoWelcomePage(),
+              HmoGuidedTourPage.routeName: (_) => const HmoGuidedTourPage(),
               '/about': (_) => const AboutPage(),
               '/help': (_) => const HelpPage(),
               '/complaint': (_) => const ComplaintPage(),
