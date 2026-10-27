@@ -530,6 +530,27 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  void _verifyAndNavigateToAdmin(BuildContext context, String routeName) {
+    showDialog<Staff>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => const StaffAuthDialog(),
+    ).then((staff) {
+      if (staff != null && context.mounted) {
+        if (staff.role == 'ADMIN' && staff.isActive) {
+          Navigator.pushNamed(context, routeName);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access denied. An active administrator must sign in to view or generate ID cards.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
+  }
+
   void _verifyAndNavigateToFinance(BuildContext context, String routeName) {
     showDialog<Staff>(
       context: context,
@@ -880,7 +901,14 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'MY ID CARD',
           icon: Icons.badge_outlined,
           color: Colors.indigo,
-          onTap: () => Navigator.pushNamed(context, '/my_id_card'),
+          onTap: () => _verifyAndNavigateToAdmin(context, '/my_id_card'),
+        ),
+        _DashboardMenuItem(
+          id: 'id_card_admin',
+          title: 'ID CARDS',
+          icon: Icons.badge,
+          color: Colors.deepPurple,
+          onTap: () => _verifyAndNavigateToAdmin(context, '/id_card_admin'),
         ),
         _DashboardMenuItem(
           id: 'gate_clock',

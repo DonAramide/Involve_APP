@@ -47,6 +47,7 @@ class DashboardMenuCatalog {
     DashboardMenuOption(id: 'attendance', label: 'Attendance', modes: ['school']),
     DashboardMenuOption(id: 'lesson_notes', label: 'Lesson Notes', modes: ['school']),
     DashboardMenuOption(id: 'my_id_card', label: 'My ID Card', modes: ['school']),
+    DashboardMenuOption(id: 'id_card_admin', label: 'ID Cards', modes: ['school']),
     DashboardMenuOption(id: 'gate_clock', label: 'Gate Clock', modes: ['school']),
     DashboardMenuOption(id: 'stock', label: 'Stock / Items', modes: ['retail']),
     DashboardMenuOption(id: 'inventory_report', label: 'Inventory Report', modes: ['retail']),
