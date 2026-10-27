@@ -13,6 +13,16 @@ describe('tenant operator route permissions', () => {
     expect(permissionsForOperatorRole('TENANT_ADMIN')).toContain('tenant.dashboard.view')
   })
 
+  test('super admin can open the HMO shell without implicit cross-tenant health grants', () => {
+    const perms = permissionsForOperatorRole('SUPER_ADMIN')
+    expect(perms).toContain('hmo.workspace')
+    expect(perms).not.toContain('platform.integration.health')
+    expect(perms).not.toContain('platform.providers.manage')
+    expect(perms).not.toContain('platform.plans.manage')
+    expect(perms).not.toContain('platform.tenant_access')
+    expect(permissionsForOperatorRole('tenant_admin')).not.toContain('hmo.workspace')
+  })
+
   test('unknown tenant roles do not fall back to super-admin-only claims', () => {
     expect(permissionsForOperatorRole('cashier')).toContain('tenant.dashboard.view')
     expect(permissionsForOperatorRole('cashier')).not.toContain('admin_deploy')

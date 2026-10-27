@@ -8,6 +8,9 @@ function invifyLogoPath(): string | null {
   const candidates = [
     path.join(__dirname, '../../assets/invify-logo.png'),
     path.join(process.cwd(), 'assets/invify-logo.png'),
+    path.join(process.cwd(), '../invify-admin/public/brand/invify-logo.png'),
+    path.join(__dirname, '../../invify-admin/public/brand/invify-logo.png'),
+    path.join(__dirname, '../../../invify-admin/public/brand/invify-logo.png'),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }

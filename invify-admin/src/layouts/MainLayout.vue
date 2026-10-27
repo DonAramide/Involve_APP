@@ -711,6 +711,11 @@ const workspaces = computed(() => {
   // 2. Finance & Audit (accessible to all)
   list.push({ id: 'finance', label: 'Finance & Audit', priority: true })
 
+  // HMO is a top-level workspace, not a child of Administration.
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_DEPLOY'])) {
+    list.push({ id: 'hmo', label: 'HMO', priority: true })
+  }
+
   // 3. Governance (accessible to platform staff)
   if (isPlatformStaff) {
     list.push({ id: 'governance', label: 'Governance', priority: true })
@@ -797,6 +802,7 @@ const activeWorkspaceObj = computed(() => {
 const workspaceHome = {
   fleet: '/fleet/overview',
   finance: '/finance/reconciliation',
+  hmo: '/hmo/overview',
   governance: '/governance/compliance',
   observability: '/observability/streams',
   ai: '/ai/copilot',
@@ -998,6 +1004,25 @@ const activeNavigationTree = computed(() => {
         { label: 'Lineage Hash Audits', path: '/communications/broadcast-center?tab=audits', icon: 'receipt_long', color: 'indigo-3' }
       ]
 
+    case 'hmo':
+      return [
+        { label: 'Overview', path: '/hmo/overview', icon: 'dashboard', color: 'teal-3' },
+        { label: 'HMO Registry', path: '/hmo/registry', icon: 'corporate_fare', color: 'teal-3' },
+        { label: 'Provider Network', path: '/hmo/providers', icon: 'local_hospital', color: 'teal-4' },
+        { label: 'Health Plans', path: '/hmo/plans', icon: 'inventory_2', color: 'teal-3', badge: 'Catalogue', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Benefits and Coverage', path: '/hmo/coverage', icon: 'verified_user', color: 'cyan-3' },
+        { label: 'Member Enrolment', path: '/hmo/enrolment', icon: 'how_to_reg', color: 'grey-4' },
+        { label: 'Members and Dependants', path: '/hmo/members', icon: 'groups', color: 'grey-4' },
+        { label: 'Claims and Authorisations', path: '/hmo/claims', icon: 'assignment', color: 'grey-4' },
+        { label: 'Premiums and Billing', path: '/hmo/billing', icon: 'receipt_long', color: 'amber-4' },
+        { label: 'Payments and Reconciliation', path: '/hmo/payments', icon: 'payments', color: 'amber-4' },
+        { label: 'Reports and Analytics', path: '/hmo/reports', icon: 'insights', color: 'cyan-3' },
+        { label: 'Integrations and Telemetry', path: '/hmo/telemetry', icon: 'hub', color: 'teal-3' },
+        { label: 'Audit Trail', path: '/hmo/audit', icon: 'history', color: 'indigo-3' },
+        { label: 'HMO Organisation Settings', path: '/hmo/settings', icon: 'tune', color: 'grey-4' },
+        { label: 'Platform Governance', path: '/hmo/governance', icon: 'admin_panel_settings', color: 'amber-4', badge: 'Session', badgeBg: 'amber-10', badgeColor: 'amber-2' }
+      ]
+
     case 'admin':
     default:
       return [
@@ -1008,6 +1033,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Production Env', path: '/admin/production-env', icon: 'vpn_key', color: 'red-4', badge: 'Governor', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'Integration Vault', path: '/admin/vault', icon: 'lock', color: 'orange-4', badge: 'Secrets', badgeBg: 'orange-10', badgeColor: 'orange-2' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
+        { label: 'Health & Wellness Governance', path: '/admin/health-insurance', icon: 'health_and_safety', color: 'teal-3', badge: 'Grants', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Pending KYC Documents', path: '/admin/kyc-pending', icon: 'pending_actions', color: 'amber-4', badge: 'Review', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
@@ -1100,6 +1126,22 @@ const getMenuDescription = (label) => {
     'Contact Maintenance': 'Update support contact numbers and dispatch real-time emergency notifications to active devices.',
     'Global Setup & RBAC': 'Configure core platform parameters, primary currency defaults, global variables, and roles & permissions.',
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',
+    'Health & Wellness Governance': 'Platform-level governance of HMO providers, tenant insurance participation, operator access grants, and audit events. Plan operations live in the HMO workspace.',
+    'Overview': 'HMO workspace home. Separates platform governance from HMO, school, and provider work.',
+    'HMO Registry': 'HMO organisations recorded in hw_providers. Empty means no registry rows, after the plans grant is present.',
+    'Provider Network': 'Provider integration identity. Facilities are registered by the owning HMO, not invented here.',
+    'Health Plans': 'Create and move health plans through draft, publish, and activate. A draft is not offered for enrolment.',
+    'Benefits and Coverage': 'Coverage terms are stored on plan versions. Contribution splits are tenant offers.',
+    'Member Enrolment': 'Enrolment stays in the school tenant or the owning HMO portal.',
+    'Members and Dependants': 'Member directories stay inside the tenant that owns them.',
+    'Claims and Authorisations': 'Claims adjudication stays in the owning HMO portal.',
+    'Premiums and Billing': 'Premium invoices use the existing tenant health billing API.',
+    'Payments and Reconciliation': 'Payment confirmation stays on the existing billing endpoints. Real-money payouts remain off.',
+    'Reports and Analytics': 'Cross-tenant aggregates are on Health & Wellness Governance and require an operational grant.',
+    'Integrations and Telemetry': 'Reads hw_providers when an integration grant is active, and separates empty, denied, and failed responses.',
+    'Audit Trail': 'Plan lifecycle audit events are written to hw_audit_events and reviewed in governance.',
+    'HMO Organisation Settings': 'An HMO edits its own profile in the institute portal.',
+    'Platform Governance': 'Entry to operational sessions, access grants, and lineage audit. It does not replace those controls.',
     'Pending KYC Documents': 'Review every CAC certificate and valid ID card waiting for operator approval.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
     'Tenant Orchestration': 'Authoritatively manage backend feature flags, reactive JSON branding tokens, and tier consumption limits.',

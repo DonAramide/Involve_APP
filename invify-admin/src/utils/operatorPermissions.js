@@ -35,7 +35,7 @@ const PLATFORM_SCOPE = {
     'create_requests', 'view_finance_queue', 'view_operations_queue',
     'view_deployment_queue', 'view_governance_queue', 'approve_finance',
     'approve_operations', 'approve_deployment', 'approve_governance',
-    'read_observability_staging', 'read_finance',
+    'read_observability_staging', 'read_finance', 'hmo.workspace',
     'billing.view', 'billing.create_obligation', 'billing.post_payment',
     'billing.reverse_payment', 'billing.manage_plan', 'billing.manage_subscription', 'billing.export',
     'FEE_DISTRIBUTION_VIEW', 'STAKEHOLDER_VIEW', 'STAKEHOLDER_MANAGE',
@@ -74,7 +74,7 @@ const PLATFORM_SCOPE = {
   ],
   ADMIN_DEPLOY: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',
-    'read_metrics', 'admin_deploy', 'read_finance', 'read_telemetry', 'read_audit',
+    'read_metrics', 'admin_deploy', 'read_finance', 'read_telemetry', 'read_audit', 'hmo.workspace',
     'soc_communications', 'create_requests', 'view_deployment_queue', 'approve_deployment',
     'FEE_DISTRIBUTION_VIEW', 'STAKEHOLDER_VIEW', 'STAKEHOLDER_MANAGE',
     'WITHDRAWAL_VIEW', 'WITHDRAWAL_REQUEST', 'WITHDRAWAL_APPROVE',

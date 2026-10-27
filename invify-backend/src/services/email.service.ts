@@ -845,6 +845,43 @@ export class EmailService {
     );
   }
 
+  /**
+   * School-to-parent broadcast notice email with HTML escaping and school sender attribution.
+   */
+  public async sendParentNotice(
+    to: string,
+    subject: string,
+    message: string,
+    schoolName: string,
+  ): Promise<boolean> {
+    const school = this.escapeHtml(schoolName || 'Your school');
+    const safeSubject = String(subject || `Message from ${schoolName || 'Your school'}`)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120);
+    const safeBody = this.escapeHtml(message || '').replace(/\r?\n/g, '<br/>');
+    const body = `
+      <div style="border-top: 6px solid #0e7490; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="padding: 18px 22px 10px 22px; background: #f8fafc;">
+          <h2 style="margin: 0; font-size: 17px; color: #0f172a;">${school}</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; font-weight: 600; color: #0e7490; letter-spacing: 0.6px;">SCHOOL NOTICE</p>
+        </div>
+        <div style="padding: 20px 22px;">
+          <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">${safeBody}</p>
+          <p style="font-size: 13px; color: #334155; margin-top: 20px;">
+            Kind regards,<br/>
+            <strong>${school}</strong><br/>
+            <span style="color: #94a3b8; font-size: 12px;">Sent via Invify School Portal</span>
+          </p>
+        </div>
+      </div>
+    `;
+    return this.sendMail(to, safeSubject, body, [], {
+      fromName: schoolName || 'School Notice',
+      skipLogo: true,
+    });
+  }
+
   public activationPdfFilename(businessName: string): string {
     const base = `Invify-Terminal-Activation-${businessName || 'Tenant'}`
       .replace(/[^a-zA-Z0-9._-]+/g, '-')

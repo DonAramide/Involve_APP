@@ -1,0 +1,18 @@
+{
+  "decision": "NO_ELIGIBLE_PROVIDER",
+  "serviceType": "TRANSFERS",
+  "operationType": "BANK_TRANSFER",
+  "quasarTenantId": "11111111-1111-4111-8111-111111111111",
+  "provider": null,
+  "allowedProviders": [],
+  "precedenceTier": "NONE",
+  "institutionId": "11111111-2222-3333-4444-555555555555",
+  "institutionCode": "PROV01",
+  "institutionName": "Providus Bank Institution Portal",
+  "decisionTraceId": "trc_susp_99887766",
+  "policyVersion": 1,
+  "evaluatedAt": "2026-10-20T00:16:45.000Z",
+  "expiresAt": "2026-10-20T00:17:45.000Z",
+  "reason": "INSTITUTION_RELATIONSHIP_SUSPENDED",
+  "instruction": "Quasar retains existing legacy provider selection; institution relationship is suspended."
+}

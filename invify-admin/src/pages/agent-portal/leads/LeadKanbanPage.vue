@@ -2,6 +2,7 @@
   <q-page class="q-pa-md bg-main text-main font-inter column op-gap-16">
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
+        <q-btn flat dense round icon="arrow_back" color="amber-4" aria-label="Back to dashboard" @click="router.push('/institute/dashboard')" />
         <q-icon name="view_kanban" size="sm" color="amber-4" />
         <div>
           <div class="text-operator-title text-weight-bold" style="font-size: 16px;">LEAD PIPELINE KANBAN</div>

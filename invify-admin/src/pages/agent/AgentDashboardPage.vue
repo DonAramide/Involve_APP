@@ -4,9 +4,25 @@
     <!-- Header -->
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="dashboard" size="sm" color="amber-4" />
+        <q-btn
+          v-if="identity.institutionType === 'BANK'"
+          flat
+          dense
+          no-caps
+          color="amber-4"
+          icon="health_and_safety"
+          label="HMO Management"
+          @click="router.push('/institute/hmo/overview')"
+        />
+        <q-icon :name="identity.institutionType === 'HMO' ? 'health_and_safety' : 'dashboard'" size="sm" :color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'" />
         <div>
-          <div class="text-operator-title text-weight-bold" style="font-size: 16px;">INSTITUTE PORTAL</div>
+          <div class="row items-center op-gap-8">
+            <div class="text-operator-title text-weight-bold" style="font-size: 16px;">
+              {{ identity.institutionType === 'HMO' ? 'HMO INSTITUTION PORTAL' : 'INSTITUTE PORTAL' }}
+            </div>
+            <q-badge v-if="identity.institutionType === 'HMO'" color="teal-9" text-color="teal-2">HMO</q-badge>
+            <q-badge v-else-if="identity.institutionType" color="amber-9" text-color="amber-2">{{ identity.institutionType }}</q-badge>
+          </div>
           <div class="text-metric-mono text-muted" style="font-size: 10px;">
             {{ identity.agentCode || (loading ? 'Loading…' : 'No Institute code') }}
             <template v-if="identity.status"> // {{ identity.status }}</template>
@@ -21,6 +37,26 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="flex flex-center col">
+      <q-spinner color="amber-4" size="3em" />
+    </div>
+
+    <!-- RESTRICTED INSTITUTION PORTAL VIEW -->
+    <div v-else-if="isRestricted" class="col" style="overflow-y: auto;">
+      <HmoInstitutionPortalView
+        :identity="identity"
+        :initial-hmo-dashboard="payload.hmoDashboard || null"
+        :portal-mode="identity.portalMode"
+        :institution-type="identity.institutionType"
+        :approval-status="identity.approvalStatus"
+        :restriction-reason="identity.restrictionReason"
+        @enable-mfa="startMfaSetup"
+      />
+    </div>
+
+    <!-- MAIN INSTITUTION PORTAL (HMO & BANK & OTHERS) -->
+    <template v-else>
     <!-- Tabs Navigation -->
     <div class="shrink-0">
       <q-tabs
@@ -30,13 +66,15 @@
         outside-arrows
         mobile-arrows
         class="bg-panel text-muted rounded-borders border-muted"
-        active-color="amber-4"
-        indicator-color="amber-4"
+        :active-color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'"
+        :indicator-color="identity.institutionType === 'HMO' ? 'teal-3' : 'amber-4'"
         align="left"
         narrow-indicator
       >
+        <q-tab v-if="identity.institutionType === 'HMO'" name="hmo_ops" label="HMO Operations" icon="health_and_safety" no-caps />
+        <q-tab v-if="identity.institutionType === 'HMO'" name="catalog" label="Product Catalogue & Pricing" icon="inventory_2" no-caps />
         <q-tab name="overview" label="Overview" icon="dashboard" no-caps />
-        <q-tab name="tenants" label="Tenants" icon="storefront" no-caps />
+        <q-tab name="tenants" :label="identity.institutionType === 'HMO' ? 'Schools & Tenants' : 'Tenants'" icon="storefront" no-caps />
         <q-tab name="deployments" label="Deployments" icon="devices" no-caps />
         <q-tab name="finance" label="Finance" icon="account_balance_wallet" no-caps />
         <q-tab name="analytics" label="Analytics" icon="analytics" no-caps />
@@ -46,14 +84,27 @@
       </q-tabs>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="flex flex-center col">
-      <q-spinner color="amber-4" size="3em" />
-    </div>
-
     <!-- Main Dashboard Panels -->
-    <q-tab-panels v-else v-model="activeTab" animated class="bg-transparent col" style="overflow-y: auto;">
+    <q-tab-panels v-model="activeTab" animated class="bg-transparent col" style="overflow-y: auto;">
       
+      <!-- HMO OPERATIONS TAB -->
+      <q-tab-panel v-if="identity.institutionType === 'HMO'" name="hmo_ops" class="q-pa-none">
+        <HmoInstitutionPortalView
+          :identity="identity"
+          :initial-hmo-dashboard="payload.hmoDashboard || null"
+          :portal-mode="identity.portalMode"
+          :institution-type="identity.institutionType"
+          :approval-status="identity.approvalStatus"
+          :restriction-reason="identity.restrictionReason"
+          @enable-mfa="startMfaSetup"
+        />
+      </q-tab-panel>
+
+      <!-- PRODUCT CATALOGUE & PRICING TAB -->
+      <q-tab-panel v-if="identity.institutionType === 'HMO'" name="catalog" class="q-pa-none">
+        <HmoProductCatalogueView :identity="identity" />
+      </q-tab-panel>
+
       <!-- OVERVIEW TAB -->
       <q-tab-panel name="overview" class="q-pa-none column op-gap-16">
         <!-- ROW 1: Performance KPIs -->
@@ -100,7 +151,7 @@
               v-for="(action, index) in visibleQuickActions" 
               :key="index" 
               class="col panel-card bg-panel border-muted rounded-borders q-pa-md row items-center justify-center op-gap-8 cursor-pointer hover-card"
-              @click="$router.push(action.route)"
+              @click="openQuickAction(action)"
             >
               <q-icon :name="action.icon" color="amber-4" size="sm" />
               <div class="text-weight-bold text-caption text-center" style="line-height: 1.2;">{{ action.label }}</div>
@@ -315,8 +366,8 @@
           <div class="col-xs-12 col-md-4 bg-panel border-muted rounded-borders q-pa-md column justify-between">
             <div class="text-weight-bold q-mb-sm text-caption">DEPLOYMENT ACTIONS</div>
             <div class="column op-gap-8">
-              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="hardwareModal.open('DEVICE')" />
-              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="hardwareModal.open('TERMINAL')" />
+              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="router.push('/institute/assign-device')" />
+              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="router.push('/institute/assign-terminal')" />
               <q-btn outline color="grey-4" icon="sync" label="Sync Device" class="full-width" no-caps @click="syncDevice()" />
             </div>
           </div>
@@ -597,9 +648,9 @@
       </q-tab-panel>
 
     </q-tab-panels>
+    </template>
     
     <AgentKYCUploadModal ref="kycModal" />
-    <AgentHardwareAssignmentModal ref="hardwareModal" />
 
     <q-dialog v-model="showMfaModal" persistent>
       <q-card class="bg-panel text-main" style="min-width: 400px">
@@ -638,14 +689,15 @@ import { useRouter } from 'vue-router'
 import VueApexCharts from 'vue3-apexcharts'
 import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
-import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
+import HmoInstitutionPortalView from './components/HmoInstitutionPortalView.vue'
+import HmoProductCatalogueView from './components/HmoProductCatalogueView.vue'
+import { resolveInstituteQuickAction } from './instituteQuickActions'
 import { pickInstituteCode } from '../../utils/instituteIdentity'
 
 const $q = useQuasar()
 const router = useRouter()
 const apexchart = VueApexCharts
 const kycModal = ref(null)
-const hardwareModal = ref(null)
 const loading = ref(true)
 const mfaBusy = ref(false)
 const showMfaModal = ref(false)
@@ -654,6 +706,10 @@ const mfaVerifyCode = ref('')
 const agentInfo = ref(null)
 const payload = ref({})
 const activeTab = ref('overview')
+function openQuickAction(action) {
+  router.push(resolveInstituteQuickAction(action))
+}
+
 const visibleQuickActions = computed(() =>
   (payload.value.quickActions || []).filter((action) => {
     const label = String(action.label || '').toLowerCase()
@@ -685,13 +741,38 @@ const identity = computed(() => {
   const parts = String(name || '').split(/\s+/).filter(Boolean)
   const initials = ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase() || '?'
   const joinedRaw = p.date_joined || a.created_at || s.created_at
+  const agentCode = pickInstituteCode(p.agent_code, a.agent_code, a.agentCode, s.agentCode, s.agent_code)
+
+  // Authoritative backend classification takes priority over any stored fallback
+  const institutionType = String(
+    p.institution_type ||
+    p.institutionType ||
+    a.institution_type ||
+    a.institutionType ||
+    (String(agentCode || '').toUpperCase().startsWith('MHMO') ? 'HMO' : 'BANK')
+  ).toUpperCase()
+
+  const portalMode = String(
+    p.portal_mode ||
+    p.portalMode ||
+    a.portal_mode ||
+    a.portalMode ||
+    (institutionType === 'HMO' ? 'HMO' : 'BANK')
+  ).toUpperCase()
+
   return {
     name,
     email,
     phone: p.phone || a.phone || a.phone_number || s.phone || '',
-    agentCode: pickInstituteCode(p.agent_code, a.agent_code, a.agentCode, s.agentCode, s.agent_code),
+    agentCode,
     status: p.status || a.status || s.status || '',
-    institution: p.institution || '',
+    institution: p.institution || a.institution_name || '',
+    institutionType,
+    portalMode,
+    approvalStatus: p.approval_status || p.status || a.status || 'ACTIVE',
+    restrictionReason: p.restriction_reason || '',
+    hmoRole: p.hmo_role || a.hmo_role || 'HMO_ADMIN',
+    hmoPermissions: p.hmo_permissions || a.hmo_permissions || [],
     territory: a.territory || p.territory || '',
     kyc: a.profile?.kyc_status || a.kyc_status || a.kycStatus || p.kyc_status || '',
     mfa: Boolean(a.profile?.mfa_enabled || s.profile?.mfa_enabled),
@@ -700,6 +781,8 @@ const identity = computed(() => {
     joinedLabel: joinedRaw ? new Date(joinedRaw).toLocaleDateString() : '—',
   }
 })
+
+const isRestricted = computed(() => identity.value.portalMode === 'RESTRICTED')
 
 const formatMoney = (num) => {
   const value = Number(num || 0)
@@ -801,6 +884,13 @@ const fetchDashboardData = async () => {
 
     if (dashRes.status === 'fulfilled' && dashRes.value.data?.identity) {
       payload.value = dashRes.value.data
+      const instType = payload.value.identity?.institution_type || payload.value.identity?.institutionType
+      const requestedTab = router.currentRoute.value?.query?.tab
+      if (requestedTab) {
+        activeTab.value = requestedTab
+      } else if (instType === 'HMO' && activeTab.value === 'overview') {
+        activeTab.value = 'hmo_ops'
+      }
     } else if (dashRes.status === 'rejected') {
       const err = dashRes.reason
       $q.notify({
@@ -814,6 +904,14 @@ const fetchDashboardData = async () => {
     if (profileRes.status === 'fulfilled' && profileRes.value.data?.data) {
       Object.assign(live, profileRes.value.data.data)
     }
+    if (payload.value?.identity?.institution_type) {
+      live.institution_type = payload.value.identity.institution_type
+      live.institutionType = payload.value.identity.institution_type
+    }
+    if (payload.value?.identity?.portal_mode) {
+      live.portal_mode = payload.value.identity.portal_mode
+      live.portalMode = payload.value.identity.portal_mode
+    }
     const code = pickInstituteCode(
       payload.value?.identity?.agent_code,
       live.agent_code,
@@ -826,6 +924,7 @@ const fetchDashboardData = async () => {
     agentInfo.value = live
     if (Object.keys(live).length) {
       localStorage.setItem('invify_agent_info', JSON.stringify(live))
+      window.dispatchEvent(new CustomEvent('invify-agent-info-updated', { detail: live }))
     }
   } catch (err) {
     console.error('Dashboard fetch failed', err)
@@ -835,7 +934,16 @@ const fetchDashboardData = async () => {
   }
 }
 
-onMounted(fetchDashboardData)
+onMounted(async () => {
+  const stored = parseStoredAgent()
+  const requestedTab = router.currentRoute.value?.query?.tab
+  if (requestedTab) {
+    activeTab.value = requestedTab
+  } else if (stored?.institution_type === 'HMO' || stored?.institutionType === 'HMO') {
+    activeTab.value = 'hmo_ops'
+  }
+  await fetchDashboardData()
+})
 
 // Chart Series
 const growthSeries = computed(() => [{ name: 'Tenants', data: payload.value.analytics?.merchantGrowth || [] }])

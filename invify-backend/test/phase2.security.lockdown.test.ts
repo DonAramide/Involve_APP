@@ -119,7 +119,7 @@ describe('Phase 2 — Security & Financial Lockdown', () => {
 
       // Either feature gate 403 or role/tenant handling — must not succeed
       expect(res.status).not.toBe(200);
-      expect([400, 403, 500]).toContain(res.status);
+      expect([400, 401, 403, 500]).toContain(res.status);
 
       process.env.OFFLINE_LOCAL_AUTH = 'false';
     });

@@ -8,6 +8,8 @@ import { evaluatePasswordPolicy } from '../../utils/password-policy';
 import { uploadBase64ToContabo } from './utils/kyc-storage';
 import { agentAccessService } from './services/agent-access.service';
 import { loadAgentFeeReadModel, loadAttributedTenantIds } from './services/agent-fee-read-model';
+import { institutionClassificationService } from '../health-insurance/services/institution-classification.service';
+import { hmoPortalService } from '../health-insurance/services/hmo-portal.service';
 
 
 
@@ -226,10 +228,20 @@ export class AgentController {
 
       const { data: agentProfile } = await supabaseAdmin
         .from('agent_profiles')
-        .select('mfa_enabled')
+        .select('mfa_enabled, logo_url')
         .eq('agent_id', agent.id)
         .maybeSingle();
       const mfaEnabled = Boolean(agentProfile?.mfa_enabled);
+      const logoUrl = agent.logo_url || agentProfile?.logo_url || null;
+      const tradingName = agent.trading_name || null;
+
+      const instCtx = await institutionClassificationService
+        .resolveForAgentOrUser({
+          authUserId: authData.user.id,
+          email: agent.email,
+          agentRecord: agent,
+        })
+        .catch(() => null);
 
       return res.status(200).json({
         success: true,
@@ -243,9 +255,22 @@ export class AgentController {
           name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || agent.email,
           first_name: agent.first_name,
           last_name: agent.last_name,
+          trading_name: tradingName,
+          tradingName: tradingName,
+          logo_url: logoUrl,
+          logoUrl: logoUrl,
           phone: agent.phone || agent.phone_number || null,
           status: agent.status,
-          kycStatus: agent.kyc_status || null,
+          kycStatus: instCtx?.kycStatus || agent.kyc_status || null,
+          institution_type: instCtx?.institutionType || agent.institution_type || 'BANK',
+          institutionType: instCtx?.institutionType || agent.institution_type || 'BANK',
+          portal_mode: instCtx?.portalMode || 'BANK',
+          portalMode: instCtx?.portalMode || 'BANK',
+          institution_id: instCtx?.institutionId || null,
+          institution_name: instCtx?.institutionName || null,
+          hmo_provider_id: instCtx?.hmoProviderId || null,
+          hmo_role: instCtx?.hmoRole || null,
+          hmo_permissions: instCtx?.hmoPermissions || [],
           created_at: agent.created_at,
           profile: { mfa_enabled: mfaEnabled },
         }
@@ -601,6 +626,19 @@ export class AgentController {
       }).length;
       const activeTenants = allTenants.filter((t: any) => String(t.status || '').toUpperCase() === 'ACTIVE').length;
 
+      const instCtx = await institutionClassificationService
+        .resolveForAgentOrUser({
+          authUserId: authUser.id,
+          email: agent.email,
+          agentRecord: agent,
+        })
+        .catch(() => null);
+
+      let hmoDashboard: any = null;
+      if (instCtx && instCtx.institutionType === 'HMO' && instCtx.portalMode === 'HMO' && instCtx.hmoProviderId) {
+        hmoDashboard = await hmoPortalService.getDashboardOverview(instCtx).catch(() => null);
+      }
+
       const payload = {
         success: true,
         identity: {
@@ -611,11 +649,23 @@ export class AgentController {
           phone: agent.phone || agent.phone_number || null,
           status: agent.status || null,
           agent_type: agent.agent_type || agent.type || null,
-          institution: agent.institution_name || agent.bank_name || agent.institution || null,
+          institution: instCtx?.institutionName || agent.institution_name || agent.bank_name || agent.institution || null,
+          institution_type: instCtx?.institutionType || 'BANK',
+          institutionType: instCtx?.institutionType || 'BANK',
+          portal_mode: instCtx?.portalMode || 'BANK',
+          portalMode: instCtx?.portalMode || 'BANK',
+          institution_id: instCtx?.institutionId || null,
+          hmo_provider_id: instCtx?.hmoProviderId || null,
+          hmo_role: instCtx?.hmoRole || null,
+          hmo_permissions: instCtx?.hmoPermissions || [],
+          approval_status: instCtx?.approvalStatus || agent.status || 'ACTIVE',
+          restriction_reason: instCtx?.restrictionReason || null,
           date_joined: agent.created_at || null,
-          kyc_status: agent.kyc_status || null,
+          kyc_status: instCtx?.kycStatus || agent.kyc_status || null,
           territory: territoryName || null,
         },
+        institutionContext: instCtx,
+        hmoDashboard,
         kpis: {
           totalMerchants: { value: allTenants.length, trend: 'Insufficient History' },
           totalTenants: { value: allTenants.length, trend: 'Insufficient History' },
@@ -691,12 +741,12 @@ export class AgentController {
           rank: rank || '-'
         },
         quickActions: [
-          { label: 'Create Lead', route: '/agent/coming-soon/create-lead', icon: 'person_add' },
-          { label: 'Upload KYC', route: '/agent/coming-soon/upload-kyc', icon: 'file_upload' },
-          { label: 'Assign Device', route: '/agent/coming-soon/assign-device', icon: 'devices' },
-          { label: 'Assign Terminal', route: '/agent/coming-soon/assign-terminal', icon: 'point_of_sale' },
-          { label: 'Request Withdrawal', route: '/agent/coming-soon/request-withdrawal', icon: 'payments' },
-          { label: 'Support Ticket', route: '/agent/coming-soon/support-ticket', icon: 'support_agent' }
+          { label: 'Create Lead', route: '/institute/leads', icon: 'person_add' },
+          { label: 'Upload KYC', route: '/institute/profile?tab=kyc', icon: 'file_upload' },
+          { label: 'Assign Device', route: '/institute/assign-device', icon: 'devices' },
+          { label: 'Assign Terminal', route: '/institute/assign-terminal', icon: 'point_of_sale' },
+          { label: 'Request Withdrawal', route: '/institute/wallet', icon: 'payments' },
+          { label: 'Support Ticket', route: '/institute/support', icon: 'support_agent' }
         ]
       };
 
@@ -712,8 +762,17 @@ export class AgentController {
       const authUserId = (req as any).user?.id;
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-      const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+      const { data: agent } = await supabase.from('agents').select('*').eq('auth_user_id', authUserId).single();
       if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+      const instCtx = await institutionClassificationService
+        .resolveForAgentOrUser({ authUserId, email: agent.email, agentRecord: agent })
+        .catch(() => null);
+      if (instCtx?.institutionType === 'HMO' || instCtx?.institutionType === 'HOSPITAL') {
+        return res.status(403).json({
+          success: false,
+          message: `Hardware assignment is a Bank/Aggregator operation and is forbidden for ${instCtx.institutionType} institutions.`,
+        });
+      }
       const agentId = agent.id;
 
       const { type, tenantId, serialNumber } = req.body;
@@ -795,6 +854,18 @@ export class AgentController {
 
   static async syncHardware(req: Request, res: Response) {
     try {
+      const authUser = (req as any).user;
+      if (authUser?.id || authUser?.email) {
+        const instCtx = await institutionClassificationService
+          .resolveForAgentOrUser({ authUserId: authUser.id, email: authUser.email })
+          .catch(() => null);
+        if (instCtx?.institutionType === 'HMO' || instCtx?.institutionType === 'HOSPITAL') {
+          return res.status(403).json({
+            success: false,
+            message: `Hardware sync is forbidden for ${instCtx.institutionType} institutions.`,
+          });
+        }
+      }
       // Dummy sync endpoint for the UI to hit
       return res.status(200).json({ success: true, message: 'Hardware sync initiated' });
     } catch (err: any) {

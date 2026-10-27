@@ -1,0 +1,2140 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Invify + Quasar Institution Registry & Provider Routing API",
+    "version": "1.6.0",
+    "description": "Canonical service-specific contract governing multi-institution governance, institutional code onboarding, and deterministic provider routing across Invify and Quasar (Contract candidate 1.6.0)."
+  },
+  "servers": [
+    {
+      "url": "https://api.invify.org/api/v1",
+      "description": "Invify Production Policy Gateway"
+    },
+    {
+      "url": "https://staging.invify.org/api/v1",
+      "description": "Invify Staging Policy Gateway"
+    }
+  ],
+  "paths": {
+    "/institutions/resolve-code": {
+      "get": {
+        "summary": "Resolve Institutional Code",
+        "description": "Public / pre-authenticated lookup for tablet and mobile onboarding. Returns safe institutional metadata, supported services, allowed business modes, and KYC verification status. Does not return API secrets or internal routing rules.",
+        "operationId": "resolveInstitutionCode",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9-]{3,20}$",
+              "example": "PROV01"
+            },
+            "description": "Normalized institutional code entered by user"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Code successfully resolved to an active, accredited institution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCodeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Code is not registered, expired, or revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCodeNotFoundResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Institution is registered but KYC or regulatory approval is pending or suspended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/resolve-checkout-route": {
+      "post": {
+        "summary": "Resolve Checkout / Card-Not-Present Payment Route",
+        "description": "Authoritative policy resolver for Quasar checkout and card-not-present payments (PaymentService.initializePaystackCheckout / RoutingService.evaluateChain). Returns eligible Quasar checkout PSP ('paystack' | 'flutterwave') or null when unrouted.",
+        "operationId": "resolveCheckoutRoute",
+        "security": [
+          {
+            "InvifyRoutingHmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Distributed correlation ID across Invify and Quasar"
+          },
+          {
+            "name": "X-Invify-Key-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "k_live_2026_a"
+            },
+            "description": "Key ID of the shared HMAC secret used for signature verification"
+          },
+          {
+            "name": "X-Signature-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "ISO 8601 UTC timestamp of request generation"
+          },
+          {
+            "name": "X-Signature-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique cryptographic nonce for replay protection"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCheckoutRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout route evaluated successfully",
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCheckoutRouteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid quasarTenantId or unsupported operationType",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "401": {
+            "description": "HMAC signature mismatch, expired timestamp, or reused nonce",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "503": {
+            "description": "Authenticated halt. Valid only when the response signature verifies and the body matches OutageFailFastError. An unsigned 503 is not a routing decision and does not authorize a provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutageFailFastError"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/resolve-transfer-rail": {
+      "post": {
+        "summary": "Resolve Bank Transfer & Name Enquiry Rail",
+        "description": "Authoritative policy resolver for Quasar outbound bank transfers and account-name enquiry (TransferService.processTransfer / TransferPspResolver). Returns eligible Quasar payout rail ('nomba' | 'paystack') or null when unrouted.",
+        "operationId": "resolveTransferRail",
+        "security": [
+          {
+            "InvifyRoutingHmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Invify-Key-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "k_live_2026_a"
+            }
+          },
+          {
+            "name": "X-Signature-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "X-Signature-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveTransferRailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer rail evaluated successfully",
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveTransferRailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or unsupported operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "503": {
+            "description": "Authenticated halt. Valid only when the response signature verifies and the body matches OutageFailFastError. An unsigned 503 is not a routing decision and does not authorize a provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutageFailFastError"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/resolve-virtual-account-provider": {
+      "post": {
+        "summary": "Resolve Virtual Account Provider",
+        "description": "Authoritative policy resolver for Quasar student and customer dedicated virtual account generation (VirtualAccountService.createOrGetStudentVirtualAccount). Returns eligible provider ('connectpoint' | 'paystack') or null when unrouted.",
+        "operationId": "resolveVirtualAccountProvider",
+        "security": [
+          {
+            "InvifyRoutingHmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Invify-Key-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "k_live_2026_a"
+            }
+          },
+          {
+            "name": "X-Signature-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "X-Signature-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveVirtualAccountProviderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Virtual account provider evaluated successfully",
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveVirtualAccountProviderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or unsupported operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          },
+          "503": {
+            "description": "Authenticated halt. Valid only when the response signature verifies and the body matches OutageFailFastError. An unsigned 503 is not a routing decision and does not authorize a provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutageFailFastError"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          }
+        }
+      }
+    },
+    "/institutions/{institutionId}/services/{serviceType}/override": {
+      "post": {
+        "summary": "Propose or Apply Tenant Service Provider Override",
+        "description": "Enables a tenant to override an institution's default provider, subject to the institution's tenant_override_policy (PERMITTED_FROM_LIST or OPEN). If policy is LOCKED, requests are rejected with 403 Forbidden.",
+        "operationId": "applyTenantRoutingOverride",
+        "security": [
+          {
+            "InvifyTenantJwtAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "institutionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "serviceType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ServiceType"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantOverrideRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Override validated, approved, and recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantOverrideResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Institution policy is LOCKED or selected provider is not in permitted list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/quasar-sync": {
+      "post": {
+        "summary": "Quasar Mutual Policy Sync & Telemetry Feedback",
+        "description": "Server-to-server endpoint allowing Quasar to report provider health states, execution telemetry, or trace feedback back to Invify. Cryptographically authenticated using HMAC-SHA256 with timestamp, nonce, and key ID.",
+        "operationId": "syncQuasarPolicy",
+        "security": [
+          {
+            "InvifyRoutingHmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Invify-Routing-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "HMAC-SHA256 signature of canonical payload '${timestamp}.${nonce}.${rawBody}'"
+          },
+          {
+            "name": "X-Invify-Key-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "k_live_2026_a"
+            }
+          },
+          {
+            "name": "X-Signature-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "X-Signature-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuasarPolicySyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy sync acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuasarPolicySyncResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Invify-Routing-Signature": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "description": "HMAC-SHA256 hex over X-Signature-Timestamp + '.' + X-Signature-Nonce + '.' + the exact raw response body. The client verifies this before parsing the body as a policy result."
+              },
+              "X-Invify-Key-Id": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Key id that signed this response. An unknown or revoked id is rejected. The body is then not a routing decision."
+              },
+              "X-Signature-Timestamp": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": "ISO-8601 UTC timestamp of this response. Absolute skew above 300 seconds is rejected."
+              },
+              "X-Signature-Nonce": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 16
+                },
+                "description": "Nonce unique to this response. Reuse within 10 minutes is rejected."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "InvifyRoutingHmacAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Invify-Routing-Signature",
+        "description": "HMAC-SHA256 signature over '${X-Signature-Timestamp}.${X-Signature-Nonce}.${rawBody}' using shared secret identified by X-Invify-Key-Id"
+      },
+      "InvifyTenantJwtAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ServiceType": {
+        "type": "string",
+        "enum": [
+          "PAYMENTS",
+          "TRANSFERS",
+          "VIRTUAL_ACCOUNTS",
+          "HEALTH_INSURANCE",
+          "CARD_ACQUIRING"
+        ]
+      },
+      "InstitutionType": {
+        "type": "string",
+        "enum": [
+          "BANK",
+          "HMO",
+          "PAYMENT_PROVIDER",
+          "AGGREGATOR"
+        ]
+      },
+      "InstitutionStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "PENDING_APPROVAL",
+          "ACTIVE",
+          "SUSPENDED",
+          "RETIRED"
+        ]
+      },
+      "KycStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "VERIFIED",
+          "REJECTED"
+        ]
+      },
+      "TenantOverridePolicy": {
+        "type": "string",
+        "enum": [
+          "LOCKED",
+          "PERMITTED_FROM_LIST",
+          "OPEN"
+        ]
+      },
+      "PrecedenceTier": {
+        "type": "string",
+        "enum": [
+          "CIRCUIT_BREAKER",
+          "INSTITUTION_LOCKED",
+          "TENANT_OVERRIDE",
+          "INSTITUTION_DEFAULT",
+          "NONE"
+        ]
+      },
+      "RoutingDecision": {
+        "type": "string",
+        "enum": [
+          "RESOLVED",
+          "NO_RELATIONSHIP",
+          "NO_MAPPING",
+          "NO_ELIGIBLE_PROVIDER"
+        ]
+      },
+      "CheckoutProvider": {
+        "type": "string",
+        "enum": [
+          "paystack",
+          "flutterwave"
+        ]
+      },
+      "TransferRailProvider": {
+        "type": "string",
+        "enum": [
+          "nomba",
+          "paystack"
+        ]
+      },
+      "VirtualAccountProvider": {
+        "type": "string",
+        "enum": [
+          "connectpoint",
+          "paystack"
+        ]
+      },
+      "ResolveCodeResponse": {
+        "type": "object",
+        "required": [
+          "valid",
+          "institution"
+        ],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
+          "institution": {
+            "type": "object",
+            "required": [
+              "id",
+              "code",
+              "name",
+              "type",
+              "isDefault",
+              "supportedServices",
+              "allowedBusinessModes"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string",
+                "example": "PROV01"
+              },
+              "name": {
+                "type": "string",
+                "example": "Providus Bank Institution Portal"
+              },
+              "type": {
+                "$ref": "#/components/schemas/InstitutionType"
+              },
+              "logoUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "isDefault": {
+                "type": "boolean",
+                "example": false
+              },
+              "supportedServices": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ServiceType"
+                }
+              },
+              "allowedBusinessModes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "school",
+                    "retail",
+                    "services",
+                    "health"
+                  ]
+                }
+              },
+              "policySummary": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "defaultProvider": {
+                      "type": "string"
+                    },
+                    "allowedProviders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "overridePolicy": {
+                      "$ref": "#/components/schemas/TenantOverridePolicy"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ResolveCodeNotFoundResponse": {
+        "type": "object",
+        "required": [
+          "valid",
+          "error",
+          "fallbackDecision"
+        ],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Institutional code 'XYZ999' is not registered or is inactive."
+          },
+          "fallbackDecision": {
+            "type": "string",
+            "example": "RETAIN_LEGACY_CONFIG"
+          },
+          "instruction": {
+            "type": "string",
+            "example": "Do not assign fabricated platform institution; retain existing tenant configuration."
+          }
+        }
+      },
+      "ResolveCheckoutRouteRequest": {
+        "type": "object",
+        "required": [
+          "quasarTenantId",
+          "operationType"
+        ],
+        "properties": {
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "CHECKOUT",
+              "WEB_PAYMENT"
+            ],
+            "example": "CHECKOUT"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "default": 0
+          },
+          "currency": {
+            "type": "string",
+            "default": "NGN"
+          },
+          "requestedProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "paystack",
+              "flutterwave",
+              null
+            ],
+            "description": "Tenant requested provider if permitted by override policy"
+          }
+        }
+      },
+      "ResolveCheckoutRouteResponse": {
+        "type": "object",
+        "required": [
+          "decision",
+          "serviceType",
+          "operationType",
+          "quasarTenantId",
+          "provider",
+          "allowedProviders",
+          "precedenceTier",
+          "decisionTraceId",
+          "policyVersion",
+          "evaluatedAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/RoutingDecision"
+          },
+          "serviceType": {
+            "type": "string",
+            "enum": [
+              "PAYMENTS"
+            ]
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "CHECKOUT",
+              "WEB_PAYMENT"
+            ],
+            "example": "CHECKOUT"
+          },
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "paystack",
+              "flutterwave",
+              null
+            ]
+          },
+          "allowedProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "paystack",
+                "flutterwave"
+              ]
+            },
+            "description": "Ordered failover list of allowed providers for this service. Non-empty when resolved; empty array [] when unrouted."
+          },
+          "precedenceTier": {
+            "$ref": "#/components/schemas/PrecedenceTier"
+          },
+          "institutionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "institutionCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "PROV01"
+          },
+          "institutionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Providus Bank Institution Portal"
+          },
+          "decisionTraceId": {
+            "type": "string",
+            "example": "trc_chk_9a8f7b6c5d4e3f21"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "example": 1
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instruction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "circuitBreakerDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "overrideDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "description": "Resolved route with an active provider",
+            "properties": {
+              "decision": {
+                "const": "RESOLVED"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "paystack",
+                  "flutterwave"
+                ]
+              },
+              "allowedProviders": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "paystack",
+                    "flutterwave"
+                  ]
+                },
+                "minItems": 1
+              },
+              "precedenceTier": {
+                "type": "string",
+                "enum": [
+                  "CIRCUIT_BREAKER",
+                  "INSTITUTION_LOCKED",
+                  "TENANT_OVERRIDE",
+                  "INSTITUTION_DEFAULT"
+                ]
+              },
+              "institutionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "institutionCode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier",
+              "institutionId",
+              "institutionCode"
+            ]
+          },
+          {
+            "description": "Unrouted or unmapped tenant with no active provider",
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "NO_RELATIONSHIP",
+                  "NO_MAPPING",
+                  "NO_ELIGIBLE_PROVIDER"
+                ]
+              },
+              "provider": {
+                "type": "null"
+              },
+              "allowedProviders": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "precedenceTier": {
+                "const": "NONE"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier"
+            ]
+          }
+        ]
+      },
+      "ResolveTransferRailRequest": {
+        "type": "object",
+        "required": [
+          "quasarTenantId",
+          "operationType"
+        ],
+        "properties": {
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER",
+              "NAME_ENQUIRY"
+            ],
+            "example": "BANK_TRANSFER"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "default": 0
+          },
+          "currency": {
+            "type": "string",
+            "default": "NGN"
+          },
+          "destinationBankCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "destinationAccountNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "nomba",
+              "paystack",
+              null
+            ]
+          }
+        }
+      },
+      "ResolveTransferRailResponse": {
+        "type": "object",
+        "required": [
+          "decision",
+          "serviceType",
+          "operationType",
+          "quasarTenantId",
+          "provider",
+          "allowedProviders",
+          "precedenceTier",
+          "decisionTraceId",
+          "policyVersion",
+          "evaluatedAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/RoutingDecision"
+          },
+          "serviceType": {
+            "type": "string",
+            "enum": [
+              "TRANSFERS"
+            ]
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER",
+              "NAME_ENQUIRY"
+            ],
+            "example": "BANK_TRANSFER"
+          },
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "nomba",
+              "paystack",
+              null
+            ]
+          },
+          "allowedProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nomba",
+                "paystack"
+              ]
+            },
+            "description": "Ordered failover list of allowed transfer rails for this service. Non-empty when resolved; empty array [] when unrouted."
+          },
+          "precedenceTier": {
+            "$ref": "#/components/schemas/PrecedenceTier"
+          },
+          "institutionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "institutionCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "PROV01"
+          },
+          "institutionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Providus Bank Institution Portal"
+          },
+          "decisionTraceId": {
+            "type": "string",
+            "example": "trc_xfr_1122334455667788"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "example": 1
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instruction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "circuitBreakerDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "overrideDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "description": "Resolved transfer rail with an active provider",
+            "properties": {
+              "decision": {
+                "const": "RESOLVED"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "nomba",
+                  "paystack"
+                ]
+              },
+              "allowedProviders": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "nomba",
+                    "paystack"
+                  ]
+                },
+                "minItems": 1
+              },
+              "precedenceTier": {
+                "type": "string",
+                "enum": [
+                  "CIRCUIT_BREAKER",
+                  "INSTITUTION_LOCKED",
+                  "TENANT_OVERRIDE",
+                  "INSTITUTION_DEFAULT"
+                ]
+              },
+              "institutionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "institutionCode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier",
+              "institutionId",
+              "institutionCode"
+            ]
+          },
+          {
+            "description": "Unrouted or unmapped tenant with no active transfer rail",
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "NO_RELATIONSHIP",
+                  "NO_MAPPING",
+                  "NO_ELIGIBLE_PROVIDER"
+                ]
+              },
+              "provider": {
+                "type": "null"
+              },
+              "allowedProviders": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "precedenceTier": {
+                "const": "NONE"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier"
+            ]
+          }
+        ]
+      },
+      "ResolveVirtualAccountProviderRequest": {
+        "type": "object",
+        "required": [
+          "quasarTenantId",
+          "operationType"
+        ],
+        "properties": {
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "VIRTUAL_ACCOUNT_CREATION"
+            ],
+            "example": "VIRTUAL_ACCOUNT_CREATION"
+          },
+          "studentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedProvider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "connectpoint",
+              "paystack",
+              null
+            ]
+          }
+        }
+      },
+      "ResolveVirtualAccountProviderResponse": {
+        "type": "object",
+        "required": [
+          "decision",
+          "serviceType",
+          "operationType",
+          "quasarTenantId",
+          "provider",
+          "allowedProviders",
+          "precedenceTier",
+          "decisionTraceId",
+          "policyVersion",
+          "evaluatedAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/RoutingDecision"
+          },
+          "serviceType": {
+            "type": "string",
+            "enum": [
+              "VIRTUAL_ACCOUNTS"
+            ]
+          },
+          "operationType": {
+            "type": "string",
+            "enum": [
+              "VIRTUAL_ACCOUNT_CREATION"
+            ],
+            "example": "VIRTUAL_ACCOUNT_CREATION"
+          },
+          "quasarTenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "connectpoint",
+              "paystack",
+              null
+            ]
+          },
+          "allowedProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "connectpoint",
+                "paystack"
+              ]
+            },
+            "description": "Ordered failover list of allowed virtual account providers for this service. Non-empty when resolved; empty array [] when unrouted."
+          },
+          "precedenceTier": {
+            "$ref": "#/components/schemas/PrecedenceTier"
+          },
+          "institutionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "institutionCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "PROV01"
+          },
+          "institutionName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Providus Bank Institution Portal"
+          },
+          "decisionTraceId": {
+            "type": "string",
+            "example": "trc_va_5566778899aabbcc"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "example": 1
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instruction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "circuitBreakerDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "overrideDetails": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "description": "Resolved virtual account provider",
+            "properties": {
+              "decision": {
+                "const": "RESOLVED"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "connectpoint",
+                  "paystack"
+                ]
+              },
+              "allowedProviders": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "connectpoint",
+                    "paystack"
+                  ]
+                },
+                "minItems": 1
+              },
+              "precedenceTier": {
+                "type": "string",
+                "enum": [
+                  "CIRCUIT_BREAKER",
+                  "INSTITUTION_LOCKED",
+                  "TENANT_OVERRIDE",
+                  "INSTITUTION_DEFAULT"
+                ]
+              },
+              "institutionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "institutionCode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier",
+              "institutionId",
+              "institutionCode"
+            ]
+          },
+          {
+            "description": "Unrouted or unmapped tenant with no active virtual account provider",
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "NO_RELATIONSHIP",
+                  "NO_MAPPING",
+                  "NO_ELIGIBLE_PROVIDER"
+                ]
+              },
+              "provider": {
+                "type": "null"
+              },
+              "allowedProviders": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "precedenceTier": {
+                "const": "NONE"
+              }
+            },
+            "required": [
+              "decision",
+              "provider",
+              "allowedProviders",
+              "precedenceTier"
+            ]
+          }
+        ]
+      },
+      "TenantOverrideRequest": {
+        "type": "object",
+        "required": [
+          "selectedProvider",
+          "justification"
+        ],
+        "properties": {
+          "selectedProvider": {
+            "type": "string",
+            "example": "flutterwave"
+          },
+          "justification": {
+            "type": "string",
+            "example": "Lower card fee structure agreed for school admissions"
+          }
+        }
+      },
+      "TenantOverrideResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "overrideId",
+          "tenantId",
+          "serviceType",
+          "selectedProvider",
+          "effectiveAt"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "overrideId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceType": {
+            "$ref": "#/components/schemas/ServiceType"
+          },
+          "selectedProvider": {
+            "type": "string",
+            "example": "flutterwave"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "QuasarPolicySyncRequest": {
+        "type": "object",
+        "required": [
+          "event",
+          "timestamp",
+          "payload"
+        ],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "PROVIDER_HEALTH_CHANGE",
+              "TENANT_PROVISION_ACK",
+              "ROUTING_TRACE_FEEDBACK"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload": {
+            "type": "object"
+          }
+        }
+      },
+      "QuasarPolicySyncResponse": {
+        "type": "object",
+        "required": [
+          "acknowledged",
+          "syncedAt"
+        ],
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "example": true
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "description": "Signed non-outage policy error. ROUTING_ALL_PROVIDERS_UNAVAILABLE is not valid here; that code belongs only to OutageFailFastError.",
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ROUTING_REQUEST_INVALID"
+          },
+          "message": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          },
+          "details": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "not": {
+          "required": [
+            "code"
+          ],
+          "properties": {
+            "code": {
+              "const": "ROUTING_ALL_PROVIDERS_UNAVAILABLE"
+            }
+          }
+        }
+      },
+      "OutageFailFastError": {
+        "description": "Authenticated all-providers-unavailable halt. details.allowedProviders is diagnostic. This schema has no dispatch provider and does not authorize fallback.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "traceId",
+          "details"
+        ],
+        "properties": {
+          "code": {
+            "const": "ROUTING_ALL_PROVIDERS_UNAVAILABLE"
+          },
+          "message": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decision",
+              "safeHalt"
+            ],
+            "properties": {
+              "decision": {
+                "const": "OUTAGE_FAIL_FAST"
+              },
+              "serviceType": {
+                "$ref": "#/components/schemas/ServiceType"
+              },
+              "operationType": {
+                "type": "string"
+              },
+              "institutionCode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "allowedProviders": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "paystack",
+                    "flutterwave",
+                    "nomba",
+                    "connectpoint"
+                  ]
+                },
+                "description": "Providers that were unavailable. Not an execution list."
+              },
+              "healthStatus": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "safeHalt": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -44,6 +44,7 @@ import {
   SESSION_STORAGE_KEYS,
   _resetSessionRuntimeForTests,
   attachSessionInterceptors,
+  restrictedAccessNotice,
   clearAuthenticatedSession,
   persistAuthenticatedSession,
   refreshSessionSingleFlight,
@@ -201,6 +202,39 @@ describe('Admin session lifecycle', () => {
       }),
     ).rejects.toMatchObject({ response: { status: 403 } });
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('a platform grant denial is not described as role read-only mode', async () => {
+    const notices: string[] = [];
+    const errorHandlers: Array<(err: any) => Promise<unknown>> = [];
+    const api: any = {
+      interceptors: {
+        response: { use: (_ok: unknown, err: (e: any) => Promise<unknown>) => errorHandlers.push(err) },
+      },
+    };
+    attachSessionInterceptors(api, {
+      Notify: { create: ({ message }: { message: string }) => notices.push(message) },
+    });
+    const body = {
+      error: {
+        code: 'PLATFORM_PERMISSION_DENIED',
+        message: "Explicit unexpired platform grant required for 'platform.plans.manage'",
+      },
+    };
+    await expect(
+      errorHandlers[0]({
+        response: { status: 403, data: body },
+        config: { url: '/api/v1/health-insurance/platform/plans', headers: {} },
+      }),
+    ).rejects.toMatchObject({ response: { status: 403 } });
+    expect(restrictedAccessNotice(body)).toBe(
+      "Explicit unexpired platform grant required for 'platform.plans.manage'",
+    );
+    expect(notices).toEqual([
+      "Explicit unexpired platform grant required for 'platform.plans.manage'",
+    ]);
+    expect(restrictedAccessNotice({})).toContain('Read-Only mode');
+    expect(restrictedAccessNotice({ error: 'MFA_REQUIRED' })).toBe('');
   });
 
   test('auth endpoints do not enter a refresh loop', async () => {

@@ -1,0 +1,17 @@
+{
+  "code": "ROUTING_ALL_PROVIDERS_UNAVAILABLE",
+  "message": "All allowed providers ['paystack', 'flutterwave'] for service PAYMENTS on institution PROV01 are in maintenance or OPEN circuit breaker. Request halted safely without unauthorized fallback.",
+  "traceId": "trc_err_outage_55443322",
+  "details": {
+    "decision": "OUTAGE_FAIL_FAST",
+    "serviceType": "PAYMENTS",
+    "operationType": "CHECKOUT",
+    "institutionCode": "PROV01",
+    "allowedProviders": ["paystack", "flutterwave"],
+    "healthStatus": {
+      "paystack": "CIRCUIT_OPEN",
+      "flutterwave": "MAINTENANCE"
+    },
+    "safeHalt": true
+  }
+}

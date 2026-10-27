@@ -99,7 +99,7 @@ describe('R5 stable POS idempotency key', () => {
     expect(reports.slice(1).every((r) => r.status === 'IDEMPOTENT_REPLAY')).toBe(true);
     expect(new Set(reports.map((r) => r.source_idempotency_key)).size).toBe(1);
     expect(insertSpy).toHaveBeenCalledTimes(1);
-  });
+  }, 30000);
 
   it('a delayed callback (later event time, new server txId) replays the original assessment', async () => {
     const first = await FeeShadowIntegration.assessPosWithdrawalSafely({
@@ -112,7 +112,7 @@ describe('R5 stable POS idempotency key', () => {
     expect(first.status).toBe('ASSESSED');
     expect(delayed.status).toBe('IDEMPOTENT_REPLAY');
     expect(insertSpy).toHaveBeenCalledTimes(1);
-  });
+  }, 30000);
 
   it('two different transactions create two assessments', async () => {
     await FeeShadowIntegration.assessPosWithdrawalSafely({

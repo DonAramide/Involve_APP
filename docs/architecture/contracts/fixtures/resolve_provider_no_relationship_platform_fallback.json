@@ -1,0 +1,18 @@
+{
+  "decision": "NO_RELATIONSHIP",
+  "serviceType": "VIRTUAL_ACCOUNTS",
+  "operationType": "VIRTUAL_ACCOUNT_CREATION",
+  "quasarTenantId": "00000000-0000-4000-8000-000000000001",
+  "provider": null,
+  "allowedProviders": [],
+  "precedenceTier": "NONE",
+  "institutionId": null,
+  "institutionCode": null,
+  "institutionName": null,
+  "decisionTraceId": "trc_noref_87654321",
+  "policyVersion": 0,
+  "evaluatedAt": "2026-10-20T00:16:30.000Z",
+  "expiresAt": "2026-10-20T00:17:30.000Z",
+  "warning": "Tenant has no active institution relationship for VIRTUAL_ACCOUNTS. Platform fallback removed per Quasar contract; Quasar retains legacy provider.",
+  "instruction": "Quasar retains existing legacy provider selection; no institutional routing applied."
+}

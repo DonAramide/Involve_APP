@@ -120,6 +120,8 @@ import { SecurityController } from '../modules/agent-portal/controllers/security
 router.get('/api/agent/profile', authenticate, ProfileController.getProfile);
 router.patch('/api/agent/profile', authenticate, ProfileController.updateProfile);
 router.post('/api/agent/profile/photo', authenticate, ProfileController.uploadPhoto);
+router.post('/api/agent/profile/logo', authenticate, ProfileController.uploadLogo);
+router.delete('/api/agent/profile/logo', authenticate, ProfileController.deleteLogo);
 router.post('/api/agent/profile/kyc', authenticate, ProfileController.uploadKyc);
 router.get('/api/agent/profile/kyc', authenticate, ProfileController.getKycDocuments);
 router.get('/api/agent/profile/id-card', authenticate, ProfileController.getQrCode);

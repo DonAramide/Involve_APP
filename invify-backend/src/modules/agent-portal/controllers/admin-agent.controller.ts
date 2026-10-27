@@ -22,6 +22,17 @@ function mapAgentRow(row: any) {
     commissions: row.lifetime_commissions ?? 0,
     territoryId: row.territory_id,
     roleId: row.role_id,
+    institutionType: row.institution_type || profile?.regulatory_metadata?.institution_type || (String(row.agent_code || '').toUpperCase().startsWith('MHMO') ? 'HMO' : 'SCHOOL'),
+    tradingName: row.trading_name || profile?.regulatory_metadata?.trading_name || null,
+    logoUrl: row.logo_url || profile?.logo_url || null,
+    cacNumber: profile?.cac_registration_number || profile?.regulatory_metadata?.cac_registration_number || null,
+    tin: profile?.tax_identification_number || profile?.regulatory_metadata?.tax_identification_number || null,
+    regulatorLicenseReference: profile?.regulator_license_reference || null,
+    regulatoryMetadata: profile?.regulatory_metadata || null,
+    address: profile?.address || null,
+    whatsappNumber: profile?.regulatory_metadata?.whatsapp_number || null,
+    passportImage: profile?.profile_photo_url || null,
+    idCard: profile?.regulatory_metadata?.id_card_url || null,
     createdAt: row.created_at,
     raw: row,
   };
@@ -152,6 +163,37 @@ export class AdminAgentController {
         tenants: [],
       });
     } catch (err: any) {
+      return handleAgentError(res, err);
+    }
+  }
+
+  /**
+   * Update Agent / Institute Profile Details
+   * PATCH /admin/agents/:id
+   */
+  static async updateAgentProfile(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+      const updatedAgent = await agentService.updateAgentProfileDetails(
+        id,
+        req.body || {},
+        actorId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      const mapped = mapAgentRow(updatedAgent);
+      return res.status(200).json({
+        success: true,
+        message: 'Institute profile updated successfully',
+        data: mapped,
+        agent: mapped,
+      });
+    } catch (err: any) {
+      if (err instanceof AgentAccessError) {
+        return res.status(err.status).json({ success: false, message: err.message });
+      }
       return handleAgentError(res, err);
     }
   }
@@ -295,6 +337,65 @@ export class AdminAgentController {
       return res.status(200).json({ success: true, message: 'Broadcast message successfully queued for tenants' });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Upload / update official institution logo
+   * POST /admin/agents/:id/logo
+   */
+  static async updateLogo(req: Request, res: Response) {
+    try {
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+      const base64Image = req.body?.logoImage || req.body?.image;
+      if (!base64Image) {
+        return res.status(400).json({ success: false, message: 'Base64 image data is required in logoImage' });
+      }
+
+      const result = await agentService.updateLogo(
+        req.params.id,
+        base64Image,
+        actorId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return res.json({
+        success: true,
+        message: 'Institution logo updated successfully',
+        logoUrl: result.logoUrl,
+      });
+    } catch (err: any) {
+      if (err instanceof AgentAccessError) {
+        return res.status(err.status).json({ success: false, message: err.message });
+      }
+      return handleAgentError(res, err);
+    }
+  }
+
+  /**
+   * Remove official institution logo
+   * DELETE /admin/agents/:id/logo
+   */
+  static async deleteLogo(req: Request, res: Response) {
+    try {
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+      await agentService.removeLogo(
+        req.params.id,
+        actorId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return res.json({
+        success: true,
+        message: 'Institution logo removed successfully',
+      });
+    } catch (err: any) {
+      if (err instanceof AgentAccessError) {
+        return res.status(err.status).json({ success: false, message: err.message });
+      }
+      return handleAgentError(res, err);
     }
   }
 
