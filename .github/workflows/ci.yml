@@ -121,9 +121,16 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: staging
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set lowercase GHCR image name
+        id: staging-image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -138,7 +145,7 @@ jobs:
           context: invify-backend
           file: invify-backend/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ steps.staging-image.outputs.name }}:staging-${{ github.sha }}
           target: runner
 
       - name: Staging smoke (optional endpoint)
