@@ -4,6 +4,8 @@ import { HealthPlatformService } from '../services/health-platform.service';
 import { PlatformEntitlementError, PlatformEntitlementService } from '../services/platform-entitlement.service';
 import { HealthPlanGovernanceService } from '../services/health-plan-governance.service';
 import { PlanDraftValidationError } from '../services/plan-draft.validation';
+import { InvifyCatalogueService } from '../services/invify-catalogue.service';
+import { CatalogueValidationError, clientSafeCatalogueError } from '../services/invify-catalogue.rules';
 import { supabaseAdmin } from '../../../db/supabase';
 
 function sendPlatformData(res: Response, data: unknown, status = 200) {
@@ -57,6 +59,14 @@ function sendPlanError(res: Response, err: any, fallback: string) {
   });
 }
 
+function sendCatalogueError(res: Response, err: any, fallback: string) {
+  const safe = err instanceof CatalogueValidationError ? err : clientSafeCatalogueError(err, fallback);
+  return res.status(safe.status).json({
+    success: false,
+    error: { code: safe.code, message: safe.message }
+  });
+}
+
 export class HealthPlatformController {
   // ─── 1. Cross-Tenant Overview ──────────────────────────────────────
   static async getOverview(req: Request, res: Response) {
@@ -77,6 +87,37 @@ export class HealthPlatformController {
       const message = err?.message || 'Failed to list participating tenants';
       const status = /mode must be|health must be/.test(message) ? 400 : 500;
       return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async getTenantDetail(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getTenantHealthDetail(String(req.params.tenantId || ''));
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load tenant health detail';
+      const status = err?.status || (/UUID/.test(message) ? 400 : 500);
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async getInstitutionDetail(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getInstitutionHealthDetail(String(req.params.institutionId || ''));
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load institution health detail';
+      const status = err?.status || 500;
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async listMembers(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.listPlatformMembers(req.query);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(500).json({ error: { message: err?.message || 'Failed to list members' } });
     }
   }
 
@@ -410,6 +451,92 @@ export class HealthPlatformController {
       return sendPlatformData(res, data);
     } catch (err: any) {
       return sendPlanError(res, err, 'Failed to update plan draft');
+    }
+  }
+
+  static async listCatalogueOfferings(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.listOfferings(req.query);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to list Invify catalogue offerings');
+    }
+  }
+
+  static async getCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.getOfferingTree(req.params.offeringId);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to load offering');
+    }
+  }
+
+  static async createCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.createOffering(req.healthContext!, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to create offering');
+    }
+  }
+
+  static async updateCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.updateOffering(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to update offering');
+    }
+  }
+
+  static async setCatalogueOfferingStatus(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.setOfferingStatus(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to change offering status');
+    }
+  }
+
+  static async addCatalogueService(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.addService(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to add service');
+    }
+  }
+
+  static async addCatalogueProduct(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.addProduct(req.healthContext!, req.params.serviceId, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to add product');
+    }
+  }
+
+  static async assignCatalogueFacility(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.assignFacility(req.healthContext!, req.params.productId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to assign facility');
+    }
+  }
+
+  static async removeCatalogueFacility(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.removeFacility(
+        req.healthContext!,
+        req.params.productId,
+        req.params.facilityId,
+        req.body?.reason || req.headers['x-platform-reason']
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to remove facility assignment');
     }
   }
 

@@ -33,6 +33,33 @@ describe('HMO workspace navigation', () => {
     })
   })
 
+  test('Invify catalogue is a workspace route behind platform.plans.manage client calls', () => {
+    expect(HMO_NAV_ITEMS.map((item) => item.path)).toContain('/hmo/catalogue')
+    const routes = fs.readFileSync(path.join(__dirname, '../src/router/routes.js'), 'utf8')
+    expect(routes).toContain("path: 'hmo/catalogue'")
+    const api = fs.readFileSync(path.join(__dirname, '../src/api/healthInsuranceApi.js'), 'utf8')
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    expect(api).toContain("api.get('/api/v1/health-insurance/platform/catalogue/offerings'")
+    expect(page).toContain('ownership_scope=invify_master')
+    expect(page).toContain('AAA000 is not the owner')
+    expect(page).toContain('Publishing does not enrol members')
+  })
+
+  test('enrolment and members clients read institution-aware platform routes', () => {
+    const api = fs.readFileSync(path.join(__dirname, '../src/api/healthInsuranceApi.js'), 'utf8')
+    const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
+    expect(api).toContain("api.get('/api/v1/health-insurance/platform/tenants'")
+    expect(api).toContain('`/api/v1/health-insurance/platform/tenants/${tenantId}`')
+    expect(api).toContain('`/api/v1/health-insurance/platform/institutions/${institutionId}`')
+    expect(api).toContain("api.get('/api/v1/health-insurance/platform/members'")
+    expect(page).toContain("label: 'Institution'")
+    expect(page).toContain('openTenantDetail')
+    expect(page).toContain('openInstitutionDetail')
+    expect(page).toContain('Not linked')
+    expect(page).toContain("label: 'Claims paid'")
+    expect(page).toContain("value: 'Unavailable'")
+  })
+
   test('the HMO registry client reads the provider route, not the plan catalogue', () => {
     const api = fs.readFileSync(path.join(__dirname, '../src/api/healthInsuranceApi.js'), 'utf8')
     const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')

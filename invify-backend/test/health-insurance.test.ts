@@ -1298,6 +1298,15 @@ describe('finance command authorization', () => {
     expect(routes).toContain(
       "router.post('/platform/tenants/:tenantId/participation', requireHealthPermission('platform.tenants.onboard'), HealthPlatformController.setTenantParticipation)"
     );
+    expect(routes).toContain(
+      "router.get('/platform/tenants/:tenantId', requireHealthPermission('platform.integration.health'), HealthPlatformController.getTenantDetail)"
+    );
+    expect(routes).toContain(
+      "router.get('/platform/institutions/:institutionId', requireHealthPermission('platform.integration.health'), HealthPlatformController.getInstitutionDetail)"
+    );
+    expect(routes).toContain(
+      "router.get('/platform/members', requireHealthPermission('platform.integration.health'), HealthPlatformController.listMembers)"
+    );
     const service = fs.readFileSync(
       path.join(__dirname, '../src/modules/health-insurance/services/health-platform.service.ts'),
       'utf8'

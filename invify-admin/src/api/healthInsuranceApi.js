@@ -62,6 +62,16 @@ export const healthInsuranceApi = {
     params,
     headers: platformReasonHeader(reason)
   }),
+  getPlatformTenantDetail: (tenantId, reason) => api.get(`/api/v1/health-insurance/platform/tenants/${tenantId}`, {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformInstitutionDetail: (institutionId, reason) => api.get(`/api/v1/health-insurance/platform/institutions/${institutionId}`, {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformMembers: (params, reason) => api.get('/api/v1/health-insurance/platform/members', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
   setTenantParticipation: (tenantId, data, reason) => api.post(`/api/v1/health-insurance/platform/tenants/${tenantId}/participation`, data, {
     headers: platformReasonHeader(reason)
   }),
@@ -127,6 +137,31 @@ export const healthInsuranceApi = {
   }),
   getPlatformFacilities: (providerId, reason) => api.get('/api/v1/health-insurance/platform/facilities', {
     params: providerId ? { providerId } : {},
+    headers: platformReasonHeader(reason)
+  }),
+  listInvifyOfferings: (params, reason) => api.get('/api/v1/health-insurance/platform/catalogue/offerings', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getInvifyOffering: (offeringId, reason) => api.get(`/api/v1/health-insurance/platform/catalogue/offerings/${offeringId}`, {
+    headers: platformReasonHeader(reason)
+  }),
+  createInvifyOffering: (data, reason) => api.post('/api/v1/health-insurance/platform/catalogue/offerings', data, {
+    headers: platformReasonHeader(reason)
+  }),
+  updateInvifyOffering: (offeringId, data, reason) => api.patch(`/api/v1/health-insurance/platform/catalogue/offerings/${offeringId}`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  setInvifyOfferingStatus: (offeringId, data, reason) => api.post(`/api/v1/health-insurance/platform/catalogue/offerings/${offeringId}/status`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  addInvifyService: (offeringId, data, reason) => api.post(`/api/v1/health-insurance/platform/catalogue/offerings/${offeringId}/services`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  addInvifyProduct: (serviceId, data, reason) => api.post(`/api/v1/health-insurance/platform/catalogue/services/${serviceId}/products`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  assignInvifyProductFacility: (productId, data, reason) => api.post(`/api/v1/health-insurance/platform/catalogue/products/${productId}/facilities`, data, {
     headers: platformReasonHeader(reason)
   })
 };

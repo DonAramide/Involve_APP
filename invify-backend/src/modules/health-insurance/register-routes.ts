@@ -89,6 +89,9 @@ export function createHealthInsuranceRouter(): Router {
   // Protected Platform Endpoints (Strictly require explicit platform.* grants & justification)
   router.get('/platform/overview', requireHealthPermission('platform.integration.health'), HealthPlatformController.getOverview);
   router.get('/platform/tenants', requireHealthPermission('platform.integration.health'), HealthPlatformController.listTenants);
+  router.get('/platform/tenants/:tenantId', requireHealthPermission('platform.integration.health'), HealthPlatformController.getTenantDetail);
+  router.get('/platform/institutions/:institutionId', requireHealthPermission('platform.integration.health'), HealthPlatformController.getInstitutionDetail);
+  router.get('/platform/members', requireHealthPermission('platform.integration.health'), HealthPlatformController.listMembers);
   router.post('/platform/tenants/:tenantId/participation', requireHealthPermission('platform.tenants.onboard'), HealthPlatformController.setTenantParticipation);
   router.get('/platform/providers', requireHealthPermission('platform.providers.manage'), HealthPlatformController.listProviderRegistry);
   router.get('/platform/providers/health', requireHealthPermission('platform.integration.health'), HealthPlatformController.getProvidersHealth);
@@ -103,6 +106,15 @@ export function createHealthInsuranceRouter(): Router {
   router.post('/platform/plans/:planId/activate', requireHealthPermission('platform.plans.manage'), HealthPlatformController.activatePlan);
   router.post('/platform/plans/:planId/retire', requireHealthPermission('platform.plans.manage'), HealthPlatformController.retirePlan);
   router.patch('/platform/plans/versions/:versionId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.updatePlanDraft);
+  router.get('/platform/catalogue/offerings', requireHealthPermission('platform.plans.manage'), HealthPlatformController.listCatalogueOfferings);
+  router.post('/platform/catalogue/offerings', requireHealthPermission('platform.plans.manage'), HealthPlatformController.createCatalogueOffering);
+  router.get('/platform/catalogue/offerings/:offeringId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.getCatalogueOffering);
+  router.patch('/platform/catalogue/offerings/:offeringId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.updateCatalogueOffering);
+  router.post('/platform/catalogue/offerings/:offeringId/status', requireHealthPermission('platform.plans.manage'), HealthPlatformController.setCatalogueOfferingStatus);
+  router.post('/platform/catalogue/offerings/:offeringId/services', requireHealthPermission('platform.plans.manage'), HealthPlatformController.addCatalogueService);
+  router.post('/platform/catalogue/services/:serviceId/products', requireHealthPermission('platform.plans.manage'), HealthPlatformController.addCatalogueProduct);
+  router.post('/platform/catalogue/products/:productId/facilities', requireHealthPermission('platform.plans.manage'), HealthPlatformController.assignCatalogueFacility);
+  router.delete('/platform/catalogue/products/:productId/facilities/:facilityId', requireHealthPermission('platform.plans.manage'), HealthPlatformController.removeCatalogueFacility);
   router.get('/platform/finance', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceSnapshot);
   router.get('/platform/finance-command', requireHealthPermission('platform.integration.health'), HealthPlatformController.getFinanceCommand);
   router.get('/platform/facilities', requireHealthPermission('platform.integration.health'), HealthPlatformController.listFacilities);

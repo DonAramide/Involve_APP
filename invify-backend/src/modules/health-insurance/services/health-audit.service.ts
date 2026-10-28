@@ -50,4 +50,34 @@ export class HealthAuditService {
   static async recordEvent(params: LogAuditEventParams): Promise<void> {
     return this.log(params);
   }
+
+  /**
+   * Tenant-scoped health audit. Do not use for Invify catalogue writes:
+   * hw_audit_events.tenant_id is NOT NULL and references tenants(id).
+   * Catalogue mutations use hw_catalogue_apply_mutation instead.
+   */
+  static async recordEventOrThrow(params: LogAuditEventParams): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('hw_audit_events')
+      .insert({
+        tenant_id: params.tenantId,
+        actor_user_id: params.actorUserId || null,
+        actor_role: params.actorRole || null,
+        action: params.action,
+        resource_type: params.resourceType,
+        resource_id: params.resourceId,
+        changes: params.changes || {},
+        ip_address: params.ipAddress || null,
+        user_agent: params.userAgent || null,
+        via_platform_access: !!params.viaPlatformAccess,
+        platform_reason: params.platformReason || null,
+        occurred_at: new Date().toISOString()
+      });
+    if (error) {
+      const err: any = new Error('Catalogue change was not recorded in the audit log and was not completed.');
+      err.status = 503;
+      err.code = 'CATALOGUE_AUDIT_FAILED';
+      throw err;
+    }
+  }
 }
