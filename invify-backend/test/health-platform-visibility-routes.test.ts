@@ -33,6 +33,16 @@ describe('platform tenant and institution visibility routes', () => {
     expect(method).not.toContain('hw_payments');
   });
 
+  test('institution detail returns the linked tenant list', () => {
+    const method = service.slice(
+      service.indexOf('static async getInstitutionHealthDetail'),
+      service.indexOf('static async listPlatformMembers')
+    );
+    expect(method).toContain('tenants: (tenantRows || []).map');
+    expect(method).toContain('membersByTenant');
+    expect(method).toContain('assigned_provider_id');
+  });
+
   test('tenant detail does not label premium collections as revenue or profit', () => {
     const method = service.slice(
       service.indexOf('static async getTenantHealthDetail'),

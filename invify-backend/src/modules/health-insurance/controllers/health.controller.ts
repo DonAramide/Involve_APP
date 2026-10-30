@@ -262,6 +262,81 @@ export class HealthController {
     }
   }
 
+  static async submitClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.submitClaim(req.healthContext!, req.body || {});
+      return res.status(201).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async approveClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.approveClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async rejectClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.rejectClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async settleClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.settleClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listClaimHistory(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.listClaimHistory(req.healthContext!, req.params.id);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listAffiliations(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.listAffiliations(req.healthContext!);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async requestAffiliation(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.requestAffiliation(req.healthContext!, req.body || {});
+      return res.status(201).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listEligibleProviders(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.listEligibleProviders();
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
   // ─── Provider Webhook Ingress ─────────────────────────────────────
   static async handleProviderWebhook(req: Request, res: Response) {
     try {

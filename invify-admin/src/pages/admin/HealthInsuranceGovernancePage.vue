@@ -826,7 +826,12 @@
                   'platform.tenant_access',
                   'platform.providers.manage',
                   'platform.plans.manage',
-                  'platform.tenants.onboard'
+                  'platform.tenants.onboard',
+                  'platform.finance.view',
+                  'platform.finance.manage',
+                  'platform.agreements.approve',
+                  'platform.statements.approve',
+                  'platform.finance.reconcile'
                 ]"
                 dense
                 outlined

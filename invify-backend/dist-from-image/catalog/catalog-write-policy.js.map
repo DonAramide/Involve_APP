@@ -1,0 +1,1 @@
+{"version":3,"file":"catalog-write-policy.js","sourceRoot":"","sources":["../../src/catalog/catalog-write-policy.ts"],"names":[],"mappings":";;;AAOA,kDAEC;AATY,QAAA,0BAA0B,GAAG;IACxC,IAAI,EAAE,4BAA4B;IAClC,KAAK,EAAE,mFAAmF;IAC1F,SAAS,EAAE,KAAK;CACR,CAAC;AAEX,gGAAgG;AAChG,SAAgB,mBAAmB,CAAC,QAA4C;IAC9E,OAAO,OAAO,CAAC,QAAQ,EAAE,EAAE,CAAC,CAAC;AAC/B,CAAC"}

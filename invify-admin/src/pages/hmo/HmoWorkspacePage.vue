@@ -316,36 +316,64 @@
     </div>
 
     <div v-else-if="current.id === 'registry'">
-      <q-input v-model="registryQuery" :dark="isDark" outlined dense label="Search HMO code or name" class="q-mb-md" />
-      <q-banner v-if="registryState === 'access_denied' || registryState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2 q-mb-md">
-        <div>{{ registryDenial || 'The HMO registry read requires platform.providers.manage. It loads hw_providers only. No rows are shown until that grant is active.' }}</div>
-        <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
-      </q-banner>
-      <q-banner v-else-if="registryState === 'unavailable'" dense rounded class="bg-red-10 text-red-2 q-mb-md">
-        The registry request failed. This is not an empty organisation list. {{ registryError }}
-      </q-banner>
-      <q-banner v-else-if="registryState === 'malformed'" dense rounded class="bg-red-10 text-red-2 q-mb-md">
-        {{ registryDenial || 'The registry response did not contain a provider list. This is not an empty organisation list.' }}
-      </q-banner>
-      <q-table
-        v-else
-        :rows="visibleProviders"
-        :columns="providerColumns"
-        row-key="id"
-        :dark="isDark"
-        flat
-        bordered
-        :loading="loadingRegistry"
-        :pagination="{ rowsPerPage: 10 }"
-        no-data-label="No HMO organisations exist in hw_providers."
-        @row-click="(_evt, row) => { selectedProvider = row }"
+      <div class="text-caption text-grey-5 q-mb-md">
+        Platform Super Admin registers and governs global HMO organisations in <code>hw_providers</code>.
+        New providers stay pending until approved. Institution admins cannot create global provider rows.
+        Requires <code>platform.providers.manage</code>.
+      </div>
+      <HmoProviderManagementPanel
+        :is-dark="isDark"
+        :reason="reason"
+        @providers-changed="loadRegistry"
+        @open-institution="(id) => openInstitutionDetail(id)"
       />
-      <q-card v-if="selectedProvider" class="bg-card-dark q-pa-md q-mt-md">
-        <div class="text-subtitle1 text-weight-bold">{{ selectedProvider.display_name }}</div>
-        <div class="text-caption text-grey-4">Code {{ selectedProvider.code }}</div>
-        <div class="text-caption text-grey-4">Integration status: {{ selectedProvider.integration_status || 'none' }}</div>
-        <div class="text-caption text-grey-4">Licence: {{ selectedProvider.licence_reference || 'Not recorded' }}</div>
-        <div class="text-caption text-grey-5 q-mt-sm">Profile edits stay on the owning institute portal. This screen does not write another HMO's settings.</div>
+      <q-card v-if="contextDetail" id="hmo-context-detail" class="bg-card-dark q-pa-md q-mt-md">
+        <div class="row items-center justify-between">
+          <div class="text-subtitle1 text-weight-bold">{{ contextDetailTitle }}</div>
+          <div class="row q-gutter-xs">
+            <q-btn
+              v-if="selectedProvider && contextDetailKind === 'tenant'"
+              flat dense no-caps color="teal-4"
+              label="Back to institute tenants"
+              @click="openInstitutionDetail(selectedProvider.id || selectedProvider.code)"
+            />
+            <q-btn flat dense no-caps color="grey-4" label="Close" @click="clearContextDetail" />
+          </div>
+        </div>
+        <div v-if="contextDetailLoad === 'loading'" class="text-caption text-grey-5">Loading recorded totals.</div>
+        <div v-else-if="contextDetailError" class="text-caption text-red-3">{{ contextDetailError }}</div>
+        <div v-else class="q-mt-sm">
+          <div class="text-caption text-grey-4">{{ contextDetailCaption }}</div>
+          <div class="row q-col-gutter-md q-mt-sm">
+            <div v-for="item in contextDetailMetrics" :key="item.label" class="col-12 col-sm-6 col-md-3">
+              <div class="text-caption text-grey-5">{{ item.label }}</div>
+              <div class="text-subtitle2">{{ item.value }}</div>
+            </div>
+          </div>
+          <div v-if="contextDetailKind === 'institution'" class="q-mt-md">
+            <div class="text-subtitle2">Tenants under this institute</div>
+            <div class="text-caption text-grey-5 q-mb-sm">Every linked tenant is listed. Click a row to open that tenant's health detail.</div>
+            <q-table
+              :rows="institutionTenants"
+              :columns="instituteTenantColumns"
+              row-key="id"
+              :dark="isDark"
+              flat
+              bordered
+              class="cursor-pointer"
+              hide-pagination
+              :rows-per-page-options="[50]"
+              no-data-label="No tenants are linked to this institute."
+              @row-click="(_evt, row) => openTenantDetail(row.id)"
+            >
+              <template #body-cell-name="props">
+                <q-td :props="props">
+                  <q-btn flat dense no-caps color="teal-4" class="q-pa-none" :label="props.row.name" @click.stop="openTenantDetail(props.row.id)" />
+                </q-td>
+              </template>
+            </q-table>
+          </div>
+        </div>
       </q-card>
     </div>
 
@@ -442,7 +470,7 @@
 
     <div v-else-if="current.id === 'enrolment'">
       <div class="text-caption text-grey-5 q-mb-sm">
-        Institution names come from recorded tenant–institution links, assigned HMO school links, or the tenant agent code. Missing links show Not linked. Counts come from GET /platform/tenants.
+        Institution names come from an assigned HMO, school link, or recorded tenant–institution relationship. Activating health access does not assign an HMO. Use Assign institute to link a tenant to an HMO such as LeadwayTest Agent HMO (3op0kk). Counts come from GET /platform/tenants.
       </div>
       <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
         <div>{{ integrationDenial || 'Participation counts require an unexpired platform.integration.health grant. Names and enrolment forms stay in the owning portal.' }}</div>
@@ -464,10 +492,12 @@
           :dark="isDark"
           flat
           bordered
+          class="cursor-pointer"
           :loading="tenantLoad === 'loading' || integrationState === 'loading'"
           hide-pagination
           :rows-per-page-options="[20]"
           no-data-label="No tenants matched this search."
+          @row-click="(_evt, row) => openTenantDetail(row.id)"
         >
           <template #body-cell-name="props">
             <q-td :props="props">
@@ -477,29 +507,55 @@
           <template #body-cell-institutionName="props">
             <q-td :props="props">
               <q-btn
-                v-if="props.row.institutionId"
+                v-if="isLinkedInstitution(props.row)"
                 flat dense no-caps color="teal-4" class="q-pa-none"
                 :label="props.row.institutionName || 'Not linked'"
-                @click.stop="openInstitutionDetail(props.row.institutionId)"
+                @click.stop="openInstitutionDetail(institutionRef(props.row))"
               />
               <span v-else>{{ props.row.institutionName || 'Not linked' }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-institutionCode="props">
+            <q-td :props="props">
+              <q-btn
+                v-if="isLinkedInstitution(props.row)"
+                flat dense no-caps color="teal-4" class="q-pa-none"
+                :label="institutionCodeLabel(props.row)"
+                @click.stop="openInstitutionDetail(institutionRef(props.row))"
+              />
+              <span v-else>{{ institutionCodeLabel(props.row) }}</span>
             </q-td>
           </template>
           <template #body-cell-actions="props">
             <q-td :props="props">
               <q-btn
+                v-if="isLinkedInstitution(props.row)"
+                dense no-caps color="teal-4"
+                class="q-mr-sm"
+                label="View institute"
+                @click.stop="openInstitutionDetail(institutionRef(props.row))"
+              />
+              <q-btn
+                v-else
+                dense no-caps color="teal-4"
+                class="q-mr-sm"
+                label="Assign institute"
+                :disable="!canOnboardTenants"
+                @click.stop="askAssignInstitute(props.row)"
+              />
+              <q-btn
                 v-if="props.row.is_enabled === false"
                 dense no-caps color="teal-8"
                 label="Activate"
                 :disable="!canOnboardTenants"
-                @click="askParticipation(props.row, true)"
+                @click.stop="askParticipation(props.row, true)"
               />
               <q-btn
                 v-else-if="props.row.is_enabled === true"
                 dense no-caps color="orange-9"
                 label="Suspend"
                 :disable="!canOnboardTenants"
-                @click="askParticipation(props.row, false)"
+                @click.stop="askParticipation(props.row, false)"
               />
               <span v-else class="text-caption text-grey-5">Unavailable</span>
             </q-td>
@@ -511,7 +567,7 @@
           <q-btn dense flat no-caps color="grey-4" label="Next" :disable="!canNextTenants" @click="changeTenantPage(1)" />
         </div>
       </template>
-      <q-card v-if="contextDetail" class="bg-card-dark q-pa-md q-mt-md">
+      <q-card v-if="contextDetail" id="hmo-context-detail" class="bg-card-dark q-pa-md q-mt-md">
         <div class="row items-center justify-between">
           <div class="text-subtitle1 text-weight-bold">{{ contextDetailTitle }}</div>
           <q-btn flat dense no-caps color="grey-4" label="Close" @click="clearContextDetail" />
@@ -525,6 +581,22 @@
               <div class="text-caption text-grey-5">{{ item.label }}</div>
               <div class="text-subtitle2">{{ item.value }}</div>
             </div>
+          </div>
+          <div v-if="contextDetailKind === 'institution'" class="q-mt-md">
+            <div class="text-subtitle2">Tenants under this institute</div>
+            <q-table
+              :rows="institutionTenants"
+              :columns="instituteTenantColumns"
+              row-key="id"
+              :dark="isDark"
+              flat
+              bordered
+              class="cursor-pointer"
+              hide-pagination
+              :rows-per-page-options="[50]"
+              no-data-label="No tenants are linked to this institute."
+              @row-click="(_evt, row) => openTenantDetail(row.id)"
+            />
           </div>
         </div>
       </q-card>
@@ -551,10 +623,12 @@
           :dark="isDark"
           flat
           bordered
+          class="cursor-pointer"
           :loading="memberLoad === 'loading'"
           hide-pagination
           :rows-per-page-options="[20]"
           no-data-label="No member rows were returned. The request succeeded."
+          @row-click="(_evt, row) => openTenantDetail(row.tenantId)"
         >
           <template #body-cell-tenantName="props">
             <q-td :props="props">
@@ -564,10 +638,10 @@
           <template #body-cell-institutionName="props">
             <q-td :props="props">
               <q-btn
-                v-if="props.row.institutionId"
+                v-if="isLinkedInstitution(props.row)"
                 flat dense no-caps color="teal-4" class="q-pa-none"
                 :label="props.row.institutionName || 'Not linked'"
-                @click.stop="openInstitutionDetail(props.row.institutionId)"
+                @click.stop="openInstitutionDetail(institutionRef(props.row))"
               />
               <span v-else>{{ props.row.institutionName || 'Not linked' }}</span>
             </q-td>
@@ -579,7 +653,7 @@
           <q-btn dense flat no-caps color="grey-4" label="Next" :disable="!canNextMembers" @click="changeMemberPage(1)" />
         </div>
       </template>
-      <q-card v-if="contextDetail" class="bg-card-dark q-pa-md q-mt-md">
+      <q-card v-if="contextDetail" id="hmo-context-detail" class="bg-card-dark q-pa-md q-mt-md">
         <div class="row items-center justify-between">
           <div class="text-subtitle1 text-weight-bold">{{ contextDetailTitle }}</div>
           <q-btn flat dense no-caps color="grey-4" label="Close" @click="clearContextDetail" />
@@ -593,6 +667,22 @@
               <div class="text-caption text-grey-5">{{ item.label }}</div>
               <div class="text-subtitle2">{{ item.value }}</div>
             </div>
+          </div>
+          <div v-if="contextDetailKind === 'institution'" class="q-mt-md">
+            <div class="text-subtitle2">Tenants under this institute</div>
+            <q-table
+              :rows="institutionTenants"
+              :columns="instituteTenantColumns"
+              row-key="id"
+              :dark="isDark"
+              flat
+              bordered
+              class="cursor-pointer"
+              hide-pagination
+              :rows-per-page-options="[50]"
+              no-data-label="No tenants are linked to this institute."
+              @row-click="(_evt, row) => openTenantDetail(row.id)"
+            />
           </div>
         </div>
       </q-card>
@@ -672,21 +762,75 @@
       />
     </div>
 
+    <div v-else-if="current.id === 'claims'">
+      <div class="text-caption text-grey-5 q-mb-sm">
+        Platform claims oversight is aggregate only. Clinical adjudication stays in the institute HMO portal.
+        Settled/approved statuses are not disbursements. Real-money payouts stay disabled.
+      </div>
+      <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
+        <div>{{ integrationDenial || 'Claims overview requires platform.integration.health.' }}</div>
+        <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
+      </q-banner>
+      <q-banner v-else-if="claimsOverviewError" dense rounded class="bg-red-10 text-red-2">{{ claimsOverviewError }}</q-banner>
+      <q-card v-else class="bg-card-dark q-pa-md">
+        <div class="text-subtitle2 text-weight-bold">Claims status tallies</div>
+        <div class="text-caption text-grey-4 q-mb-sm">Total records: {{ claimsOverview?.totalRecords ?? '—' }}</div>
+        <div v-for="(count, status) in (claimsOverview?.byStatus || {})" :key="status" class="text-caption">{{ status }}: {{ count }}</div>
+        <div class="text-subtitle2 text-weight-bold q-mt-md">By record type</div>
+        <div v-for="(count, type) in (claimsOverview?.byType || {})" :key="type" class="text-caption">{{ type }}: {{ count }}</div>
+        <div class="text-caption text-amber-3 q-mt-sm">{{ claimsOverview?.disclaimer }}</div>
+      </q-card>
+    </div>
+
     <div v-else-if="current.id === 'reports'">
       <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
         <div>{{ integrationDenial || 'Reports require an unexpired platform.integration.health grant. They are withheld.' }}</div>
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
       </q-banner>
       <q-banner v-else-if="trendLoad === 'error'" dense rounded class="bg-red-10 text-red-2">Coverage trends failed to load.</q-banner>
-      <q-card v-else class="bg-card-dark q-pa-md">
-        <div class="text-subtitle2 text-weight-bold">Coverage by mode</div>
-        <div v-if="!(trends?.byMode || []).length" class="text-caption text-grey-5">No mode rows were returned.</div>
-        <div v-for="item in trends?.byMode || []" :key="item.mode" class="text-caption">{{ item.mode }}: {{ item.count }}</div>
-        <div class="text-subtitle2 text-weight-bold q-mt-md">Policies by status</div>
-        <div v-if="!(trends?.byStatus || []).length" class="text-caption text-grey-5">No policy status rows were returned.</div>
-        <div v-for="item in trends?.byStatus || []" :key="item.status" class="text-caption">{{ item.status }}: {{ item.count }}</div>
-        <div class="text-caption text-grey-5 q-mt-sm">Export is not offered. There is no health export route behind this workspace.</div>
-      </q-card>
+      <div v-else class="column q-gutter-md">
+        <q-card class="bg-card-dark q-pa-md">
+          <div class="text-subtitle2 text-weight-bold">Coverage by mode</div>
+          <div v-if="!(trends?.byMode || []).length" class="text-caption text-grey-5">No mode rows were returned.</div>
+          <div v-for="item in trends?.byMode || []" :key="item.mode" class="text-caption">{{ item.mode }}: {{ item.count }}</div>
+          <div class="text-subtitle2 text-weight-bold q-mt-md">Policies by status</div>
+          <div v-if="!(trends?.byStatus || []).length" class="text-caption text-grey-5">No policy status rows were returned.</div>
+          <div v-for="item in trends?.byStatus || []" :key="item.status" class="text-caption">{{ item.status }}: {{ item.count }}</div>
+        </q-card>
+        <q-card class="bg-card-dark q-pa-md">
+          <div class="row items-center justify-between">
+            <div class="text-subtitle2 text-weight-bold">Profitability overview</div>
+            <q-btn dense flat no-caps color="teal-4" label="Refresh" :loading="financeOverviewLoading" @click="loadFinanceOverview" />
+          </div>
+          <div v-if="financeOverviewError" class="text-caption text-red-3">{{ financeOverviewError }}</div>
+          <div v-else-if="financeOverview" class="row q-col-gutter-sm q-mt-sm">
+            <div v-for="item in financeOverviewCards" :key="item.label" class="col-6 col-md-3">
+              <div class="text-caption text-grey-5">{{ item.label }}</div>
+              <div class="text-subtitle2">{{ item.value }}</div>
+            </div>
+          </div>
+          <div v-else class="text-caption text-grey-5">No profitability snapshot loaded yet.</div>
+          <div class="text-caption text-grey-5 q-mt-sm">Premium collections are not profit. Settlement reconcile tracks references only — no payouts.</div>
+        </q-card>
+        <q-card class="bg-card-dark q-pa-md">
+          <div class="row items-center justify-between q-mb-sm">
+            <div class="text-subtitle2 text-weight-bold">Bank HMO offerings</div>
+            <q-btn dense flat no-caps color="teal-4" label="Refresh" :loading="bankOfferingsLoading" @click="loadBankOfferings" />
+          </div>
+          <q-table
+            dense
+            flat
+            bordered
+            :dark="isDark"
+            :rows="bankOfferings"
+            :columns="bankOfferingColumns"
+            row-key="id"
+            :loading="bankOfferingsLoading"
+            :pagination="{ rowsPerPage: 8 }"
+            no-data-label="No bank offerings recorded."
+          />
+        </q-card>
+      </div>
     </div>
 
     <div v-else-if="current.id === 'audit'">
@@ -738,6 +882,30 @@
       <p class="text-caption text-grey-4 q-mb-none">{{ unavailable.detail }}</p>
     </q-card>
 
+    <q-dialog v-model="showAssignInstitute" persistent>
+      <q-card class="hmo-dialog">
+        <q-card-section class="text-h6">Assign institute to {{ assignRow?.name }}</q-card-section>
+        <q-card-section class="q-gutter-sm">
+          <div class="text-caption text-grey-4">This writes hw_tenant_settings.assigned_provider_id and an HMO school link. It does not enrol members or create an invoice.</div>
+          <q-select
+            v-model="assignProviderId"
+            :options="registryProviderOptions"
+            emit-value
+            map-options
+            outlined
+            dense
+            :dark="isDark"
+            label="HMO institute"
+            :loading="loadingRegistry"
+          />
+          <q-input v-model="assignReason" outlined dense :dark="isDark" label="Audit reason" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" v-close-popup />
+          <q-btn color="teal-8" no-caps label="Assign" :loading="assignSaving" @click="submitAssignInstitute" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <q-dialog v-model="showCreate" persistent>
       <q-card class="hmo-dialog">
         <q-card-section class="text-h6">{{ editingVersionId ? 'Edit draft version' : 'Create health plan draft' }}</q-card-section>
@@ -770,10 +938,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi'
+import HmoProviderManagementPanel from 'src/pages/hmo/HmoProviderManagementPanel.vue'
 import BenefitRows from 'src/hmo/BenefitRows.vue'
 import { benefitsFromVersion, benefitsPayload, emptyBenefit } from 'src/hmo/benefitDraft'
 import { hmoItemForPath } from 'src/hmo/hmoWorkspace'
@@ -856,6 +1025,11 @@ const loadingRegistry = ref(false)
 const telemetryProviders = ref([])
 const registryQuery = ref('')
 const selectedProvider = ref(null)
+const showAssignInstitute = ref(false)
+const assignRow = ref(null)
+const assignProviderId = ref(null)
+const assignReason = ref('')
+const assignSaving = ref(false)
 const integrationState = ref('idle')
 const integrationError = ref('')
 const integrationDenial = ref('')
@@ -894,6 +1068,13 @@ const trendLoad = ref('idle')
 const finance = ref(null)
 const financeLoad = ref('idle')
 const financeError = ref('')
+const financeOverview = ref(null)
+const financeOverviewLoading = ref(false)
+const financeOverviewError = ref('')
+const bankOfferings = ref([])
+const bankOfferingsLoading = ref(false)
+const claimsOverview = ref(null)
+const claimsOverviewError = ref('')
 const financeCommand = ref(null)
 const commandLoad = ref('idle')
 const commandError = ref('')
@@ -986,25 +1167,9 @@ const unavailableBySection = {
     title: 'Member records are not listed here',
     detail: 'A platform operator does not get an implicit cross-tenant member or dependant directory. Use the tenant or HMO portal that already scopes those records.'
   },
-  claims: {
-    title: 'Claims are not available on the platform workspace',
-    detail: 'Claim and pre-authorisation adjudication exists for the owning HMO in the institute portal. A cross-tenant claims inbox would expose clinical data and is not provided.'
-  },
   billing: {
     title: 'Premium billing is tenant-scoped',
     detail: 'Invoices are issued through the tenant health billing API. Platform premium totals, when an integration grant is active, are the governance overview aggregates.'
-  },
-  payments: {
-    title: 'Payment reconciliation is not a new ledger',
-    detail: 'Real-money payouts stay disabled. Payment confirmation remains on the existing health billing endpoints. This page does not post a payment.'
-  },
-  reports: {
-    title: 'Aggregates stay on governance',
-    detail: 'Cross-tenant counts are loaded only on Health & Wellness Governance after an operational grant. This page does not substitute zeros or sample figures.'
-  },
-  audit: {
-    title: 'Lineage audit is on governance',
-    detail: 'Plan draft, publish, activate, and retire actions write hw_audit_events. Inspect them from Platform Governance rather than a second audit store.'
   },
   settings: {
     title: 'Organisation settings belong to the HMO',
@@ -1138,7 +1303,7 @@ const recentAudit = computed(() => (auditEvents.value || []).slice(0, 5))
 const tenantColumns = [
   { name: 'name', label: 'Tenant', field: 'name', align: 'left' },
   { name: 'institutionName', label: 'Institution', field: (row) => row.institutionName || 'Not linked', align: 'left' },
-  { name: 'institutionCode', label: 'Institution code', field: (row) => row.institutionCode || 'Not recorded', align: 'left' },
+  { name: 'institutionCode', label: 'Institution code', field: (row) => row.institutionCode || row.tenantCode || row.agentCode || 'Not recorded', align: 'left' },
   { name: 'mode', label: 'Mode', field: (row) => modeLabel(row.mode), align: 'left' },
   { name: 'enrolled_count', label: 'Members', field: (row) => formatCount(row.enrolled_count), align: 'right' },
   { name: 'active_count', label: 'Active policies', field: (row) => formatCount(row.active_count), align: 'right' },
@@ -1195,6 +1360,27 @@ const contextDetailCaption = computed(() => {
   const inst = contextDetail.value.institutions || {}
   return `Mode ${modeLabel(tenant.mode)}. Institution ${inst.institutionName || 'Not linked'}. Health access ${contextDetail.value.healthAccess || 'unavailable'}.`
 })
+const institutionTenants = computed(() => {
+  const detail = contextDetail.value
+  if (!detail || contextDetailKind.value !== 'institution') return []
+  const listed = Array.isArray(detail.tenants) ? detail.tenants : []
+  const memberRows = Array.isArray(detail.membersByTenant) ? detail.membersByTenant : []
+  const membersById = new Map(memberRows.map((row) => [row.tenantId, row]))
+  return listed.map((tenant) => {
+    const members = membersById.get(tenant.id)
+    return {
+      id: tenant.id,
+      name: tenant.name || members?.tenantName || 'Unnamed tenant',
+      mode: tenant.mode || 'school',
+      members: members?.members ?? null
+    }
+  })
+})
+const instituteTenantColumns = [
+  { name: 'name', label: 'Tenant', field: 'name', align: 'left' },
+  { name: 'mode', label: 'Mode', field: (row) => modeLabel(row.mode), align: 'left' },
+  { name: 'members', label: 'Members', field: (row) => formatCount(row.members), align: 'right' }
+]
 const contextDetailMetrics = computed(() => {
   const detail = contextDetail.value
   if (!detail) return []
@@ -1271,12 +1457,28 @@ const planColumns = [
 const providerColumns = [
   { name: 'display_name', label: 'HMO', field: 'display_name', align: 'left' },
   { name: 'code', label: 'Code', field: 'code', align: 'left' },
+  { name: 'tenant_count', label: 'Tenants', field: (row) => formatCount(row.tenant_count), align: 'right' },
   { name: 'integration_status', label: 'Integration', field: 'integration_status', align: 'left' },
   { name: 'licence_reference', label: 'Licence', field: (row) => row.licence_reference || 'Not recorded', align: 'left' }
 ]
 
 function reason() {
   return sessionStorage.getItem('hw_platform_reason') || ''
+}
+
+function institutionCodeLabel(row) {
+  if (isLinkedInstitution(row)) return row?.institutionCode || 'Not recorded'
+  return row?.institutionCode || row?.tenantCode || row?.agentCode || 'Not recorded'
+}
+
+function isLinkedInstitution(row) {
+  if (row?.institutionId) return true
+  return row?.institutionResolution === 'resolved' && !!(row?.institutionCode)
+}
+
+function institutionRef(row) {
+  if (!isLinkedInstitution(row)) return ''
+  return row?.institutionId || row?.institutionCode || ''
 }
 
 function tenantQueryParams() {
@@ -1376,12 +1578,23 @@ function clearContextDetail() {
   contextDetailLoad.value = 'idle'
 }
 
+async function revealContextDetail() {
+  await nextTick()
+  document.getElementById('hmo-context-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+
+async function selectRegistryProvider(row) {
+  selectedProvider.value = row
+  await openInstitutionDetail(row?.id || row?.code)
+}
+
 async function openTenantDetail(tenantId) {
   if (!tenantId) return
   contextDetailKind.value = 'tenant'
   contextDetailLoad.value = 'loading'
   contextDetailError.value = ''
   contextDetail.value = { tenant: { name: 'Tenant' } }
+  await revealContextDetail()
   try {
     const res = await healthInsuranceApi.getPlatformTenantDetail(tenantId, reason())
     contextDetail.value = unwrapPlatformBody(res.data)
@@ -1398,6 +1611,7 @@ async function openInstitutionDetail(institutionId) {
   contextDetailLoad.value = 'loading'
   contextDetailError.value = ''
   contextDetail.value = { institution: { name: 'Institution' } }
+  await revealContextDetail()
   try {
     const res = await healthInsuranceApi.getPlatformInstitutionDetail(institutionId, reason())
     contextDetail.value = unwrapPlatformBody(res.data)
@@ -1405,6 +1619,45 @@ async function openInstitutionDetail(institutionId) {
   } catch (err) {
     contextDetailError.value = err?.response?.data?.error?.message || 'Institution detail was not loaded.'
     contextDetailLoad.value = 'error'
+  }
+}
+
+async function askAssignInstitute(row) {
+  if (!canOnboardTenants.value) {
+    $q.notify({ type: 'warning', message: 'platform.tenants.onboard is required to assign an HMO institute.' })
+    return
+  }
+  assignRow.value = row
+  assignProviderId.value = row?.assignedProviderId || null
+  assignReason.value = ''
+  showAssignInstitute.value = true
+  if (!registryProviders.value.length) await loadRegistry()
+}
+
+async function submitAssignInstitute() {
+  if (!assignRow.value?.id) return
+  if (!assignProviderId.value) {
+    $q.notify({ type: 'warning', message: 'Select an HMO institute.' })
+    return
+  }
+  if (!assignReason.value || String(assignReason.value).trim().length < 5) {
+    $q.notify({ type: 'warning', message: 'Reason must be at least 5 characters.' })
+    return
+  }
+  assignSaving.value = true
+  try {
+    await healthInsuranceApi.assignTenantProvider(
+      assignRow.value.id,
+      { providerId: assignProviderId.value },
+      String(assignReason.value).trim()
+    )
+    $q.notify({ type: 'positive', message: 'HMO institute assigned.' })
+    showAssignInstitute.value = false
+    await loadTenants()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err?.response?.data?.error?.message || 'HMO institute was not assigned.' })
+  } finally {
+    assignSaving.value = false
   }
 }
 
@@ -1852,6 +2105,81 @@ async function loadIntegration(includeBoard = false) {
   }
 }
 
+const bankOfferingColumns = [
+  { name: 'provider', label: 'HMO', field: (r) => r.providerName || r.providerCode || '—', align: 'left' },
+  { name: 'plan', label: 'Plan', field: (r) => r.planName || r.planCode || '—', align: 'left' },
+  { name: 'agent', label: 'Bank agent', field: 'agentId', align: 'left' },
+  { name: 'active', label: 'Active', field: (r) => (r.isActive ? 'yes' : 'no'), align: 'left' }
+]
+
+const financeOverviewCards = computed(() => {
+  const o = financeOverview.value || {}
+  const pick = (...keys) => {
+    for (const key of keys) {
+      if (o[key] != null) return o[key]
+      if (o.totals && o.totals[key] != null) return o.totals[key]
+      if (o.kpis && o.kpis[key] != null) return o.kpis[key]
+    }
+    return null
+  }
+  const format = (v) => {
+    if (v == null) return '—'
+    if (typeof v === 'number') return formatKobo(v)
+    if (typeof v === 'object' && v.minor != null) return formatKobo(v.minor)
+    return String(v)
+  }
+  return [
+    { label: 'Recognised premium / revenue basis', value: format(pick('recognisedRevenueMinor', 'totalRevenueMinor', 'billedMinor', 'revenue')) },
+    { label: 'Collected premiums', value: format(pick('collectedPremiumMinor', 'collectedMinor', 'collections')) },
+    { label: 'Recorded costs', value: format(pick('totalCostsMinor', 'costsMinor', 'expenses')) },
+    { label: 'Profit basis (documented)', value: format(pick('eligibleProfitBasisMinor', 'profitMinor', 'netProfit')) }
+  ]
+})
+
+async function loadFinanceOverview() {
+  financeOverviewLoading.value = true
+  financeOverviewError.value = ''
+  try {
+    const res = await healthInsuranceApi.getPlatformFinanceOverview({}, reason())
+    financeOverview.value = res?.data?.data || res?.data || null
+  } catch (err) {
+    financeOverviewError.value = err?.response?.data?.error?.message || err?.message || 'Failed to load profitability overview'
+    financeOverview.value = null
+  } finally {
+    financeOverviewLoading.value = false
+  }
+}
+
+async function loadBankOfferings() {
+  bankOfferingsLoading.value = true
+  try {
+    const res = await healthInsuranceApi.getPlatformBankOfferings({ limit: 50 }, reason())
+    const payload = res?.data?.data || res?.data || {}
+    bankOfferings.value = payload.offerings || []
+  } catch (err) {
+    bankOfferings.value = []
+    $q.notify({ type: 'negative', message: err?.response?.data?.error?.message || err?.message || 'Failed to load bank offerings' })
+  } finally {
+    bankOfferingsLoading.value = false
+  }
+}
+
+async function loadClaimsOverview() {
+  claimsOverviewError.value = ''
+  try {
+    const res = await healthInsuranceApi.getPlatformClaimsOverview(reason())
+    claimsOverview.value = res?.data?.data || res?.data || null
+  } catch (err) {
+    const denial = platformHttpDenial(err?.response?.status, err?.response?.data)
+    if (denial.state === 'access_denied' || denial.state === 'reason_required') {
+      integrationDenial.value = denial.message
+      integrationState.value = denial.state
+    }
+    claimsOverviewError.value = err?.response?.data?.error?.message || err?.message || 'Failed to load claims overview'
+    claimsOverview.value = null
+  }
+}
+
 async function loadFinanceCommand() {
   commandLoad.value = 'loading'
   commandError.value = ''
@@ -2195,12 +2523,17 @@ function refreshSection() {
   if (['plans', 'coverage'].includes(id)) loadCatalogue()
   if (id === 'catalogue') loadOfferings()
   if (['registry', 'settings', 'providers'].includes(id)) loadRegistry()
-  if (['enrolment', 'billing', 'payments', 'reports'].includes(id)) loadIntegration()
+  if (['enrolment', 'billing', 'payments', 'reports', 'claims'].includes(id)) loadIntegration()
   if (id === 'members') {
     loadIntegration()
     loadMembers()
   }
   if (id === 'billing') loadFinanceCommand()
+  if (id === 'reports') {
+    loadFinanceOverview()
+    loadBankOfferings()
+  }
+  if (id === 'claims') loadClaimsOverview()
   if (id === 'telemetry') loadTelemetry()
   if (id === 'providers') loadFacilities()
   if (id === 'audit') loadAudit()

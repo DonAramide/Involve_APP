@@ -15,9 +15,12 @@ export const healthInsuranceApi = {
   // Executive & Operational Metrics
   getOverviewMetrics: () => api.get('/api/v1/health-insurance/reports/overview'),
 
-  // Providers & Plans
+  // Providers & Plans (tenant-facing: verified providers only)
   getProviders: () => api.get('/api/v1/health-insurance/providers'),
-  createProvider: (data) => api.post('/api/v1/health-insurance/providers', data),
+  /** Global HMO registration is platform-only. Do not call from institution admins. */
+  createProvider: (data, reason) => api.post('/api/v1/health-insurance/platform/providers', data, {
+    headers: platformReasonHeader(reason)
+  }),
   getPlans: (providerId) => api.get(`/api/v1/health-insurance/providers/${providerId}/plans`),
   createPlan: (providerId, data) => api.post(`/api/v1/health-insurance/providers/${providerId}/plans`, data),
   createPlanVersion: (planId, data) => api.post(`/api/v1/health-insurance/plans/${planId}/versions`, data),
@@ -50,9 +53,20 @@ export const healthInsuranceApi = {
   initiatePayment: (invoiceId, data) => api.post(`/api/v1/health-insurance/billing/invoices/${invoiceId}/initiate-payment`, data),
   getPayments: (params) => api.get('/api/v1/health-insurance/billing/payments', { params }),
 
-  // Claims
+  // Claims (administrative status; settle ≠ payout)
   getClaims: (params) => api.get('/api/v1/health-insurance/claims', { params }),
-  syncClaimStatus: (claimId) => api.post(`/api/v1/health-insurance/claims/sync`, { claimId }),
+  submitClaim: (data) => api.post('/api/v1/health-insurance/claims', data),
+  approveClaim: (claimId, data) => api.post(`/api/v1/health-insurance/claims/${claimId}/approve`, data || {}),
+  rejectClaim: (claimId, data) => api.post(`/api/v1/health-insurance/claims/${claimId}/reject`, data),
+  settleClaim: (claimId, data) => api.post(`/api/v1/health-insurance/claims/${claimId}/settle`, data || {}),
+  getClaimHistory: (claimId) => api.get(`/api/v1/health-insurance/claims/${claimId}/history`),
+  // Status lookup by claim reference (no /claims/sync route — use GET /claims/:reference)
+  lookupClaimStatus: (claimReference) => api.get(`/api/v1/health-insurance/claims/${encodeURIComponent(claimReference)}`),
+
+  // Institution–provider affiliation
+  listEligibleProviders: () => api.get('/api/v1/health-insurance/eligible-providers'),
+  listAffiliations: () => api.get('/api/v1/health-insurance/affiliations'),
+  requestAffiliation: (data) => api.post('/api/v1/health-insurance/affiliations', data),
 
   // Platform Governance (Super Admin Interface C)
   getPlatformOverview: (reason) => api.get('/api/v1/health-insurance/platform/overview', {
@@ -73,6 +87,9 @@ export const healthInsuranceApi = {
     headers: platformReasonHeader(reason)
   }),
   setTenantParticipation: (tenantId, data, reason) => api.post(`/api/v1/health-insurance/platform/tenants/${tenantId}/participation`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  assignTenantProvider: (tenantId, data, reason) => api.post(`/api/v1/health-insurance/platform/tenants/${tenantId}/assignment`, data, {
     headers: platformReasonHeader(reason)
   }),
   getProvidersHealth: (reason) => api.get('/api/v1/health-insurance/platform/providers/health', {
@@ -107,7 +124,36 @@ export const healthInsuranceApi = {
     headers: platformReasonHeader(reason)
   }),
   selfActivateGrant: (data) => api.post('/api/v1/health-insurance/platform/grants/self-activate', data),
-  getPlatformRegistry: (reason) => api.get('/api/v1/health-insurance/platform/providers', {
+  getPlatformRegistry: (reason, params) => api.get('/api/v1/health-insurance/platform/providers', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformProviderStatistics: (reason) => api.get('/api/v1/health-insurance/platform/providers/statistics', {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformProviderDetail: (providerId, reason) => api.get(`/api/v1/health-insurance/platform/providers/${providerId}`, {
+    headers: platformReasonHeader(reason)
+  }),
+  registerPlatformProvider: (data, reason) => api.post('/api/v1/health-insurance/platform/providers', data, {
+    headers: platformReasonHeader(reason)
+  }),
+  updatePlatformProvider: (providerId, data, reason) => api.patch(`/api/v1/health-insurance/platform/providers/${providerId}`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  approvePlatformProvider: (providerId, reason) => api.post(`/api/v1/health-insurance/platform/providers/${providerId}/approve`, {}, {
+    headers: platformReasonHeader(reason)
+  }),
+  rejectPlatformProvider: (providerId, data, reason) => api.post(`/api/v1/health-insurance/platform/providers/${providerId}/reject`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  suspendPlatformProvider: (providerId, data, reason) => api.post(`/api/v1/health-insurance/platform/providers/${providerId}/suspend`, data, {
+    headers: platformReasonHeader(reason)
+  }),
+  reactivatePlatformProvider: (providerId, data, reason) => api.post(`/api/v1/health-insurance/platform/providers/${providerId}/reactivate`, data || {}, {
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformProviderAudit: (providerId, params, reason) => api.get(`/api/v1/health-insurance/platform/providers/${providerId}/audit`, {
+    params,
     headers: platformReasonHeader(reason)
   }),
   getPlatformCatalogue: (reason) => api.get('/api/v1/health-insurance/platform/plans', {
@@ -133,6 +179,33 @@ export const healthInsuranceApi = {
   }),
   getPlatformFinanceCommand: (params, reason) => api.get('/api/v1/health-insurance/platform/finance-command', {
     params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceOverview: (params, reason) => api.get('/api/v1/health-insurance/platform/finance/overview', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceTrends: (params, reason) => api.get('/api/v1/health-insurance/platform/finance/trends', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceAgreements: (params, reason) => api.get('/api/v1/health-insurance/platform/finance/agreements', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceStatements: (params, reason) => api.get('/api/v1/health-insurance/platform/finance/statements', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformFinanceSettlements: (params, reason) => api.get('/api/v1/health-insurance/platform/finance/settlements', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformBankOfferings: (params, reason) => api.get('/api/v1/health-insurance/platform/bank-offerings', {
+    params,
+    headers: platformReasonHeader(reason)
+  }),
+  getPlatformClaimsOverview: (reason) => api.get('/api/v1/health-insurance/platform/claims-overview', {
     headers: platformReasonHeader(reason)
   }),
   getPlatformFacilities: (providerId, reason) => api.get('/api/v1/health-insurance/platform/facilities', {

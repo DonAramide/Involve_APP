@@ -496,12 +496,22 @@ describe('Invify Health & Wellness — Unit & Security Verification', () => {
             })
           };
         }
+        if (table === 'hw_hmo_school_links' || table === 'hw_tenant_settings' || table === 'hw_tenant_plan_offers') {
+          return { select: jest.fn().mockResolvedValue({ data: [], error: null }) };
+        }
+        if (table === 'tenants') {
+          return {
+            select: jest.fn().mockReturnValue({
+              in: jest.fn().mockResolvedValue({ data: [], error: null })
+            })
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       });
 
       const providers = await HealthPlatformService.listProviderRegistry();
       expect(providers).toEqual([
-        { id: 'p1', code: 'ACME', display_name: 'Acme HMO', integration_status: 'none', licence_reference: null }
+        { id: 'p1', code: 'ACME', display_name: 'Acme HMO', integration_status: 'none', licence_reference: null, tenant_count: 0 }
       ]);
     });
 

@@ -1417,6 +1417,7 @@ export class HmoPortalService {
       status: 'approved' | 'rejected' | 'settled';
       authorisedAmountMinor?: number;
       rejectionReason?: string;
+      notes?: string;
     }
   ) {
     const providerId = ctx.hmoProviderId!;
@@ -1431,7 +1432,7 @@ export class HmoPortalService {
     // Verify policy belongs to this HMO provider
     const { data: policy } = await supabaseAdmin
       .from('hw_policies')
-      .select('id, provider_id')
+      .select('id, provider_id, tenant_id')
       .eq('id', rec.policy_id)
       .eq('provider_id', providerId)
       .maybeSingle();
@@ -1440,16 +1441,33 @@ export class HmoPortalService {
       throw new Error('Access denied: Claim/Pre-Authorization belongs to another HMO.');
     }
 
+    const from = String(rec.status || '');
+    const next = payload.status;
+    const allowed: Record<string, string[]> = {
+      approved: ['submitted', 'pending'],
+      rejected: ['submitted', 'pending'],
+      settled: ['approved'],
+    };
+    if (!allowed[next]?.includes(from)) {
+      throw new Error(
+        `Cannot move claim from ${from} to ${next}. Approval and settlement are separate; settlement does not disburse funds.`
+      );
+    }
+    if (next === 'rejected') {
+      const reason = String(payload.rejectionReason || '').trim();
+      if (reason.length < 5) throw new Error('Rejection requires a recorded reason (at least 5 characters).');
+    }
+
     const updates: Record<string, any> = {
-      status: payload.status,
+      status: next,
       status_date: new Date().toISOString(),
       last_synced_at: new Date().toISOString(),
     };
     if (payload.authorisedAmountMinor !== undefined) {
       updates.authorised_amount_minor = Math.max(0, Number(payload.authorisedAmountMinor));
     }
-    if (payload.status === 'rejected') {
-      updates.rejection_reason = payload.rejectionReason || 'Rejected by HMO Claims/Auth Officer';
+    if (next === 'rejected') {
+      updates.rejection_reason = String(payload.rejectionReason).trim();
     }
 
     const { data: updated, error } = await supabaseAdmin
@@ -1460,6 +1478,39 @@ export class HmoPortalService {
       .single();
 
     if (error) throw new Error(error.message);
+
+    try {
+      await supabaseAdmin.from('hw_claim_status_events').insert({
+        claim_id: recordId,
+        from_status: from,
+        to_status: next,
+        actor_user_id: ctx.authUserId || null,
+        notes: payload.notes || payload.rejectionReason || null,
+        occurred_at: new Date().toISOString(),
+      });
+    } catch {
+      /* history table may be unapplied */
+    }
+
+    const { HealthAuditService } = await import('./health-audit.service');
+    await HealthAuditService.log({
+      tenantId: policy.tenant_id,
+      actorUserId: ctx.authUserId || undefined,
+      action: `claim.${next}`,
+      resourceType: 'hw_claim_status_records',
+      resourceId: recordId,
+      changes: { from, to: next, rejectionReason: updates.rejection_reason || null },
+    });
+
+    const { HealthNotificationService } = await import('./health-notification.service');
+    await HealthNotificationService.notifyTenantAdmins(
+      policy.tenant_id,
+      next === 'approved' ? 'claim.approved' : next === 'rejected' ? 'claim.rejected' : 'claim.settled',
+      `HMO claim ${next}`,
+      `Claim ${rec.claim_reference} is now ${next}. Settlement tracking is not a payout.`,
+      { claimId: recordId, claimReference: rec.claim_reference }
+    );
+
     return updated;
   }
 

@@ -1,0 +1,102 @@
+"use strict";
+// invify-backend/src/modules/financial-platform/health/FinancialPlatformHealthService.ts
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FinancialPlatformHealthService = void 0;
+const db_1 = require("../../../utils/db");
+class FinancialPlatformHealthService {
+    quasarClient;
+    credentialProvider;
+    circuitBreaker;
+    vaultClient;
+    constructor(quasarClient, credentialProvider, circuitBreaker, vaultClient) {
+        this.quasarClient = quasarClient;
+        this.credentialProvider = credentialProvider;
+        this.circuitBreaker = circuitBreaker;
+        this.vaultClient = vaultClient;
+    }
+    async getDiagnostics(tenantId, context) {
+        const startTime = Date.now();
+        const diagnostics = {
+            tenantId,
+            platformStatus: 'UNPROVISIONED',
+            status: 'UNPROVISIONED',
+            quasarStatus: 'UNKNOWN',
+            vaultStatus: 'UNKNOWN',
+            credentialValidity: 'UNKNOWN',
+            quasarTenantId: null,
+            environment: null,
+            healthStatus: 'UNKNOWN',
+            apiLatencyMs: 0,
+            circuitBreakerState: this.circuitBreaker.getStatus().state,
+            lastSuccessfulHealthCheck: null,
+            lastHealthCheckAt: null
+        };
+        if (!tenantId || tenantId === 'undefined') {
+            return diagnostics;
+        }
+        try {
+            const { data: connection, error } = await db_1.supabaseAdmin
+                .from('quasar_integrations')
+                .select('*')
+                .eq('invify_tenant_id', tenantId)
+                .maybeSingle();
+            if (error) {
+                console.error('[FinancialPlatformHealth] DB lookup failed:', error.message);
+                diagnostics.platformStatus = 'ERROR';
+                diagnostics.status = 'ERROR';
+                return diagnostics;
+            }
+            if (!connection) {
+                return diagnostics;
+            }
+            const platformStatus = String(connection.status || 'provisioned').toUpperCase();
+            diagnostics.platformStatus = platformStatus === 'PROVISIONED' ? 'PROVISIONING' : platformStatus;
+            diagnostics.status = diagnostics.platformStatus;
+            diagnostics.quasarTenantId = connection.quasar_tenant_id || null;
+            diagnostics.environment = connection.quasar_environment || 'test';
+            diagnostics.lastSuccessfulHealthCheck = connection.quasar_provisioned_at;
+            diagnostics.lastHealthCheckAt = new Date().toISOString();
+            if (connection.status !== 'active') {
+                diagnostics.healthStatus = diagnostics.platformStatus;
+                return diagnostics;
+            }
+            try {
+                await this.credentialProvider.getTenantCredentials(tenantId);
+                diagnostics.vaultStatus = 'HEALTHY';
+                diagnostics.credentialValidity = 'VALID';
+            }
+            catch {
+                diagnostics.vaultStatus = 'DEGRADED';
+                diagnostics.credentialValidity = 'INVALID_OR_MISSING';
+            }
+            try {
+                const quasarPingStart = Date.now();
+                // Partner credentials are vertical-scoped — must use stored quasar_vertical
+                // (school activations fail/degrade if we default to invify_retail).
+                const vertical = connection.quasar_vertical ||
+                    connection.vertical ||
+                    'invify_retail';
+                await this.quasarClient.getTenant(connection.quasar_tenant_id, context, String(vertical));
+                diagnostics.apiLatencyMs = Date.now() - quasarPingStart;
+                diagnostics.quasarStatus = 'HEALTHY';
+                diagnostics.healthStatus = 'HEALTHY';
+                diagnostics.quasarVertical = vertical;
+            }
+            catch {
+                diagnostics.quasarStatus = 'DEGRADED';
+                diagnostics.healthStatus = 'DEGRADED';
+                diagnostics.apiLatencyMs = Date.now() - startTime;
+                diagnostics.platformStatus = 'DEGRADED';
+                diagnostics.status = 'DEGRADED';
+            }
+        }
+        catch (e) {
+            console.error('Failed to aggregate diagnostics', e);
+            diagnostics.platformStatus = 'ERROR';
+            diagnostics.status = 'ERROR';
+        }
+        return diagnostics;
+    }
+}
+exports.FinancialPlatformHealthService = FinancialPlatformHealthService;
+//# sourceMappingURL=FinancialPlatformHealthService.js.map

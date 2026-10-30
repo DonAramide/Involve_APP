@@ -5,6 +5,8 @@ export type InstitutionLinkSource =
   | 'tenant_institution_relationships'
   | 'hw_tenant_settings'
   | 'hw_hmo_school_links'
+  | 'hw_providers'
+  | 'tenant_code'
   | 'agent_code';
 
 export interface LinkedInstitution {
@@ -33,11 +35,14 @@ export function relationMissing(error: unknown): boolean {
   const message = String((error as { message?: string } | null)?.message || '');
   return (
     code === 'PGRST205' ||
+    code === 'PGRST204' ||
     code === '42P01' ||
+    code === '42703' ||
     code === '42883' ||
     /schema cache/i.test(message) ||
     /does not exist/i.test(message) ||
     /Could not find the table/i.test(message) ||
+    /Could not find the .* column/i.test(message) ||
     /could not find the function/i.test(message)
   );
 }
@@ -55,9 +60,121 @@ export function pickPrimaryInstitution(links: LinkedInstitution[]): LinkedInstit
   if (registry) return registry;
   const assigned = links.find((row) => row.source === 'hw_tenant_settings' && row.id);
   if (assigned) return assigned;
+  const assignedHmo = links.find((row) => row.source === 'hw_providers' && (row.id || row.code));
+  if (assignedHmo) return assignedHmo;
   const schoolLink = links.find((row) => row.source === 'hw_hmo_school_links' && row.id);
   if (schoolLink) return schoolLink;
+  const onboarded = links.find((row) => row.source === 'tenant_code' && (row.id || row.code));
+  if (onboarded) return onboarded;
   return links[0];
+}
+
+export function rememberProviderTenant(
+  map: Map<string, Set<string>>,
+  providerId: string | null | undefined,
+  tenantId: string | null | undefined
+) {
+  const provider = String(providerId || '').trim();
+  const tenant = String(tenantId || '').trim();
+  if (!provider || !tenant) return;
+  const current = map.get(provider) || new Set<string>();
+  current.add(tenant);
+  map.set(provider, current);
+}
+
+export function providerTenantCounts(map: Map<string, Set<string>>): Map<string, number> {
+  return new Map([...map.entries()].map(([id, tenants]) => [id, tenants.size]));
+}
+
+function rememberHmo(
+  linksByTenant: Map<string, LinkedInstitution[]>,
+  tenantId: string | null | undefined,
+  provider: { id?: string | null; code?: string | null; display_name?: string | null } | null | undefined,
+  source: InstitutionLinkSource
+) {
+  const name = String(provider?.display_name || '').trim();
+  if (!name || !tenantId) return;
+  remember(linksByTenant, tenantId, {
+    id: provider?.id || null,
+    code: provider?.code || null,
+    name,
+    mode: 'HMO',
+    source
+  });
+}
+
+export async function collectProviderTenantCounts(
+  providers: Array<{ id: string; code?: string | null }>
+): Promise<Map<string, number>> {
+  const map = new Map<string, Set<string>>();
+  if (!providers.length) return new Map();
+
+  const links = await safeSelect(() =>
+    supabaseAdmin.from('hw_hmo_school_links').select('provider_id, tenant_id')
+  );
+  for (const row of links as any[]) rememberProviderTenant(map, row.provider_id, row.tenant_id);
+
+  const assigned = await safeSelect(() =>
+    supabaseAdmin.from('hw_tenant_settings').select('assigned_provider_id, tenant_id')
+  );
+  for (const row of assigned as any[]) rememberProviderTenant(map, row.assigned_provider_id, row.tenant_id);
+
+  const offers = await safeSelect(() =>
+    supabaseAdmin
+      .from('hw_tenant_plan_offers')
+      .select('tenant_id, hw_plan_versions ( hw_plans ( provider_id ) )')
+  );
+  for (const row of offers as any[]) {
+    const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions;
+    const plan = Array.isArray(version?.hw_plans) ? version.hw_plans[0] : version?.hw_plans;
+    rememberProviderTenant(map, plan?.provider_id, row.tenant_id);
+  }
+
+  const codes = [...new Set(
+    providers
+      .map((provider) => String(provider.code || '').trim().toLowerCase())
+      .filter(Boolean)
+  )];
+  const codeVariants = [...new Set(codes.flatMap((code) => [code, code.toUpperCase(), code.toLowerCase()]))];
+  if (codeVariants.length) {
+    const byTenantCode = await safeSelect(() =>
+      supabaseAdmin.from('tenants').select('id, tenant_code, agent_code').in('tenant_code', codeVariants)
+    );
+    const byAgentCode = await safeSelect(() =>
+      supabaseAdmin.from('tenants').select('id, tenant_code, agent_code').in('agent_code', codeVariants)
+    );
+    const codeToProvider = new Map(
+      providers.map((provider) => [String(provider.code || '').trim().toLowerCase(), provider.id])
+    );
+    for (const row of [...byTenantCode, ...byAgentCode] as any[]) {
+      const tenantCode = String(row.tenant_code || '').trim().toLowerCase();
+      const agentCode = String(row.agent_code || '').trim().toLowerCase();
+      const providerId = codeToProvider.get(tenantCode) || codeToProvider.get(agentCode);
+      if (providerId) rememberProviderTenant(map, providerId, row.id);
+    }
+  }
+
+  return providerTenantCounts(map);
+}
+
+export function recordedInstitutionCode(
+  context: TenantInstitutionContext | null | undefined,
+  tenant: { tenant_code?: string | null; agent_code?: string | null } | null | undefined
+): string | null {
+  const linked = String(context?.institutionCode || '').trim();
+  if (linked) return linked;
+  const tenantCode = String(tenant?.tenant_code || '').trim();
+  if (tenantCode) return tenantCode;
+  const agentCode = String(tenant?.agent_code || '').trim();
+  return agentCode || null;
+}
+
+export function tenantOnboardingCodes(tenant: { tenant_code?: string | null; agent_code?: string | null }): string[] {
+  return [...new Set(
+    [tenant?.tenant_code, tenant?.agent_code]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )];
 }
 
 export function describeInstitutions(links: LinkedInstitution[]): TenantInstitutionContext {
@@ -110,7 +227,7 @@ function remember(map: Map<string, LinkedInstitution[]>, tenantId: string, link:
 }
 
 export async function resolveInstitutionsForTenants(
-  tenants: { id: string; agent_code?: string | null }[]
+  tenants: { id: string; tenant_code?: string | null; agent_code?: string | null }[]
 ): Promise<Map<string, TenantInstitutionContext>> {
   const result = new Map<string, TenantInstitutionContext>();
   const linksByTenant = new Map<string, LinkedInstitution[]>();
@@ -168,10 +285,30 @@ export async function resolveInstitutionsForTenants(
     });
   }
 
+  const assignedProviderRows = await safeSelect(() =>
+    supabaseAdmin
+      .from('hw_tenant_settings')
+      .select('tenant_id, assigned_provider_id')
+      .in('tenant_id', tenantIds)
+  );
+  const assignedProviderIds = assignedProviderRows.map((row: any) => row.assigned_provider_id).filter(Boolean);
+  const assignedProviders = assignedProviderIds.length
+    ? await safeSelect(() =>
+        supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name')
+          .in('id', assignedProviderIds)
+      )
+    : [];
+  const assignedProviderMap = new Map(assignedProviders.map((row: any) => [row.id, row]));
+  for (const row of assignedProviderRows as any[]) {
+    rememberHmo(linksByTenant, row.tenant_id, assignedProviderMap.get(row.assigned_provider_id), 'hw_providers');
+  }
+
   const schoolLinks = await safeSelect(() =>
     supabaseAdmin
       .from('hw_hmo_school_links')
-      .select('tenant_id, institution_id')
+      .select('tenant_id, institution_id, provider_id')
       .in('tenant_id', tenantIds)
   );
   const linkInstIds = schoolLinks.map((row: any) => row.institution_id).filter(Boolean);
@@ -184,17 +321,84 @@ export async function resolveInstitutionsForTenants(
       )
     : [];
   const linkInstMap = new Map(linkInstitutions.map((row: any) => [row.id, row]));
+  const linkProviderIds = schoolLinks.map((row: any) => row.provider_id).filter(Boolean);
+  const linkProviders = linkProviderIds.length
+    ? await safeSelect(() =>
+        supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name')
+          .in('id', linkProviderIds)
+      )
+    : [];
+  const linkProviderMap = new Map(linkProviders.map((row: any) => [row.id, row]));
   for (const row of schoolLinks as any[]) {
     const inst = linkInstMap.get(row.institution_id);
     const name = inst ? institutionLabel(inst) : null;
-    if (!name || !row.tenant_id) continue;
-    remember(linksByTenant, row.tenant_id, {
-      id: inst.id,
-      code: inst.institution_code || null,
-      name,
-      mode: inst.institution_type || null,
-      source: 'hw_hmo_school_links'
-    });
+    if (name && row.tenant_id) {
+      remember(linksByTenant, row.tenant_id, {
+        id: inst.id,
+        code: inst.institution_code || null,
+        name,
+        mode: inst.institution_type || null,
+        source: 'hw_hmo_school_links'
+      });
+    }
+    rememberHmo(linksByTenant, row.tenant_id, linkProviderMap.get(row.provider_id), 'hw_providers');
+  }
+
+  const onboardingCodes = [...new Set(tenants.flatMap((row) => tenantOnboardingCodes(row)))];
+  const onboardingVariants = [...new Set(onboardingCodes.flatMap((code) => [code, code.toUpperCase(), code.toLowerCase()]))];
+  const codeInstitutions = onboardingVariants.length
+    ? await safeSelect(() =>
+        supabaseAdmin
+          .from('institutions')
+          .select('id, institution_code, legal_name, trading_name, institution_type')
+          .in('institution_code', onboardingVariants)
+      )
+    : [];
+  const codeProviders = onboardingVariants.length
+    ? await safeSelect(() =>
+        supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name')
+          .in('code', onboardingVariants.map((code) => code.toLowerCase()))
+      )
+    : [];
+  for (const tenant of tenants) {
+    const wanted = tenantOnboardingCodes(tenant).map((code) => code.toUpperCase());
+    if (!wanted.length) continue;
+    const inst = (codeInstitutions as any[]).find((row) =>
+      wanted.includes(String(row.institution_code || '').toUpperCase())
+    );
+    if (inst) {
+      const name = institutionLabel(inst) || String(inst.institution_code || '').trim();
+      if (name && tenant.id) {
+        remember(linksByTenant, tenant.id, {
+          id: inst.id || null,
+          code: inst.institution_code || wanted[0],
+          name,
+          mode: inst.institution_type || null,
+          source: 'tenant_code'
+        });
+      }
+    }
+    const provider = (codeProviders as any[]).find((row) =>
+      wanted.includes(String(row.code || '').toUpperCase())
+    );
+    rememberHmo(linksByTenant, tenant.id, provider, 'hw_providers');
+  }
+
+  const planOffers = await safeSelect(() =>
+    supabaseAdmin
+      .from('hw_tenant_plan_offers')
+      .select('tenant_id, hw_plan_versions ( hw_plans ( hw_providers ( id, code, display_name ) ) )')
+      .in('tenant_id', tenantIds)
+  );
+  for (const row of planOffers as any[]) {
+    const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions;
+    const plan = Array.isArray(version?.hw_plans) ? version.hw_plans[0] : version?.hw_plans;
+    const provider = Array.isArray(plan?.hw_providers) ? plan.hw_providers[0] : plan?.hw_providers;
+    rememberHmo(linksByTenant, row.tenant_id, provider, 'hw_providers');
   }
 
   const agentCodes = [...new Set(tenants.map((row) => String(row.agent_code || '').trim()).filter(Boolean))];
