@@ -4,8 +4,6 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { WalletService } from '../services/wallet.service';
 import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
-import { BuildVariantService } from '../config/build-variant';
-import { IntegrationVaultService } from '../services/integration-vault.service';
 import { NotificationService } from '../services/notification.service';
 import { hydrateTenantOwnerContact } from '../utils/owner-contact';
 import {
@@ -36,7 +34,10 @@ import {
 } from '../utils/virtual-account-funds';
 import { tenantInstitutePortService } from '../services/tenant-institute-port.service';
 import { loadActivationGate, virtualAccountGenerationBlockReason } from '../modules/financial-platform/activation/activation-gate';
-import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
+import {
+  resolveVaCounterpartyOwnerId,
+  resolveVaInstitutionCodeForTenant,
+} from '../integrations/quasar/va-institution-code';
 
 function isPlatformFinanceOperator(user: any): boolean {
   const role = String(user?.role || '').toLowerCase()
@@ -79,26 +80,6 @@ function isFileBackedConfigKey(key: string): boolean {
 function isBrokenConfigAuditError(message: string | undefined): boolean {
   const msg = String(message || '').toLowerCase();
   return msg.includes('commission_events') || msg.includes('event_type');
-}
-
-async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
-  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
-  if (envKey) return envKey;
-
-  try {
-    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
-    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
-    if (vaultKey) return vaultKey;
-  } catch (err: any) {
-    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
-  }
-
-  const variant = BuildVariantService.getInstance();
-  if (variant.isProd() || variant.isStaging()) {
-    throw new Error('QUASAR_API_KEY is required in staging/production');
-  }
-
-  return 'demo-key';
 }
 
 async function rejectUnlessMakerCheckerApproved(res: Response, tenantId: string): Promise<boolean> {
@@ -1422,12 +1403,12 @@ export class AdminController {
 
       const { getQuasarService } = require('../integrations/quasar/factory');
       const quasar = await getQuasarService(tenant.id, { tenantIntegrationOnly: true });
-      const platformId = 'platform-admin-owner-id';
+      const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenant.id);
       const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);
       
       const va = await quasar.createVirtualAccount({
         childId: tenant.id,
-        parentId: platformId,
+        parentId: counterpartyOwnerId,
         currency: 'NGN',
         email: `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
         firstName: tenant.name.split(' ')[0],
@@ -1467,15 +1448,14 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = await resolvePlatformApiKey(id);
-          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-          const quasar = new QuasarServiceModule(platformApiKey);
-          const platformId = 'platform-admin-owner-id';
+          const { getQuasarService } = require('../integrations/quasar/factory');
+          const quasar = await getQuasarService(id);
+          const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
           
           const institutionCode = await resolveVaInstitutionCodeForTenant(id);
           const va = await quasar.createVirtualAccount({
             childId: studentId,
-            parentId: platformId,
+            parentId: counterpartyOwnerId,
             currency: 'NGN',
             email: `student-${studentId}@invify.app`,
             firstName: 'Student',
@@ -1503,15 +1483,14 @@ export class AdminController {
       // In real scenario, verify student exists in backend DB too.
       // Here we just provision directly for the given studentId under this tenant.
       
-      const platformApiKey = await resolvePlatformApiKey(tenant.id);
-      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-      const quasar = new QuasarServiceModule(platformApiKey);
-      const platformId = 'platform-admin-owner-id'; // or tenant's subaccount id
+      const { getQuasarService } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarService(tenant.id);
+      const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
       
       const institutionCode = await resolveVaInstitutionCodeForTenant(id);
       const va = await quasar.createVirtualAccount({
         childId: studentId,
-        parentId: platformId,
+        parentId: counterpartyOwnerId,
         currency: 'NGN',
         email: `student-${studentId}@invify.app`,
         firstName: 'Student',
@@ -1565,15 +1544,14 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = await resolvePlatformApiKey(id);
-          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-          const quasar = new QuasarServiceModule(platformApiKey);
-          const platformId = 'platform-admin-owner-id';
+          const { getQuasarService } = require('../integrations/quasar/factory');
+          const quasar = await getQuasarService(id);
+          const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
           
           const institutionCode = await resolveVaInstitutionCodeForTenant(id);
           const va = await quasar.createVirtualAccount({
             childId: customerId,
-            parentId: platformId,
+            parentId: counterpartyOwnerId,
             currency: 'NGN',
             email: email,
             phone: customer.phone || undefined,
@@ -1600,15 +1578,14 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = await resolvePlatformApiKey(tenant.id);
-      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-      const quasar = new QuasarServiceModule(platformApiKey);
-      const platformId = 'platform-admin-owner-id';
+      const { getQuasarService } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarService(tenant.id);
+      const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
       
       const institutionCode = await resolveVaInstitutionCodeForTenant(id);
       const va = await quasar.createVirtualAccount({
         childId: customerId,
-        parentId: platformId,
+        parentId: counterpartyOwnerId,
         currency: 'NGN',
         email: email,
         phone: customer.phone || undefined,

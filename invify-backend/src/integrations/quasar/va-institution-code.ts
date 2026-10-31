@@ -2,10 +2,21 @@
  * Resolve the canonical institution_code for Quasar VA provider routing.
  * Uses Invify institution registry (VIRTUAL_ACCOUNTS relationship) only —
  * never tenant UUID, institution UUID, or wallet owner id.
+ *
+ * Also exports the VA counterparty (Quasar merchantWalletOwnerId / schoolId)
+ * resolver: the Invify tenant UUID already used by working student/customer paths.
  */
 import { supabaseAdmin } from '../../db/supabase';
 
 const VA_SERVICE = 'VIRTUAL_ACCOUNTS';
+
+/** Quasar CreateVirtualAccountDto requires UUID v4 for merchantWalletOwnerId / schoolId. */
+const UUID_V4 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const FORBIDDEN_COUNTERPARTY_SENTINELS = new Set([
+  'platform-admin-owner-id',
+]);
 
 function isMissingRelation(err: unknown): boolean {
   const msg = String((err as any)?.message || err || '').toLowerCase();
@@ -79,4 +90,23 @@ export function applyInstitutionCodeToVaBody(
   if (!code) return;
   body.institutionCode = code;
   body.institution_code = code;
+}
+
+/**
+ * Quasar VA split counterparty / school wallet owner.
+ * Must be the target Invify tenant UUID (same convention as student/customer VA).
+ * Never a fabricated platform id, institution UUID substitute, or random UUID.
+ */
+export function resolveVaCounterpartyOwnerId(tenantId: string): string {
+  const tid = String(tenantId || '').trim();
+  if (!tid) {
+    throw new Error('VA_COUNTERPARTY_TENANT_ID_REQUIRED');
+  }
+  if (FORBIDDEN_COUNTERPARTY_SENTINELS.has(tid.toLowerCase())) {
+    throw new Error('VA_COUNTERPARTY_SENTINEL_FORBIDDEN');
+  }
+  if (!UUID_V4.test(tid)) {
+    throw new Error('VA_COUNTERPARTY_TENANT_ID_INVALID');
+  }
+  return tid;
 }

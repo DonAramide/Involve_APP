@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { getQuasarService } from '../integrations/quasar/factory';
-import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
+import {
+  resolveVaCounterpartyOwnerId,
+  resolveVaInstitutionCodeForTenant,
+} from '../integrations/quasar/va-institution-code';
 import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
@@ -264,7 +267,7 @@ export class CustomerController {
       }
 
       const quasar = await getQuasarService(tenantId);
-      const platformId = 'platform-admin-owner-id';
+      const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenantId);
 
       const staffPhone = String(phone || defaultPhone || '').trim();
       if (!staffPhone) {
@@ -273,7 +276,7 @@ export class CustomerController {
       const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
       const quasarAccount = await quasar.createVirtualAccount({
         childId: userId,
-        parentId: platformId,
+        parentId: counterpartyOwnerId,
         email: email || defaultEmail,
         phone: staffPhone,
         firstName: companyName,
