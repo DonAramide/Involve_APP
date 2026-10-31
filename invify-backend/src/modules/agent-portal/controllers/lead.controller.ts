@@ -7,7 +7,7 @@ import {
   resolveVaCounterpartyOwnerId,
   resolveVaInstitutionCodeForTenant,
 } from '../../../integrations/quasar/va-institution-code';
-import { getQuasarService } from '../../../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../../../integrations/quasar/factory';
 
 export class LeadController {
   static async create(req: Request, res: Response) {
@@ -98,8 +98,8 @@ export class LeadController {
 
       // Try virtual account creation using Quasar SDK
       try {
-        // Prefer tenant integration key; fall back via factory (new tenants may lack quasar_integrations).
-        const quasar = await getQuasarService(tenant.id);
+        // Fail closed: tenant VA must use quasar_integrations — never env/platform key.
+        const quasar = await getQuasarServiceForTenantVa(tenant.id);
         const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenant.id);
         
         const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);

@@ -1401,8 +1401,8 @@ export class AdminController {
 
       if (await rejectUnlessMakerCheckerApproved(res, tenant.id)) return;
 
-      const { getQuasarService } = require('../integrations/quasar/factory');
-      const quasar = await getQuasarService(tenant.id, { tenantIntegrationOnly: true });
+      const { getQuasarServiceForTenantVa } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarServiceForTenantVa(tenant.id);
       const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenant.id);
       const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);
       
@@ -1448,8 +1448,8 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const { getQuasarService } = require('../integrations/quasar/factory');
-          const quasar = await getQuasarService(id);
+          const { getQuasarServiceForTenantVa } = require('../integrations/quasar/factory');
+          const quasar = await getQuasarServiceForTenantVa(id);
           const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
           
           const institutionCode = await resolveVaInstitutionCodeForTenant(id);
@@ -1483,8 +1483,8 @@ export class AdminController {
       // In real scenario, verify student exists in backend DB too.
       // Here we just provision directly for the given studentId under this tenant.
       
-      const { getQuasarService } = require('../integrations/quasar/factory');
-      const quasar = await getQuasarService(tenant.id);
+      const { getQuasarServiceForTenantVa } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarServiceForTenantVa(tenant.id);
       const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
       
       const institutionCode = await resolveVaInstitutionCodeForTenant(id);
@@ -1544,8 +1544,8 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const { getQuasarService } = require('../integrations/quasar/factory');
-          const quasar = await getQuasarService(id);
+          const { getQuasarServiceForTenantVa } = require('../integrations/quasar/factory');
+          const quasar = await getQuasarServiceForTenantVa(id);
           const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
           
           const institutionCode = await resolveVaInstitutionCodeForTenant(id);
@@ -1578,8 +1578,8 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const { getQuasarService } = require('../integrations/quasar/factory');
-      const quasar = await getQuasarService(tenant.id);
+      const { getQuasarServiceForTenantVa } = require('../integrations/quasar/factory');
+      const quasar = await getQuasarServiceForTenantVa(tenant.id);
       const counterpartyOwnerId = resolveVaCounterpartyOwnerId(id);
       
       const institutionCode = await resolveVaInstitutionCodeForTenant(id);

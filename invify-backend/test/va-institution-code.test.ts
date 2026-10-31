@@ -99,6 +99,17 @@ describe('VA ownership call-site mapping', () => {
     expect(customer).toMatch(/parentId:\s*tenantId/);
   });
 
+  it('VA create paths use fail-closed tenant integration keys', () => {
+    const student = read('controllers/student.controller.ts');
+    const customer = read('controllers/customer.controller.ts');
+    const admin = read('controllers/admin.controller.ts');
+    const lead = read('modules/agent-portal/controllers/lead.controller.ts');
+    expect(student).toMatch(/getQuasarServiceForTenantVa\(/);
+    expect(customer).toMatch(/getQuasarServiceForTenantVa\(/);
+    expect(admin).toMatch(/getQuasarServiceForTenantVa\(/);
+    expect(lead).toMatch(/getQuasarServiceForTenantVa\(/);
+  });
+
   it('documents the seven ownership mappings', () => {
     const expected = [
       { path: 'staff', child: 'userId', parent: 'tenantId' },

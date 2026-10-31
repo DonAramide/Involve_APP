@@ -1,6 +1,6 @@
 // invify-backend/src/services/student.service.ts
 import { supabase } from '../db/supabase';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
 import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
 import { AuditService } from './audit.service';
 import { toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
@@ -45,7 +45,7 @@ export class StudentService {
       }
 
       // 3. Resolve Quasar Service (Multi-Tenant)
-      const quasar = await getQuasarService(schoolId);
+      const quasar = await getQuasarServiceForTenantVa(schoolId);
 
       // 4. Call Quasar SDK (childId must be UUID; map stu-* keys deterministically)
       const quasarChildId = toQuasarChildUuid(schoolId, studentId);

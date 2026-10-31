@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
 import {
   resolveVaCounterpartyOwnerId,
   resolveVaInstitutionCodeForTenant,
@@ -69,7 +69,7 @@ export class CustomerController {
         });
       }
 
-      const quasar = await getQuasarService(tenantId);
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
       const reference = `VA-CUST-${customerId.substring(0, 8)}-${Date.now()}`;
       const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
       
@@ -266,7 +266,7 @@ export class CustomerController {
         // Safe to ignore if table/record query fails, fall back to default email
       }
 
-      const quasar = await getQuasarService(tenantId);
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
       const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenantId);
 
       const staffPhone = String(phone || defaultPhone || '').trim();

@@ -1,7 +1,7 @@
 // invify-backend/src/controllers/student.controller.ts
 import { Request, Response } from 'express';
 import { StudentService } from '../services/student.service';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
 import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
 import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
@@ -147,7 +147,7 @@ export class StudentController {
         });
       }
 
-      const quasar = await getQuasarService(tenantId);
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
       const reference = `VA-STU-${quasarChildId.substring(0, 8)}-${Date.now()}`;
       const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
 
@@ -304,7 +304,7 @@ export class StudentController {
         try {
           const tenant = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
           const key = String(req.params.studentId || '').trim();
-          const quasar = await getQuasarService(tenant);
+          const quasar = await getQuasarServiceForTenantVa(tenant);
           const recovered = await StudentController.fetchQuasarVa(
             quasar,
             toQuasarChildUuid(tenant, key),

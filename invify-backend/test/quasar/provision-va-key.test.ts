@@ -4,7 +4,10 @@ import { BuildVariantService } from '../../src/config/build-variant';
 import { QuasarIntegrationStore } from '../../src/integrations/quasar/quasar-integration.store';
 import { IntegrationVaultService } from '../../src/services/integration-vault.service';
 import { QuasarService } from '../../src/integrations/quasar/quasar.service';
-import { getQuasarService } from '../../src/integrations/quasar/factory';
+import {
+  getQuasarService,
+  getQuasarServiceForTenantVa,
+} from '../../src/integrations/quasar/factory';
 
 jest.mock('../../src/integrations/quasar/quasar-integration.store');
 jest.mock('../../src/services/integration-vault.service');
@@ -126,19 +129,63 @@ describe('provision-va tenant Quasar key resolution', () => {
       'QUASAR_LIVE_CREDENTIAL_FORBIDDEN_OUTSIDE_PRODUCTION',
     );
   });
+
+  it('H: getQuasarServiceForTenantVa ignores env QUASAR_API_KEY when integration missing', async () => {
+    process.env.QUASAR_API_KEY = SK_TEST;
+    MockStore.getByInvifyTenantId.mockResolvedValue(null);
+
+    await expect(getQuasarServiceForTenantVa(TENANT)).rejects.toThrow(
+      'QUASAR_TENANT_INTEGRATION_MISSING',
+    );
+    expect(MockQuasarService).not.toHaveBeenCalled();
+    expect(MockVault.getDecryptedCredential).not.toHaveBeenCalled();
+  });
+
+  it('I: getQuasarServiceForTenantVa uses tenant integration key only', async () => {
+    process.env.QUASAR_API_KEY = 'sk_test_platform_env_must_not_win';
+    MockStore.getByInvifyTenantId.mockResolvedValue({
+      quasar_sk_secret_enc: 'enc',
+      quasar_environment: 'test',
+    } as any);
+    MockStore.decryptSkSecret.mockReturnValue(SK_TEST);
+
+    await getQuasarServiceForTenantVa(TENANT);
+
+    expect(MockQuasarService).toHaveBeenCalledWith(SK_TEST, expect.any(String));
+    expect(MockVault.getDecryptedCredential).not.toHaveBeenCalled();
+  });
+
+  it('J: default getQuasarService may still use env for platform-level ops', async () => {
+    process.env.QUASAR_API_KEY = SK_TEST;
+    MockStore.getByInvifyTenantId.mockResolvedValue(null);
+
+    await getQuasarService(TENANT);
+
+    expect(MockQuasarService).toHaveBeenCalledWith(SK_TEST, expect.any(String));
+  });
 });
 
 describe('provision-va source contracts', () => {
   const adminSrc = fs.readFileSync(path.join(__dirname, '../../src/controllers/admin.controller.ts'), 'utf8');
   const customerSrc = fs.readFileSync(path.join(__dirname, '../../src/controllers/customer.controller.ts'), 'utf8');
   const studentSrc = fs.readFileSync(path.join(__dirname, '../../src/controllers/student.controller.ts'), 'utf8');
+  const studentSvcSrc = fs.readFileSync(path.join(__dirname, '../../src/services/student.service.ts'), 'utf8');
+  const leadSrc = fs.readFileSync(
+    path.join(__dirname, '../../src/modules/agent-portal/controllers/lead.controller.ts'),
+    'utf8',
+  );
+  const paymentSrc = fs.readFileSync(path.join(__dirname, '../../src/services/payment.service.ts'), 'utf8');
   const webhookSrc = fs.readFileSync(path.join(__dirname, '../../src/controllers/webhook.controller.ts'), 'utf8');
 
-  it('E: customer/staff VA still call getQuasarService(tenantId) without tenantIntegrationOnly', () => {
-    expect(customerSrc).toMatch(/getQuasarService\(tenantId\)/);
-    expect(customerSrc).not.toMatch(/tenantIntegrationOnly/);
-    expect(studentSrc).toMatch(/getQuasarService\(/);
-    expect(studentSrc).not.toMatch(/tenantIntegrationOnly/);
+  it('E: all tenant VA create paths use getQuasarServiceForTenantVa (fail-closed)', () => {
+    expect(customerSrc).toMatch(/getQuasarServiceForTenantVa\(tenantId\)/);
+    expect(customerSrc).not.toMatch(/getQuasarService\(tenantId\)/);
+    expect(studentSrc).toMatch(/getQuasarServiceForTenantVa\(/);
+    expect(studentSrc).not.toMatch(/getQuasarService\(/);
+    expect(studentSvcSrc).toMatch(/getQuasarServiceForTenantVa\(schoolId\)/);
+    expect(leadSrc).toMatch(/getQuasarServiceForTenantVa\(tenant\.id\)/);
+    expect(adminSrc.match(/getQuasarServiceForTenantVa\(/g)?.length).toBeGreaterThanOrEqual(5);
+    expect(adminSrc).not.toMatch(/getQuasarService\([^)]*tenantIntegrationOnly/);
   });
 
   it('F: virtual-account/init still uses QuasarProvisioningService.provisionMerchant', () => {
@@ -154,14 +201,20 @@ describe('provision-va source contracts', () => {
     expect(webhookSrc).not.toMatch(/resolvePlatformApiKey/);
   });
 
-  it('tenant provision-va uses getQuasarService tenantIntegrationOnly and not resolvePlatformApiKey', () => {
+  it('tenant provision-va uses getQuasarServiceForTenantVa and not resolvePlatformApiKey', () => {
     const start = adminSrc.indexOf('static async provisionVirtualAccount');
     const end = adminSrc.indexOf('static async provisionStudentVirtualAccount');
     const block = adminSrc.slice(start, end);
     expect(block).toMatch(/rejectUnlessMakerCheckerApproved/);
-    expect(block).toMatch(/getQuasarService\(tenant\.id, \{ tenantIntegrationOnly: true \}\)/);
+    expect(block).toMatch(/getQuasarServiceForTenantVa\(tenant\.id\)/);
     expect(block).not.toMatch(/resolvePlatformApiKey/);
     expect(block).toMatch(/createVirtualAccount/);
     expect(block).toMatch(/virtual_account_number/);
+  });
+
+  it('K: payment service retains default getQuasarService (platform fallback allowed)', () => {
+    expect(paymentSrc).toMatch(/getQuasarService\(tenantId\)/);
+    expect(paymentSrc).not.toMatch(/getQuasarServiceForTenantVa/);
+    expect(paymentSrc).not.toMatch(/tenantIntegrationOnly/);
   });
 });
