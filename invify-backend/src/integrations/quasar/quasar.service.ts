@@ -139,6 +139,8 @@ export class QuasarService {
     firstName?: string;
     lastName?: string;
     parentShareBps?: number;
+    /** Canonical institution registry code for Quasar VA provider routing. */
+    institutionCode?: string | null;
     metadata?: Record<string, any>;
   }) {
     try {
@@ -147,8 +149,36 @@ export class QuasarService {
         QuasarService.normalizeCustomerPhone(params.phone) ||
         QuasarService.normalizeCustomerPhone(params.metadata?.phone) ||
         QuasarService.normalizeCustomerPhone(params.metadata?.phoneNumber);
+      const institutionCode = String(params.institutionCode || '')
+        .trim()
+        .toUpperCase() || null;
       if (this.apiKey.startsWith('sk_test_')) {
-        console.log('[QuasarSDK] Test API key detected. Routing to sandbox account generator...');
+        // Test keys call Quasar so institution selection runs on the same
+        // resolver. A routing rejection is returned as-is. The local sandbox
+        // generator is only a fallback when no institution code was supplied
+        // and Quasar itself could not be reached.
+        console.log('[QuasarSDK] Test API key detected. Forwarding virtual-account request to Quasar...');
+        try {
+          return await this.client.createVirtualAccount({
+            ...params,
+            phone: phone || undefined,
+            firstName: params.firstName || 'User',
+            lastName: params.lastName || 'Account',
+            currency: 'NGN',
+            institutionCode,
+          });
+        } catch (sandboxLiveErr: any) {
+          const status = Number(
+            sandboxLiveErr?.response?.status || sandboxLiveErr?.statusCode || 0,
+          );
+          if (institutionCode || (status >= 400 && status < 500)) {
+            throw sandboxLiveErr;
+          }
+          console.warn(
+            '[QuasarSDK] Quasar unavailable for sk_test_ without an institution code; falling back to generateSandboxAccounts:',
+            sandboxLiveErr?.message || sandboxLiveErr,
+          );
+        }
         const sandboxAccounts = await this.client.generateSandboxAccounts({
           accountName: `${params.firstName || 'User'} ${params.lastName || 'Account'}`,
           count: 1
@@ -161,7 +191,8 @@ export class QuasarService {
         return {
           accountNumber: sandboxAccounts[0].accountNumber,
           bankName: sandboxAccounts[0].bankName,
-          accountName: sandboxAccounts[0].accountName
+          accountName: sandboxAccounts[0].accountName,
+          providerSelectionDecision: 'SANDBOX_FALLBACK',
         };
       }
 
@@ -170,7 +201,8 @@ export class QuasarService {
         phone: phone || undefined,
         firstName: params.firstName || 'User',
         lastName: params.lastName || 'Account',
-        currency: 'NGN'
+        currency: 'NGN',
+        institutionCode,
       });
     } catch (error: any) {
       console.error('[QuasarSDK] createVirtualAccount failed:', error.message);

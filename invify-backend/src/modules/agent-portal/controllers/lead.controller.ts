@@ -5,6 +5,7 @@ import { integrationEngine } from '../../../services/integration-engine.service'
 import { BuildVariantService } from '../../../config/build-variant';
 import { IntegrationVaultService } from '../../../services/integration-vault.service';
 import { newSelfServeTenantPlan } from '../../../utils/new-tenant-plan';
+import { resolveVaInstitutionCodeForTenant } from '../../../integrations/quasar/va-institution-code';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -120,6 +121,7 @@ export class LeadController {
         const quasar = new QuasarServiceModule(platformApiKey);
         const platformId = 'platform-admin-owner-id';
         
+        const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);
         const va = await quasar.createVirtualAccount({
           childId: tenant.id,
           parentId: platformId,
@@ -128,7 +130,11 @@ export class LeadController {
           firstName: lead.contact_person ? lead.contact_person.split(' ')[0] : 'Owner',
           lastName: lead.contact_person ? (lead.contact_person.split(' ').slice(1).join(' ') || 'Merchant') : 'Merchant',
           parentShareBps: 0,
-          metadata: { type: 'tenant_operating_account' }
+          institutionCode,
+          metadata: {
+            type: 'tenant_operating_account',
+            ...(institutionCode ? { institutionCode } : {}),
+          },
         });
         
         await supabase

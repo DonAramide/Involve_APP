@@ -36,6 +36,7 @@ import {
 } from '../utils/virtual-account-funds';
 import { tenantInstitutePortService } from '../services/tenant-institute-port.service';
 import { loadActivationGate, virtualAccountGenerationBlockReason } from '../modules/financial-platform/activation/activation-gate';
+import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
 
 function isPlatformFinanceOperator(user: any): boolean {
   const role = String(user?.role || '').toLowerCase()
@@ -1422,6 +1423,7 @@ export class AdminController {
       const { getQuasarService } = require('../integrations/quasar/factory');
       const quasar = await getQuasarService(tenant.id, { tenantIntegrationOnly: true });
       const platformId = 'platform-admin-owner-id';
+      const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);
       
       const va = await quasar.createVirtualAccount({
         childId: tenant.id,
@@ -1431,7 +1433,11 @@ export class AdminController {
         firstName: tenant.name.split(' ')[0],
         lastName: tenant.name.split(' ').slice(1).join(' ') || 'Business',
         parentShareBps: 0,
-        metadata: { type: 'tenant_operating_account' }
+        institutionCode,
+        metadata: {
+          type: 'tenant_operating_account',
+          ...(institutionCode ? { institutionCode } : {}),
+        },
       });
       
       await supabaseAdmin
@@ -1466,6 +1472,7 @@ export class AdminController {
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
           
+          const institutionCode = await resolveVaInstitutionCodeForTenant(id);
           const va = await quasar.createVirtualAccount({
             childId: studentId,
             parentId: platformId,
@@ -1474,7 +1481,12 @@ export class AdminController {
             firstName: 'Student',
             lastName: studentId,
             parentShareBps: 0,
-            metadata: { type: 'student_account', tenantId: id }
+            institutionCode,
+            metadata: {
+              type: 'student_account',
+              tenantId: id,
+              ...(institutionCode ? { institutionCode } : {}),
+            },
           });
           
           return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
@@ -1496,6 +1508,7 @@ export class AdminController {
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id'; // or tenant's subaccount id
       
+      const institutionCode = await resolveVaInstitutionCodeForTenant(id);
       const va = await quasar.createVirtualAccount({
         childId: studentId,
         parentId: platformId,
@@ -1504,7 +1517,12 @@ export class AdminController {
         firstName: 'Student',
         lastName: studentId,
         parentShareBps: 0,
-        metadata: { type: 'student_account', tenantId: id }
+        institutionCode,
+        metadata: {
+          type: 'student_account',
+          tenantId: id,
+          ...(institutionCode ? { institutionCode } : {}),
+        },
       });
       
       return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
@@ -1552,6 +1570,7 @@ export class AdminController {
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
           
+          const institutionCode = await resolveVaInstitutionCodeForTenant(id);
           const va = await quasar.createVirtualAccount({
             childId: customerId,
             parentId: platformId,
@@ -1561,7 +1580,13 @@ export class AdminController {
             firstName: firstName,
             lastName: lastName,
             parentShareBps: 0,
-            metadata: { type: 'customer_account', tenantId: id, phone: customer.phone }
+            institutionCode,
+            metadata: {
+              type: 'customer_account',
+              tenantId: id,
+              phone: customer.phone,
+              ...(institutionCode ? { institutionCode } : {}),
+            },
           });
           
           return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
@@ -1580,6 +1605,7 @@ export class AdminController {
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id';
       
+      const institutionCode = await resolveVaInstitutionCodeForTenant(id);
       const va = await quasar.createVirtualAccount({
         childId: customerId,
         parentId: platformId,
@@ -1589,7 +1615,13 @@ export class AdminController {
         firstName: firstName,
         lastName: lastName,
         parentShareBps: 0,
-        metadata: { type: 'customer_account', tenantId: id, phone: customer.phone }
+        institutionCode,
+        metadata: {
+          type: 'customer_account',
+          tenantId: id,
+          phone: customer.phone,
+          ...(institutionCode ? { institutionCode } : {}),
+        },
       });
       
       return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
