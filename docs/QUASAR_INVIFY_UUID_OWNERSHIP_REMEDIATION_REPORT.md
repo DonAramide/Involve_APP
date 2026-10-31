@@ -107,4 +107,30 @@ Still `@IsUUID('4')` on `merchantWalletOwnerId` / `schoolId` at locked QUASAR co
 
 ## 7. Git status / commit
 
-See footer after commit. No push. No deploy. No migrations. No VA creates.
+| Item | Value |
+|---|---|
+| Branch | `feature/va-institution-provider-routing` |
+| Commit | `d83efe01be5c47eecf750187185bcfde3cd9d4aa` |
+| Parent | `ba3c002f8ebc5aed8861ea73edba25f1fdc67e4b` |
+| QUASAR HEAD (untouched) | `de4c33aa8287d38b98938cee2feedbbd0e2c7c8c` |
+| Push / deploy / migrate / VA create | **Not done** |
+
+Unrelated dirty Invify working-tree files were left unstaged. SMTP hotfix on Quasar was not touched.
+
+### TypeScript
+
+```text
+npx tsc --noEmit --pretty false
+→ exit 0 after removing invalid `currency` from typed lead createVirtualAccount call
+  (QuasarService already forces currency NGN)
+```
+
+### Jest (final)
+
+```text
+npx jest test/va-institution-code.test.ts --watchman=false --coverage=false --runInBand --forceExit
+→ Tests: 9 passed, 9 total
+→ exit_code: 0
+```
+
+**STOP.** Await approval before push, deploy, database work, or staging VA creation.
