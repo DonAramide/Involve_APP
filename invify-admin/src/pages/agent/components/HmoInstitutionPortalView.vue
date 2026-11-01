@@ -356,52 +356,82 @@
               <div
                 v-for="enr in enrollments"
                 :key="enr.id"
-                class="bg-panel-darker border-muted rounded-borders q-pa-sm row items-center justify-between op-gap-8"
+                class="bg-panel-darker border-muted rounded-borders q-pa-md column op-gap-10"
               >
-                <div class="col-xs-12 col-md-5">
-                  <div class="row items-center op-gap-8">
-                    <span class="text-weight-bold text-teal-3">{{ enr.enrolmentReference }}</span>
-                    <q-badge :color="enr.status === 'active' ? 'green-9' : enr.status === 'rejected' ? 'red-9' : 'amber-9'">
-                      {{ enr.status }}
-                    </q-badge>
-                    <span class="text-caption text-muted">• {{ enr.memberCategory }}</span>
+                <div class="row items-start justify-between op-gap-12">
+                  <div class="col-grow">
+                    <div class="row items-center op-gap-8 q-mb-xs">
+                      <span class="text-weight-bold text-teal-3">{{ enr.enrolmentReference }}</span>
+                      <q-badge :color="enr.status === 'active' ? 'green-9' : enr.status === 'rejected' ? 'red-9' : 'amber-9'">
+                        {{ enr.status }}
+                      </q-badge>
+                      <span class="text-caption text-muted">• {{ enr.memberCategory }}</span>
+                    </div>
+                    <div class="text-subtitle2 text-weight-bold text-main">
+                      {{ enr.member?.fullName || 'Member details pending sync' }}
+                      <span v-if="enr.member?.admissionNumber" class="text-caption text-muted text-weight-regular">
+                        · Adm {{ enr.member.admissionNumber }}
+                      </span>
+                    </div>
+                    <div class="text-caption text-muted">
+                      Plan: <b class="text-main">{{ enr.planName }} ({{ enr.planCode }})</b>
+                      · Period: {{ enr.periodStart }} → {{ enr.periodEnd }}
+                      <template v-if="enr.insurerMemberRef"> · HMO ID: <b class="text-green-4">{{ enr.insurerMemberRef }}</b></template>
+                    </div>
                   </div>
-                  <div class="text-caption text-muted">
-                    School: <b class="text-main">{{ enr.schoolName }}</b> | Plan: <b class="text-main">{{ enr.planName }} ({{ enr.planCode }})</b>
-                  </div>
-                  <div class="text-caption text-muted" style="font-size: 11px;">
-                    Period: {{ enr.periodStart }} → {{ enr.periodEnd }}
-                    <template v-if="enr.insurerMemberRef"> | HMO ID: <b class="text-green-4">{{ enr.insurerMemberRef }}</b></template>
+                  <div class="row op-gap-8 items-center">
+                    <q-input
+                      v-model="enr._inputMemberId"
+                      dark
+                      filled
+                      dense
+                      placeholder="HMO Member ID (e.g. MHMO/26/001)"
+                      class="bg-panel"
+                      style="width: 210px;"
+                    />
+                    <q-btn
+                      dense
+                      color="green-5"
+                      text-color="black"
+                      label="Confirm Coverage"
+                      no-caps
+                      class="text-weight-bold q-px-sm"
+                      @click="handleAdjudicateEnrollment(enr, 'confirm')"
+                    />
+                    <q-btn
+                      dense
+                      outline
+                      color="red-4"
+                      label="Reject"
+                      no-caps
+                      class="q-px-sm"
+                      @click="handleAdjudicateEnrollment(enr, 'reject')"
+                    />
                   </div>
                 </div>
-                <div class="row op-gap-8 items-center">
-                  <q-input
-                    v-model="enr._inputMemberId"
-                    dark
-                    filled
-                    dense
-                    placeholder="HMO Member ID (e.g. MHMO/26/001)"
-                    class="bg-panel"
-                    style="width: 210px;"
-                  />
-                  <q-btn
-                    dense
-                    color="green-5"
-                    text-color="black"
-                    label="Confirm Coverage"
-                    no-caps
-                    class="text-weight-bold q-px-sm"
-                    @click="handleAdjudicateEnrollment(enr, 'confirm')"
-                  />
-                  <q-btn
-                    dense
-                    outline
-                    color="red-4"
-                    label="Reject"
-                    no-caps
-                    class="q-px-sm"
-                    @click="handleAdjudicateEnrollment(enr, 'reject')"
-                  />
+
+                <div class="row q-col-gutter-md">
+                  <div class="col-12 col-md-4">
+                    <div class="text-caption text-teal-3 text-weight-bold q-mb-xs">Student medical profile</div>
+                    <div class="text-caption text-muted">DOB: <b class="text-main">{{ formatMemberDate(enr.member?.dateOfBirth) }}</b></div>
+                    <div class="text-caption text-muted">Gender: <b class="text-main">{{ enr.member?.gender || '—' }}</b></div>
+                    <div class="text-caption text-muted">Class: <b class="text-main">{{ enr.member?.currentClass || enr.cohortLabel || '—' }}</b></div>
+                    <div class="text-caption text-muted">Address: <b class="text-main">{{ enr.member?.address || '—' }}</b></div>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <div class="text-caption text-teal-3 text-weight-bold q-mb-xs">Parent / guardian</div>
+                    <div class="text-caption text-muted">Name: <b class="text-main">{{ enr.member?.parentName || '—' }}</b></div>
+                    <div class="text-caption text-muted">Phone: <b class="text-main">{{ enr.member?.parentPhone || '—' }}</b></div>
+                    <div class="text-caption text-muted">Email: <b class="text-main">{{ enr.member?.parentEmail || '—' }}</b></div>
+                    <div class="text-caption text-muted">Relationship: <b class="text-main">{{ enr.member?.parentRelationship || '—' }}</b></div>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <div class="text-caption text-teal-3 text-weight-bold q-mb-xs">School</div>
+                    <div class="text-caption text-muted">Name: <b class="text-main">{{ enr.schoolName }}</b></div>
+                    <div class="text-caption text-muted">Location: <b class="text-main">{{ enr.schoolAddress || [enr.schoolCity, enr.schoolState].filter(Boolean).join(', ') || '—' }}</b></div>
+                    <div class="text-caption text-muted">Phone: <b class="text-main">{{ enr.schoolPhone || '—' }}</b></div>
+                    <div class="text-caption text-muted">Email: <b class="text-main">{{ enr.schoolEmail || '—' }}</b></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1172,6 +1202,15 @@ async function loadOverviewAndProfile() {
   } catch (err) {
     console.warn('[HmoPortal] Initial fetch warning:', err)
   }
+}
+
+function formatMemberDate(value) {
+  if (!value) return '—'
+  const raw = String(value)
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return raw
+  return parsed.toISOString().slice(0, 10)
 }
 
 async function loadEnrollments() {

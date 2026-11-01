@@ -1,8 +1,10 @@
 import {
   emptyProviderRegistrationForm,
   isProviderAssignable,
+  providerChannelLabel,
   providerGovernanceLabel,
-  providerStatusColor
+  providerStatusColor,
+  REGISTRATION_CHANNEL_OPTIONS
 } from '../src/hmo/providerLifecycle'
 
 describe('provider lifecycle helpers', () => {
@@ -25,7 +27,19 @@ describe('provider lifecycle helpers', () => {
     const form = emptyProviderRegistrationForm()
     expect(form.displayName).toBe('')
     expect(form.regulatorType).toBe('NHIA')
+    expect(form.registrationChannel).toBe('platform')
     expect(form.logoImage).toBe('')
+  })
+
+  test('registration channel labels cover platform self-service and agent', () => {
+    expect(providerChannelLabel('platform')).toBe('Platform')
+    expect(providerChannelLabel('self_service')).toBe('Self-service')
+    expect(providerChannelLabel('agent')).toBe('Agent / institute')
+    expect(REGISTRATION_CHANNEL_OPTIONS.map((o) => o.value)).toEqual([
+      'platform',
+      'self_service',
+      'agent'
+    ])
   })
 
   test('status colors are defined for known statuses', () => {

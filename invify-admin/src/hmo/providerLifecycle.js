@@ -30,6 +30,17 @@ export function isProviderAssignable(status) {
   return String(status || '') === 'verified'
 }
 
+export const PROVIDER_CHANNEL_LABELS = {
+  platform: 'Platform',
+  self_service: 'Self-service',
+  agent: 'Agent / institute'
+}
+
+export function providerChannelLabel(channel) {
+  const key = String(channel || 'platform')
+  return PROVIDER_CHANNEL_LABELS[key] || key
+}
+
 export function emptyProviderRegistrationForm() {
   return {
     code: '',
@@ -37,6 +48,7 @@ export function emptyProviderRegistrationForm() {
     legalName: '',
     licenceReference: '',
     regulatorType: 'NHIA',
+    registrationChannel: 'platform',
     licenceExpiry: '',
     contactEmail: '',
     contactPhone: '',
@@ -59,6 +71,12 @@ export const REGULATOR_OPTIONS = [
   { label: 'Other', value: 'OTHER' }
 ]
 
+export const REGISTRATION_CHANNEL_OPTIONS = [
+  { label: 'Platform (Super Admin)', value: 'platform' },
+  { label: 'Self-service HMO', value: 'self_service' },
+  { label: 'Agent / institute onboarded', value: 'agent' }
+]
+
 export const PROVIDER_STATUS_FILTERS = [
   { label: 'All statuses', value: '' },
   { label: 'Draft', value: 'none' },
@@ -67,4 +85,11 @@ export const PROVIDER_STATUS_FILTERS = [
   { label: 'Suspended', value: 'suspended' },
   { label: 'Rejected', value: 'rejected' },
   { label: 'Sandbox', value: 'sandbox' }
+]
+
+export const PROVIDER_CHANNEL_FILTERS = [
+  { label: 'All channels', value: '' },
+  { label: 'Platform', value: 'platform' },
+  { label: 'Self-service', value: 'self_service' },
+  { label: 'Agent / institute', value: 'agent' }
 ]

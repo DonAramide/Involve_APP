@@ -468,6 +468,9 @@
           <div class="col bg-panel border-muted rounded-borders q-pa-md column justify-center items-center op-gap-8">
             <div class="text-caption text-muted">Wallet Center</div>
             <q-btn color="amber-4" text-color="black" icon="open_in_new" label="Open Wallet Center" class="full-width" no-caps @click="$router.push('/institute/wallet')" />
+            <q-btn v-if="identity.institutionType === 'HMO'" outline color="teal-3" icon="health_and_safety" label="HMO Earnings" class="full-width" no-caps @click="$router.push('/institute/finance/hmo-earnings')" />
+            <q-btn v-if="identity.institutionType === 'HMO'" outline color="teal-3" icon="outbox" label="Withdrawals" class="full-width" no-caps @click="$router.push('/institute/finance/withdrawals')" />
+            <q-btn v-if="identity.institutionType === 'HMO'" outline color="grey-4" icon="account_balance" label="Bank Accounts" class="full-width" no-caps @click="$router.push('/institute/settings/bank-accounts')" />
           </div>
         </div>
 

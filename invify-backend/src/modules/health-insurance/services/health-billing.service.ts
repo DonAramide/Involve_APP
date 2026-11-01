@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../../db/supabase';
 import { HealthContext } from '../types';
 import { HealthAuditService } from './health-audit.service';
 import { LedgerService } from '../../../services/ledger.service';
+import { evaluateHmoServiceCharge } from '../../hmo-monetisation/hmo-service-fee';
 
 export class HealthBillingService {
   /**
@@ -257,14 +258,27 @@ export class HealthBillingService {
       console.warn('[HealthBillingService] Ledger recording warning (non-fatal for coverage):', ledgerErr?.message || ledgerErr);
     }
 
+    const enrolmentRow = (invoice as any).hw_enrolments;
+    const hmoServiceFee = evaluateHmoServiceCharge({
+      tenantId,
+      enrolmentId: enrolmentRow?.id,
+      enrolmentStatus: isFullyPaid
+        ? (enrolmentRow?.status === 'awaiting_premium_payment' ? 'awaiting_insurer_activation' : enrolmentRow?.status)
+        : enrolmentRow?.status,
+      invoicePaid: isFullyPaid,
+      premiumMinor: Number(payment.amount_minor),
+      paymentId,
+      invoiceId,
+    });
+
     await HealthAuditService.log({
       tenantId,
       action: 'payment.confirmed',
       resourceType: 'hw_payments',
       resourceId: paymentId,
-      changes: { invoiceId, amountMinor: payment.amount_minor, quasarReference }
+      changes: { invoiceId, amountMinor: payment.amount_minor, quasarReference, hmoServiceFee }
     });
 
-    return { success: true };
+    return { success: true, hmoServiceFee };
   }
 }

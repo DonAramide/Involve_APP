@@ -32,6 +32,10 @@ export type HmoPermission =
   | 'hmo.claims.adjudicate'
   | 'hmo.billing.view'
   | 'hmo.billing.reconcile'
+  | 'institution.hmo_earnings.view'
+  | 'institution.withdrawals.view'
+  | 'institution.withdrawals.create'
+  | 'institution.bank_accounts.manage'
   | 'hmo.reports.view'
   | 'hmo.reports.export'
   | 'hmo.users.manage'
@@ -58,6 +62,10 @@ export const HMO_ROLE_PERMISSIONS: Record<HmoRole, HmoPermission[]> = {
     'hmo.claims.adjudicate',
     'hmo.billing.view',
     'hmo.billing.reconcile',
+    'institution.hmo_earnings.view',
+    'institution.withdrawals.view',
+    'institution.withdrawals.create',
+    'institution.bank_accounts.manage',
     'hmo.reports.view',
     'hmo.reports.export',
     'hmo.users.manage',
@@ -107,6 +115,10 @@ export const HMO_ROLE_PERMISSIONS: Record<HmoRole, HmoPermission[]> = {
     'hmo.claims.view',
     'hmo.billing.view',
     'hmo.billing.reconcile',
+    'institution.hmo_earnings.view',
+    'institution.withdrawals.view',
+    'institution.withdrawals.create',
+    'institution.bank_accounts.manage',
     'hmo.reports.view',
     'hmo.reports.export',
   ],
@@ -120,6 +132,8 @@ export const HMO_ROLE_PERMISSIONS: Record<HmoRole, HmoPermission[]> = {
     'hmo.preauth.view',
     'hmo.claims.view',
     'hmo.billing.view',
+    'institution.hmo_earnings.view',
+    'institution.withdrawals.view',
     'hmo.reports.view',
     'hmo.audit.view',
   ],

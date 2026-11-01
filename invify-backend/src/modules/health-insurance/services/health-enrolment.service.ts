@@ -78,6 +78,95 @@ export class HealthEnrolmentService {
     };
   }
 
+  private static isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  /**
+   * Resolve an hw_members row for enrolment. Accepts:
+   * - hw_members.id (UUID)
+   * - students.id (UUID) via studentId / student_id
+   * - students.admission_number via admissionNumber / admission_number
+   * - legacy mobile clients that send admission_number in memberId
+   * Creates the hw_members row when a tenant student is found but not yet a member.
+   */
+  static async resolveMemberForEnrolment(
+    ctx: HealthContext,
+    params: {
+      memberId?: string;
+      studentId?: string;
+      admissionNumber?: string;
+    },
+  ): Promise<{ id: string; tenant_id: string; member_category: string }> {
+    const memberId = String(params.memberId || '').trim();
+    const studentId = String(params.studentId || '').trim();
+    const admissionNumber = String(params.admissionNumber || '').trim();
+
+    if (memberId && this.isUuid(memberId)) {
+      const { data: byMemberId } = await supabaseAdmin
+        .from('hw_members')
+        .select('id, tenant_id, member_category')
+        .eq('id', memberId)
+        .eq('tenant_id', ctx.tenantId)
+        .maybeSingle();
+      if (byMemberId) return byMemberId;
+
+      // Mobile/web may pass the students.id UUID in memberId.
+      try {
+        const { HealthMemberService } = await import('./health-member.service');
+        const ensured = await HealthMemberService.enrolStudentMember(ctx, memberId);
+        return {
+          id: String(ensured.id),
+          tenant_id: ctx.tenantId,
+          member_category: 'student',
+        };
+      } catch {
+        throw new Error('Member not found');
+      }
+    }
+
+    const studentUuid = studentId && this.isUuid(studentId) ? studentId : '';
+    if (studentUuid) {
+      const { HealthMemberService } = await import('./health-member.service');
+      const ensured = await HealthMemberService.enrolStudentMember(ctx, studentUuid);
+      return {
+        id: String(ensured.id),
+        tenant_id: ctx.tenantId,
+        member_category: 'student',
+      };
+    }
+
+    const admission = admissionNumber || (!this.isUuid(memberId) ? memberId : '');
+    if (!admission) {
+      throw new Error('Member not found');
+    }
+
+    const { data: students, error: stuErr } = await supabaseAdmin
+      .from('students')
+      .select('id, tenant_id, school_id, admission_number')
+      .eq('admission_number', admission)
+      .limit(25);
+
+    if (stuErr) throw new Error(`Member lookup failed: ${stuErr.message}`);
+
+    const student = (students || []).find((row: any) => {
+      const tenant = row.tenant_id || row.school_id;
+      return String(tenant) === String(ctx.tenantId);
+    });
+
+    if (!student?.id) {
+      throw new Error('Member not found');
+    }
+
+    const { HealthMemberService } = await import('./health-member.service');
+    const ensured = await HealthMemberService.enrolStudentMember(ctx, String(student.id));
+    return {
+      id: String(ensured.id),
+      tenant_id: ctx.tenantId,
+      member_category: 'student',
+    };
+  }
+
   /**
    * Create an enrolment in draft/enrolment_pending status.
    */
@@ -91,20 +180,19 @@ export class HealthEnrolmentService {
     }
   ) {
     const raw = params as any;
-    const memberId = String(raw.memberId || raw.member_id || '');
+    const memberIdRaw = String(raw.memberId || raw.member_id || '');
+    const studentIdRaw = String(raw.studentId || raw.student_id || '');
+    const admissionNumberRaw = String(raw.admissionNumber || raw.admission_number || '');
     const planVersionId = String(raw.planVersionId || raw.plan_version_id || '');
     const periodStart = String(raw.periodStart || raw.period_start || raw.start_date || '');
     const periodEnd = String(raw.periodEnd || raw.period_end || raw.end_date || '');
 
-    // 1. Verify member exists in this tenant
-    const { data: member, error: memErr } = await supabaseAdmin
-      .from('hw_members')
-      .select('id, tenant_id, member_category')
-      .eq('id', memberId)
-      .eq('tenant_id', ctx.tenantId)
-      .maybeSingle();
-
-    if (memErr || !member) throw new Error('Member not found');
+    // 1. Resolve or create hw_members for this tenant (member UUID, student UUID, or admission number)
+    const member = await this.resolveMemberForEnrolment(ctx, {
+      memberId: memberIdRaw,
+      studentId: studentIdRaw,
+      admissionNumber: admissionNumberRaw,
+    });
 
     // 2. Verify plan version is published and offered by tenant
     const { data: offer, error: offErr } = await supabaseAdmin
@@ -129,7 +217,7 @@ export class HealthEnrolmentService {
       .from('hw_enrolments')
       .insert({
         tenant_id: ctx.tenantId,
-        member_id: memberId,
+        member_id: member.id,
         plan_version_id: planVersionId,
         period_start: periodStart,
         period_end: periodEnd,

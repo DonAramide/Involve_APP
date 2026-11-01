@@ -3,12 +3,15 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireHealthInsuranceEnabled } from './guards/health-flag.guard';
 import { requireHealthPermission } from './guards/health-permission.guard';
+import { requireHealthTenantContext } from './guards/health-tenant-context.guard';
 import { requireGuardianLink } from './guards/guardian-access.guard';
 import { HealthController } from './controllers/health.controller';
+
 import { HealthPlatformController } from './controllers/health-platform.controller';
 import { HmoPortalController } from './controllers/hmo-portal.controller';
 import { HealthFinanceController } from './controllers/health-finance.controller';
 import { requireHmoInstitution } from './guards/hmo-institution.guard';
+import { attachHmoMonetisationRoutes } from '../hmo-monetisation/register-routes';
 
 export function createHmoPortalRouter(): Router {
   const hmoRouter = Router();
@@ -152,19 +155,19 @@ export function createHealthInsuranceRouter(): Router {
   router.get('/overview', requireHealthPermission('health.reports.read'), HealthController.getOverview);
   router.get('/reports/overview', requireHealthPermission('health.reports.read'), HealthController.getOverview);
 
-  // 2. Settings
-  router.get('/settings', requireHealthPermission('health.settings.manage'), HealthController.getSettings);
+  // 2. Settings (GET is readable by any tenant member / guardian — mobile HMO card)
+  router.get('/settings', requireHealthTenantContext(), HealthController.getSettings);
   router.post('/settings', requireHealthPermission('health.settings.manage'), HealthController.updateSettings);
 
   // 3. Providers & Plans
   router.get('/providers', HealthController.listProviders);
   router.get('/plans', HealthController.listPlans);
   router.get('/providers/:providerId/plans', HealthController.listPlans);
-  router.get('/tenant-offers', HealthController.listTenantOffers);
-  router.get('/plans/offers', HealthController.listTenantOffers);
+  router.get('/tenant-offers', requireHealthTenantContext(), HealthController.listTenantOffers);
+  router.get('/plans/offers', requireHealthTenantContext(), HealthController.listTenantOffers);
   router.post('/tenant-offers', requireHealthPermission('health.plans.manage'), HealthController.configureTenantOffer);
   router.post('/plans/offers', requireHealthPermission('health.plans.manage'), HealthController.configureTenantOffer);
-  router.get('/facilities', HealthController.listFacilities);
+  router.get('/facilities', requireHealthTenantContext(), HealthController.listFacilities);
 
   // 4. Members
   router.get('/members', requireHealthPermission('health.members.read'), HealthController.listMembers);
@@ -214,5 +217,6 @@ export function attachHealthInsuranceRoutes(app: any): void {
   app._healthInsuranceRoutesAttached = true;
   app.use('/api/v1/health-insurance', createHealthInsuranceRouter());
   app.use('/api/agent/hmo', createHmoPortalRouter());
+  attachHmoMonetisationRoutes(app);
   console.log('[HealthInsurance] Routes attached at /api/v1/health-insurance and /api/agent/hmo');
 }

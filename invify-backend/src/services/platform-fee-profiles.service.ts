@@ -16,6 +16,7 @@ export const PLATFORM_FEE_TRANSACTION_TYPES: FeeTransactionType[] = [
   'TREASURY_TRANSFER',
   'SMS',
   'AI_TASK',
+  'HMO_SERVICE',
 ];
 
 export const POS_WITHDRAWAL_DEFAULTS = {
@@ -25,6 +26,20 @@ export const POS_WITHDRAWAL_DEFAULTS = {
   min_fee_kobo: 0,
   max_fee_kobo: 5000,
 };
+
+/** Proposed 5% HMO service fee. Unpublished until enum + checker publish. */
+export const HMO_SERVICE_DEFAULTS = {
+  method: 'PERCENTAGE' as const,
+  percentage_bps: 500,
+  flat_amount_kobo: 0,
+  min_fee_kobo: 0,
+  max_fee_kobo: 0,
+};
+
+/** Example fixed charge: ₦500 per approved HMO request. */
+export const HMO_SERVICE_FIXED_EXAMPLE_KOBO = 50_000;
+
+const HMO_VIRTUAL_PROFILE_ID = '00000000-0000-4000-a000-0000000000f1';
 
 const METHODS: FeeCalcMethod[] = ['FLAT', 'PERCENTAGE', 'HYBRID'];
 
@@ -276,6 +291,56 @@ export function computePreview(input: {
   };
 }
 
+function virtualHmoCatalog(agent: { id: string; agent_code: string; first_name?: string | null; last_name?: string | null } | null) {
+  const fields: DraftFeeFields = {
+    ...HMO_SERVICE_DEFAULTS,
+    platform_share_bps: 0,
+    processor_share_bps: 0,
+    service_share_bps: 0,
+    agent_share_bps: 0,
+    notes:
+      'HMO_SERVICE is catalogued in application code. Persist and publish only after DO_NOT_APPLY_hmo_service_fee_catalog.sql is approved. Wallet posting stays blocked until fee ownership is approved.',
+  };
+  return {
+    profile: {
+      id: HMO_VIRTUAL_PROFILE_ID,
+      transaction_type: 'HMO_SERVICE' as FeeTransactionType,
+      display_name: 'HMO Service Fee',
+      description:
+        'Invify HMO service charge, separate from insurer premium. Not posted until financial ownership is approved.',
+      current_published_version_id: null,
+      created_at: null,
+      updated_at: null,
+      scope: 'GLOBAL',
+      agent_id: agent ? String(agent.id) : null,
+    },
+    agent: agent
+      ? {
+          id: String(agent.id),
+          agent_code: agent.agent_code,
+          name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim(),
+        }
+      : null,
+    fee_source: agent ? 'GLOBAL_FALLBACK' : 'GLOBAL',
+    fee_source_label: agent ? 'GLOBAL FALLBACK' : 'Global configuration',
+    draft: null,
+    published: null,
+    working_version: null,
+    fields,
+    proposal: null,
+    pos_locked: false,
+    pos_tariff_locked: false,
+    publish_ready: false,
+    publish_blockers: [
+      'HMO_SERVICE enum is not applied on this database.',
+      'Fee ownership (Invify vs institution vs HMO) is unresolved — posting is blocked.',
+    ],
+    versions: [],
+    schema_pending: true,
+    schema_pending_code: 'HMO_FEE_ENUM_UNAPPLIED',
+  };
+}
+
 export class PlatformFeeProfilesService {
   constructor(private readonly db: DbClient = supabaseAdmin) {}
 
@@ -401,7 +466,10 @@ export class PlatformFeeProfilesService {
     const agentProfile = agent ? await this.loadAgentProfileRow(transactionType, String(agent.id)) : null;
     const profile = agentProfile || globalProfile;
     const feeSource = agentProfile ? 'AGENT_PROFILE' : 'GLOBAL_FALLBACK';
-    if (!profile) throw Object.assign(new Error('Fee profile not found'), { status: 404 });
+    if (!profile) {
+      if (transactionType === 'HMO_SERVICE') return virtualHmoCatalog(agent);
+      throw Object.assign(new Error('Fee profile not found'), { status: 404 });
+    }
 
     const { data: versions, error: vErr } = await this.db
       .from('fee_profile_versions')
@@ -501,6 +569,12 @@ export class PlatformFeeProfilesService {
     }
 
     const detail = await this.getProfile(transactionType, agentId);
+    if ((detail as { schema_pending?: boolean }).schema_pending) {
+      throw Object.assign(
+        new Error('HMO_SERVICE cannot be persisted until the fee_transaction_type enum is applied on this database.'),
+        { status: 409, code: 'HMO_FEE_ENUM_UNAPPLIED' },
+      );
+    }
     const versions = detail.versions;
     const existingDraft = versions.find((v) => v.status === 'DRAFT');
     const payload = {
@@ -684,7 +758,9 @@ export class PlatformFeeProfilesService {
               ),
             })
             .eq('id', published.id);
-          if (govErr) throw Object.assign(new Error(govErr.message), { status: 400 });
+          if (govErr && !String(govErr.message || '').includes('cannot be modified')) {
+            throw Object.assign(new Error(govErr.message), { status: 400 });
+          }
           const refreshed = await this.getProfile(transactionTypeRaw, agentId);
           return { published_version_id: published.id, already_published: true, ...refreshed };
         }
@@ -708,29 +784,30 @@ export class PlatformFeeProfilesService {
       throw Object.assign(new Error('Cannot publish another Agent or a stale draft version'), { status: 403 });
     }
 
+    const publishedNotes = writePublishedMcNotes(
+      {
+        status: 'published',
+        makerId: detail.proposal.makerId,
+        makerEmail: detail.proposal.makerEmail,
+        proposedAt: detail.proposal.proposedAt,
+        versionId: draft.id,
+        checkerId: actor.id,
+        checkerEmail: actor.email,
+        approvedAt: new Date().toISOString(),
+      },
+      parseMcNotes(draft.notes).operatorNotes,
+    );
+    const { error: govErr } = await this.db
+      .from('fee_profile_versions')
+      .update({ notes: publishedNotes })
+      .eq('id', draft.id)
+      .eq('status', 'DRAFT');
+    if (govErr) throw Object.assign(new Error(govErr.message), { status: 400 });
+
     const { data, error } = await this.db.rpc('publish_fee_profile_version', {
       p_version_id: draft.id,
     });
     if (error) throw Object.assign(new Error(error.message), { status: 400 });
-    const { error: govErr } = await this.db
-      .from('fee_profile_versions')
-      .update({
-        notes: writePublishedMcNotes(
-          {
-            status: 'published',
-            makerId: detail.proposal.makerId,
-            makerEmail: detail.proposal.makerEmail,
-            proposedAt: detail.proposal.proposedAt,
-            versionId: draft.id,
-            checkerId: actor.id,
-            checkerEmail: actor.email,
-            approvedAt: new Date().toISOString(),
-          },
-          parseMcNotes(draft.notes).operatorNotes,
-        ),
-      })
-      .eq('id', draft.id);
-    if (govErr) throw Object.assign(new Error(govErr.message), { status: 400 });
     await this.auditFeeChange(agentId, transactionTypeRaw, 'PUBLISHED', {
       previous_version: detail.published?.id || null,
       new_version: draft.id,

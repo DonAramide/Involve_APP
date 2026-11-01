@@ -81,6 +81,9 @@ const routes = [
       { path: 'assign-device', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
       { path: 'assign-terminal', component: () => import('pages/agent/InstituteAssignmentHoldPage.vue') },
       { path: 'hmo/:section', component: () => import('pages/agent/InstituteHmoWorkspace.vue') },
+      { path: 'finance/hmo-earnings', component: () => import('pages/agent/InstitutionHmoEarningsPage.vue'), meta: { title: 'HMO Earnings' } },
+      { path: 'finance/withdrawals', component: () => import('pages/agent/InstitutionWithdrawalsPage.vue'), meta: { title: 'Institution Withdrawals' } },
+      { path: 'settings/bank-accounts', component: () => import('pages/tenant/BankAccountsPage.vue'), props: { mode: 'institution' }, meta: { title: 'Bank Accounts' } },
       { path: 'notifications', component: () => import('pages/agent-portal/AgentNotificationsPage.vue') },
       { path: 'profile', component: () => import('pages/agent-portal/AgentProfilePage.vue') },
       { path: 'leads', component: () => import('pages/agent-portal/leads/LeadKanbanPage.vue') },
@@ -246,6 +249,11 @@ const routes = [
         path: 'governance/audit-trail', 
         component: () => import('pages/governance/AuditTrailPage.vue'),
         meta: { title: 'Immutable Audit Lineage', workspace: 'governance', permission: 'read_audit', requiresAuth: true }
+      },
+      {
+        path: 'governance/bank-accounts',
+        component: () => import('pages/governance/BankAccountVerificationPage.vue'),
+        meta: { title: 'Bank Account Verification', workspace: 'governance', permission: 'platform.bank_accounts.view', requiresAuth: true }
       },
       { 
         path: 'governance/user-devices', 
@@ -469,7 +477,8 @@ const routes = [
 
 
       { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true, keywords: ['subscription', 'plans'] } },
-      { path: 'admin/platform-fees', component: () => import('pages/admin/PlatformFeeProfilesPage.vue'), meta: { workspace: 'finance', title: 'Platform Fee Orchestration', permission: 'read_finance', requiresAuth: true, keywords: ['platform fees', 'fee profiles', 'pos withdrawal', 'orchestration'] } },
+      { path: 'admin/platform-fees', component: () => import('pages/admin/PlatformFeeProfilesPage.vue'), meta: { workspace: 'finance', title: 'Platform Fee Orchestration', permission: 'read_finance', requiresAuth: true, keywords: ['platform fees', 'fee profiles', 'pos withdrawal', 'orchestration', 'hmo'] } },
+      { path: 'admin/hmo-finance', component: () => import('pages/admin/HmoFinanceReportPage.vue'), meta: { workspace: 'finance', title: 'HMO Financial Reconciliation', permission: 'read_finance', requiresAuth: true, keywords: ['hmo', 'reconciliation', 'service fee'] } },
       { path: 'admin/platform-fees/assessments', component: () => import('pages/admin/PlatformFeeAssessmentsPage.vue'), meta: { workspace: 'finance', title: 'Fee Assessments', permission: 'read_finance', requiresAuth: true, keywords: ['fee assessments', 'shadow', 'reconciliation'] } },
       { path: 'admin/platform-fees/assessments/:assessmentId', component: () => import('pages/admin/PlatformFeeAssessmentDetailPage.vue'), meta: { workspace: 'finance', title: 'Fee Assessment Detail', permission: 'read_finance', requiresAuth: true } },
       { path: 'admin/platform-fees/distribution', component: () => import('pages/admin/PlatformFeeDistributionPage.vue'), meta: { workspace: 'finance', title: 'Fee Distribution', permission: 'read_finance', requiresAuth: true, keywords: ['fee distribution', 'stakeholders', 'shadow'] } },
@@ -533,6 +542,7 @@ const routes = [
       { path: 'activity', component: () => import('src/domains/tenant/users/pages/TenantActivityPage.vue'), meta: { title: 'Activity Audit', requiresAuth: true, permission: 'tenant.activity.view' } },
       { path: 'reports', component: () => import('src/domains/tenant/reports/pages/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true, permission: 'tenant.reports.view' } },
       { path: 'settings', component: () => import('src/domains/tenant/settings/pages/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true, permission: 'tenant.settings.manage' } },
+      { path: 'settings/bank-accounts', component: () => import('pages/tenant/BankAccountsPage.vue'), props: { mode: 'tenant' }, meta: { title: 'Bank Accounts', requiresAuth: true, permission: 'tenant.bank_accounts.manage' } },
       { path: 'settings/financial-platform', component: () => import('src/pages/financial-platform/FinancialPlatformPage.vue'), meta: { title: 'Financial Platform', requiresAuth: true, permission: 'tenant.settings.manage' } },
       { path: 'profile', component: () => import('src/domains/tenant/settings/pages/TenantProfilePage.vue'), meta: { title: 'My Account & Security', requiresAuth: true, permission: 'tenant.settings.manage' } },
       
