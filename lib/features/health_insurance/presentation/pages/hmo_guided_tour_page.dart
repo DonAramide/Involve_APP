@@ -1,5 +1,6 @@
 // lib/features/health_insurance/presentation/pages/hmo_guided_tour_page.dart
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/service_mode/service_mode_terms.dart';
 import '../utils/hmo_tour_storage.dart';
 
 class HmoTourStep {
@@ -29,8 +30,12 @@ class HmoGuidedTourPage extends StatefulWidget {
 
   final String? userId;
   final String? tenantId;
+  /// Display name of the organisation (legacy param name: schoolName).
   final String? schoolName;
+  final String? organizationName;
   final String? hmoProviderName;
+  /// Tenant business mode: school / retail / services.
+  final String? businessMode;
   final VoidCallback? onFinish;
 
   const HmoGuidedTourPage({
@@ -38,7 +43,9 @@ class HmoGuidedTourPage extends StatefulWidget {
     this.userId,
     this.tenantId,
     this.schoolName,
+    this.organizationName,
     this.hmoProviderName,
+    this.businessMode,
     this.onFinish,
   });
 
@@ -50,78 +57,89 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
 
+  late final ServiceModeTerms _terms;
   late final List<HmoTourStep> _steps;
 
   @override
   void initState() {
     super.initState();
-    final school = widget.schoolName?.trim().isNotEmpty == true ? widget.schoolName! : 'Your School';
-    final hmo = widget.hmoProviderName?.trim().isNotEmpty == true ? widget.hmoProviderName! : 'Accredited HMO Partners';
+    _terms = ServiceModeTerms.fromRaw(widget.businessMode);
+    final orgRaw = (widget.organizationName ?? widget.schoolName)?.trim();
+    final org = (orgRaw != null && orgRaw.isNotEmpty)
+        ? orgRaw
+        : 'Your ${_terms.organisation}';
+    final hmo = widget.hmoProviderName?.trim().isNotEmpty == true
+        ? widget.hmoProviderName!
+        : 'Accredited HMO Partners';
+    final orgLower = _terms.organisation.toLowerCase();
+    final beneficiariesLower = _terms.beneficiaries.toLowerCase();
+    final responsibleLower = _terms.responsiblePerson.toLowerCase();
 
     _steps = [
-      // Step 1: Welcome to Health & Wellness
       HmoTourStep(
         title: 'Welcome to Health & Wellness',
-        subtitle: '$school has partnered with $hmo to provide an integrated digital healthcare experience for eligible students and staff.',
+        subtitle:
+            '$org has partnered with $hmo to provide an integrated digital healthcare experience for eligible $beneficiariesLower and staff.',
         imageAsset: 'assets/images/hmo_welcome.jpg',
         fallbackIcon: Icons.health_and_safety_rounded,
         themeColor: Colors.teal,
         bulletPoints: [
-          'View health plans tailored specifically for your school community.',
+          'View health plans tailored specifically for your $orgLower community.',
           'Track enrollment verification status live from your phone.',
           'Access a Digital Health ID pass once coverage is verified and activated.',
-          'Clear visibility into what your school and the HMO each provide.',
+          'Clear visibility into what your $orgLower and the HMO each provide.',
         ],
-        calloutText: 'Digital Health Pass is issued exclusively after policy confirmation.',
+        calloutText:
+            'Digital Health Pass is issued exclusively after policy confirmation.',
       ),
-
-      // Step 2: What is an HMO?
-      const HmoTourStep(
+      HmoTourStep(
         title: 'What is an HMO?',
-        subtitle: 'A Health Maintenance Organization (HMO) coordinates medical care through an authorized network of healthcare professionals.',
+        subtitle:
+            'A Health Maintenance Organization (HMO) coordinates medical care through an authorized network of healthcare professionals.',
         imageAsset: 'assets/images/hmo_what_is.png',
         fallbackIcon: Icons.local_hospital_rounded,
         themeColor: Colors.indigo,
-        bulletPoints: [
+        bulletPoints: const [
           'Direct access to designated clinics, private hospitals, and diagnostic centers.',
           'Coverage for outpatient consultations, inpatient admissions, and prescription drugs.',
           '24/7 emergency medical support and pre-authorized hospital admissions.',
           'No out-of-pocket payment required for covered benefits at network facilities.',
         ],
-        calloutText: 'Covered hospital tiers and benefits depend on your school\'s selected plan.',
+        calloutText:
+            'Covered hospital tiers and benefits depend on your $orgLower\'s selected plan.',
       ),
-
-      // Step 3: Explore your school's plans
       HmoTourStep(
-        title: 'Explore School Health Plans',
-        subtitle: '$school administration selects and configures the exact plan packages offered to eligible families and staff.',
+        title: 'Explore ${_terms.hmoPlans}',
+        subtitle:
+            '$org administration selects and configures the exact plan packages offered to eligible $beneficiariesLower and staff.',
         imageAsset: 'assets/images/hmo_plans.png',
         fallbackIcon: Icons.menu_book_rounded,
         themeColor: Colors.purple,
         bulletPoints: [
           'Compare covered benefits, hospital tiers, and annual premium schedules.',
-          'See if your school subsidizes coverage (school-funded, shared, or member-paid).',
-          'Understand your exact family contribution before initiating enrollment.',
+          'See if your $orgLower subsidizes coverage (${orgLower}-funded, shared, or member-paid).',
+          'Understand your exact contribution before initiating enrollment.',
           'Transparent basis-point splits guarantee zero hidden charges.',
         ],
-        calloutText: 'If no plans are currently visible, your school administration has not published them yet.',
+        calloutText:
+            'If no plans are currently visible, your $orgLower administration has not published them yet.',
       ),
-
-      // Step 4: How enrollment works
-      const HmoTourStep(
+      HmoTourStep(
         title: 'How Enrollment Works',
-        subtitle: 'A streamlined, 5-step journey ensures your beneficiary is enrolled and registered with the health insurer.',
+        subtitle:
+            'A streamlined, 5-step journey ensures your beneficiary is enrolled and registered with the health insurer.',
         imageAsset: 'assets/images/hmo_enrollment.png',
         fallbackIcon: Icons.assignment_turned_in_rounded,
         themeColor: Colors.teal,
         bulletPoints: [
-          '1. Select Beneficiary: Choose your linked child from the verified roster.',
-          '2. Choose Plan: Pick an eligible school health package.',
-          '3. Review Contribution: Confirm subsidy and parent share.',
-          '4. Submit Request: Registered with school administration for verification.',
+          '1. Select Beneficiary: Choose a linked ${_terms.beneficiary.toLowerCase()} from the verified roster.',
+          '2. Choose Plan: Pick an eligible ${_terms.beneficiary.toLowerCase()} health package.',
+          '3. Review Contribution: Confirm subsidy and $responsibleLower share.',
+          '4. Submit Request: Registered with $orgLower administration for verification.',
           '5. Insurer Activation: HMO issues policy number and digital ID pass.',
         ],
-        calloutText: 'IMPORTANT: Submitting enrollment does NOT immediately activate coverage. Full coverage begins once verified and activated by the insurer.',
+        calloutText:
+            'IMPORTANT: Submitting enrollment does NOT immediately activate coverage. Full coverage begins once verified and activated by the insurer.',
         isNotice: true,
       ),
     ];
@@ -192,15 +210,12 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Progress Bar
             LinearProgressIndicator(
               value: (_currentIndex + 1) / _steps.length,
               backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
               valueColor: AlwaysStoppedAnimation<Color>(step.themeColor),
               minHeight: 4,
             ),
-
-            // Page View
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -213,8 +228,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
                 },
               ),
             ),
-
-            // Bottom Navigation Toolbar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
@@ -225,7 +238,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
               ),
               child: Row(
                 children: [
-                  // Back Button (hidden on first page)
                   if (_currentIndex > 0)
                     OutlinedButton.icon(
                       key: const Key('hmo_tour_back_button'),
@@ -240,10 +252,7 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
                     )
                   else
                     const SizedBox(width: 80),
-
                   const Spacer(),
-
-                  // Dots Indicator
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: List.generate(
@@ -261,10 +270,7 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
                       ),
                     ),
                   ),
-
                   const Spacer(),
-
-                  // Next / Finish Button
                   ElevatedButton.icon(
                     key: const Key('hmo_tour_next_button'),
                     onPressed: _nextPage,
@@ -276,7 +282,10 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
                       ),
                       elevation: 1,
                     ),
-                    icon: Icon(isLastStep ? Icons.check_circle_outline : Icons.arrow_forward, size: 18),
+                    icon: Icon(
+                      isLastStep ? Icons.check_circle_outline : Icons.arrow_forward,
+                      size: 18,
+                    ),
                     label: Text(
                       isLastStep ? 'Get Started' : 'Next',
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -300,7 +309,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Illustration Card
           Center(
             child: Container(
               height: 200,
@@ -328,8 +336,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
             ),
           ),
           const SizedBox(height: 18),
-
-          // Title
           Text(
             step.title,
             style: theme.textTheme.headlineSmall?.copyWith(
@@ -338,8 +344,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
             ),
           ),
           const SizedBox(height: 6),
-
-          // Subtitle
           Text(
             step.subtitle,
             style: TextStyle(
@@ -349,8 +353,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Bullet Points
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -388,7 +390,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
               }).toList(),
             ),
           ),
-
           if (step.calloutText != null) ...[
             const SizedBox(height: 14),
             Container(
@@ -430,7 +431,6 @@ class _HmoGuidedTourPageState extends State<HmoGuidedTourPage> {
               ),
             ),
           ],
-
           const SizedBox(height: 16),
         ],
       ),

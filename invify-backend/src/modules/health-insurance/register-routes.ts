@@ -26,6 +26,7 @@ export function createHmoPortalRouter(): Router {
 
   // 3. School & Employer Network
   hmoRouter.get('/schools', requireHmoInstitution('hmo.schools.view'), HmoPortalController.listSchools);
+  hmoRouter.get('/schools/:tenantId', requireHmoInstitution('hmo.schools.view'), HmoPortalController.getSchoolTenantMetrics);
   hmoRouter.patch('/schools/:tenantId', requireHmoInstitution('hmo.schools.manage'), HmoPortalController.updateSchoolOnboarding);
 
   // 4. Insurance Plans & Versioned Benefits
@@ -185,6 +186,8 @@ export function createHealthInsuranceRouter(): Router {
   router.get('/enrolments', requireHealthPermission('health.members.read'), HealthController.listEnrolments);
   router.post('/enrolments', requireHealthPermission('health.enrolments.manage'), HealthController.createEnrolment);
   router.post('/enrolments/:id/verify', requireHealthPermission('health.enrolments.verify'), HealthController.verifyEnrolment);
+  router.delete('/enrolments/:id', requireHealthPermission('health.enrolments.manage'), HealthController.dismissRejectedEnrolment);
+  router.post('/enrolments/:id/repush', requireHealthPermission('health.enrolments.manage'), HealthController.repushRejectedEnrolment);
   router.post('/enrolments/:id/simulate-sandbox-activation', requireHealthPermission('health.enrolments.manage'), HealthController.simulateSandboxActivation);
   router.post('/enrolments/:id/activate-policy', requireHealthPermission('health.enrolments.manage'), HealthController.simulateSandboxActivation);
 

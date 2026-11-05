@@ -29,6 +29,8 @@ abstract class HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   });
 
   /// Fetches health claims and pre-authorisation records for the school/policy.
@@ -42,4 +44,10 @@ abstract class HealthInsuranceRepository {
 
   /// Triggers sandbox insurer activation for an enrolment (Staging/Dev only).
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId);
+
+  /// Permanently removes a rejected/cancelled enrolment from the school list.
+  Future<void> dismissRejectedEnrolment(String enrolmentId);
+
+  /// Re-submits a rejected/cancelled enrolment as a fresh pending request.
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId);
 }

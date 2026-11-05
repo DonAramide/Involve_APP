@@ -210,6 +210,30 @@ export class HealthController {
     }
   }
 
+  static async dismissRejectedEnrolment(req: Request, res: Response) {
+    try {
+      const data = await HealthEnrolmentService.dismissRejectedEnrolment(
+        req.healthContext!,
+        req.params.id
+      );
+      return res.status(200).json(data);
+    } catch (err: any) {
+      return res.status(400).json({ error: { message: err?.message } });
+    }
+  }
+
+  static async repushRejectedEnrolment(req: Request, res: Response) {
+    try {
+      const data = await HealthEnrolmentService.repushRejectedEnrolment(
+        req.healthContext!,
+        req.params.id
+      );
+      return res.status(201).json(data);
+    } catch (err: any) {
+      return res.status(400).json({ error: { message: err?.message } });
+    }
+  }
+
   // ─── Billing & Payments ───────────────────────────────────────────
   static async issueInvoice(req: Request, res: Response) {
     try {

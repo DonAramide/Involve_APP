@@ -451,6 +451,143 @@ export class HealthEnrolmentService {
   }
 
   /**
+   * Permanently remove a rejected/cancelled enrolment from the school list.
+   * Cleans confirmation-batch and draft billing/policy children first.
+   */
+  static async dismissRejectedEnrolment(ctx: HealthContext, enrolmentId: string) {
+    const { data: current, error: getErr } = await supabaseAdmin
+      .from('hw_enrolments')
+      .select('id, status, tenant_id')
+      .eq('id', enrolmentId)
+      .eq('tenant_id', ctx.tenantId)
+      .maybeSingle();
+
+    if (getErr || !current) throw new Error('Enrolment not found');
+    if (!['rejected', 'cancelled'].includes(String(current.status))) {
+      throw new Error('Only rejected or cancelled enrolments can be deleted');
+    }
+
+    const { data: policy } = await supabaseAdmin
+      .from('hw_policies')
+      .select('id, status')
+      .eq('enrolment_id', enrolmentId)
+      .maybeSingle();
+
+    if (policy && !['pending', 'cancelled', 'rejected_by_provider'].includes(String(policy.status))) {
+      throw new Error('Cannot delete an enrolment that still has an active policy record');
+    }
+
+    const { data: invoices } = await supabaseAdmin
+      .from('hw_premium_invoices')
+      .select('id, status')
+      .eq('enrolment_id', enrolmentId);
+
+    const blockingInvoice = (invoices || []).find((inv: any) =>
+      ['issued', 'partially_paid', 'paid'].includes(String(inv.status))
+    );
+    if (blockingInvoice) {
+      throw new Error('Cannot delete an enrolment that has billed premiums');
+    }
+
+    // Confirmation-queue / batch rows block hard delete (ON DELETE RESTRICT).
+    await supabaseAdmin.from('hw_enrolment_batch_items').delete().eq('enrolment_id', enrolmentId);
+
+    if ((invoices || []).length > 0) {
+      await supabaseAdmin
+        .from('hw_premium_invoices')
+        .delete()
+        .eq('enrolment_id', enrolmentId)
+        .in('status', ['draft', 'void']);
+    }
+
+    if (policy) {
+      await supabaseAdmin.from('hw_policies').delete().eq('id', policy.id);
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from('hw_enrolments')
+      .delete()
+      .eq('id', enrolmentId)
+      .eq('tenant_id', ctx.tenantId);
+
+    if (delErr) throw new Error(`Failed to delete enrolment: ${delErr.message}`);
+
+    await HealthAuditService.log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.userId,
+      action: 'enrolment.dismissed',
+      resourceType: 'hw_enrolments',
+      resourceId: enrolmentId,
+      changes: { previousStatus: current.status },
+    });
+
+    return { id: enrolmentId, deleted: true };
+  }
+
+  /**
+   * Re-submit a rejected/cancelled enrolment as a fresh enrolment_pending row
+   * using the same member, plan version, and coverage period.
+   */
+  static async repushRejectedEnrolment(ctx: HealthContext, enrolmentId: string) {
+    const { data: current, error: getErr } = await supabaseAdmin
+      .from('hw_enrolments')
+      .select('id, status, member_id, plan_version_id, period_start, period_end')
+      .eq('id', enrolmentId)
+      .eq('tenant_id', ctx.tenantId)
+      .maybeSingle();
+
+    if (getErr || !current) throw new Error('Enrolment not found');
+    if (!['rejected', 'cancelled'].includes(String(current.status))) {
+      throw new Error('Only rejected or cancelled enrolments can be re-pushed');
+    }
+
+    // Unique open-period index: if a live twin already exists, just clear the rejected row.
+    const { data: existingOpen } = await supabaseAdmin
+      .from('hw_enrolments')
+      .select('id, status, member_id, plan_version_id, period_start, period_end, created_at')
+      .eq('tenant_id', ctx.tenantId)
+      .eq('member_id', current.member_id)
+      .eq('plan_version_id', current.plan_version_id)
+      .eq('period_start', current.period_start)
+      .not('status', 'in', '(cancelled,rejected,expired)')
+      .neq('id', enrolmentId)
+      .maybeSingle();
+
+    const result =
+      existingOpen ||
+      (await this.createEnrolment(ctx, {
+        memberId: String(current.member_id),
+        planVersionId: String(current.plan_version_id),
+        periodStart: String(current.period_start),
+        periodEnd: String(current.period_end),
+      }));
+
+    if (!result?.id) {
+      throw new Error('Failed to re-push enrolment');
+    }
+
+    try {
+      await this.dismissRejectedEnrolment(ctx, enrolmentId);
+    } catch {
+      /* keep rejected row if FK cleanup fails; open/pending row still usable */
+    }
+
+    await HealthAuditService.log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.userId,
+      action: 'enrolment.repushed',
+      resourceType: 'hw_enrolments',
+      resourceId: result.id,
+      changes: {
+        fromEnrolmentId: enrolmentId,
+        reusedExisting: Boolean(existingOpen),
+      },
+    });
+
+    return result;
+  }
+
+  /**
    * Staging / Sandbox simulation: Submit to sandbox adapter and activate.
    * Rejected in production.
    */

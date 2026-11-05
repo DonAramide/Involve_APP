@@ -200,5 +200,44 @@ void main() {
       expect(metrics.outstandingNaira, 2500000.0);
       expect(metrics.claimsValueNaira, 3400000.0);
     });
+
+    test('Pending Activation uses the larger of the metric and visible enrolments', () {
+      final draft = HealthEnrolment.fromJson({
+        'id': 'enr-draft',
+        'status': 'draft',
+        'hw_members': {
+          'id': 'mem-3',
+          'member_category': 'student',
+          'students': {'first_name': 'Halen', 'last_name': 'Ade', 'admission_number': '00002'},
+        },
+      });
+      final pending = HealthEnrolment.fromJson({
+        'id': 'enr-pending',
+        'status': 'enrolment_pending',
+        'hw_members': {
+          'id': 'mem-4',
+          'member_category': 'student',
+          'students': {'first_name': 'Ayoyo', 'last_name': 'Domoth', 'admission_number': '00001'},
+        },
+      });
+      expect(draft.isPendingActivation, isTrue);
+      expect(pending.isPendingActivation, isTrue);
+
+      const emptyMetric = HealthOverviewMetrics(
+        totalMembers: 3,
+        enrolledCount: 2,
+        activeCoverageCount: 0,
+        awaitingVerificationCount: 0,
+        awaitingActivationCount: 0,
+        incompleteCount: 2,
+        expiringSoonCount: 0,
+        billedMinor: 0,
+        collectedMinor: 0,
+        outstandingMinor: 0,
+        claimsCount: 0,
+        claimsValueMinor: 0,
+      );
+      expect(emptyMetric.pendingActivationFor([draft, pending]), 2);
+    });
   });
 }

@@ -181,6 +181,13 @@
             class="bg-transparent text-grey-3 font-mono"
             :pagination="{ rowsPerPage: 10 }"
           >
+            <template v-slot:no-data>
+              <div class="full-width column flex-center q-pa-lg text-grey-5">
+                <q-icon name="inbox" size="32px" class="q-mb-sm" />
+                <div class="text-body2">No enrolments match this filter.</div>
+              </div>
+            </template>
+
             <template v-slot:body-cell-status="props">
               <q-td :props="props">
                 <q-badge :color="getEnrolmentBadgeColor(props.value)" class="text-weight-bold">
@@ -194,7 +201,7 @@
                 <div class="row q-gutter-xs no-wrap">
                   <!-- Verification action -->
                   <q-btn
-                    v-if="['draft', 'submitted', 'pending_verification'].includes(props.row.status)"
+                    v-if="['draft', 'enrolment_pending', 'awaiting_verification', 'pending_verification', 'submitted'].includes(props.row.status)"
                     size="xs"
                     color="teal-10"
                     text-color="teal-3"
@@ -203,7 +210,7 @@
                   />
                   <!-- Activate Policy Action -->
                   <q-btn
-                    v-if="['awaiting_premium_payment', 'verified', 'submitted_to_insurer'].includes(props.row.status)"
+                    v-if="['awaiting_premium_payment', 'awaiting_insurer_activation', 'verified', 'submitted_to_insurer'].includes(props.row.status)"
                     size="xs"
                     color="indigo-10"
                     text-color="indigo-3"
@@ -242,7 +249,7 @@
         <q-tab-panel name="guardians" class="q-pa-md">
           <div class="row items-center justify-between q-mb-md">
             <div>
-              <div class="text-subtitle1 text-weight-bold">Student-Guardian Verification Matrix</div>
+              <div class="text-subtitle1 text-weight-bold">{{ terms.hmoVerificationMatrix }}</div>
               <div class="text-caption text-grey-5">
                 Guardians cannot access dependant medical coverage until their relationship is explicitly verified by administration.
               </div>
@@ -504,7 +511,7 @@
             outlined
             dark
             dense
-            label="Member UUID or Admission Number"
+            :label="terms.hmoMemberLookup"
             hint="Select or input existing student/staff ID"
           />
           <q-select
@@ -556,7 +563,7 @@
     <q-dialog v-model="showGuardianDialog">
       <q-card class="bg-card-dark text-white border-grey-9" style="min-width: 480px;">
         <q-card-section class="row items-center justify-between border-bottom">
-          <div class="text-subtitle1 text-weight-bold">Invite Student Guardian</div>
+          <div class="text-subtitle1 text-weight-bold">{{ terms.hmoInviteGuardian }}</div>
           <q-btn flat dense round icon="close" v-close-popup />
         </q-card-section>
         <q-card-section class="q-gutter-md">
@@ -565,7 +572,7 @@
             outlined
             dark
             dense
-            label="Student ID (UUID)"
+            :label="terms.hmoStudentId"
           />
           <q-input
             v-model="newGuardian.guardianEmail"
@@ -809,14 +816,15 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi';
-import { industryLabel, industryWorkplace, tenantIndustry } from 'src/utils/tenantIndustry';
+import { serviceModeTerms } from 'src/utils/serviceModeTerms';
+import { industryLabel, tenantIndustry } from 'src/utils/tenantIndustry';
 
-const workplace = industryWorkplace()
+const terms = serviceModeTerms(tenantIndustry())
 const modeBadge = `${industryLabel()} MODE`
-const memberNoun = tenantIndustry() === 'school' ? 'Students' : 'Members'
-const modeCaption = tenantIndustry() === 'school'
+const memberNoun = terms.hmoMemberNoun
+const modeCaption = terms.isSchool
   ? 'Health insurance administration — manage student, guardian, and staff coverage, premium billing, and insurer activation.'
-  : `Health insurance administration — manage staff, member, and dependant coverage, premium billing, and insurer activation for this ${workplace}.`
+  : `Health insurance administration — manage ${terms.beneficiaries.toLowerCase()}, contacts, and staff coverage, premium billing, and insurer activation for this ${terms.organisation.toLowerCase()}.`
 
 const $q = useQuasar();
 
@@ -844,10 +852,13 @@ const statusFilter = ref('');
 const statusOptions = [
   { label: 'All Statuses', value: '' },
   { label: 'Draft', value: 'draft' },
-  { label: 'Pending Verification', value: 'pending_verification' },
+  { label: 'Enrolment Pending', value: 'enrolment_pending' },
+  { label: 'Awaiting Verification', value: 'awaiting_verification' },
   { label: 'Awaiting Premium Payment', value: 'awaiting_premium_payment' },
+  { label: 'Awaiting Insurer Activation', value: 'awaiting_insurer_activation' },
   { label: 'Active', value: 'active' },
-  { label: 'Terminated', value: 'terminated' }
+  { label: 'Rejected', value: 'rejected' },
+  { label: 'Cancelled', value: 'cancelled' },
 ];
 
 const enrolmentColumns = [
@@ -1055,13 +1066,52 @@ function formatNgn(amount) {
 function getEnrolmentBadgeColor(status) {
   switch (status) {
     case 'active': return 'green-10';
+    case 'enrolment_pending':
+    case 'awaiting_verification':
     case 'pending_verification': return 'amber-10';
     case 'awaiting_premium_payment': return 'orange-10';
+    case 'awaiting_insurer_activation':
     case 'submitted_to_insurer': return 'cyan-10';
     case 'draft': return 'grey-8';
+    case 'rejected':
+    case 'cancelled':
     case 'terminated': return 'red-10';
     default: return 'indigo-10';
   }
+}
+
+function firstRelation(value) {
+  if (Array.isArray(value)) return value[0] || {};
+  return value && typeof value === 'object' ? value : {};
+}
+
+function mapEnrolmentRow(raw) {
+  const member = firstRelation(raw.hw_members || raw.member);
+  const student = firstRelation(member.students);
+  const staffProfile = firstRelation(member.hw_staff_profiles);
+  const tenantStaff = firstRelation(staffProfile.tenant_staff);
+  const planVersion = firstRelation(raw.hw_plan_versions);
+  const plan = firstRelation(planVersion.hw_plans);
+
+  let memberName = '';
+  if (student.first_name || student.last_name) {
+    memberName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+  } else if (tenantStaff.name) {
+    memberName = String(tenantStaff.name);
+  } else if (raw.member_name) {
+    memberName = String(raw.member_name);
+  }
+
+  return {
+    id: raw.id,
+    status: raw.status,
+    status_reason: raw.status_reason || raw.statusReason || null,
+    member_name: memberName || '—',
+    member_type: member.member_category || raw.member_type || '—',
+    plan_name: plan.name || raw.plan_name || '—',
+    start_date: raw.period_start || raw.start_date || '—',
+    period_end: raw.period_end || raw.end_date || null,
+  };
 }
 
 function claimStatusColor(status) {
@@ -1105,10 +1155,21 @@ async function loadOverviewMetrics() {
 async function loadEnrolments() {
   loadingEnrolments.value = true;
   try {
-    const res = await healthInsuranceApi.getEnrolments({ status: statusFilter.value || undefined });
-    enrolments.value = res.data || [];
+    const res = await healthInsuranceApi.getEnrolments({
+      status: statusFilter.value || undefined,
+      limit: 100,
+    });
+    // API returns { data: [...], pagination }; axios body is that object.
+    const payload = res?.data;
+    const list = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    enrolments.value = list.map(mapEnrolmentRow);
   } catch (err) {
     console.warn('Enrolments load:', err?.message);
+    enrolments.value = [];
   } finally {
     loadingEnrolments.value = false;
   }
@@ -1118,9 +1179,15 @@ async function loadPolicies() {
   loadingPolicies.value = true;
   try {
     const res = await healthInsuranceApi.getPolicies();
-    policies.value = res.data || [];
+    const payload = res?.data;
+    policies.value = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
   } catch (err) {
     console.warn('Policies load:', err?.message);
+    policies.value = [];
   } finally {
     loadingPolicies.value = false;
   }
@@ -1130,9 +1197,15 @@ async function loadInvoices() {
   loadingInvoices.value = true;
   try {
     const res = await healthInsuranceApi.getInvoices();
-    invoices.value = res.data || [];
+    const payload = res?.data;
+    invoices.value = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
   } catch (err) {
     console.warn('Invoices load:', err?.message);
+    invoices.value = [];
   } finally {
     loadingInvoices.value = false;
   }

@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class="row op-gap-8">
-        <q-btn dense color="teal-4" text-color="black" icon="add_link" label="Assign to School" no-caps class="text-weight-bold q-px-sm" @click="showAssignDialog = true" />
+        <q-btn dense color="teal-4" text-color="black" icon="add_link" label="Assign to School" no-caps class="text-weight-bold q-px-sm" @click="openAssignDialog()" />
         <q-btn dense outline color="amber-4" icon="refresh" label="Refresh Catalogue" no-caps class="q-px-sm" :loading="loading" @click="loadCatalogData" />
       </div>
     </div>
@@ -134,7 +134,7 @@
             <div class="text-subtitle2 text-weight-bold">Active School Tenant Subscriptions & Entitlements</div>
             <div class="text-caption text-muted">Products and feature entitlements provisioned to your managed school tenants</div>
           </div>
-          <q-btn dense color="teal-4" text-color="black" icon="add" label="New School Assignment" no-caps class="text-weight-bold" @click="showAssignDialog = true" />
+          <q-btn dense color="teal-4" text-color="black" icon="add" label="New School Assignment" no-caps class="text-weight-bold" @click="openAssignDialog()" />
         </div>
 
         <div v-if="!assignments.length" class="text-center text-muted q-pa-xl column flex-center op-gap-8">
@@ -280,9 +280,29 @@
               emit-value
               map-options
               dark filled dense
+              use-input
+              fill-input
+              hide-selected
+              input-debounce="0"
+              :loading="tenantsLoading"
+              :disable="tenantsLoading"
               label="Choose school tenant..."
               class="bg-panel-darker text-caption"
-            />
+              behavior="menu"
+              popup-content-class="bg-panel text-main"
+              @filter="filterTenants"
+            >
+              <template #no-option>
+                <q-item>
+                  <q-item-section class="text-muted text-caption">
+                    {{ tenantsLoading ? 'Loading linked schools…' : 'No linked school tenants found for this HMO' }}
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
+            <div v-if="!tenantsLoading && !tenantOptions.length" class="text-caption text-amber-4">
+              Link a school under HMO Operations → Schools & Employers first.
+            </div>
           </div>
 
           <div class="column op-gap-4">
@@ -351,6 +371,8 @@ const savingPricing = ref(false)
 const showAssignDialog = ref(false)
 const assignForm = ref({ tenantId: '', productId: '' })
 const assigningProduct = ref(false)
+const tenantsLoading = ref(false)
+const tenantFilter = ref('')
 
 function authHeaders() {
   const token = localStorage.getItem('invify_agent_token')
@@ -363,9 +385,24 @@ const calculatedFinalPriceNaira = computed(() => {
   return baseNaira + (Number(pricingForm.value.adjustmentNaira) || 0)
 })
 
-const tenantOptions = computed(() =>
-  managedTenants.value.map(t => ({ label: `${t.name} (${t.code || t.id.slice(0, 8)})`, value: t.id }))
+const allTenantOptions = computed(() =>
+  managedTenants.value.map((t) => ({
+    label: `${t.name}${t.location ? ` — ${t.location}` : ''}${t.code ? ` (${t.code})` : ''}`,
+    value: t.id,
+  }))
 )
+
+const tenantOptions = computed(() => {
+  const q = String(tenantFilter.value || '').trim().toLowerCase()
+  if (!q) return allTenantOptions.value
+  return allTenantOptions.value.filter((opt) => String(opt.label || '').toLowerCase().includes(q))
+})
+
+function filterTenants(val, update) {
+  update(() => {
+    tenantFilter.value = val || ''
+  })
+}
 
 const productOfferOptions = computed(() =>
   offers.value.map(o => ({
@@ -378,23 +415,65 @@ const chosenOffer = computed(() =>
   offers.value.find(o => o.productId === assignForm.value.productId)
 )
 
+async function loadManagedTenants() {
+  tenantsLoading.value = true
+  try {
+    // HMO linked schools (authoritative for this institute type)
+    const schoolsRes = await axios.get('/api/agent/hmo/schools', { headers: authHeaders() })
+    const schools = schoolsRes.data?.data || []
+    if (schools.length) {
+      managedTenants.value = schools.map((sch) => ({
+        id: sch.tenantId || sch.tenant_id || sch.id,
+        name: sch.schoolName || sch.name || 'School Partner',
+        code: String(sch.tenantId || sch.id || '').slice(0, 8),
+        location: sch.location || sch.state || '',
+      })).filter((t) => t.id)
+      return
+    }
+
+    // Fallback: agent portfolio attribution
+    const [dashRes, portfolioRes] = await Promise.allSettled([
+      axios.get('/api/agent/dashboard', { headers: authHeaders() }),
+      axios.get('/api/agent-portal/tenant/list', { headers: authHeaders() }),
+    ])
+    const fromDash = dashRes.status === 'fulfilled'
+      ? (dashRes.value.data?.recentMerchants || [])
+      : []
+    const fromPortfolio = portfolioRes.status === 'fulfilled'
+      ? (portfolioRes.value.data?.data || [])
+      : []
+    const byId = new Map()
+    for (const m of [...fromDash, ...fromPortfolio]) {
+      const id = m.tenant_id || m.tenantId || m.id
+      if (!id) continue
+      byId.set(String(id), {
+        id: String(id),
+        name: m.business_name || m.businessName || m.name || m.schoolName || 'School Partner',
+        code: m.agent_code || String(id).slice(0, 8),
+        location: m.location || m.state || '',
+      })
+    }
+    managedTenants.value = [...byId.values()]
+  } catch (err) {
+    console.error('[HmoProductCatalogueView] tenants load error:', err)
+    managedTenants.value = []
+  } finally {
+    tenantsLoading.value = false
+  }
+}
+
 async function loadCatalogData() {
   loading.value = true
   try {
-    const [prodRes, offerRes, asgnRes, tenantRes] = await Promise.all([
+    const [prodRes, offerRes, asgnRes] = await Promise.all([
       axios.get('/api/agent/catalog/products', { headers: authHeaders() }),
       axios.get('/api/agent/catalog/offers', { headers: authHeaders() }),
       axios.get('/api/agent/catalog/assignments', { headers: authHeaders() }),
-      axios.get('/api/agent/dashboard', { headers: authHeaders() })
     ])
     masterProducts.value = prodRes.data?.data || []
     offers.value = offerRes.data?.data || []
     assignments.value = asgnRes.data?.data || []
-    managedTenants.value = (tenantRes.data?.recentMerchants || []).map(m => ({
-      id: m.id,
-      name: m.business_name || 'School Partner',
-      code: m.agent_code
-    }))
+    await loadManagedTenants()
   } catch (err) {
     console.error('[HmoProductCatalogueView] load error:', err)
   } finally {
@@ -431,9 +510,14 @@ function openPricingDialogFromMaster(prod) {
   }
 }
 
-function quickAssign(offer) {
-  assignForm.value.productId = offer.productId
+async function openAssignDialog(productId = '') {
+  if (productId) assignForm.value.productId = productId
   showAssignDialog.value = true
+  await loadManagedTenants()
+}
+
+async function quickAssign(offer) {
+  await openAssignDialog(offer.productId)
 }
 
 async function saveOfferPricing() {

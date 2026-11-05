@@ -181,22 +181,38 @@ class TenantPlanOffer extends Equatable {
   });
 
   factory TenantPlanOffer.fromJson(Map<String, dynamic> json) {
-    final version = json['hw_plan_versions'] as Map<String, dynamic>? ?? {};
-    final planData = version['hw_plans'] as Map<String, dynamic>? ?? {};
-    final providerData = planData['hw_providers'] as Map<String, dynamic>? ?? {};
+    final rawVersion = json['hw_plan_versions'];
+    final version = rawVersion is Map<String, dynamic>
+        ? rawVersion
+        : (rawVersion is List && rawVersion.isNotEmpty && rawVersion.first is Map<String, dynamic>
+            ? rawVersion.first as Map<String, dynamic>
+            : <String, dynamic>{});
+    final rawPlan = version['hw_plans'];
+    final planData = rawPlan is Map<String, dynamic>
+        ? rawPlan
+        : (rawPlan is List && rawPlan.isNotEmpty && rawPlan.first is Map<String, dynamic>
+            ? rawPlan.first as Map<String, dynamic>
+            : <String, dynamic>{});
+    final rawProvider = planData['hw_providers'];
+    final providerData = rawProvider is Map<String, dynamic>
+        ? rawProvider
+        : (rawProvider is List && rawProvider.isNotEmpty && rawProvider.first is Map<String, dynamic>
+            ? rawProvider.first as Map<String, dynamic>
+            : <String, dynamic>{});
 
     final plan = HealthPlan(
-      id: planData['id'] as String? ?? '',
-      code: planData['code'] as String? ?? '',
-      name: planData['name'] as String? ?? 'School Health Plan',
+      id: planData['id']?.toString() ?? '',
+      code: planData['code']?.toString() ?? '',
+      name: planData['name']?.toString() ?? 'School Health Plan',
       status: 'active',
-      providerId: providerData['id'] as String? ?? '',
-      providerName: providerData['display_name'] as String? ?? 'HMO Partner',
-      planVersionId: version['id'] as String? ?? '',
-      version: version['version'] as String? ?? '1.0',
+      providerId: providerData['id']?.toString() ?? '',
+      providerName: providerData['display_name']?.toString() ?? 'HMO Partner',
+      planVersionId: version['id']?.toString() ?? '',
+      // API returns integer version; hard cast to String throws and empties offers.
+      version: version['version']?.toString() ?? '1.0',
       premiumMinor: (version['premium_minor'] as num?)?.toInt() ?? 0,
-      currency: version['currency'] as String? ?? 'NGN',
-      billingFrequency: version['billing_frequency'] as String? ?? 'annual',
+      currency: version['currency']?.toString() ?? 'NGN',
+      billingFrequency: version['billing_frequency']?.toString() ?? 'annual',
       memberCategories: (version['member_categories'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -211,11 +227,11 @@ class TenantPlanOffer extends Equatable {
     );
 
     return TenantPlanOffer(
-      id: json['id'] as String? ?? '',
-      defaultFunding: json['default_funding'] as String? ?? 'self_funded',
+      id: json['id']?.toString() ?? '',
+      defaultFunding: json['default_funding']?.toString() ?? 'self_funded',
       sharedSplit: (json['shared_split'] as num?)?.toInt() ?? 0,
-      isActive: json['is_active'] as bool? ?? true,
-      planVersionId: version['id'] as String? ?? '',
+      isActive: json['is_active'] == true,
+      planVersionId: version['id']?.toString() ?? '',
       plan: plan,
     );
   }
@@ -352,6 +368,11 @@ class HealthEnrolment extends Equatable {
 
   double get premiumNaira => premiumMinor / 100.0;
   bool get isCoverageActive => status == EnrolmentLifecycleStatus.active && policyStatus == PolicyLifecycleStatus.active;
+  bool get isPendingActivation =>
+      policyStatus == PolicyLifecycleStatus.pendingActivation ||
+      status == EnrolmentLifecycleStatus.enrolmentPending ||
+      status == EnrolmentLifecycleStatus.awaitingPremiumPayment ||
+      status == EnrolmentLifecycleStatus.awaitingInsurerActivation;
 
   factory HealthEnrolment.fromJson(Map<String, dynamic> json) {
     final member = json['hw_members'] as Map<String, dynamic>? ?? {};
@@ -436,10 +457,19 @@ class HealthEnrolment extends Equatable {
         polStatus = PolicyLifecycleStatus.unknown;
     }
 
+    final reason = (json['status_reason'] ??
+            json['statusReason'] ??
+            json['provider_error'] ??
+            json['providerError'] ??
+            json['rejection_reason'] ??
+            json['rejectionReason'])
+        ?.toString()
+        .trim();
+
     return HealthEnrolment(
       id: json['id'] as String? ?? '',
       status: enrolmentStatus,
-      statusReason: json['status_reason'] as String?,
+      statusReason: (reason != null && reason.isNotEmpty) ? reason : null,
       periodStart: json['period_start'] != null ? DateTime.tryParse(json['period_start'] as String) : null,
       periodEnd: json['period_end'] != null ? DateTime.tryParse(json['period_end'] as String) : null,
       providerSyncStatus: json['provider_sync_status'] as String?,
@@ -607,7 +637,15 @@ class HealthOverviewMetrics extends Equatable {
   double get coverageRatePercentage =>
       totalMembers > 0 ? (activeCoverageCount / totalMembers) * 100.0 : 0.0;
 
+  int pendingActivationFor(List<HealthEnrolment> enrolments) {
+    final derived = enrolments.where((item) => item.isPendingActivation).length;
+    return awaitingActivationCount > derived ? awaitingActivationCount : derived;
+  }
+
   factory HealthOverviewMetrics.fromJson(Map<String, dynamic> json) {
+    final nested = json['metrics'] is Map<String, dynamic>
+        ? json['metrics'] as Map<String, dynamic>
+        : const <String, dynamic>{};
     final members = json['members'] is Map<String, dynamic>
         ? json['members'] as Map<String, dynamic>
         : const <String, dynamic>{};
@@ -621,43 +659,56 @@ class HealthOverviewMetrics extends Equatable {
         ? json['billing'] as Map<String, dynamic>
         : const <String, dynamic>{};
 
-    final billedMinor = (json['billedMinor'] as num?)?.toInt() ??
-        (billing['totalInvoicedKobo'] as num?)?.toInt() ??
+    int? asInt(dynamic value) => value is num ? value.toInt() : null;
+
+    final billedMinor = asInt(json['billedMinor']) ??
+        asInt(nested['premiumsBilledMinor']) ??
+        asInt(billing['totalInvoicedKobo']) ??
         0;
-    final collectedMinor = (json['collectedMinor'] as num?)?.toInt() ??
-        (billing['totalPaidKobo'] as num?)?.toInt() ??
+    final collectedMinor = asInt(json['collectedMinor']) ??
+        asInt(nested['premiumsCollectedMinor']) ??
+        asInt(billing['totalPaidKobo']) ??
         0;
-    final outstandingMinor = (json['outstandingMinor'] as num?)?.toInt() ??
-        (billing['outstandingBalanceKobo'] as num?)?.toInt() ??
+    final outstandingMinor = asInt(json['outstandingMinor']) ??
+        asInt(nested['outstandingBalanceMinor']) ??
+        asInt(billing['outstandingBalanceKobo']) ??
         (billedMinor > collectedMinor ? billedMinor - collectedMinor : 0);
 
     return HealthOverviewMetrics(
-      totalMembers: (json['totalMembers'] as num?)?.toInt() ??
-          (members['total'] as num?)?.toInt() ??
+      totalMembers: asInt(json['totalMembers']) ??
+          asInt(nested['eligibleMembers']) ??
+          asInt(members['total']) ??
           0,
-      enrolledCount: (json['enrolledCount'] as num?)?.toInt() ??
-          (enrolments['total'] as num?)?.toInt() ??
+      enrolledCount: asInt(json['enrolledCount']) ??
+          asInt(nested['enrolledMembers']) ??
+          asInt(enrolments['total']) ??
           0,
-      activeCoverageCount: (json['activeCoverageCount'] as num?)?.toInt() ??
-          (policies['active'] as num?)?.toInt() ??
-          (enrolments['active'] as num?)?.toInt() ??
+      activeCoverageCount: asInt(json['activeCoverageCount']) ??
+          asInt(nested['insurerConfirmedActive']) ??
+          asInt(policies['active']) ??
+          asInt(enrolments['active']) ??
           0,
-      awaitingVerificationCount: (json['awaitingVerificationCount'] as num?)?.toInt() ??
-          (enrolments['awaitingVerification'] as num?)?.toInt() ??
+      awaitingVerificationCount: asInt(json['awaitingVerificationCount']) ??
+          asInt(nested['awaitingVerification']) ??
+          asInt(enrolments['awaitingVerification']) ??
           0,
-      awaitingActivationCount: (json['awaitingActivationCount'] as num?)?.toInt() ??
-          (enrolments['awaitingActivation'] as num?)?.toInt() ??
-          (enrolments['awaitingPayment'] as num?)?.toInt() ??
+      awaitingActivationCount: asInt(json['awaitingActivationCount']) ??
+          asInt(nested['awaitingActivation']) ??
+          asInt(enrolments['awaitingActivation']) ??
+          asInt(enrolments['awaitingPayment']) ??
           0,
-      incompleteCount: (json['incompleteCount'] as num?)?.toInt() ??
-          (enrolments['draft'] as num?)?.toInt() ??
+      incompleteCount: asInt(json['incompleteCount']) ??
+          asInt(nested['incompleteEnrolments']) ??
+          asInt(enrolments['draft']) ??
           0,
-      expiringSoonCount: (json['expiringSoonCount'] as num?)?.toInt() ?? 0,
+      expiringSoonCount: asInt(json['expiringSoonCount']) ??
+          asInt(nested['policiesExpiringIn30Days']) ??
+          0,
       billedMinor: billedMinor,
       collectedMinor: collectedMinor,
       outstandingMinor: outstandingMinor,
-      claimsCount: (json['claimsCount'] as num?)?.toInt() ?? 0,
-      claimsValueMinor: (json['claimsValueMinor'] as num?)?.toInt() ?? 0,
+      claimsCount: asInt(json['claimsCount']) ?? 0,
+      claimsValueMinor: asInt(json['claimsValueMinor']) ?? 0,
     );
   }
 

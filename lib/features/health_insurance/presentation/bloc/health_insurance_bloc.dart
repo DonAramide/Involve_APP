@@ -17,6 +17,8 @@ class HealthInsuranceBloc extends Bloc<HealthInsuranceEvent, HealthInsuranceStat
     on<SubmitBulkEnrolmentRequest>(_onSubmitBulkEnrolment);
     on<InitiatePaymentRequest>(_onInitiatePayment);
     on<SimulateSandboxActivationRequest>(_onSimulateSandboxActivation);
+    on<DismissRejectedEnrolmentRequest>(_onDismissRejectedEnrolment);
+    on<RepushRejectedEnrolmentRequest>(_onRepushRejectedEnrolment);
     on<ResetHealthInsuranceState>(_onResetState);
   }
 
@@ -156,9 +158,11 @@ class HealthInsuranceBloc extends Bloc<HealthInsuranceEvent, HealthInsuranceStat
       );
 
       final enrolments = await repository.getEnrolments().catchError((_) => state.enrolments);
+      final metrics = await repository.getOverviewMetrics().catchError((_) => state.metrics);
       emit(state.copyWith(
         isActionLoading: false,
         enrolments: enrolments,
+        metrics: metrics,
         actionSuccessMessage: () => 'Enrolment request submitted successfully. Awaiting verification.',
       ));
     } catch (e) {
@@ -192,11 +196,13 @@ class HealthInsuranceBloc extends Bloc<HealthInsuranceEvent, HealthInsuranceStat
     }
 
     final enrolments = await repository.getEnrolments().catchError((_) => state.enrolments);
+    final metrics = await repository.getOverviewMetrics().catchError((_) => state.metrics);
 
     if (errors.isEmpty) {
       emit(state.copyWith(
         isActionLoading: false,
         enrolments: enrolments,
+        metrics: metrics,
         actionSuccessMessage: () =>
             'Successfully submitted enrolment for $successCount student${successCount > 1 ? "s" : ""}.',
       ));
@@ -204,6 +210,7 @@ class HealthInsuranceBloc extends Bloc<HealthInsuranceEvent, HealthInsuranceStat
       emit(state.copyWith(
         isActionLoading: false,
         enrolments: enrolments,
+        metrics: metrics,
         actionSuccessMessage: successCount > 0
             ? () => 'Enrolled $successCount student${successCount > 1 ? "s" : ""}. (${errors.length} failed)'
             : null,
@@ -256,6 +263,56 @@ class HealthInsuranceBloc extends Bloc<HealthInsuranceEvent, HealthInsuranceStat
       emit(state.copyWith(
         isActionLoading: false,
         errorMessage: () => 'Failed to activate policy in sandbox: ${e.toString()}',
+      ));
+    }
+  }
+
+  Future<void> _onDismissRejectedEnrolment(
+    DismissRejectedEnrolmentRequest event,
+    Emitter<HealthInsuranceState> emit,
+  ) async {
+    emit(state.copyWith(isActionLoading: true, errorMessage: () => null, actionSuccessMessage: () => null));
+    try {
+      await repository.dismissRejectedEnrolment(event.enrolmentId);
+      final enrolments = await repository.getEnrolments().catchError(
+        (_) => state.enrolments.where((e) => e.id != event.enrolmentId).toList(),
+      );
+      final metrics = await repository.getOverviewMetrics().catchError((_) => state.metrics);
+
+      emit(state.copyWith(
+        isActionLoading: false,
+        enrolments: enrolments,
+        metrics: metrics,
+        actionSuccessMessage: () => 'Rejected enrolment removed.',
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isActionLoading: false,
+        errorMessage: () => 'Failed to delete enrolment: ${e.toString()}',
+      ));
+    }
+  }
+
+  Future<void> _onRepushRejectedEnrolment(
+    RepushRejectedEnrolmentRequest event,
+    Emitter<HealthInsuranceState> emit,
+  ) async {
+    emit(state.copyWith(isActionLoading: true, errorMessage: () => null, actionSuccessMessage: () => null));
+    try {
+      await repository.repushRejectedEnrolment(event.enrolmentId);
+      final enrolments = await repository.getEnrolments().catchError((_) => state.enrolments);
+      final metrics = await repository.getOverviewMetrics().catchError((_) => state.metrics);
+
+      emit(state.copyWith(
+        isActionLoading: false,
+        enrolments: enrolments,
+        metrics: metrics,
+        actionSuccessMessage: () => 'Enrolment re-submitted for verification.',
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isActionLoading: false,
+        errorMessage: () => 'Failed to re-push enrolment: ${e.toString()}',
       ));
     }
   }

@@ -378,35 +378,50 @@
                       · Period: {{ enr.periodStart }} → {{ enr.periodEnd }}
                       <template v-if="enr.insurerMemberRef"> · HMO ID: <b class="text-green-4">{{ enr.insurerMemberRef }}</b></template>
                     </div>
+                    <div class="text-caption text-muted q-mt-xs">
+                      School: <b class="text-teal-2">{{ enr.schoolName || '—' }}</b>
+                      <span class="q-mx-xs">·</span>
+                      Location: <b class="text-main">{{ enr.schoolAddress || [enr.schoolCity, enr.schoolState].filter(Boolean).join(', ') || '—' }}</b>
+                    </div>
                   </div>
-                  <div class="row op-gap-8 items-center">
-                    <q-input
-                      v-model="enr._inputMemberId"
-                      dark
-                      filled
-                      dense
-                      placeholder="HMO Member ID (e.g. MHMO/26/001)"
-                      class="bg-panel"
-                      style="width: 210px;"
-                    />
-                    <q-btn
-                      dense
-                      color="green-5"
-                      text-color="black"
-                      label="Confirm Coverage"
-                      no-caps
-                      class="text-weight-bold q-px-sm"
-                      @click="handleAdjudicateEnrollment(enr, 'confirm')"
-                    />
-                    <q-btn
-                      dense
-                      outline
-                      color="red-4"
-                      label="Reject"
-                      no-caps
-                      class="q-px-sm"
-                      @click="handleAdjudicateEnrollment(enr, 'reject')"
-                    />
+                  <div class="column op-gap-4" style="min-width: 280px;">
+                    <div class="row op-gap-8 items-center">
+                      <q-input
+                        v-model="enr._inputMemberId"
+                        dark
+                        filled
+                        dense
+                        clearable
+                        placeholder="HMO Member ID (e.g. MHMO/26/001)"
+                        class="bg-panel"
+                        style="width: 210px;"
+                        :error="Boolean(enr._confirmIdError)"
+                        :error-message="enr._confirmIdError || undefined"
+                        @update:model-value="enr._confirmIdError = ''"
+                        @keyup.enter="handleAdjudicateEnrollment(enr, 'confirm')"
+                      />
+                      <q-btn
+                        dense
+                        color="green-5"
+                        text-color="black"
+                        label="Confirm Coverage"
+                        no-caps
+                        class="text-weight-bold q-px-sm"
+                        @click="handleAdjudicateEnrollment(enr, 'confirm')"
+                      />
+                      <q-btn
+                        dense
+                        outline
+                        color="red-4"
+                        label="Reject"
+                        no-caps
+                        class="q-px-sm"
+                        @click="handleAdjudicateEnrollment(enr, 'reject')"
+                      />
+                    </div>
+                    <div class="text-caption text-amber-3">
+                      Enter the insurer HMO Member ID in the box, then click Confirm Coverage.
+                    </div>
                   </div>
                 </div>
 
@@ -423,11 +438,12 @@
                     <div class="text-caption text-muted">Name: <b class="text-main">{{ enr.member?.parentName || '—' }}</b></div>
                     <div class="text-caption text-muted">Phone: <b class="text-main">{{ enr.member?.parentPhone || '—' }}</b></div>
                     <div class="text-caption text-muted">Email: <b class="text-main">{{ enr.member?.parentEmail || '—' }}</b></div>
+                    <div class="text-caption text-muted">Location: <b class="text-main">{{ enr.member?.parentLocation || enr.member?.address || '—' }}</b></div>
                     <div class="text-caption text-muted">Relationship: <b class="text-main">{{ enr.member?.parentRelationship || '—' }}</b></div>
                   </div>
                   <div class="col-12 col-md-4">
-                    <div class="text-caption text-teal-3 text-weight-bold q-mb-xs">School</div>
-                    <div class="text-caption text-muted">Name: <b class="text-main">{{ enr.schoolName }}</b></div>
+                    <div class="text-caption text-teal-3 text-weight-bold q-mb-xs">School / tenant</div>
+                    <div class="text-caption text-muted">Name: <b class="text-teal-2">{{ enr.schoolName || '—' }}</b></div>
                     <div class="text-caption text-muted">Location: <b class="text-main">{{ enr.schoolAddress || [enr.schoolCity, enr.schoolState].filter(Boolean).join(', ') || '—' }}</b></div>
                     <div class="text-caption text-muted">Phone: <b class="text-main">{{ enr.schoolPhone || '—' }}</b></div>
                     <div class="text-caption text-muted">Email: <b class="text-main">{{ enr.schoolEmail || '—' }}</b></div>
@@ -455,15 +471,30 @@
 
             <div v-else class="row q-col-gutter-md">
               <div v-for="sch in schools" :key="sch.tenantId" class="col-xs-12 col-md-6">
-                <div class="bg-panel-darker border-muted rounded-borders q-pa-md column op-gap-8">
-                  <div class="row items-center justify-between">
-                    <div class="text-subtitle2 text-weight-bold">{{ sch.schoolName }}</div>
+                <div
+                  class="bg-panel-darker border-muted rounded-borders q-pa-md column op-gap-8 cursor-pointer hover-card"
+                  role="button"
+                  tabindex="0"
+                  @click="openTenantProfile(sch)"
+                  @keyup.enter="openTenantProfile(sch)"
+                >
+                  <div class="row items-center justify-between op-gap-8">
+                    <div class="text-subtitle2 text-weight-bold text-teal-2">{{ sch.schoolName || 'Unnamed institution' }}</div>
                     <q-badge :color="sch.onboardingStatus === 'active' ? 'green-9' : sch.onboardingStatus === 'rejected' ? 'red-9' : 'amber-9'">
                       {{ sch.onboardingStatus }}
                     </q-badge>
                   </div>
                   <div class="text-caption text-muted">
-                    Type: {{ sch.tenantType }} | State: {{ sch.state }} | Contact: {{ sch.contactEmail || sch.contactPhone || 'N/A' }}
+                    Type: <b class="text-main">{{ sch.tenantType || '—' }}</b>
+                  </div>
+                  <div class="text-caption text-muted">
+                    Location: <b class="text-main">{{ sch.location || [sch.city, sch.state].filter(Boolean).join(', ') || sch.state || '—' }}</b>
+                  </div>
+                  <div class="text-caption text-muted">
+                    Contact:
+                    <b class="text-main">{{ sch.contactPhone || '—' }}</b>
+                    <span class="q-mx-xs">·</span>
+                    <b class="text-main">{{ sch.contactEmail || '—' }}</b>
                   </div>
                   <div class="row justify-between text-caption q-pt-xs border-top">
                     <span>Total Enrolled: <b>{{ sch.enrolledMembers }}</b></span>
@@ -473,6 +504,7 @@
                   <div
                     v-if="['pending_approval', 'pending'].includes(String(sch.onboardingStatus || '').toLowerCase())"
                     class="row op-gap-8 q-pt-sm"
+                    @click.stop
                   >
                     <q-btn
                       dense
@@ -493,6 +525,7 @@
                       @click="handleSchoolOnboarding(sch, 'rejected')"
                     />
                   </div>
+                  <div class="text-caption text-teal-4 q-pt-xs">Open tenant management →</div>
                 </div>
               </div>
             </div>
@@ -983,6 +1016,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 
@@ -998,7 +1032,15 @@ const props = defineProps({
 defineEmits(['enable-mfa'])
 
 const $q = useQuasar()
+const router = useRouter()
 const hmoTab = ref('overview')
+const QUEUE_ENROLMENT_STATUSES = new Set([
+  'enrolment_pending',
+  'awaiting_verification',
+  'awaiting_insurer_activation',
+  'awaiting_premium_payment',
+  'draft',
+])
 
 const overviewData = ref(props.initialHmoDashboard || {})
 const orgProfile = ref({
@@ -1178,30 +1220,62 @@ function batchStatusColor(status) {
   return 'amber-9'
 }
 
+const TAB_LOADING_MESSAGES = {
+  overview: 'Loading executive overview…',
+  excel_centre: 'Loading Excel / CSV centre…',
+  enrollments: 'Loading enrollment confirmation queue…',
+  schools: 'Loading schools & employers…',
+  plans: 'Loading plans & benefits…',
+  providers: 'Loading provider network…',
+  claims: 'Loading pre-auth & claims…',
+  billing: 'Loading billing & reconciliation…',
+  users_audit: 'Loading RBAC & audit trail…',
+  org_profile: 'Loading HMO profile…',
+}
+
+async function withTabLoading(tabKey, work) {
+  const message = TAB_LOADING_MESSAGES[tabKey] || 'Loading…'
+  $q.loading.show({
+    message,
+    backgroundColor: 'dark',
+    spinnerColor: 'teal-3',
+    messageColor: 'white',
+    delay: 120,
+  })
+  try {
+    return await work()
+  } finally {
+    $q.loading.hide()
+  }
+}
+
 async function loadOverviewAndProfile() {
   if (props.portalMode !== 'HMO') return
-  try {
-    const [ovRes, profRes, batRes, mapRes] = await Promise.allSettled([
-      axios.get('/api/agent/hmo/overview', { headers: authHeaders() }),
-      axios.get('/api/agent/hmo/profile', { headers: authHeaders() }),
-      axios.get('/api/agent/hmo/excel/batches', { headers: authHeaders() }),
-      axios.get('/api/agent/hmo/excel/mappings', { headers: authHeaders() }),
-    ])
-    if (ovRes.status === 'fulfilled' && ovRes.value.data?.data) {
-      overviewData.value = ovRes.value.data.data
+  const loadingKey = ['excel_centre', 'org_profile'].includes(hmoTab.value) ? hmoTab.value : 'overview'
+  await withTabLoading(loadingKey, async () => {
+    try {
+      const [ovRes, profRes, batRes, mapRes] = await Promise.allSettled([
+        axios.get('/api/agent/hmo/overview', { headers: authHeaders() }),
+        axios.get('/api/agent/hmo/profile', { headers: authHeaders() }),
+        axios.get('/api/agent/hmo/excel/batches', { headers: authHeaders() }),
+        axios.get('/api/agent/hmo/excel/mappings', { headers: authHeaders() }),
+      ])
+      if (ovRes.status === 'fulfilled' && ovRes.value.data?.data) {
+        overviewData.value = ovRes.value.data.data
+      }
+      if (profRes.status === 'fulfilled' && profRes.value.data?.data) {
+        Object.assign(orgProfile.value, profRes.value.data.data)
+      }
+      if (batRes.status === 'fulfilled' && batRes.value.data?.data) {
+        batches.value = batRes.value.data.data
+      }
+      if (mapRes.status === 'fulfilled' && mapRes.value.data?.data) {
+        mappings.value = mapRes.value.data.data
+      }
+    } catch (err) {
+      console.warn('[HmoPortal] Initial fetch warning:', err)
     }
-    if (profRes.status === 'fulfilled' && profRes.value.data?.data) {
-      Object.assign(orgProfile.value, profRes.value.data.data)
-    }
-    if (batRes.status === 'fulfilled' && batRes.value.data?.data) {
-      batches.value = batRes.value.data.data
-    }
-    if (mapRes.status === 'fulfilled' && mapRes.value.data?.data) {
-      mappings.value = mapRes.value.data.data
-    }
-  } catch (err) {
-    console.warn('[HmoPortal] Initial fetch warning:', err)
-  }
+  })
 }
 
 function formatMemberDate(value) {
@@ -1214,76 +1288,108 @@ function formatMemberDate(value) {
 }
 
 async function loadEnrollments() {
-  try {
-    const res = await axios.get('/api/agent/hmo/enrollments', {
-      headers: authHeaders(),
-      params: { search: enrollmentSearch.value || undefined },
-    })
-    enrollments.value = (res.data?.data || []).map((r) => ({
-      ...r,
-      _inputMemberId: r.insurerMemberRef || '',
-    }))
-  } catch (err) {
-    $q.notify({ type: 'negative', message: err.response?.data?.message || 'Failed to load enrollments' })
+  await withTabLoading('enrollments', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/enrollments', {
+        headers: authHeaders(),
+        params: { search: enrollmentSearch.value || undefined },
+      })
+      // Confirmation queue: hide already confirmed / rejected cards
+      enrollments.value = (res.data?.data || [])
+        .filter((r) => QUEUE_ENROLMENT_STATUSES.has(String(r.status || '').toLowerCase()))
+        .map((r) => ({
+          ...r,
+          _inputMemberId: r.insurerMemberRef || '',
+          _confirmIdError: '',
+        }))
+    } catch (err) {
+      $q.notify({ type: 'negative', message: err.response?.data?.message || 'Failed to load enrollments' })
+    }
+  })
+}
+
+function openTenantProfile(sch) {
+  const tenantId = sch?.tenantId || sch?.tenant_id
+  if (!tenantId) {
+    $q.notify({ type: 'warning', message: 'Tenant id is missing for this institution' })
+    return
   }
+  // Open tenant metrics on Schools & Tenants (institute-safe; not admin /tenants/:id)
+  router.push({
+    path: '/institute/dashboard',
+    query: { tab: 'tenants', tenantId: String(tenantId) },
+  })
 }
 
 async function loadSchools() {
-  try {
-    const res = await axios.get('/api/agent/hmo/schools', { headers: authHeaders() })
-    schools.value = res.data?.data || []
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load schools network' })
-  }
+  await withTabLoading('schools', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/schools', { headers: authHeaders() })
+      schools.value = res.data?.data || []
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load schools network' })
+    }
+  })
 }
 
 async function loadPlans() {
-  try {
-    const res = await axios.get('/api/agent/hmo/plans', { headers: authHeaders() })
-    plans.value = res.data?.data || []
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load HMO plans' })
-  }
+  await withTabLoading('plans', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/plans', { headers: authHeaders() })
+      plans.value = res.data?.data || []
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load HMO plans' })
+    }
+  })
 }
 
 async function loadFacilities() {
-  try {
-    const res = await axios.get('/api/agent/hmo/facilities', { headers: authHeaders() })
-    facilities.value = res.data?.data || []
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load provider network' })
-  }
+  await withTabLoading('providers', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/facilities', { headers: authHeaders() })
+      facilities.value = res.data?.data || []
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load provider network' })
+    }
+  })
 }
 
 async function loadClaims() {
-  try {
-    const res = await axios.get('/api/agent/hmo/claims', { headers: authHeaders() })
-    claimsList.value = res.data?.data || []
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load claims/pre-authorizations' })
-  }
+  await withTabLoading('claims', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/claims', { headers: authHeaders() })
+      claimsList.value = res.data?.data || []
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load claims/pre-authorizations' })
+    }
+  })
 }
 
 async function loadBilling() {
-  try {
-    const res = await axios.get('/api/agent/hmo/billing', { headers: authHeaders() })
-    billingData.value = res.data?.data || { summary: {}, statements: [] }
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load billing summary' })
-  }
+  await withTabLoading('billing', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/billing', { headers: authHeaders() })
+      billingData.value = res.data?.data || { summary: {}, statements: [] }
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load billing summary' })
+    }
+  })
 }
 
 async function loadAudit() {
-  try {
-    const res = await axios.get('/api/agent/hmo/users-audit', { headers: authHeaders() })
-    auditData.value = res.data?.data || { recentImportAudit: [] }
-  } catch (err) {
-    $q.notify({ type: 'negative', message: 'Failed to load RBAC and audit trail' })
-  }
+  await withTabLoading('users_audit', async () => {
+    try {
+      const res = await axios.get('/api/agent/hmo/users-audit', { headers: authHeaders() })
+      auditData.value = res.data?.data || { recentImportAudit: [] }
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to load RBAC and audit trail' })
+    }
+  })
 }
 
 watch(hmoTab, (tab) => {
-  if (tab === 'enrollments') loadEnrollments()
+  if (tab === 'overview' || tab === 'excel_centre' || tab === 'org_profile') loadOverviewAndProfile()
+  else if (tab === 'enrollments') loadEnrollments()
   else if (tab === 'schools') loadSchools()
   else if (tab === 'plans') loadPlans()
   else if (tab === 'providers') loadFacilities()
@@ -1371,20 +1477,97 @@ async function handleReconcileSheet(commit) {
 
 async function handleAdjudicateEnrollment(enr, decision) {
   try {
+    if (decision === 'confirm') {
+      const memberId = String(enr?._inputMemberId || '').trim()
+      if (!memberId) {
+        enr._confirmIdError = 'HMO Member ID is required'
+        $q.notify({
+          type: 'warning',
+          icon: 'edit',
+          message: 'Type the HMO Member ID in the field next to Confirm, then click Confirm Coverage again.',
+        })
+        return
+      }
+      enr._confirmIdError = ''
+    }
+
+    let reason
+    if (decision === 'reject') {
+      const dialogHint =
+        'Enter the rejection reason below (min 5 characters). The enrollment will leave the confirmation queue.'
+      reason = await new Promise((resolve) => {
+        // Keep prompt model in a local object — Quasar can echo `message` into onOk
+        // when prompt binding is wrong, which previously stored the hint as the reason.
+        const promptState = { model: '' }
+        $q.dialog({
+          title: 'Reject enrollment',
+          message: dialogHint,
+          prompt: {
+            model: promptState.model,
+            type: 'text',
+            isValid: (v) => {
+              const text = String(v || '').trim()
+              return text.length >= 5 && text !== dialogHint
+            },
+          },
+          cancel: true,
+          persistent: true,
+          dark: true,
+          ok: { label: 'Reject enrollment', color: 'negative' },
+        })
+          .onOk((val) => {
+            const typed = String(val ?? promptState.model ?? '').trim()
+            if (!typed || typed.length < 5 || typed === dialogHint) {
+              resolve(null)
+              return
+            }
+            resolve(typed)
+          })
+          .onCancel(() => resolve(null))
+      })
+      if (!reason || reason.length < 5) {
+        $q.notify({ type: 'warning', message: 'Rejection reason must be at least 5 characters' })
+        return
+      }
+    }
+
+    const enrolmentId = enr.id || enr.enrolmentId
+    if (!enrolmentId) {
+      $q.notify({ type: 'negative', message: 'Enrollment id is missing' })
+      return
+    }
+
     const res = await axios.post(
-      `/api/agent/hmo/enrollments/${enr.id}/adjudicate`,
+      `/api/agent/hmo/enrollments/${enrolmentId}/adjudicate`,
       {
         decision,
         hmoMemberId: enr._inputMemberId,
         policyNumber: enr._inputMemberId,
+        reason,
+        rejectionReason: reason,
       },
       { headers: authHeaders() }
     )
-    $q.notify({ type: 'positive', message: res.data?.message || 'Enrollment updated' })
+    const nextStatus = String(res.data?.data?.status || '').toLowerCase()
+    if (decision === 'reject' && !['rejected', 'cancelled'].includes(nextStatus)) {
+      throw new Error(res.data?.message || 'Rejection did not close the enrollment')
+    }
+    if (decision === 'confirm' && nextStatus !== 'active') {
+      throw new Error(res.data?.message || `Confirmation did not activate coverage (status: ${nextStatus || 'unknown'})`)
+    }
+    $q.notify({
+      type: decision === 'reject' ? 'warning' : 'positive',
+      message:
+        res.data?.message ||
+        (decision === 'reject' ? 'Enrollment rejected' : 'Coverage confirmed'),
+    })
+    // Drop closed rows immediately, then refresh from server
+    enrollments.value = enrollments.value.filter((row) => row.id !== enrolmentId)
     await loadEnrollments()
     await loadOverviewAndProfile()
   } catch (err) {
-    $q.notify({ type: 'negative', message: err.response?.data?.message || 'Failed to adjudicate enrollment' })
+    $q.notify({ type: 'negative', message: err.response?.data?.message || err.message || 'Failed to adjudicate enrollment' })
+    await loadEnrollments()
   }
 }
 

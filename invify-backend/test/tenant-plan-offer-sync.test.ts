@@ -44,8 +44,8 @@ describe('ensureTenantOffersFromAssignedHmo', () => {
         return {
           select: () => ({
             in: () => ({
-              order: async () => ({
-                data: [{ id: 'ver-1', plan_id: 'plan-1', status: 'published', version: 1 }],
+              eq: async () => ({
+                data: [{ id: 'ver-1', plan_id: 'plan-1', status: 'published' }],
                 error: null
               })
             })

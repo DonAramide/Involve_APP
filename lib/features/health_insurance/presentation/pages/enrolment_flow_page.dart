@@ -94,14 +94,17 @@ class _EnrolmentFlowPageState extends State<EnrolmentFlowPage> {
 
         for (final s in students) {
           final className = classMap[s.classId] ?? (s.classId > 0 ? 'Class ${s.classId}' : 'Unassigned Class');
-          final identifier = s.admissionNumber.trim().isNotEmpty
-              ? s.admissionNumber.trim()
+          final admission = s.admissionNumber.trim();
+          // Selection key is admission number for local school students. The API
+          // resolves hw_members via admissionNumber (not local integer student ids).
+          final identifier = admission.isNotEmpty
+              ? admission
               : (s.id?.toString() ?? '');
           if (identifier.isNotEmpty) {
             items.add(EnrolmentStudentItem(
               id: identifier,
               fullName: s.fullName,
-              admissionNumber: s.admissionNumber,
+              admissionNumber: admission.isNotEmpty ? admission : identifier,
               className: className,
               classId: s.classId,
             ));

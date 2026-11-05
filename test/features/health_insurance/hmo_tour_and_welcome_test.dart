@@ -55,6 +55,14 @@ class MockHealthInsuranceRepository implements HealthInsuranceRepository {
 
   @override
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId) async => {};
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {}
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    throw UnimplementedError();
+  }
 }
 
 void main() {

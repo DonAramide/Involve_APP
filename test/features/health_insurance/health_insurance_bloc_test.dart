@@ -197,6 +197,17 @@ class FakeHealthInsuranceRepository implements HealthInsuranceRepository {
     if (shouldThrow) throw Exception('Sandbox activation failed');
     return {'status': 'activated'};
   }
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {
+    if (shouldThrow) throw Exception('Dismiss failed');
+  }
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    if (shouldThrow) throw Exception('Repush failed');
+    return testEnrolments.first;
+  }
 }
 
 void main() {
