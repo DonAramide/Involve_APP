@@ -974,50 +974,76 @@ export class DeviceController {
       // 1. Fetch user data to verify status, name, and if MFA is enabled
       const { data: userData, error: userError } = await supabaseAdmin
         .from('users')
-        .select('mfa_enabled, mfa_secret, name')
+        .select('mfa_enabled, mfa_secret, name, email')
         .eq('id', user.id)
         .single();
 
       if (userError || !userData) {
         await logAudit('failed', 'Operator user profile not found');
-        return res.status(401).json({ error: 'Failed to retrieve operator profile' });
+        // 403 (not 401): step-up failures must not trigger client session logout.
+        return res.status(403).json({ error: 'Failed to retrieve operator profile' });
       }
       dbUser = userData;
       dbUserName = dbUser.name || 'Admin';
 
-      // 2. Validate Password
-      const { password, mfaToken } = req.body;
+      // 2. Validate Password (admin login password — not the activation key / MFA code)
+      const { password, mfaToken, otp, totpCode } = req.body || {};
+      const stepUpMfa = String(mfaToken || otp || totpCode || '').trim();
       if (!password) {
         await logAudit('failed', 'Password missing from request');
         return res.status(400).json({ error: 'Password is required' });
       }
 
+      const verifyEmail = String(dbUser.email || user.email || '').trim();
+      if (!verifyEmail) {
+        await logAudit('failed', 'Operator email missing for password verify');
+        return res.status(403).json({ error: 'Operator email missing; cannot verify password' });
+      }
+
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         if (password === 'wrongpassword') {
           await logAudit('failed', 'Invalid local bypass password entered');
-          return res.status(401).json({ error: 'Invalid password' });
+          return res.status(403).json({ error: 'Invalid password' });
         }
       } else {
-        const { error: authVerifyError } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: password
+        // Throwaway client so password re-check does not disturb shared auth state.
+        const { createClient } = await import('@supabase/supabase-js');
+        const { BuildVariantService } = await import('../config/build-variant');
+        const cfg = BuildVariantService.getInstance().getSupabaseConfig();
+        const authClient = createClient(cfg.url, cfg.key, {
+          auth: { persistSession: false, autoRefreshToken: false },
         });
+        const { error: authVerifyError } = await authClient.auth.signInWithPassword({
+          email: verifyEmail,
+          password: String(password),
+        });
+        try {
+          await authClient.auth.signOut();
+        } catch {
+          /* ignore */
+        }
         if (authVerifyError) {
           await logAudit('failed', 'Invalid admin password entered');
-          return res.status(401).json({ error: 'Invalid admin password' });
+          return res.status(403).json({
+            error: 'Invalid admin password. Use the password for your admin login, not the activation key or authenticator code.',
+          });
         }
       }
 
       // 3. Validate MFA if enabled
       if (dbUser.mfa_enabled) {
-        if (!mfaToken) {
+        if (!stepUpMfa) {
           await logAudit('failed', 'MFA token missing from request');
-          return res.status(400).json({ error: 'MFA token is required' });
+          return res.status(400).json({
+            error: 'MFA token is required',
+            code: 'MFA_REQUIRED',
+            mfaRequired: true,
+          });
         }
-        const isValidMfa = authenticator.verify({ token: mfaToken, secret: dbUser.mfa_secret });
+        const isValidMfa = authenticator.verify({ token: stepUpMfa, secret: dbUser.mfa_secret });
         if (!isValidMfa) {
           await logAudit('failed', 'Invalid MFA token entered');
-          return res.status(400).json({ error: 'Invalid MFA token' });
+          return res.status(400).json({ error: 'Invalid MFA token. Enter the 6-digit code from your authenticator app.' });
         }
       }
 

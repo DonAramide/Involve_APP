@@ -57,5 +57,21 @@ class ImageCommand extends PrintCommand {
   final String? path;
   final Uint8List? bytes;
   final String align;
-  ImageCommand({this.path, this.bytes, this.align = 'center'});
+  /// When true, use ESC/POS GS v 0 raster (no 270° rotation). Required for
+  /// landscape ID-card bitmaps that must print upright for cut-out cards.
+  final bool useRaster;
+  ImageCommand({
+    this.path,
+    this.bytes,
+    this.align = 'center',
+    this.useRaster = false,
+  });
+}
+
+/// ESC/POS native Code 128 (subset B). Prefer [ImageCommand] with a rendered
+/// barcode PNG when the payload is long or the printer profile is unreliable.
+class BarcodeCommand extends PrintCommand {
+  final String data;
+  final String align;
+  BarcodeCommand({required this.data, this.align = 'center'});
 }

@@ -628,23 +628,46 @@ export class SchoolSyncController {
     for (const p of parents) {
       parentByLocalId.set(String(p.id ?? ''), p);
     }
-    const rows: any[] = [];
+    const rowsById = new Map<string, any>();
+    const parentKeyOf = (parent: any, fallback = '') => {
+      const rawSync = String(parent.syncId || parent.sync_id || parent.id || fallback || '').trim();
+      if (!rawSync) return '';
+      return rawSync.startsWith('par-') ? rawSync : `par-${rawSync}`;
+    };
+    // Always create a CRM row for every synced parent (Guardians Directory).
+    for (const p of parents) {
+      const id = parentKeyOf(p, p.phone || p.email || '');
+      if (!id) continue;
+      rowsById.set(id, {
+        id,
+        tenant_id: tenantId,
+        name: p.fullName || p.name || 'Parent',
+        phone: p.phone || null,
+        email: p.email || null,
+        virtual_account_number: p.virtualAccountNumber || null,
+        virtual_account_bank: p.virtualAccountBank || null,
+        virtual_account_name: p.virtualAccountName || p.fullName || p.name || 'Parent',
+        updated_at: new Date().toISOString(),
+      });
+    }
     const pushVa = (parent: any, accountNumber: string, bank?: string, kind = 'canonical') => {
       const number = String(accountNumber || '').trim();
       if (!number) return;
-      const rawSync = String(parent.syncId || parent.sync_id || parent.id || '').trim();
-      const parentKey = rawSync.startsWith('par-') ? rawSync : `par-${rawSync || number}`;
-      const id =
-        kind === 'canonical' ? parentKey : `${parentKey}-legacy-${number}`;
-      rows.push({
+      const parentKey = parentKeyOf(parent, number);
+      if (!parentKey) return;
+      const id = kind === 'canonical' ? parentKey : `${parentKey}-legacy-${number}`;
+      const prev = rowsById.get(id) || {};
+      rowsById.set(id, {
+        ...prev,
         id,
         tenant_id: tenantId,
-        name: parent.fullName || parent.name || 'Parent',
-        phone: parent.phone || null,
-        email: parent.email || null,
+        name: parent.fullName || parent.name || prev.name || 'Parent',
+        phone: parent.phone || prev.phone || null,
+        email: parent.email || prev.email || null,
         virtual_account_number: number,
-        virtual_account_bank: bank || parent.virtualAccountBank || null,
-        virtual_account_name: parent.virtualAccountName || parent.fullName || 'Parent',
+        virtual_account_bank: bank || parent.virtualAccountBank || prev.virtual_account_bank || null,
+        virtual_account_name:
+          parent.virtualAccountName || parent.fullName || parent.name || prev.virtual_account_name || 'Parent',
         updated_at: new Date().toISOString(),
       });
     };
@@ -659,6 +682,7 @@ export class SchoolSyncController {
       const canonical = v.isCanonical === true || v.kind === 'canonical';
       pushVa(parent, v.accountNumber, v.bankName, canonical ? 'canonical' : 'legacy');
     }
+    const rows = Array.from(rowsById.values());
     for (let i = 0; i < rows.length; i += 50) {
       const batch = rows.slice(i, i + 50);
       const { error } = await supabaseAdmin.from('customers').upsert(batch, { onConflict: 'id' });

@@ -108,13 +108,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MerchantDetailDrawer from '../../../components/agent-portal/portfolio/MerchantDetailDrawer.vue'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 const search = ref('')
 const loading = ref(true)
@@ -125,6 +126,25 @@ const openMerchantDetail = (tenant) => {
   if (merchantDrawer.value) {
     merchantDrawer.value.open(tenant)
   }
+}
+
+function openTenantFromQuery() {
+  const wanted = String(route.query.tenantId || route.query.tenant_id || '').trim()
+  if (!wanted || !tenants.value.length) return
+  const match = tenants.value.find((t) =>
+    [t.id, t.tenant_id, t.tenantId].some((id) => String(id || '') === wanted)
+  )
+  if (match) {
+    openMerchantDetail(match)
+    return
+  }
+  // Deep-link from HMO school network: open a minimal detail card even if not in portfolio list
+  openMerchantDetail({
+    id: wanted,
+    tenant_id: wanted,
+    business_name: `Tenant ${wanted.slice(0, 8)}`,
+    status: 'ACTIVE',
+  })
 }
 
 const fetchTenants = async () => {
@@ -141,6 +161,8 @@ const fetchTenants = async () => {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenants.value = res.data.data || []
+    await nextTick()
+    openTenantFromQuery()
   } catch (err) {
     console.error('Failed to fetch tenants', err)
     $q.notify({ type: 'negative', message: 'Failed to load tenant portfolio', position: 'top-right' })

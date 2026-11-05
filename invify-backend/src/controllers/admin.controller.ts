@@ -2433,6 +2433,8 @@ export class AdminController {
         role: user.role,
         tenantId: user.tenant_id,
         memberSince: user.created_at,
+        mfa_enabled: !!user.mfa_enabled,
+        mfaEnabled: !!user.mfa_enabled,
       });
     } catch (error: any) {
       console.error('[AdminController] getProfile Error:', error.message);

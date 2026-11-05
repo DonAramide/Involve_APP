@@ -67,6 +67,9 @@ const SOFT_SESSION_FAILURE_MARKERS = [
   '/api/v1/wallet',
   '/api/inventory',
   '/api/v1/inventory',
+  // Wrong password / step-up auth on reset must not wipe the admin session.
+  '/activations/',
+  '/devices/activations/',
 ];
 
 /** Background/overview GETs that should degrade instead of wiping the operator session. */

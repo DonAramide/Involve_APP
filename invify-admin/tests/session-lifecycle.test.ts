@@ -36,8 +36,10 @@ Object.defineProperty(global, 'localStorage', { value: localStorageMock, configu
 Object.defineProperty(global, 'sessionStorage', { value: sessionStorageMock, configurable: true });
 
 jest.mock('../src/utils/authLoginPaths', () => ({
-  loginPathForContext: ({ pathname } = { pathname: '' }) =>
-    String(pathname || '').startsWith('/tenant') ? '/tenant/login' : '/admin/login',
+  loginPathForContext: ({ pathname } = { pathname: '' }) => {
+    const p = String(pathname || '').toLowerCase();
+    return p === '/tenant' || p.startsWith('/tenant/') ? '/tenant/login' : '/admin/login';
+  },
 }));
 
 import {

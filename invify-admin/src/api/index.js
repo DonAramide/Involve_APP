@@ -340,7 +340,7 @@ export const deviceApi = {
   resendActivationEmail: (id) => api.post(`/api/devices/activations/${id}/resend-email`),
   validateCode: (data) => api.post('/api/devices/validate', data),
   updateDevice: (id, data) => api.patch(`/api/devices/${id}`, data),
-  resetActivation: (code, data) => api.patch(`/api/devices/activations/${code}/reset`, data),
+  resetActivation: (code, data) => api.patch(`/api/devices/activations/${encodeURIComponent(code)}/reset`, data),
 
   // Telemetry & Fleet Visibility
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
@@ -389,6 +389,7 @@ export const inventoryApi = {
   getOutOfStock: () => api.get('/api/inventory/stock/out'),
   getStockSummary: () => api.get('/api/inventory/stock/summary'),
   getStockHistory: (id) => api.get(`/api/inventory/stock/${id}/history`),
+  addStock: (id, data) => api.post(`/api/inventory/stock/${id}/add`, data),
   getCategories: () => api.get('/api/inventory/categories'),
   getSuppliers: () => api.get('/api/inventory/suppliers'),
 };
@@ -421,6 +422,7 @@ export const attendanceApi = {
 export const schoolApi = {
   getRoster: (config) => api.get('/api/school/roster', config),
   getAcademics: () => api.get('/api/school/roster', { params: { type: 'result' } }),
+  getBilling: (config) => api.get('/api/school/billing', config),
   bulkSync: (data) => api.post('/api/school/bulk-sync', data),
   getPayments: (config) => api.get('/api/school/payments', config),
   syncPayments: (data) => api.post('/api/school/payments/sync', data),

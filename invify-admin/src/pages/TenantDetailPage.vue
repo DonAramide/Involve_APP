@@ -1357,24 +1357,31 @@
         </q-card-section>
 
         <q-card-section class="q-pa-lg">
+          <div class="text-caption text-grey-5 q-mb-md">
+            Use your <strong class="text-white">admin login password</strong>
+            <span v-if="mfaEnabledForAdmin"> and the current <strong class="text-white">6-digit authenticator code</strong></span>.
+            Do not paste the activation key here.
+          </div>
           <q-input
             v-model="resetPasswordInput"
             type="password"
-            label="Super Admin Password"
+            label="Admin login password"
             dark filled
             class="q-mb-md"
             label-color="indigo-3"
+            autocomplete="current-password"
           />
           <q-input
             v-if="mfaEnabledForAdmin"
             v-model="resetMfaInput"
             type="text"
-            label="2FA / Google Authenticator Code"
+            label="Authenticator / 2FA code"
             dark filled
             mask="######"
             class="q-mb-md"
             label-color="indigo-3"
-            hint="Enter the 6-digit verification code from your authenticator app"
+            hint="Open Google Authenticator (or your 2FA app) and enter the current 6-digit code"
+            autocomplete="one-time-code"
           />
         </q-card-section>
 
@@ -1711,14 +1718,21 @@ const resetActivationKey = async (cert) => {
   loadingResetSetup.value = true
   try {
     const { data: profile } = await adminApi.getProfile()
-    mfaEnabledForAdmin.value = !!profile?.mfa_enabled
+    // Profile used to omit mfa_enabled, which hid the 2FA field while the API still required it.
+    mfaEnabledForAdmin.value = !!(profile?.mfa_enabled || profile?.mfaEnabled)
     resetDialogKey.value = cert.code
     resetPasswordInput.value = ''
     resetMfaInput.value = ''
     showResetDialog.value = true
   } catch (e) {
     console.error(e)
-    $q.notify({ type: 'negative', message: 'Failed to retrieve admin security setup.' })
+    // Still open dialog; assume MFA may be required so the field is available.
+    mfaEnabledForAdmin.value = true
+    resetDialogKey.value = cert.code
+    resetPasswordInput.value = ''
+    resetMfaInput.value = ''
+    showResetDialog.value = true
+    $q.notify({ type: 'warning', message: 'Could not load MFA status. Enter password and authenticator code if you use 2FA.' })
   } finally {
     loadingResetSetup.value = false
   }
@@ -1726,27 +1740,34 @@ const resetActivationKey = async (cert) => {
 
 const submitResetKey = async () => {
   if (!resetPasswordInput.value) {
-    $q.notify({ type: 'negative', message: 'Admin password is required.' })
+    $q.notify({ type: 'negative', message: 'Admin login password is required.' })
     return
   }
-  if (mfaEnabledForAdmin.value && !resetMfaInput.value) {
-    $q.notify({ type: 'negative', message: 'MFA verification code is required.' })
+  if (mfaEnabledForAdmin.value && !String(resetMfaInput.value || '').trim()) {
+    $q.notify({ type: 'negative', message: 'Enter the 6-digit authenticator code.' })
     return
   }
 
   resettingKey.value = true
   try {
+    const mfa = String(resetMfaInput.value || '').trim()
     await deviceApi.resetActivation(resetDialogKey.value, {
       password: resetPasswordInput.value,
-      mfaToken: resetMfaInput.value
+      mfaToken: mfa,
+      otp: mfa,
+      totpCode: mfa,
     })
     $q.notify({ type: 'positive', message: 'Activation key has been successfully reset!' })
     showResetDialog.value = false
     await fetchDetails()
   } catch (e) {
     console.error(e)
-    const errMessage = e.response?.data?.error || 'Failed to reset activation key.'
-    $q.notify({ type: 'negative', message: errMessage })
+    const data = e.response?.data || {}
+    if (data.mfaRequired || data.code === 'MFA_REQUIRED' || /mfa token is required/i.test(String(data.error || ''))) {
+      mfaEnabledForAdmin.value = true
+    }
+    const errMessage = data.error || 'Failed to reset activation key.'
+    $q.notify({ type: 'negative', message: errMessage, timeout: 7000 })
   } finally {
     resettingKey.value = false
   }

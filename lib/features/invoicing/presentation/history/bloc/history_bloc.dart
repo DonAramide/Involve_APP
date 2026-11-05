@@ -135,8 +135,17 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       var totalSales = totals.collected;
       var totalInvoiced = totals.invoiced;
       var totalPending = totals.pending;
+      // Remote summary is tenant-wide for the date range only — skip when the
+      // list is narrowed by search/staff/class/method so the header matches rows.
+      final filtersActive = (event.query?.trim().isNotEmpty ?? false) ||
+          event.amount != null ||
+          (event.paymentMethod != null && event.paymentMethod != 'All') ||
+          (event.paymentStatus != null && event.paymentStatus != 'All') ||
+          event.staffId != null ||
+          event.classId != null ||
+          (event.customerName?.trim().isNotEmpty ?? false);
       try {
-        if (GetIt.instance.isRegistered<FinanceApiClient>()) {
+        if (!filtersActive && GetIt.instance.isRegistered<FinanceApiClient>()) {
           final client = GetIt.instance<FinanceApiClient>();
           final res = await client.get(
             '/api/v1/finance/invoices/collection-summary',
@@ -147,13 +156,22 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           );
           final data = res.data;
           if (data is Map) {
-            totalInvoiced = (data['invoiced'] as num?)?.toDouble() ?? totalInvoiced;
-            totalSales = (data['recordedCollected'] as num?)?.toDouble() ?? totalSales;
-            totalPending = (data['pending'] as num?)?.toDouble() ?? totalPending;
+            // Cloud can lag behind local cash settlements. Never replace
+            // on-device period totals with a weaker remote summary (zeros).
+            final remoteInvoiced = (data['invoiced'] as num?)?.toDouble();
+            final remoteCollected = (data['recordedCollected'] as num?)?.toDouble();
+            if (remoteInvoiced != null && remoteInvoiced > totalInvoiced) {
+              totalInvoiced = remoteInvoiced;
+            }
+            if (remoteCollected != null && remoteCollected > totalSales) {
+              totalSales = remoteCollected;
+            }
+            totalPending = totalInvoiced - totalSales;
+            if (totalPending < 0) totalPending = 0;
           }
         }
       } catch (_) {
-        // Keep local pending totals while offline.
+        // Keep local period totals while offline.
       }
 
       emit(HistoryLoaded(

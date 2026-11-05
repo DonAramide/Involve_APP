@@ -227,6 +227,81 @@
 
       <!-- TENANTS TAB -->
       <q-tab-panel name="tenants" class="q-pa-none column op-gap-16">
+        <!-- HMO: participating schools/employers with metrics drawer -->
+        <template v-if="identity.institutionType === 'HMO'">
+          <div class="row op-gap-16 shrink-0">
+            <div class="col bg-panel border-muted rounded-borders q-pa-md">
+              <div class="text-weight-bold text-caption q-mb-sm">LINKED SCHOOLS & EMPLOYERS</div>
+              <div class="text-h5 text-teal-2 text-weight-bold">{{ hmoSchools.length }}</div>
+              <div class="text-caption text-muted">Tenants offering your HMO plans</div>
+            </div>
+            <div class="col bg-panel border-muted rounded-borders q-pa-md">
+              <div class="text-weight-bold text-caption q-mb-sm">ACTIVE COVERAGE</div>
+              <div class="text-h5 text-green-4 text-weight-bold">{{ hmoSchoolTotals.active }}</div>
+              <div class="text-caption text-muted">Members with active coverage</div>
+            </div>
+            <div class="col bg-panel border-muted rounded-borders q-pa-md">
+              <div class="text-weight-bold text-caption q-mb-sm">PENDING CONFIRMATION</div>
+              <div class="text-h5 text-amber-4 text-weight-bold">{{ hmoSchoolTotals.pending }}</div>
+              <div class="text-caption text-muted">Awaiting HMO confirmation</div>
+            </div>
+          </div>
+
+          <div class="bg-panel border-muted rounded-borders column overflow-hidden">
+            <div class="bg-panel-darker q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
+              <span class="text-weight-bold text-caption">PARTICIPATING TENANTS</span>
+              <q-btn dense flat color="teal-3" icon="refresh" size="sm" :loading="hmoSchoolsLoading" @click="loadHmoSchools" />
+            </div>
+            <div v-if="hmoSchoolsLoading" class="flex flex-center q-pa-lg">
+              <q-spinner color="teal-3" size="2em" />
+            </div>
+            <div v-else-if="!hmoSchools.length" class="flex flex-center col text-muted q-pa-md">
+              No schools/employers linked to this HMO yet.
+            </div>
+            <div v-else class="col overflow-auto custom-scrollbar" style="max-height: 420px;">
+              <table class="enterprise-table full-width text-left" style="border-collapse: collapse;">
+                <thead class="bg-panel-darker text-muted text-metric-mono sticky-header" style="font-size: 10px;">
+                  <tr>
+                    <th class="q-pa-sm border-bottom">Institution</th>
+                    <th class="q-pa-sm border-bottom">Location</th>
+                    <th class="q-pa-sm border-bottom">Contact</th>
+                    <th class="q-pa-sm border-bottom">Enrolled</th>
+                    <th class="q-pa-sm border-bottom">Status</th>
+                    <th class="q-pa-sm border-bottom">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="text-caption" style="font-size: 12px;">
+                  <tr
+                    v-for="sch in hmoSchools"
+                    :key="sch.tenantId"
+                    class="border-bottom-light hover-row cursor-pointer"
+                    @click="openHmoTenantMetrics(sch)"
+                  >
+                    <td class="q-pa-sm text-weight-bold text-teal-2">{{ sch.schoolName || 'Unnamed institution' }}</td>
+                    <td class="q-pa-sm text-muted">{{ sch.location || sch.state || '—' }}</td>
+                    <td class="q-pa-sm text-muted">{{ sch.contactPhone || sch.contactEmail || '—' }}</td>
+                    <td class="q-pa-sm">
+                      <span class="text-green-4">{{ sch.activeMembers || 0 }}</span>
+                      /
+                      <span>{{ sch.enrolledMembers || 0 }}</span>
+                    </td>
+                    <td class="q-pa-sm">
+                      <q-badge :color="sch.onboardingStatus === 'active' ? 'green-9' : 'amber-9'" :text-color="sch.onboardingStatus === 'active' ? 'green-3' : 'amber-3'">
+                        {{ sch.onboardingStatus || 'active' }}
+                      </q-badge>
+                    </td>
+                    <td class="q-pa-sm">
+                      <q-btn dense flat color="teal-3" icon="analytics" size="sm" label="Metrics" no-caps @click.stop="openHmoTenantMetrics(sch)" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <HmoTenantMetricsDrawer ref="hmoTenantMetricsDrawer" />
+        </template>
+
+        <template v-else>
         <!-- Actions & Territory/Portfolio Summary -->
         <div class="row op-gap-16 shrink-0">
           <!-- Quick Actions -->
@@ -356,6 +431,7 @@
             </table>
           </div>
         </div>
+        </template>
       </q-tab-panel>
 
       <!-- DEPLOYMENTS TAB -->
@@ -684,7 +760,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import axios from 'axios'
 import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
@@ -694,6 +770,7 @@ import QrcodeVue from 'qrcode.vue'
 import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
 import HmoInstitutionPortalView from './components/HmoInstitutionPortalView.vue'
 import HmoProductCatalogueView from './components/HmoProductCatalogueView.vue'
+import HmoTenantMetricsDrawer from './components/HmoTenantMetricsDrawer.vue'
 import { resolveInstituteQuickAction } from './instituteQuickActions'
 import { pickInstituteCode } from '../../utils/instituteIdentity'
 
@@ -709,6 +786,44 @@ const mfaVerifyCode = ref('')
 const agentInfo = ref(null)
 const payload = ref({})
 const activeTab = ref('overview')
+const hmoSchools = ref([])
+const hmoSchoolsLoading = ref(false)
+const hmoTenantMetricsDrawer = ref(null)
+
+const hmoSchoolTotals = computed(() => {
+  return hmoSchools.value.reduce(
+    (acc, sch) => {
+      acc.active += Number(sch.activeMembers || 0)
+      acc.pending += Number(sch.pendingMembers || 0)
+      return acc
+    },
+    { active: 0, pending: 0 },
+  )
+})
+
+async function loadHmoSchools() {
+  if (identity.value.institutionType !== 'HMO') return
+  hmoSchoolsLoading.value = true
+  try {
+    const res = await axios.get('/api/agent/hmo/schools', { headers: agentAuthHeaders() })
+    hmoSchools.value = res.data?.data || []
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.message || 'Failed to load linked schools' })
+  } finally {
+    hmoSchoolsLoading.value = false
+  }
+}
+
+function openHmoTenantMetrics(sch) {
+  hmoTenantMetricsDrawer.value?.open(sch)
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'tenants' && identity.value.institutionType === 'HMO') {
+    loadHmoSchools()
+  }
+})
+
 function openQuickAction(action) {
   router.push(resolveInstituteQuickAction(action))
 }
@@ -940,12 +1055,20 @@ const fetchDashboardData = async () => {
 onMounted(async () => {
   const stored = parseStoredAgent()
   const requestedTab = router.currentRoute.value?.query?.tab
+  const requestedTenantId = router.currentRoute.value?.query?.tenantId
   if (requestedTab) {
     activeTab.value = requestedTab
   } else if (stored?.institution_type === 'HMO' || stored?.institutionType === 'HMO') {
     activeTab.value = 'hmo_ops'
   }
   await fetchDashboardData()
+  if (identity.value.institutionType === 'HMO' && (activeTab.value === 'tenants' || requestedTenantId)) {
+    await loadHmoSchools()
+  }
+  if (requestedTenantId && identity.value.institutionType === 'HMO') {
+    activeTab.value = 'tenants'
+    openHmoTenantMetrics({ tenantId: String(requestedTenantId) })
+  }
 })
 
 // Chart Series

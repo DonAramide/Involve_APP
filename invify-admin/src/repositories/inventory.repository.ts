@@ -64,6 +64,11 @@ export class InventoryRepository {
     await inventoryApi.archiveProduct(id);
   }
 
+  static async addStock(id: string, quantity: number, notes?: string): Promise<ItemDTO> {
+    const res = await inventoryApi.addStock(id, { quantity, notes });
+    return res.data?.item || res.data;
+  }
+
   // STOCK
   static async getLowStock(): Promise<ItemDTO[]> {
     const res = await inventoryApi.getLowStock();

@@ -209,6 +209,7 @@ import { logoutAuthenticatedSession } from '../auth/session'
 import InvifyLoadingState from '../components/InvifyLoadingState.vue'
 import { ensureTenantRealtime } from '../services/tenantSocket'
 import { useFinanceStore } from '../stores/finance.store'
+import { serviceModeTerms } from '../utils/serviceModeTerms'
 import { industryLabel, tenantIndustry } from '../utils/tenantIndustry'
 
 const router = useRouter()
@@ -313,26 +314,27 @@ const coreNavigationTree = [
 ]
 
 // Dynamic industry-specific options based on the active industry
-function identityNav(modeLabel) {
+function identityNav(modeLabel, terms) {
   return [
     { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: modeLabel },
-    { label: 'ID Cards', path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: modeLabel },
-    { label: modeLabel === 'SCHOOL' ? 'Entry and Exit' : 'Gate Clock', path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: modeLabel }
+    { label: terms.idCardModuleTitle, path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: modeLabel },
+    { label: terms.gateClockTitle, path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: modeLabel },
+    { label: terms.isSchool ? 'Attendance' : terms.attendanceTitle, path: '/tenant/attendance', icon: 'fact_check', color: 'blue-4', mode: modeLabel }
   ]
 }
 
 const industryNavigationTree = computed(() => {
   const mode = tenantIndustry(activeIndustry.value)
   const modeLabel = industryLabel(activeIndustry.value)
+  const terms = serviceModeTerms(mode)
   if (mode === 'school') {
     return [
       { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
-      { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
-      ...identityNav('SCHOOL'),
+      { label: terms.beneficiaries, path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
+      ...identityNav('SCHOOL', terms),
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
-      { label: 'Attendance', path: '/tenant/attendance', icon: 'fact_check', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Message parents', path: '/tenant/parent-messages', icon: 'campaign', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'School Payments', path: '/tenant/school-payments', icon: 'payments', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
@@ -348,7 +350,7 @@ const industryNavigationTree = computed(() => {
     return [
       { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: modeLabel },
       { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: modeLabel },
-      ...identityNav(modeLabel),
+      ...identityNav(modeLabel, terms),
       { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: modeLabel },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
       { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: modeLabel }
@@ -356,8 +358,8 @@ const industryNavigationTree = computed(() => {
   } else if (mode === 'services') {
     return [
       { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: modeLabel },
-      ...identityNav(modeLabel),
-      { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: modeLabel },
+      ...identityNav(modeLabel, terms),
+      { label: `${terms.beneficiary} Directory`, path: '/tenant/users', icon: 'people', color: 'blue-4', mode: modeLabel },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
       { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: modeLabel },
       { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: modeLabel }

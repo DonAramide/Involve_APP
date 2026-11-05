@@ -8,7 +8,7 @@
           <h1 class="text-h4 text-weight-bolder text-white q-my-none letter-spacing-1">Inventory Stock Matrix</h1>
         </div>
         <div class="text-caption text-grey-5 q-mt-xs">
-          Manage product catalog, real-time stock levels, and supply chains.
+          School fee catalog and stock items synced from mobile (Fee Structure / Inventory).
         </div>
       </div>
       <div>
@@ -85,8 +85,8 @@
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn flat round color="cyan-4" icon="edit" size="sm">
-              <q-tooltip class="bg-black text-cyan-4 border-cyan font-mono">EDIT PRODUCT</q-tooltip>
+            <q-btn flat round color="cyan-4" icon="edit" size="sm" @click="openEdit(props.row)">
+              <q-tooltip class="bg-black text-cyan-4 border-cyan font-mono">EDIT PRICE / STOCK</q-tooltip>
             </q-btn>
             <q-btn flat round color="green-4" icon="history" size="sm" @click="viewStockHistory(props.row)" class="q-ml-xs">
               <q-tooltip class="bg-black text-green-4 border-green font-mono">STOCK HISTORY</q-tooltip>
@@ -95,6 +95,29 @@
         </template>
       </q-table>
     </q-card>
+
+    <q-dialog v-model="showEditDialog">
+      <q-card class="bg-card-dark border-grey-9 text-white" style="width: 420px; max-width: 92vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6 text-weight-bold">Update {{ editForm.name || 'item' }}</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="editForm.name" dark filled dense label="Name" />
+          <q-input v-model.number="editForm.price" dark filled dense type="number" label="Price (₦)" min="0" step="0.01" />
+          <q-input v-model.number="editForm.quantity" dark filled dense type="number" label="Stock quantity" min="0" step="1" />
+          <q-input v-model.number="editForm.minQuantity" dark filled dense type="number" label="Low-stock alert level" min="0" step="1" />
+          <div class="text-caption text-grey-5">
+            Changes save to the cloud catalog. Sync / restore on mobile to pull updated fee prices onto the tablet.
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn color="cyan-7" text-color="black" label="Save" :loading="savingEdit" @click="saveEdit" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <!-- Stock History Dialog -->
     <q-dialog v-model="showHistoryDialog">
@@ -138,15 +161,60 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useQuasar } from 'quasar'
 import { useInventoryStore } from '../../../../stores/inventory.store'
 import { InventoryRepository } from '../../../../repositories/inventory.repository'
 
+const $q = useQuasar()
 const inventoryStore = useInventoryStore()
 const showAddDialog = ref(false)
 const showHistoryDialog = ref(false)
+const showEditDialog = ref(false)
+const savingEdit = ref(false)
 const isLoadingHistory = ref(false)
 const selectedProduct = ref(null)
 const mockHistory = ref([])
+const editForm = ref({
+  id: '',
+  name: '',
+  price: 0,
+  quantity: 0,
+  minQuantity: 0,
+})
+
+const openEdit = (row) => {
+  editForm.value = {
+    id: row.id,
+    name: row.name || '',
+    price: Number(row.price || 0),
+    quantity: Number(row.quantity || 0),
+    minQuantity: Number(row.minQuantity || 0),
+  }
+  showEditDialog.value = true
+}
+
+const saveEdit = async () => {
+  if (!editForm.value.id) return
+  savingEdit.value = true
+  try {
+    await inventoryStore.updateProduct(editForm.value.id, {
+      name: editForm.value.name,
+      price: Number(editForm.value.price || 0),
+      stock_qty: Number(editForm.value.quantity || 0),
+      min_stock_qty: Number(editForm.value.minQuantity || 0),
+    })
+    $q.notify({ type: 'positive', message: 'Price / stock updated' })
+    showEditDialog.value = false
+    await inventoryStore.fetchProducts()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error || err?.message || 'Could not update item. Upload products from mobile Settings first if this fee only exists on the tablet.',
+    })
+  } finally {
+    savingEdit.value = false
+  }
+}
 
 const columns = [
   { name: 'sku', label: 'SKU', align: 'left', field: 'sku', sortable: true, classes: 'font-mono text-grey-4' },
