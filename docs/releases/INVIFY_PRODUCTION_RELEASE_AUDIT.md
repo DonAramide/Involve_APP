@@ -1,11 +1,11 @@
-# INVIFY PRODUCTION RELEASE AUDIT
+﻿# INVIFY PRODUCTION RELEASE AUDIT
 
 **Document:** `docs/releases/INVIFY_PRODUCTION_RELEASE_AUDIT.md`  
 **Audit started (UTC):** 2026-11-05T16:54Z  
 **Auditor workspace:** `C:\dev\Involve_APP_health`  
 **Release intent:** Controlled production release of registration, attendance, Gate Clock, ID Cards (incl. 12-char Invify identity), and **operational** HMO — **excluding** unresolved HMO monetisation / live payouts.  
 **Current verdict:** **PHASE 1 CONSOLIDATION COMPLETE — PRODUCTION DEPLOY/MIGRATE STILL BLOCKED** pending DB identity confirmation + backup gates (§12).  
-**Release candidate SHA:** `5465431d9b53308f28100833ecb2b9e01b763dc8` (`release/invify-production-2026`)
+**Release candidate SHA:** `db44014a711df392d38eccce0fee8759d8bc143e` (`release/invify-production-2026`)
 
 ---
 
@@ -108,7 +108,7 @@ Counts are `git rev-list --left-right --count origin/main...<branch>` → `behin
 | Git integration base (proposed) | `origin/main` = `fdd830b8…` (**contains** prod base) |
 | Staging runtime candidate | Host path `candidate-20261028` + overlays; git tip historically `b4956971` / current dirty `4cdfc54a` |
 | Release integration branch | `release/invify-production-2026` (worktree `C:\dev\_wt_invify_release_2026`) |
-| Release candidate SHA | `5465431d9b53308f28100833ecb2b9e01b763dc8` |
+| Release candidate SHA | `db44014a711df392d38eccce0fee8759d8bc143e` |
 
 ---
 
@@ -292,7 +292,7 @@ Documented historical rollback path from manifest:
 | `a463caba` | Service-mode terms, institute affiliation, attendance UI |
 | `5465431d` | Supporting inventory/sync/tenant admin + this audit doc |
 
-**Release candidate tip:** `5465431d9b53308f28100833ecb2b9e01b763dc8`
+**Release candidate tip:** `db44014a711df392d38eccce0fee8759d8bc143e`
 
 Docs follow-up commit may advance tip (see `git rev-parse release/invify-production-2026`).
 
@@ -354,3 +354,4 @@ Until (1)–(3) pass, **no production migrations or production deploy**.
 | 2026-11-05T17:25 | Merged VA/HMO feature branches | Clean merges |
 | 2026-11-05T17:40 | Curated commits `3175bbee`…`5465431d` | RC SHA fixed |
 | 2026-11-05T17:50 | Migration manifest prepared | Apply still blocked |
+
