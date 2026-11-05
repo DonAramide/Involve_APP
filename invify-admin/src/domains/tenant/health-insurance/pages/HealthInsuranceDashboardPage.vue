@@ -343,9 +343,36 @@
           <div class="row items-center justify-between q-mb-md">
             <div>
               <div class="text-subtitle1 text-weight-bold">Configured HMO Plans & Tenant Offers</div>
-              <div class="text-caption text-grey-5">Partner underwriters and eligible plans offered to this school.</div>
+              <div class="text-caption text-grey-5">Partner underwriters and eligible plans offered to this school. Institution admins cannot register global HMO providers.</div>
             </div>
           </div>
+
+          <q-card class="bg-card-dark border-grey-9 q-pa-md q-mb-md">
+            <div class="text-subtitle2 text-weight-bold">Request HMO affiliation</div>
+            <div class="text-caption text-grey-5 q-mb-sm">Select an approved (verified) platform HMO. The request starts as pending approval.</div>
+            <div class="row q-col-gutter-sm items-end">
+              <div class="col-12 col-md-6">
+                <q-select
+                  v-model="affiliationProviderId"
+                  :options="eligibleProviderOptions"
+                  emit-value
+                  map-options
+                  dense
+                  outlined
+                  dark
+                  label="Approved HMO provider"
+                />
+              </div>
+              <div class="col-12 col-md-3">
+                <q-btn color="teal-8" no-caps label="Request affiliation" :loading="affiliationSaving" :disable="!affiliationProviderId" @click="submitAffiliation" />
+              </div>
+            </div>
+            <div v-if="affiliations.length" class="q-mt-md">
+              <div class="text-caption text-grey-4" v-for="link in affiliations" :key="link.id">
+                {{ link.hw_providers?.display_name || link.provider_id }} — {{ link.onboarding_status }}
+              </div>
+            </div>
+          </q-card>
 
           <div class="row q-col-gutter-md">
             <div v-for="offer in tenantOffers" :key="offer.id" class="col-12 col-md-4">
@@ -382,14 +409,20 @@
           />
         </q-tab-panel>
 
-        <!-- TAB 7: Claims Log -->
+        <!-- TAB 7: Claims Log (tenant submit + status; no HMO adjudication) -->
         <q-tab-panel name="claims" class="q-pa-md">
-          <div class="text-subtitle1 text-weight-bold q-mb-md">Claims & Treatment Authorisations</div>
+          <div class="row items-center justify-between q-mb-md">
+            <div class="text-subtitle1 text-weight-bold">Claims & Treatment Authorisations</div>
+            <div class="row q-gutter-sm">
+              <q-btn dense outline color="cyan-4" icon="refresh" label="Refresh" no-caps :loading="loadingClaims" @click="loadClaims" />
+              <q-btn dense unelevated color="teal-7" icon="add" label="Submit Claim" no-caps @click="showClaimDialog = true" />
+            </div>
+          </div>
           <q-banner dense rounded class="bg-dark text-grey-4 border-grey-9 q-mb-md">
             <template v-slot:avatar><q-icon name="info" color="cyan-4" /></template>
             <div class="text-caption">
-              Clinical claim adjudications and medical justifications reside in the HMO provider systems.
-              Only verified financial and authorization status updates are reflected here.
+              Submit administrative claim or pre-authorisation records for HMO review.
+              Approval, rejection, and settlement are performed by the HMO — not from this school dashboard.
             </div>
           </q-banner>
           <q-table
@@ -398,8 +431,24 @@
             row-key="id"
             dark
             flat
+            :loading="loadingClaims"
             class="bg-transparent text-grey-3 font-mono"
-          />
+            @row-click="(_, row) => openClaimDetail(row)"
+          >
+            <template #body-cell-status="props">
+              <q-td :props="props">
+                <q-badge :color="claimStatusColor(props.row.status)">{{ props.row.status }}</q-badge>
+              </q-td>
+            </template>
+            <template #body-cell-actions="props">
+              <q-td :props="props">
+                <q-btn dense flat color="cyan-4" label="Detail" no-caps @click.stop="openClaimDetail(props.row)" />
+              </q-td>
+            </template>
+            <template #no-data>
+              <div class="full-width text-center q-pa-lg text-grey-5">No claims submitted yet.</div>
+            </template>
+          </q-table>
         </q-tab-panel>
       </q-tab-panels>
     </q-card>
@@ -621,11 +670,113 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- DIALOG: Submit Claim / Pre-Auth (tenant) -->
+    <q-dialog v-model="showClaimDialog">
+      <q-card class="bg-card-dark text-white border-grey-9" style="min-width: 480px;">
+        <q-card-section class="row items-center justify-between border-bottom">
+          <div class="text-subtitle1 text-weight-bold">Submit Claim / Pre-Authorisation</div>
+          <q-btn flat dense round icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-select
+            v-model="newClaim.recordType"
+            outlined
+            dark
+            dense
+            :options="[
+              { label: 'Claim', value: 'claim' },
+              { label: 'Pre-Authorisation', value: 'pre_authorisation' }
+            ]"
+            emit-value
+            map-options
+            label="Record Type"
+          />
+          <q-input v-model="newClaim.policyId" outlined dark dense label="Policy UUID" hint="Active policy id for this institution" />
+          <q-input v-model="newClaim.memberId" outlined dark dense label="Member UUID" />
+          <q-input v-model="newClaim.facilityId" outlined dark dense label="Facility UUID (optional)" />
+          <q-input
+            v-model.number="newClaim.amountNaira"
+            outlined
+            dark
+            dense
+            type="number"
+            label="Authorised amount (₦)"
+            hint="Stored as administrative authorised amount — not a disbursement"
+          />
+          <q-input v-model="newClaim.notes" outlined dark dense type="textarea" label="Notes (optional)" />
+        </q-card-section>
+        <q-card-actions align="right" class="border-top q-pa-md">
+          <q-btn flat label="Cancel" v-close-popup color="grey-5" />
+          <q-btn
+            unelevated
+            label="Submit"
+            color="teal-7"
+            class="text-weight-bold font-mono"
+            :loading="submittingClaim"
+            @click="submitNewClaim"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- DIALOG: Claim Detail + History -->
+    <q-dialog v-model="showClaimDetailDialog">
+      <q-card class="bg-card-dark text-white border-grey-9" style="min-width: 520px; max-width: 640px;">
+        <q-card-section class="row items-center justify-between border-bottom">
+          <div class="text-subtitle1 text-weight-bold">Claim Detail</div>
+          <q-btn flat dense round icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section v-if="selectedClaim" class="q-gutter-sm">
+          <div class="text-caption text-grey-5">Reference</div>
+          <div class="font-mono text-teal-3">{{ selectedClaim.claim_reference }}</div>
+          <div class="row q-col-gutter-md q-mt-xs">
+            <div class="col-6">
+              <div class="text-caption text-grey-5">Status</div>
+              <q-badge :color="claimStatusColor(selectedClaim.status)">{{ selectedClaim.status }}</q-badge>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-5">Type</div>
+              <div>{{ selectedClaim.record_type }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-5">Submitted</div>
+              <div>{{ selectedClaim.submitted_date || '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-5">Amount</div>
+              <div>{{ formatNgn((Number(selectedClaim.authorised_amount_minor || 0) / 100)) }}</div>
+            </div>
+          </div>
+          <div v-if="selectedClaim.rejection_reason" class="text-caption text-red-4 q-mt-sm">
+            Rejection: {{ selectedClaim.rejection_reason }}
+          </div>
+          <div class="text-subtitle2 q-mt-md">Status History</div>
+          <div v-if="claimHistoryNote" class="text-caption text-amber-4">{{ claimHistoryNote }}</div>
+          <div v-if="loadingClaimHistory" class="text-caption text-grey-5">Loading history…</div>
+          <div v-else-if="!claimHistory.length" class="text-caption text-grey-5">No history events.</div>
+          <div v-else class="column q-gutter-xs">
+            <div
+              v-for="ev in claimHistory"
+              :key="ev.id"
+              class="bg-dark border-grey-9 rounded-borders q-pa-sm text-caption font-mono"
+            >
+              {{ ev.from_status || '∅' }} → {{ ev.to_status }}
+              <span class="text-grey-5"> · {{ ev.occurred_at }}</span>
+              <div v-if="ev.notes" class="text-grey-4">{{ ev.notes }}</div>
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" class="border-top q-pa-md">
+          <q-btn flat label="Close" v-close-popup color="grey-5" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi';
 
@@ -705,6 +856,10 @@ const invoiceColumns = [
 
 // Plans & Facilities & Claims
 const tenantOffers = ref([]);
+const eligibleProviderOptions = ref([]);
+const affiliations = ref([]);
+const affiliationProviderId = ref('');
+const affiliationSaving = ref(false);
 const facilities = ref([]);
 const facilityColumns = [
   { name: 'name', label: 'FACILITY NAME', field: 'name', align: 'left' },
@@ -713,11 +868,35 @@ const facilityColumns = [
   { name: 'address', label: 'ADDRESS', field: 'address', align: 'left' }
 ];
 const claims = ref([]);
+const loadingClaims = ref(false);
+const showClaimDialog = ref(false);
+const showClaimDetailDialog = ref(false);
+const submittingClaim = ref(false);
+const selectedClaim = ref(null);
+const claimHistory = ref([]);
+const claimHistoryNote = ref('');
+const loadingClaimHistory = ref(false);
+const newClaim = reactive({
+  recordType: 'claim',
+  policyId: '',
+  memberId: '',
+  facilityId: '',
+  amountNaira: null,
+  notes: ''
+});
 const claimColumns = [
-  { name: 'claim_number', label: 'CLAIM #', field: 'claim_number', align: 'left' },
-  { name: 'service_date', label: 'DATE', field: 'service_date', align: 'left' },
-  { name: 'amount', label: 'AMOUNT (NGN)', field: 'amount', align: 'right', format: v => formatNgn(v) },
-  { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
+  { name: 'claim_reference', label: 'CLAIM #', field: 'claim_reference', align: 'left' },
+  { name: 'record_type', label: 'TYPE', field: 'record_type', align: 'left' },
+  { name: 'submitted_date', label: 'DATE', field: 'submitted_date', align: 'left' },
+  {
+    name: 'amount',
+    label: 'AMOUNT (NGN)',
+    field: (row) => Number(row.authorised_amount_minor || 0) / 100,
+    align: 'right',
+    format: (v) => formatNgn(v)
+  },
+  { name: 'status', label: 'STATUS', field: 'status', align: 'center' },
+  { name: 'actions', label: '', field: 'id', align: 'right' }
 ];
 
 // Dialog Modals
@@ -807,6 +986,20 @@ function getEnrolmentBadgeColor(status) {
   }
 }
 
+function claimStatusColor(status) {
+  switch (String(status || '')) {
+    case 'approved':
+    case 'settled':
+      return 'green-10';
+    case 'rejected':
+      return 'red-10';
+    case 'pending':
+      return 'amber-10';
+    default:
+      return 'cyan-10';
+  }
+}
+
 // Fetch Functions
 async function loadOverviewMetrics() {
   try {
@@ -865,6 +1058,112 @@ async function loadPlansAndOffers() {
   }
 }
 
+async function loadAffiliations() {
+  try {
+    const [eligible, links] = await Promise.all([
+      healthInsuranceApi.listEligibleProviders(),
+      healthInsuranceApi.listAffiliations()
+    ]);
+    const providers = eligible?.data?.data?.providers || eligible?.data?.providers || [];
+    eligibleProviderOptions.value = providers.map((p) => ({
+      label: `${p.display_name || p.code} (${p.integration_status || 'verified'})`,
+      value: p.id
+    }));
+    affiliations.value = links?.data?.data || links?.data || [];
+  } catch (err) {
+    console.warn('Affiliation load:', err?.message);
+  }
+}
+
+async function loadClaims() {
+  loadingClaims.value = true;
+  try {
+    const res = await healthInsuranceApi.getClaims();
+    claims.value = res?.data?.data || res?.data || [];
+  } catch (err) {
+    claims.value = [];
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error?.message || err?.response?.data?.message || 'Failed to load claims'
+    });
+  } finally {
+    loadingClaims.value = false;
+  }
+}
+
+async function submitNewClaim() {
+  if (!newClaim.policyId || !newClaim.memberId) {
+    $q.notify({ type: 'warning', message: 'Policy UUID and Member UUID are required' });
+    return;
+  }
+  submittingClaim.value = true;
+  try {
+    await healthInsuranceApi.submitClaim({
+      policyId: newClaim.policyId.trim(),
+      memberId: newClaim.memberId.trim(),
+      facilityId: newClaim.facilityId?.trim() || undefined,
+      recordType: newClaim.recordType,
+      authorisedAmountMinor:
+        newClaim.amountNaira != null && newClaim.amountNaira !== ''
+          ? Math.round(Number(newClaim.amountNaira) * 100)
+          : undefined,
+      notes: newClaim.notes || undefined
+    });
+    $q.notify({ type: 'positive', message: 'Claim submitted for HMO review' });
+    showClaimDialog.value = false;
+    newClaim.policyId = '';
+    newClaim.memberId = '';
+    newClaim.facilityId = '';
+    newClaim.amountNaira = null;
+    newClaim.notes = '';
+    await loadClaims();
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error?.message || err?.response?.data?.message || 'Failed to submit claim'
+    });
+  } finally {
+    submittingClaim.value = false;
+  }
+}
+
+async function openClaimDetail(row) {
+  selectedClaim.value = row;
+  claimHistory.value = [];
+  claimHistoryNote.value = '';
+  showClaimDetailDialog.value = true;
+  loadingClaimHistory.value = true;
+  try {
+    const res = await healthInsuranceApi.getClaimHistory(row.id);
+    const payload = res?.data?.data || res?.data || {};
+    claimHistory.value = payload.events || [];
+    claimHistoryNote.value = payload.note || '';
+  } catch (err) {
+    claimHistoryNote.value =
+      err?.response?.data?.error?.message || err?.response?.data?.message || 'Unable to load claim history';
+  } finally {
+    loadingClaimHistory.value = false;
+  }
+}
+
+async function submitAffiliation() {
+  if (!affiliationProviderId.value) return;
+  affiliationSaving.value = true;
+  try {
+    await healthInsuranceApi.requestAffiliation({ providerId: affiliationProviderId.value });
+    $q.notify({ type: 'positive', message: 'Affiliation request submitted for HMO approval.' });
+    affiliationProviderId.value = '';
+    await loadAffiliations();
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error?.message || err?.message || 'Affiliation request failed'
+    });
+  } finally {
+    affiliationSaving.value = false;
+  }
+}
+
 async function loadFacilities() {
   try {
     const res = await healthInsuranceApi.getFacilities();
@@ -882,10 +1181,16 @@ async function refreshAll() {
     loadPolicies(),
     loadInvoices(),
     loadPlansAndOffers(),
-    loadFacilities()
+    loadFacilities(),
+    loadAffiliations(),
+    loadClaims()
   ]);
   loading.value = false;
 }
+
+watch(activeTab, (tab) => {
+  if (tab === 'claims') loadClaims();
+});
 
 // Actions
 async function submitNewEnrolment() {

@@ -2,29 +2,12 @@ import { Request, Response } from 'express';
 import { leadService } from '../services/lead.service';
 import { supabase } from '../../../db/supabase';
 import { integrationEngine } from '../../../services/integration-engine.service';
-import { BuildVariantService } from '../../../config/build-variant';
-import { IntegrationVaultService } from '../../../services/integration-vault.service';
 import { newSelfServeTenantPlan } from '../../../utils/new-tenant-plan';
-
-async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
-  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
-  if (envKey) return envKey;
-
-  try {
-    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
-    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
-    if (vaultKey) return vaultKey;
-  } catch (err: any) {
-    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
-  }
-
-  const variant = BuildVariantService.getInstance();
-  if (variant.isProd() || variant.isStaging()) {
-    throw new Error('QUASAR_API_KEY is required in staging/production');
-  }
-
-  return 'demo-key';
-}
+import {
+  resolveVaCounterpartyOwnerId,
+  resolveVaInstitutionCodeForTenant,
+} from '../../../integrations/quasar/va-institution-code';
+import { getQuasarServiceForTenantVa } from '../../../integrations/quasar/factory';
 
 export class LeadController {
   static async create(req: Request, res: Response) {
@@ -115,20 +98,23 @@ export class LeadController {
 
       // Try virtual account creation using Quasar SDK
       try {
-        const platformApiKey = await resolvePlatformApiKey(tenant.id);
-        const QuasarServiceModule = require('../../../integrations/quasar/quasar.service').QuasarService;
-        const quasar = new QuasarServiceModule(platformApiKey);
-        const platformId = 'platform-admin-owner-id';
+        // Fail closed: tenant VA must use quasar_integrations — never env/platform key.
+        const quasar = await getQuasarServiceForTenantVa(tenant.id);
+        const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenant.id);
         
+        const institutionCode = await resolveVaInstitutionCodeForTenant(tenant.id);
         const va = await quasar.createVirtualAccount({
           childId: tenant.id,
-          parentId: platformId,
-          currency: 'NGN',
+          parentId: counterpartyOwnerId,
           email: lead.email || `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
           firstName: lead.contact_person ? lead.contact_person.split(' ')[0] : 'Owner',
           lastName: lead.contact_person ? (lead.contact_person.split(' ').slice(1).join(' ') || 'Merchant') : 'Merchant',
           parentShareBps: 0,
-          metadata: { type: 'tenant_operating_account' }
+          institutionCode,
+          metadata: {
+            type: 'tenant_operating_account',
+            ...(institutionCode ? { institutionCode } : {}),
+          },
         });
         
         await supabase

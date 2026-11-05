@@ -1,0 +1,457 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TerminalSyncService = void 0;
+const quasar_platform_service_1 = require("./quasar-platform.service");
+// src/services/terminal-sync.service.ts
+const terminal_inventory_service_1 = require("./terminal-inventory.service");
+const terminal_audit_service_1 = require("./terminal-audit.service");
+const supabase_1 = require("../db/supabase");
+const pos_service_1 = require("./pos.service");
+const pos_host_endpoint_1 = require("./pos-host-endpoint");
+class TerminalSyncService {
+    /**
+     * Prefer one row when duplicates exist (maybeSingle fails on >1 with PGRST116).
+     * When preferredTenantId is set, prefer that tenant's row over an arbitrary first row
+     * (avoids false ACCESS_DENIED_OWNERSHIP_MISMATCH for reassigned tablets).
+     */
+    static async fetchOneByDeviceId(table, deviceId, select, preferredTenantId) {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from(table)
+            .select(select)
+            .eq('device_id', deviceId)
+            .limit(10);
+        if (error)
+            throw error;
+        const rows = data || [];
+        if (rows.length === 0)
+            return null;
+        if (rows.length > 1) {
+            console.warn(`[TerminalSync] ${table} has ${rows.length}+ rows for ${deviceId}; dedupe recommended`);
+        }
+        if (preferredTenantId) {
+            const matched = rows.find((r) => r.tenant_id === preferredTenantId);
+            if (matched) {
+                if (rows.length > 1) {
+                    console.log(`[TerminalSync] ${table}: using row for tenant ${preferredTenantId} among ${rows.length} duplicates`);
+                }
+                return matched;
+            }
+        }
+        return rows[0];
+    }
+    /**
+     * Called by mobile device on startup / periodic sync.
+     * Returns terminal config provisioned for the given deviceId.
+     */
+    static async syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId, tenantId) {
+        // Step 1: Look up device record (prefer caller's tenant when duplicates exist)
+        let deviceRecord = null;
+        try {
+            deviceRecord = await this.fetchOneByDeviceId('device_registrations', deviceId, '*, tenants(id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code)', tenantId);
+        }
+        catch (err) {
+            console.warn(`[TerminalSync] device_registrations lookup failed for ${deviceId}:`, err);
+        }
+        // Fleet tablets often live in `devices` instead of device_registrations.
+        if (!deviceRecord) {
+            try {
+                const data = await this.fetchOneByDeviceId('devices', deviceId, '*', tenantId);
+                if (data) {
+                    deviceRecord = {
+                        ...data,
+                        device_category: data.device_category || 'USER_DEVICE',
+                        device_role: data.device_role || 'TABLET',
+                        tenant_id: data.tenant_id || tenantId || null,
+                    };
+                }
+            }
+            catch (e) {
+                console.warn('[TerminalSync] devices fallback failed (non-fatal)');
+            }
+        }
+        // Inventory assignment is source of truth for company tablets — resolve before ownership gate.
+        let inventoryAssignment = null;
+        try {
+            inventoryAssignment = await terminal_inventory_service_1.TerminalInventoryService.getAssignmentByDeviceId(deviceId);
+        }
+        catch (e) {
+            console.warn('[TerminalSync] inventory assignment lookup failed (non-fatal):', e?.message || e);
+        }
+        const inventoryTenantId = inventoryAssignment?.assigned_tenant_id || null;
+        // If duplicates pointed at a stale tenant but inventory (or JWT) says current tenant, rebind.
+        if (deviceRecord &&
+            tenantId &&
+            deviceRecord.tenant_id &&
+            deviceRecord.tenant_id !== tenantId) {
+            const staleTenantId = deviceRecord.tenant_id;
+            // Rebind only when inventory *explicitly* assigns this device to the JWT tenant.
+            // Missing inventory must not allow cross-tenant takeover via sync.
+            const inventoryAgrees = inventoryTenantId != null && inventoryTenantId === tenantId;
+            let fleetAgrees = false;
+            try {
+                const fleet = await this.fetchOneByDeviceId('devices', deviceId, 'tenant_id', tenantId);
+                fleetAgrees = !!fleet?.tenant_id && fleet.tenant_id === tenantId;
+            }
+            catch (_) { }
+            if (inventoryAgrees || fleetAgrees) {
+                console.warn(`[TerminalSync] Rebinding device ${deviceId} tenant ${staleTenantId} → ${tenantId} ` +
+                    `(JWT tenant; inventory=${inventoryTenantId} fleetAgrees=${fleetAgrees})`);
+                deviceRecord = { ...deviceRecord, tenant_id: tenantId };
+                // Point all registration/device rows for this hardware at the active tenant
+                try {
+                    await supabase_1.supabaseAdmin
+                        .from('device_registrations')
+                        .update({ tenant_id: tenantId })
+                        .eq('device_id', deviceId);
+                }
+                catch (_) { }
+                try {
+                    await supabase_1.supabaseAdmin
+                        .from('devices')
+                        .update({ tenant_id: tenantId })
+                        .eq('device_id', deviceId);
+                }
+                catch (_) { }
+            }
+            else {
+                console.warn(`[TerminalSync] Device ownership spoofing detected! Device ${deviceId} belongs to tenant ${staleTenantId}, but request user is from tenant ${tenantId} (inventory=${inventoryTenantId}).`);
+                throw new Error('ACCESS_DENIED_OWNERSHIP_MISMATCH');
+            }
+        }
+        const resolvedTenantId = deviceRecord?.tenant_id || tenantId || inventoryTenantId || null;
+        let deviceCategory = deviceRecord?.device_category || 'USER_DEVICE';
+        let deviceRole = deviceRecord?.device_role || 'PHONE';
+        // Admin Assignments write to terminal_inventory — honor that even if category is stale.
+        if (inventoryAssignment) {
+            deviceCategory = 'COMPANY_DEVICE';
+            if (!deviceRole || deviceRole === 'PHONE')
+                deviceRole = 'TABLET';
+            console.log(`[TerminalSync] Found terminal_inventory assignment for ${deviceId} → COMPANY_DEVICE`);
+            const patch = {
+                device_category: 'COMPANY_DEVICE',
+                device_role: deviceRole,
+                tenant_id: resolvedTenantId || deviceRecord?.tenant_id || null,
+            };
+            try {
+                await supabase_1.supabaseAdmin.from('device_registrations').update(patch).eq('device_id', deviceId);
+            }
+            catch (_) { }
+            try {
+                await supabase_1.supabaseAdmin.from('devices').update({
+                    device_category: 'COMPANY_DEVICE',
+                    tenant_id: patch.tenant_id,
+                }).eq('device_id', deviceId);
+            }
+            catch (_) { }
+        }
+        // Step 2: support config
+        let supportPhone = '+234 800 INVIFY';
+        let supportEmail = 'support@invify.org';
+        let supportWhatsapp = '+2348023552282';
+        let broadcastMessage = '';
+        try {
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('system_configurations')
+                .select('config_key, config_value')
+                .in('config_key', ['support_phone', 'support_email', 'support_whatsapp', 'broadcast_message']);
+            if (!error && data && data.length > 0) {
+                for (const row of data) {
+                    if (row.config_key === 'support_phone')
+                        supportPhone = row.config_value;
+                    if (row.config_key === 'support_email')
+                        supportEmail = row.config_value;
+                    if (row.config_key === 'support_whatsapp')
+                        supportWhatsapp = row.config_value;
+                    if (row.config_key === 'broadcast_message')
+                        broadcastMessage = row.config_value;
+                }
+            }
+        }
+        catch (e) {
+            console.warn('[TerminalSync] system_configurations lookup failed (non-fatal)');
+        }
+        let tenantDetails = deviceRecord?.tenants || null;
+        // Always re-read the tenant row. The device join omits system_access_password,
+        // and a replacement tablet needs that admin password.
+        if (resolvedTenantId) {
+            try {
+                const { data: tenant } = await supabase_1.supabaseAdmin
+                    .from('tenants')
+                    .select('id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code, is_emergency_locked, emergency_lock_code, status, system_access_password')
+                    .eq('id', resolvedTenantId)
+                    .maybeSingle();
+                if (tenant)
+                    tenantDetails = { ...(tenantDetails || {}), ...tenant };
+            }
+            catch (_) { }
+        }
+        if (tenantDetails) {
+            if (tenantDetails.support_phone)
+                supportPhone = tenantDetails.support_phone;
+            if (tenantDetails.support_email)
+                supportEmail = tenantDetails.support_email;
+            if (tenantDetails.support_whatsapp)
+                supportWhatsapp = tenantDetails.support_whatsapp;
+        }
+        const emergencyLock = {
+            isEmergencyLocked: !!tenantDetails?.is_emergency_locked,
+            emergencyLockCode: tenantDetails?.emergency_lock_code || null,
+            tenantStatus: tenantDetails?.status || null,
+            systemAccessPassword: tenantDetails?.system_access_password || null,
+        };
+        // Step 3: USER_DEVICE — no bank TID / MPOS bundle
+        if (deviceCategory !== 'COMPANY_DEVICE') {
+            console.log(`[TerminalSync] Device ${deviceId} → USER_DEVICE. Returning capability profile.`);
+            if (typeof process.env.JEST_WORKER_ID === 'undefined' &&
+                tenantDetails &&
+                tenantDetails.plan !== 'free' &&
+                tenantDetails.plan !== 'basic') {
+                try {
+                    quasar_platform_service_1.QuasarPlatformService.provisionTenant(tenantDetails).catch(e => console.error(e));
+                }
+                catch (_) { }
+            }
+            return {
+                assigned: false,
+                deviceCategory: 'USER_DEVICE',
+                deviceRole,
+                tenantId: resolvedTenantId,
+                tenantName: tenantDetails?.name || null,
+                plan: tenantDetails?.plan || null,
+                type: tenantDetails?.type || null,
+                ...emergencyLock,
+                features: {
+                    invoicing: true,
+                    inventory: true,
+                    customerManagement: true,
+                    reporting: true,
+                    printing: false,
+                    emvPayments: false,
+                    cardSettlement: false,
+                },
+                supportPhone,
+                supportEmail,
+                supportWhatsapp,
+                broadcastMessage,
+                message: `No terminal assigned to this device. Device ID: ${deviceId}`,
+                syncedAt: new Date().toISOString(),
+            };
+        }
+        // Step 4: COMPANY_DEVICE — full terminal config
+        console.log(`[TerminalSync] Device ${deviceId} → COMPANY_DEVICE. Fetching terminal bundle.`);
+        const bundle = inventoryAssignment || (await terminal_inventory_service_1.TerminalInventoryService.getAssignmentByDeviceId(deviceId));
+        if (bundle) {
+            await terminal_audit_service_1.TerminalAuditService.log({
+                actionType: 'SYNC_SUCCESS',
+                terminalId: bundle.terminal_id?.tid,
+                mposTerminalId: bundle.mpos?.id,
+                newDeviceId: deviceId,
+                adminId: deviceId,
+                tenantId: resolvedTenantId || bundle.assigned_tenant_id || null,
+                adminName: tenantDetails?.name || undefined,
+                reason: 'Mobile device sync',
+                metadata: {
+                    serialNumber,
+                    androidId,
+                    enrollmentKey,
+                    tenant_id: resolvedTenantId || bundle.assigned_tenant_id || null,
+                    tenant_name: tenantDetails?.name || null,
+                },
+            });
+        }
+        const routingConfig = await pos_service_1.PosService.getRoutingConfig();
+        const { expressPay, kimono, primaryHost, secondaryHost, tertiaryHost, nibssEndpoint, } = (0, pos_host_endpoint_1.resolvePosHosts)(routingConfig);
+        const tenantCategory = tenantDetails?.type || 'retail';
+        const agentCode = tenantDetails?.agent_code || null;
+        const terminalGroup = pos_service_1.PosService.resolveTerminalGroup();
+        let tenantPolicy = null;
+        if (routingConfig.tenantRoutingProfiles) {
+            tenantPolicy = pos_service_1.PosService.resolveTenantRoutingProfile({
+                tenantId: resolvedTenantId,
+                agentCode,
+                terminalGroup,
+                category: tenantCategory,
+            });
+        }
+        console.log(`[TerminalSync] Profile resolve tenant=${resolvedTenantId || 'n/a'} category=${tenantCategory} ` +
+            `group=${terminalGroup || 'n/a'} → ` +
+            (tenantPolicy
+                ? `${tenantPolicy.scopeType}/${tenantPolicy.targetValue || tenantPolicy.category} processOnDevice=${!!tenantPolicy.processOnDevice} sendField120=${tenantPolicy.sendField120 === true}`
+                : 'none (processOnDevice defaults false, sendField120 defaults false)'));
+        const hasMpos = !!bundle?.mpos;
+        const hasPrinter = !!bundle?.printer;
+        const hasAssignment = !!(bundle?.terminal_id?.tid || bundle?.mpos || bundle?.printer);
+        if (!hasAssignment) {
+            console.warn(`[TerminalSync] Device ${deviceId} marked COMPANY_DEVICE but no inventory bundle found`);
+        }
+        const configVersion = pos_service_1.PosService.getConfigVersion();
+        return {
+            assigned: hasAssignment,
+            success: hasAssignment,
+            deviceCategory: 'COMPANY_DEVICE',
+            deviceRole,
+            tenantId: resolvedTenantId,
+            tenantName: tenantDetails?.name || 'Business mapped via Tenant DB',
+            businessName: tenantDetails?.name || null,
+            plan: tenantDetails?.plan || null,
+            type: tenantDetails?.type || null,
+            ...emergencyLock,
+            features: {
+                invoicing: true,
+                inventory: true,
+                customerManagement: true,
+                reporting: true,
+                printing: hasPrinter || deviceRole === 'TABLET',
+                emvPayments: hasMpos,
+                cardSettlement: hasMpos,
+            },
+            terminalId: bundle?.terminal_id?.tid || null,
+            mposTerminalId: bundle?.mpos?.id || null,
+            posSerialNumber: bundle?.mpos?.serial_number || null,
+            terminalType: bundle?.mpos?.hardware_type || null,
+            configVersion,
+            syncedAt: new Date().toISOString(),
+            printerMac: bundle?.printer?.mac_address || null,
+            printerModel: bundle?.printer?.model || null,
+            supportPhone,
+            supportEmail,
+            supportWhatsapp,
+            broadcastMessage,
+            message: hasAssignment
+                ? null
+                : `No terminal assigned to this device. Device ID: ${deviceId}`,
+            activeHost: routingConfig.activeHost.toUpperCase(),
+            expressPayHost: expressPay?.ip || null,
+            expressPayPort: expressPay?.port || null,
+            // Flat NIBSS fields (parity with kimonoIp/kimonoPort) — also on primaryHost
+            nibssIp: nibssEndpoint.nibssIp,
+            nibssPort: nibssEndpoint.nibssPort,
+            nibssSsl: nibssEndpoint.nibssSsl,
+            primaryHost,
+            secondaryHost,
+            tertiaryHost,
+            routingRules: {
+                activeHost: routingConfig.activeHost,
+                failoverOrder: routingConfig.failoverOrder,
+                splitThresholdNaira: routingConfig.splitThresholdNaira,
+                processOnDevice: tenantPolicy?.processOnDevice ?? false,
+                sendField120: tenantPolicy?.sendField120 === true,
+                webhookUrl: tenantPolicy?.webhookUrl ?? null,
+                preferredHosts: tenantPolicy?.preferredHosts || [],
+                fallbackHosts: tenantPolicy?.fallbackHosts || [],
+                amountThresholds: tenantPolicy?.amountThresholds || [],
+                transactionTypeRules: tenantPolicy?.transactionTypeRules || [],
+                scopeType: tenantPolicy?.scopeType || null,
+                targetValue: tenantPolicy?.targetValue || tenantPolicy?.category || null,
+            },
+            thresholdRules: routingConfig.thresholdRulesMatrix,
+            tenantPolicy,
+            expressPayBaseUrl: expressPay?.baseUrl || null,
+            expressPayAuthToken: expressPay?.authToken || null,
+            merchantCode: expressPay?.merchantCode || null,
+            terminalGroup,
+            sslProfile: expressPay?.sslProfile || null,
+            kimonoIp: kimono?.kimonoIp || kimono?.ip || null,
+            kimonoPort: kimono?.kimonoPort || kimono?.port || null,
+            kimonoSSL: kimono?.kimonoSSL || kimono?.sslEnabled || false,
+            kimonoKeys: kimono?.kimonoKeys || null,
+            kimonoFallbackParameters: kimono?.kimonoFallbackParameters || null,
+        };
+    }
+    /**
+     * Lightweight status check — no audit log entry.
+     */
+    static async getTerminalStatus(deviceId) {
+        let deviceCategory = 'USER_DEVICE';
+        let deviceRole = 'PHONE';
+        try {
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('devices')
+                .select('device_category, device_role')
+                .eq('device_id', deviceId)
+                .maybeSingle();
+            if (error)
+                throw error;
+            if (data) {
+                deviceCategory = data.device_category || 'USER_DEVICE';
+                deviceRole = data.device_role || 'PHONE';
+            }
+        }
+        catch (e) {
+            // continue — inventory can still promote
+        }
+        const bundle = await terminal_inventory_service_1.TerminalInventoryService.getAssignmentByDeviceId(deviceId);
+        if (bundle) {
+            deviceCategory = 'COMPANY_DEVICE';
+            if (!deviceRole || deviceRole === 'PHONE')
+                deviceRole = 'TABLET';
+        }
+        if (deviceCategory !== 'COMPANY_DEVICE') {
+            return {
+                assigned: false,
+                deviceCategory,
+                deviceRole,
+                features: {
+                    invoicing: true,
+                    inventory: true,
+                    customerManagement: true,
+                    reporting: true,
+                    printing: false,
+                    emvPayments: false,
+                    cardSettlement: false,
+                },
+            };
+        }
+        const routingConfig = await pos_service_1.PosService.getRoutingConfig();
+        const { expressPay, kimono, primaryHost, secondaryHost, tertiaryHost, nibssEndpoint, } = (0, pos_host_endpoint_1.resolvePosHosts)(routingConfig);
+        const hasMpos = !!bundle?.mpos;
+        const hasPrinter = !!bundle?.printer;
+        return {
+            assigned: !!(bundle?.terminal_id?.tid || bundle?.mpos || bundle?.printer),
+            deviceCategory,
+            deviceRole,
+            features: {
+                invoicing: true,
+                inventory: true,
+                customerManagement: true,
+                reporting: true,
+                printing: hasPrinter || deviceRole === 'TABLET',
+                emvPayments: hasMpos,
+                cardSettlement: hasMpos,
+            },
+            terminalId: bundle?.terminal_id?.tid,
+            mposTerminalId: bundle?.mpos?.id,
+            posSerialNumber: bundle?.mpos?.serial_number,
+            terminalType: bundle?.mpos?.hardware_type,
+            configVersion: pos_service_1.PosService.getConfigVersion(),
+            activeHost: routingConfig.activeHost.toUpperCase(),
+            expressPayHost: expressPay?.ip || null,
+            expressPayPort: expressPay?.port || null,
+            nibssIp: nibssEndpoint.nibssIp,
+            nibssPort: nibssEndpoint.nibssPort,
+            nibssSsl: nibssEndpoint.nibssSsl,
+            primaryHost,
+            secondaryHost,
+            tertiaryHost,
+            expressPayBaseUrl: expressPay?.baseUrl || null,
+            expressPayAuthToken: expressPay?.authToken || null,
+            terminalGroup: pos_service_1.PosService.resolveTerminalGroup() || null,
+            kimonoIp: kimono?.kimonoIp || kimono?.ip || null,
+            kimonoPort: kimono?.kimonoPort || kimono?.port || null,
+            kimonoSSL: kimono?.kimonoSSL || kimono?.sslEnabled || false,
+        };
+    }
+    static async recordKeyExchangeSuccess(deviceId) {
+        const { error } = await supabase_1.supabaseAdmin
+            .from('devices')
+            .update({
+            last_key_exchange_at: new Date().toISOString(),
+        })
+            .eq('device_id', deviceId);
+        if (error)
+            throw error;
+        return { success: true };
+    }
+}
+exports.TerminalSyncService = TerminalSyncService;
+//# sourceMappingURL=terminal-sync.service.js.map

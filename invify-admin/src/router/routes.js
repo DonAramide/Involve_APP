@@ -447,6 +447,7 @@ const routes = [
       { path: 'hmo/registry', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Registry', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'registry'] } },
       { path: 'hmo/providers', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Provider Network', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'providers'] } },
       { path: 'hmo/plans', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Health Plans', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'plans', 'catalogue'] } },
+      { path: 'hmo/catalogue', name: 'hmoCatalogue', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'HMO Catalogue', permission: 'hmo.workspace', requiresAuth: true, keywords: ['hmo', 'offerings', 'services', 'products'] } },
       { path: 'hmo/coverage', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Benefits and Coverage', permission: 'hmo.workspace', requiresAuth: true } },
       { path: 'hmo/enrolment', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Member Enrolment', permission: 'hmo.workspace', requiresAuth: true } },
       { path: 'hmo/members', component: () => import('pages/hmo/HmoWorkspacePage.vue'), meta: { workspace: 'hmo', title: 'Members and Dependants', permission: 'hmo.workspace', requiresAuth: true } },

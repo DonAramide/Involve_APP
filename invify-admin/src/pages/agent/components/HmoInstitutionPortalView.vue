@@ -428,7 +428,7 @@
                 <div class="bg-panel-darker border-muted rounded-borders q-pa-md column op-gap-8">
                   <div class="row items-center justify-between">
                     <div class="text-subtitle2 text-weight-bold">{{ sch.schoolName }}</div>
-                    <q-badge :color="sch.onboardingStatus === 'active' ? 'green-9' : 'amber-9'">
+                    <q-badge :color="sch.onboardingStatus === 'active' ? 'green-9' : sch.onboardingStatus === 'rejected' ? 'red-9' : 'amber-9'">
                       {{ sch.onboardingStatus }}
                     </q-badge>
                   </div>
@@ -439,6 +439,29 @@
                     <span>Total Enrolled: <b>{{ sch.enrolledMembers }}</b></span>
                     <span class="text-green-4">Active Covered: <b>{{ sch.activeMembers }}</b></span>
                     <span class="text-amber-4">Pending Confirmation: <b>{{ sch.pendingMembers }}</b></span>
+                  </div>
+                  <div
+                    v-if="['pending_approval', 'pending'].includes(String(sch.onboardingStatus || '').toLowerCase())"
+                    class="row op-gap-8 q-pt-sm"
+                  >
+                    <q-btn
+                      dense
+                      color="green-5"
+                      text-color="black"
+                      label="Approve"
+                      no-caps
+                      :loading="schoolActionBusy === sch.tenantId"
+                      @click="handleSchoolOnboarding(sch, 'active')"
+                    />
+                    <q-btn
+                      dense
+                      outline
+                      color="red-4"
+                      label="Reject"
+                      no-caps
+                      :disable="schoolActionBusy === sch.tenantId"
+                      @click="handleSchoolOnboarding(sch, 'rejected')"
+                    />
                   </div>
                 </div>
               </div>
@@ -728,23 +751,55 @@
             </div>
 
             <div v-else class="column op-gap-8">
-              <div v-for="clm in claimsList" :key="clm.id" class="bg-panel-darker border-muted rounded-borders q-pa-sm row items-center justify-between">
-                <div>
-                  <div class="row items-center op-gap-8">
-                    <span class="text-weight-bold">{{ clm.claim_reference }}</span>
-                    <q-badge color="indigo-9" text-color="indigo-2">{{ clm.record_type }}</q-badge>
-                    <q-badge :color="clm.status === 'approved' || clm.status === 'settled' ? 'green-9' : clm.status === 'rejected' ? 'red-9' : 'amber-9'">
-                      {{ clm.status }}
-                    </q-badge>
+              <div v-for="clm in claimsList" :key="clm.id" class="bg-panel-darker border-muted rounded-borders q-pa-sm column op-gap-8">
+                <div class="row items-center justify-between">
+                  <div>
+                    <div class="row items-center op-gap-8">
+                      <span class="text-weight-bold">{{ clm.claim_reference }}</span>
+                      <q-badge color="indigo-9" text-color="indigo-2">{{ clm.record_type }}</q-badge>
+                      <q-badge :color="clm.status === 'approved' || clm.status === 'settled' ? 'green-9' : clm.status === 'rejected' ? 'red-9' : 'amber-9'">
+                        {{ clm.status }}
+                      </q-badge>
+                    </div>
+                    <div class="text-caption text-muted">
+                      Policy: {{ clm.policyNumber || clm.policy_id }} • Submitted: {{ clm.submitted_date }}
+                      • Amount: ₦{{ (Number(clm.authorised_amount_minor || 0) / 100).toLocaleString() }}
+                    </div>
+                    <div v-if="clm.rejection_reason" class="text-caption text-red-4 q-mt-xs">
+                      Rejection: {{ clm.rejection_reason }}
+                    </div>
                   </div>
-                  <div class="text-caption text-muted">
-                    Policy: {{ clm.policyNumber || clm.policy_id }} • Submitted: {{ clm.submitted_date }}
-                    • Amount: ₦{{ (Number(clm.authorised_amount_minor || 0) / 100).toLocaleString() }}
+                  <div class="row op-gap-8">
+                    <q-btn
+                      v-if="['submitted', 'pending'].includes(clm.status)"
+                      dense
+                      color="green-5"
+                      text-color="black"
+                      label="Approve"
+                      no-caps
+                      @click="handleAdjudicateClaim(clm.id, 'approved')"
+                    />
+                    <q-btn
+                      v-if="['submitted', 'pending'].includes(clm.status)"
+                      dense
+                      outline
+                      color="red-4"
+                      label="Reject"
+                      no-caps
+                      @click="handleAdjudicateClaim(clm.id, 'rejected')"
+                    />
+                    <q-btn
+                      v-if="clm.status === 'approved'"
+                      dense
+                      color="teal-4"
+                      text-color="black"
+                      label="Mark Settled"
+                      no-caps
+                      @click="handleAdjudicateClaim(clm.id, 'settled')"
+                    >
+                      <q-tooltip>Administrative settlement tracking only — does not disburse funds</q-tooltip>
+                    </q-btn>
                   </div>
-                </div>
-                <div class="row op-gap-8">
-                  <q-btn dense color="green-5" text-color="black" label="Approve" no-caps @click="handleAdjudicateClaim(clm.id, 'approved')" />
-                  <q-btn dense outline color="red-4" label="Reject" no-caps @click="handleAdjudicateClaim(clm.id, 'rejected')" />
                 </div>
               </div>
             </div>
@@ -935,6 +990,7 @@ const schools = ref([])
 const plans = ref([])
 const facilities = ref([])
 const claimsList = ref([])
+const schoolActionBusy = ref(null)
 const billingData = ref({ summary: {}, statements: [] })
 const auditData = ref({ recentImportAudit: [] })
 
@@ -1352,11 +1408,97 @@ async function handleSaveFacility() {
 
 async function handleAdjudicateClaim(id, status) {
   try {
-    await axios.post(`/api/agent/hmo/claims/${id}/adjudicate`, { status }, { headers: authHeaders() })
+    const payload = { status }
+    if (status === 'rejected') {
+      const reason = await new Promise((resolve) => {
+        $q.dialog({
+          title: 'Reject claim / pre-auth',
+          message: 'Provide a rejection reason (required, min 5 characters). Invalid transitions will be rejected by the server.',
+          prompt: { model: '', type: 'text', isValid: (v) => String(v || '').trim().length >= 5 },
+          cancel: true,
+          persistent: true,
+          dark: true,
+        }).onOk((val) => resolve(String(val || '').trim())).onCancel(() => resolve(null))
+      })
+      if (!reason) return
+      payload.rejectionReason = reason
+    }
+    if (status === 'settled') {
+      const ok = await new Promise((resolve) => {
+        $q.dialog({
+          title: 'Mark claim settled?',
+          message: 'This records administrative settlement only. It does not initiate a payout or post fees.',
+          cancel: true,
+          persistent: true,
+          dark: true,
+        }).onOk(() => resolve(true)).onCancel(() => resolve(false))
+      })
+      if (!ok) return
+    }
+    await axios.post(`/api/agent/hmo/claims/${id}/adjudicate`, payload, { headers: authHeaders() })
     $q.notify({ type: 'positive', message: `Record marked ${status}` })
     await loadClaims()
   } catch (err) {
-    $q.notify({ type: 'negative', message: err.response?.data?.message || 'Failed to update claim' })
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.message || err.response?.data?.error?.message || 'Failed to update claim',
+    })
+  }
+}
+
+async function handleSchoolOnboarding(sch, onboardingStatus) {
+  const tenantId = sch.tenantId || sch.tenant_id
+  if (!tenantId) {
+    $q.notify({ type: 'negative', message: 'School tenant id is missing' })
+    return
+  }
+  let rejectionReason
+  let notes
+  if (onboardingStatus === 'rejected') {
+    rejectionReason = await new Promise((resolve) => {
+      $q.dialog({
+        title: 'Reject affiliation request',
+        message: 'Provide a reason for rejecting this school network request.',
+        prompt: { model: '', type: 'text', isValid: (v) => String(v || '').trim().length >= 5 },
+        cancel: true,
+        persistent: true,
+        dark: true,
+      }).onOk((val) => resolve(String(val || '').trim())).onCancel(() => resolve(null))
+    })
+    if (!rejectionReason) return
+  } else {
+    const ok = await new Promise((resolve) => {
+      $q.dialog({
+        title: 'Approve school affiliation?',
+        message: `Activate ${sch.schoolName || 'this school'} on your HMO network and refresh provider linkage.`,
+        cancel: true,
+        persistent: true,
+        dark: true,
+      }).onOk(() => resolve(true)).onCancel(() => resolve(false))
+    })
+    if (!ok) return
+    notes = 'Approved via HMO school network portal'
+  }
+  schoolActionBusy.value = tenantId
+  try {
+    await axios.patch(
+      `/api/agent/hmo/schools/${tenantId}`,
+      { onboardingStatus, rejectionReason, notes },
+      { headers: authHeaders() },
+    )
+    $q.notify({
+      type: 'positive',
+      message: onboardingStatus === 'active' ? 'School affiliation approved' : 'School affiliation rejected',
+    })
+    await loadSchools()
+    await loadOverviewAndProfile()
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.message || err.response?.data?.error?.message || 'Failed to update school onboarding',
+    })
+  } finally {
+    schoolActionBusy.value = null
   }
 }
 

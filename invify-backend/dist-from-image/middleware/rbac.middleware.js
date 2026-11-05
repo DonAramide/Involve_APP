@@ -1,0 +1,172 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkBillingPermission = exports.checkTenantPermission = exports.checkTenantAccess = exports.checkRole = void 0;
+const finance_tenant_1 = require("../utils/finance-tenant");
+const parseRoles = (roleData) => {
+    if (typeof roleData === 'string') {
+        return roleData.split(',').map((r) => r.trim().toLowerCase());
+    }
+    if (Array.isArray(roleData)) {
+        return roleData.map((r) => typeof r === 'string' ? r.toLowerCase() : '');
+    }
+    return [];
+};
+/**
+ * Ensures the user has one of the allowed roles.
+ */
+const checkRole = (allowedRoles) => {
+    const allowedLower = allowedRoles.map(r => r.toLowerCase());
+    return (req, res, next) => {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ error: 'Unauthenticated' });
+        const userRoles = parseRoles(user.role);
+        console.log(`[RBAC checkRole] Path: ${req.path}, User Roles: ${userRoles.join(',')}, Allowed Roles: ${allowedRoles.join(',')}`);
+        // 1. Super Admin bypass
+        if (userRoles.includes('super_admin')) {
+            return next();
+        }
+        // 2. Map platform staff roles if route demands 'super_admin'
+        // This allows specific platform staff roles to access administrative routes relevant to their function
+        if (allowedLower.includes('super_admin')) {
+            const path = req.path.toLowerCase();
+            const isAdminSurface = (legacyPrefix) => path.startsWith(legacyPrefix) || path.startsWith(`/api${legacyPrefix}`);
+            if (userRoles.includes('admin_deploy') || userRoles.includes('owner') || userRoles.includes('admin')) {
+                // Platform operators: Release Channels, Global Settings, POS Switchboard
+                if (isAdminSurface('/admin/settings') || path.startsWith('/api/admin/apk') || path.startsWith('/admin/pos') || path.startsWith('/admin/commissions') || isAdminSurface('/admin/tenants') || isAdminSurface('/admin/users') || isAdminSurface('/admin/agents')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('internal_staff')) {
+                if (isAdminSurface('/admin/users') || isAdminSurface('/admin/tenants') || path.startsWith('/api/admin/audit')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('admin_ops')) {
+                // admin_ops has privilege "Reissue Cards, Fleet Management"
+                if (path.startsWith('/api/admin/terminals') || path.startsWith('/api/admin/inventory') || path.startsWith('/devices')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('admin_risk')) {
+                // admin_risk has privilege "Freeze Wallets, Suspend Terminals"
+                if (path.startsWith('/admin/audit-logs') || path.startsWith('/api/admin/terminals') || path.startsWith('/api/admin/inventory') || path.startsWith('/devices')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('admin_executive')) {
+                // admin_executive has privilege "Board View, Export Reports"
+                if (path.startsWith('/admin/dashboard-stats') || path.startsWith('/admin/analytics') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('admin_finance')) {
+                // admin_finance has privilege "Read/Write Ledgers"
+                if (path.startsWith('/admin/ledger') || path.startsWith('/admin/payments') || path.includes('tenant-payables') || path.includes('virtual-accounts') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit')) {
+                    return next();
+                }
+            }
+            if (userRoles.includes('admin_treasury')) {
+                // admin_treasury has privilege "Batch Payouts, Wallet Adjustments"
+                if (path.startsWith('/wallet') || path.startsWith('/api/payout') || path.startsWith('/api/finance/executive-summary') || path.startsWith('/api/finance/school-dashboard') || path.startsWith('/api/reconciliation') || path.startsWith('/reconciliation') || path.startsWith('/api/school') || path.startsWith('/school') || path.includes('card-settlement') || path.startsWith('/api/dashboard') || path.startsWith('/dashboard') || isAdminSurface('/admin/complaints') || isAdminSurface('/admin/user-devices') || isAdminSurface('/admin/audit') || isAdminSurface('/admin/inventory')) {
+                    return next();
+                }
+            }
+        }
+        const hasAnyAllowedRole = userRoles.some(r => allowedLower.includes(r));
+        if (!hasAnyAllowedRole) {
+            return res.status(403).json({ error: `Forbidden: Requires ${allowedRoles.join(' or ')} role` });
+        }
+        next();
+    };
+};
+exports.checkRole = checkRole;
+/**
+ * Enforces Tenant Isolation.
+ * Rule: Super Admin can access everything.
+ * Tenant Admin/Staff can only access their specific tenant.
+ */
+const checkTenantAccess = (req, res, next) => {
+    try {
+        req.effectiveTenantId = (0, finance_tenant_1.resolveAuthoritativeTenantId)(req);
+        return next();
+    }
+    catch (err) {
+        return res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
+    }
+};
+exports.checkTenantAccess = checkTenantAccess;
+/**
+ * Enforces fine-grained domain permissions for Tenant Users.
+ */
+const checkTenantPermission = (requiredPermission) => {
+    return (req, res, next) => {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ error: 'Unauthenticated' });
+        const userRoles = parseRoles(user.role);
+        // 1. Super Admin Bypass
+        if (userRoles.includes('super_admin')) {
+            return next();
+        }
+        // 2. Tenant Admin / Owner Bypass
+        if (userRoles.includes('tenant_admin') || userRoles.includes('owner')) {
+            return next();
+        }
+        // 3. Admin Finance Bypass (Map admin_finance to reconciliation permissions)
+        if (userRoles.includes('admin_finance') && requiredPermission.startsWith('reconciliation.')) {
+            return next();
+        }
+        if (userRoles.includes('finance_staff') && requiredPermission.startsWith('reconciliation.')) {
+            // finance_staff gets view/basic permissions but maybe not override.
+            const basicReconPerms = ['reconciliation.view', 'reconciliation.assign', 'reconciliation.timeline.view', 'reconciliation.audit.view'];
+            if (basicReconPerms.includes(requiredPermission)) {
+                return next();
+            }
+        }
+        // 4. Check explicit permissions array (assuming it exists on the JWT/User object)
+        const userPermissions = user.permissions || [];
+        if (!userPermissions.includes(requiredPermission)) {
+            return res.status(403).json({ error: `Forbidden: Missing required permission: ${requiredPermission}` });
+        }
+        next();
+    };
+};
+exports.checkTenantPermission = checkTenantPermission;
+const BILLING_PERMISSION_ROLES = {
+    'billing.view': ['super_admin', 'admin_finance', 'admin_treasury', 'admin_executive'],
+    'billing.create_obligation': ['super_admin', 'admin_finance'],
+    'billing.post_payment': ['super_admin', 'admin_finance'],
+    'billing.reverse_payment': ['super_admin'],
+    'billing.manage_plan': ['super_admin', 'admin_finance'],
+    'billing.manage_subscription': ['super_admin', 'admin_finance'],
+    'billing.export': ['super_admin', 'admin_finance', 'admin_executive'],
+};
+/** Platform Tenant Billing & Collections. Tenant operators never pass. */
+const checkBillingPermission = (requiredPermission) => {
+    return (req, res, next) => {
+        const user = req.user;
+        if (!user)
+            return res.status(401).json({ error: 'Unauthenticated' });
+        const userRoles = parseRoles(user.role);
+        if (userRoles.includes('owner') ||
+            userRoles.includes('tenant_admin') ||
+            userRoles.includes('tenant_operator') ||
+            userRoles.includes('cashier') ||
+            userRoles.includes('finance_staff') ||
+            userRoles.includes('teacher')) {
+            return res.status(403).json({ error: 'Forbidden: tenant isolation — billing collections is platform-only' });
+        }
+        if (userRoles.includes('super_admin'))
+            return next();
+        const allowed = BILLING_PERMISSION_ROLES[requiredPermission] || [];
+        if (userRoles.some((r) => allowed.includes(r)))
+            return next();
+        const explicit = user.permissions || [];
+        if (explicit.includes(requiredPermission))
+            return next();
+        return res.status(403).json({ error: `Forbidden: Missing required permission: ${requiredPermission}` });
+    };
+};
+exports.checkBillingPermission = checkBillingPermission;
+//# sourceMappingURL=rbac.middleware.js.map

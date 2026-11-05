@@ -1,0 +1,20 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const catalog_controller_1 = require("../controllers/catalog.controller");
+const rbac_middleware_1 = require("../middleware/rbac.middleware");
+const catalog_rbac_middleware_1 = require("../catalog/catalog-rbac.middleware");
+const router = (0, express_1.Router)();
+router.use(rbac_middleware_1.checkTenantAccess);
+router.get('/categories', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.view'), catalog_controller_1.CatalogController.listCategories);
+router.post('/categories', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.category.manage'), catalog_controller_1.CatalogController.createCategory);
+router.patch('/categories/:id', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.category.manage'), catalog_controller_1.CatalogController.updateCategory);
+router.get('/items', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.view'), catalog_controller_1.CatalogController.listItems);
+router.post('/items', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.create'), catalog_controller_1.CatalogController.createItem);
+router.patch('/items/:id', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.update'), catalog_controller_1.CatalogController.updateItem);
+router.get('/items/:id', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.view'), catalog_controller_1.CatalogController.getItem);
+router.get('/changes', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.view'), catalog_controller_1.CatalogController.getChanges);
+router.post('/devices/ack', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.view'), catalog_controller_1.CatalogController.ackDevice);
+router.get('/devices/sync-status', (0, catalog_rbac_middleware_1.requireCatalogPermission)('catalog.sync.view'), catalog_controller_1.CatalogController.syncStatus);
+exports.default = router;
+//# sourceMappingURL=catalog.routes.js.map

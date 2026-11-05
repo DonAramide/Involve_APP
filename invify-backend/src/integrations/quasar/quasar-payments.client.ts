@@ -12,6 +12,7 @@
 
 import * as crypto from 'crypto';
 import { QuasarApiClient, RequestOptions } from './quasar-api.client';
+import { applyInstitutionCodeToVaBody } from './va-institution-code';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -666,6 +667,11 @@ export class QuasarPaymentsClient {
       parentShareBps?: number;
       preferredBankCode?: string;
       bvn?: string;
+      /**
+       * Canonical Invify institution registry code for Quasar VA provider routing.
+       * Must not be a tenant UUID / institution UUID / wallet owner id.
+       */
+      institutionCode?: string | null;
       metadata?: Record<string, any>;
     },
     opts?: RequestOptions,
@@ -694,6 +700,7 @@ export class QuasarPaymentsClient {
       body.phone = phone;
       body.phoneNumber = phone;
     }
+    applyInstitutionCodeToVaBody(body, params.institutionCode);
 
     const safeBody = {
       ...body,

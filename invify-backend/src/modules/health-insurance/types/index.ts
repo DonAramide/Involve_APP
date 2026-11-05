@@ -70,14 +70,34 @@ export type HealthPermission =
   | 'health.reports.read'
   | 'health.exports.run'
   | 'health.audit.read'
-  | 'health.claims.read';
+  | 'health.claims.read'
+  | 'health.claims.manage';
 
 export type PlatformHealthPermission = 
   | 'platform.providers.manage'
   | 'platform.plans.manage'
   | 'platform.tenants.onboard'
   | 'platform.integration.health'
-  | 'platform.tenant_access';
+  | 'platform.tenant_access'
+  | 'platform.finance.view'
+  | 'platform.finance.manage'
+  | 'platform.agreements.approve'
+  | 'platform.statements.approve'
+  | 'platform.finance.reconcile';
+
+/** Permissions that may be issued via platform grant APIs once DB CHECK allows them. */
+export const PLATFORM_GRANTABLE_PERMISSIONS: PlatformHealthPermission[] = [
+  'platform.providers.manage',
+  'platform.plans.manage',
+  'platform.tenants.onboard',
+  'platform.integration.health',
+  'platform.tenant_access',
+  'platform.finance.view',
+  'platform.finance.manage',
+  'platform.agreements.approve',
+  'platform.statements.approve',
+  'platform.finance.reconcile'
+];
 
 export interface HealthContext {
   tenantId: string;

@@ -1,0 +1,1 @@
+export { VerificationResult } from "./interfaces";

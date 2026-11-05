@@ -6,12 +6,14 @@ import { activeBankOfferingVersionIds, assertBankOfferingForNewEnrolment } from 
 
 export class HealthPlanService {
   /**
-   * List approved insurance providers.
+   * List insurance providers eligible for institution selection / new offerings.
+   * Suspended, rejected, draft, and pending HMO organisations are withheld.
    */
   static async listProviders() {
     const { data, error } = await supabaseAdmin
       .from('hw_providers')
       .select('id, code, display_name, licence_reference, integration_status, adapter_key, capabilities, last_verified_at')
+      .eq('integration_status', 'verified')
       .order('display_name', { ascending: true });
 
     if (error) throw new Error(`Failed to list providers: ${error.message}`);

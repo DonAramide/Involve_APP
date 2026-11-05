@@ -1,0 +1,492 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IntegrationVaultService = void 0;
+const supabase_1 = require("../db/supabase");
+const vault_encryption_util_1 = require("../utils/vault-encryption.util");
+class IntegrationVaultService {
+    /**
+     * Registers a new integration in the vault.
+     */
+    static async registerIntegration(payload) {
+        const { data, error } = await supabase_1.supabaseAdmin.from('integration_vault').insert(payload).select().single();
+        if (error)
+            throw new Error(`Failed to register integration: ${error.message}`);
+        return data;
+    }
+    /**
+     * Retrieves all integrations with their current health and active credentials.
+     */
+    static async listIntegrations(scope, tenantId) {
+        let query = supabase_1.supabaseAdmin.from('integration_vault').select(`
+      *,
+      integration_credentials(id, key_name, environment, status, expires_at, credential_type),
+      integration_health_logs(status, latency_ms, checked_at),
+      integration_usage_analytics(metric_name, metric_value),
+      integration_dependencies(used_by_feature)
+    `);
+        if (scope)
+            query = query.eq('scope', scope);
+        if (tenantId)
+            query = query.eq('tenant_id', tenantId);
+        const { data, error } = await query;
+        if (error)
+            throw new Error(`Failed to list integrations: ${error.message}`);
+        return data;
+    }
+    /**
+     * Adds a new credential, optionally rotating out the old one.
+     */
+    static async addCredential(vaultId, payload) {
+        // 1. Encrypt the secret
+        const encrypted = vault_encryption_util_1.VaultEncryptionUtil.encrypt(payload.plaintext_value);
+        // 2. Begin transaction logic (Supabase RPC or sequential calls)
+        // If rotate_existing is true, demote current ACTIVE to STANDBY
+        if (payload.rotate_existing) {
+            await supabase_1.supabaseAdmin.from('integration_credentials')
+                .update({ status: 'STANDBY', revoked_at: new Date().toISOString() })
+                .eq('vault_id', vaultId)
+                .eq('environment', payload.environment)
+                .eq('key_name', payload.key_name)
+                .eq('status', 'ACTIVE');
+        }
+        // 3. Insert new credential (ACTIVE if rotating, STANDBY if not)
+        const insertPayload = {
+            vault_id: vaultId,
+            credential_type: payload.credential_type,
+            environment: payload.environment,
+            status: payload.rotate_existing ? 'ACTIVE' : 'STANDBY',
+            key_name: payload.key_name,
+            encrypted_value: encrypted.encryptedValue,
+            iv: encrypted.iv,
+            auth_tag: encrypted.authTag,
+            key_version: encrypted.keyVersion,
+            expires_at: payload.expires_at || null,
+            created_by: payload.operator_id || null
+        };
+        const { data, error } = await supabase_1.supabaseAdmin.from('integration_credentials').insert(insertPayload).select().single();
+        if (error)
+            throw new Error(`Failed to store credential: ${error.message}`);
+        return data;
+    }
+    /**
+     * INTERNAL: Retrieves and decrypts an active credential. Never exposed to API directly.
+     */
+    static async getDecryptedCredential(serviceIdentifier, environment = 'PRODUCTION', tenantId, keyName, options) {
+        // 1. Find Vault ID
+        let vaultQuery = supabase_1.supabaseAdmin.from('integration_vault')
+            .select('id')
+            .eq('service_identifier', serviceIdentifier)
+            .eq('status', 'ACTIVE');
+        if (tenantId) {
+            vaultQuery = vaultQuery.eq('tenant_id', tenantId).eq('scope', 'TENANT');
+        }
+        else {
+            vaultQuery = vaultQuery.eq('scope', 'GLOBAL');
+        }
+        const { data: vault, error: vaultErr } = await vaultQuery.maybeSingle();
+        if (vaultErr || !vault)
+            return null;
+        const statuses = options?.allowStandby ? ['ACTIVE', 'STANDBY'] : ['ACTIVE'];
+        let cred = null;
+        for (const status of statuses) {
+            let credQuery = supabase_1.supabaseAdmin.from('integration_credentials')
+                .select('*')
+                .eq('vault_id', vault.id)
+                .eq('environment', environment)
+                .eq('status', status);
+            if (keyName) {
+                credQuery = credQuery.eq('key_name', keyName);
+            }
+            credQuery = credQuery.order('created_at', { ascending: false }).limit(1);
+            const { data, error: credErr } = await credQuery;
+            const row = Array.isArray(data) ? data[0] : data;
+            if (!credErr && row) {
+                cred = row;
+                break;
+            }
+        }
+        if (!cred)
+            return null;
+        // 3. Decrypt
+        const payload = {
+            encryptedValue: cred.encrypted_value,
+            iv: cred.iv,
+            authTag: cred.auth_tag,
+            keyVersion: cred.key_version
+        };
+        return vault_encryption_util_1.VaultEncryptionUtil.decrypt(payload);
+    }
+    /**
+     * Promotes a STANDBY credential to ACTIVE and demotes any existing ACTIVE credential for the same key_name and environment.
+     */
+    static async activateCredential(vaultId, credentialId) {
+        // 1. Fetch the target credential
+        const { data: targetCred, error: fetchErr } = await supabase_1.supabaseAdmin.from('integration_credentials')
+            .select('environment, key_name')
+            .eq('id', credentialId)
+            .eq('vault_id', vaultId)
+            .single();
+        if (fetchErr || !targetCred)
+            throw new Error('Credential not found');
+        // 2. Demote current ACTIVE to STANDBY
+        await supabase_1.supabaseAdmin.from('integration_credentials')
+            .update({ status: 'STANDBY', revoked_at: new Date().toISOString() })
+            .eq('vault_id', vaultId)
+            .eq('environment', targetCred.environment)
+            .eq('key_name', targetCred.key_name)
+            .eq('status', 'ACTIVE');
+        // 3. Promote target to ACTIVE
+        const { data, error } = await supabase_1.supabaseAdmin.from('integration_credentials')
+            .update({ status: 'ACTIVE', revoked_at: null })
+            .eq('id', credentialId)
+            .select().single();
+        if (error)
+            throw new Error(`Failed to activate credential: ${error.message}`);
+        return data;
+    }
+    /**
+     * Updates an existing credential in place (name, type, expiry, and/or secret).
+     * Does not create a new version. Optional promote flips STANDBY → ACTIVE.
+     */
+    static async updateCredential(vaultId, credentialId, payload) {
+        const { data: existing, error: fetchErr } = await supabase_1.supabaseAdmin.from('integration_credentials')
+            .select('id, status')
+            .eq('id', credentialId)
+            .eq('vault_id', vaultId)
+            .single();
+        if (fetchErr || !existing)
+            throw new Error('Credential not found');
+        const update = {};
+        if (payload.credential_type)
+            update.credential_type = payload.credential_type;
+        if (payload.key_name)
+            update.key_name = payload.key_name;
+        if (payload.expires_at !== undefined)
+            update.expires_at = payload.expires_at || null;
+        const secret = typeof payload.plaintext_value === 'string' ? payload.plaintext_value.trim() : '';
+        if (secret) {
+            const encrypted = vault_encryption_util_1.VaultEncryptionUtil.encrypt(secret);
+            update.encrypted_value = encrypted.encryptedValue;
+            update.iv = encrypted.iv;
+            update.auth_tag = encrypted.authTag;
+            update.key_version = encrypted.keyVersion;
+        }
+        if (Object.keys(update).length === 0 && !payload.promote) {
+            throw new Error('No changes provided');
+        }
+        if (Object.keys(update).length) {
+            const { error } = await supabase_1.supabaseAdmin.from('integration_credentials')
+                .update(update)
+                .eq('id', credentialId)
+                .eq('vault_id', vaultId);
+            if (error)
+                throw new Error(`Failed to update credential: ${error.message}`);
+        }
+        if (payload.promote && existing.status !== 'ACTIVE') {
+            return this.activateCredential(vaultId, credentialId);
+        }
+        const { data, error } = await supabase_1.supabaseAdmin.from('integration_credentials')
+            .select('*')
+            .eq('id', credentialId)
+            .single();
+        if (error)
+            throw new Error(`Failed to load updated credential: ${error.message}`);
+        return data;
+    }
+    /**
+     * Hard deletes a credential from the vault.
+     */
+    static async deleteCredential(vaultId, credentialId) {
+        const { error } = await supabase_1.supabaseAdmin.from('integration_credentials')
+            .delete()
+            .eq('id', credentialId)
+            .eq('vault_id', vaultId);
+        if (error)
+            throw new Error(`Failed to delete credential: ${error.message}`);
+        return true;
+    }
+    /**
+     * Logs a health check result.
+     */
+    static async logHealthCheck(vaultId, environment, status, latencyMs, errorMessage) {
+        const { error } = await supabase_1.supabaseAdmin.from('integration_health_logs').insert({
+            vault_id: vaultId,
+            environment,
+            status,
+            latency_ms: latencyMs,
+            error_message: errorMessage || null
+        });
+        if (error)
+            console.error('[Vault] Failed to log health:', error.message);
+    }
+    /**
+     * Ensures the global Quasar vault integration exists and stores/rotates the
+     * outbound webhook HMAC signing secret (from Quasar Outbound webhook defaults).
+     */
+    static async upsertQuasarWebhookSigningSecret(signingSecret, environment = 'PRODUCTION') {
+        const serviceIdentifier = 'quasar';
+        const keyName = 'QUASAR_WEBHOOK_SIGNING_SECRET';
+        let vaultId = null;
+        const { data: existing } = await supabase_1.supabaseAdmin
+            .from('integration_vault')
+            .select('id')
+            .eq('service_identifier', serviceIdentifier)
+            .eq('scope', 'GLOBAL')
+            .maybeSingle();
+        if (existing?.id) {
+            vaultId = existing.id;
+        }
+        else {
+            const created = await this.registerIntegration({
+                service_identifier: serviceIdentifier,
+                name: 'Quasar Payments',
+                description: 'Quasar outbound webhook HMAC signing secret (x-quasar-signature) and payment credentials.',
+                category: 'PAYMENTS',
+                scope: 'GLOBAL',
+                tenant_id: null,
+            });
+            vaultId = created.id;
+        }
+        await this.addCredential(vaultId, {
+            credential_type: 'WEBHOOK_SECRET',
+            environment,
+            plaintext_value: signingSecret,
+            key_name: keyName,
+            rotate_existing: true,
+        });
+        return { vaultId, keyName, environment };
+    }
+    /**
+     * Status-only check for Quasar webhook signing secret (never returns plaintext).
+     */
+    static async getQuasarWebhookSecretStatus(environment = 'PRODUCTION') {
+        const fromEnv = Boolean((process.env.QUASAR_WEBHOOK_SIGNING_SECRET && process.env.QUASAR_WEBHOOK_SIGNING_SECRET.length >= 10) ||
+            (process.env.QUASAR_WEBHOOK_SECRET && process.env.QUASAR_WEBHOOK_SECRET.length >= 10));
+        const fromVault = Boolean(await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_WEBHOOK_SIGNING_SECRET'));
+        return {
+            configured: fromEnv || fromVault,
+            sources: {
+                runtimeEnv: fromEnv,
+                integrationVault: fromVault,
+            },
+            environment,
+            header: 'x-quasar-signature',
+        };
+    }
+    /**
+     * Ensure global Quasar vault exists and store admin username + password
+     * for POS encryption key rotate (Quasar /admin/auth/login).
+     */
+    static async upsertQuasarAdminCredentials(params, environment = 'PRODUCTION') {
+        const username = String(params.username || '').trim();
+        const password = String(params.password || '');
+        if (!username || !password) {
+            throw new Error('username and password are required');
+        }
+        const serviceIdentifier = 'quasar';
+        let vaultId = null;
+        const { data: existing } = await supabase_1.supabaseAdmin
+            .from('integration_vault')
+            .select('id')
+            .eq('service_identifier', serviceIdentifier)
+            .eq('scope', 'GLOBAL')
+            .maybeSingle();
+        if (existing?.id) {
+            vaultId = existing.id;
+        }
+        else {
+            const created = await this.registerIntegration({
+                service_identifier: serviceIdentifier,
+                name: 'Quasar Payments',
+                description: 'Quasar outbound webhook HMAC, admin credentials for POS key rotate, and payment credentials.',
+                category: 'PAYMENTS',
+                scope: 'GLOBAL',
+                tenant_id: null,
+            });
+            vaultId = created.id;
+        }
+        await this.addCredential(vaultId, {
+            credential_type: 'API_KEY',
+            environment,
+            plaintext_value: username,
+            key_name: 'QUASAR_ADMIN_USERNAME',
+            rotate_existing: true,
+        });
+        await this.addCredential(vaultId, {
+            credential_type: 'CLIENT_SECRET',
+            environment,
+            plaintext_value: password,
+            key_name: 'QUASAR_ADMIN_PASSWORD',
+            rotate_existing: true,
+        });
+        // Apply immediately without restart
+        process.env.QUASAR_ADMIN_USERNAME = username;
+        process.env.QUASAR_ADMIN_PASSWORD = password;
+        console.log(`[IntegrationVault] Quasar admin credentials stored vaultId=${vaultId} env=${environment}`);
+        return { vaultId, environment, keys: ['QUASAR_ADMIN_USERNAME', 'QUASAR_ADMIN_PASSWORD'] };
+    }
+    /** Status-only — never returns password. */
+    static async getQuasarAdminCredentialsStatus(environment = 'PRODUCTION') {
+        const fromEnv = Boolean(process.env.QUASAR_ADMIN_USERNAME?.trim() && process.env.QUASAR_ADMIN_PASSWORD?.trim());
+        const fromEnvJwt = Boolean(process.env.QUASAR_ADMIN_JWT?.trim());
+        const usernameVault = Boolean(await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_USERNAME'));
+        const passwordVault = Boolean(await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_PASSWORD'));
+        const fromVault = usernameVault && passwordVault;
+        return {
+            configured: fromEnv || fromVault || fromEnvJwt,
+            sources: {
+                runtimeEnv: fromEnv,
+                integrationVault: fromVault,
+                adminJwtEnv: fromEnvJwt,
+            },
+            environment,
+            usernameConfigured: Boolean(process.env.QUASAR_ADMIN_USERNAME?.trim()) || usernameVault,
+            passwordConfigured: Boolean(process.env.QUASAR_ADMIN_PASSWORD?.trim()) || passwordVault,
+        };
+    }
+    /** Decrypt Quasar admin login pair for server-side use only. */
+    static async getQuasarAdminCredentials(environment = 'PRODUCTION') {
+        const username = (await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_USERNAME')) ||
+            process.env.QUASAR_ADMIN_USERNAME?.trim() ||
+            process.env.QUASAR_ADMIN_EMAIL?.trim() ||
+            '';
+        const password = (await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_PASSWORD')) ||
+            process.env.QUASAR_ADMIN_PASSWORD?.trim() ||
+            '';
+        if (!username || !password)
+            return null;
+        return { username, password };
+    }
+    // ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
+    static META_WHATSAPP_SERVICE = 'META_WHATSAPP';
+    static META_WHATSAPP_KEYS = [
+        'PUBLIC_API_BASE_URL',
+        'WHATSAPP_GRAPH_API_VERSION',
+        'WHATSAPP_ACCESS_TOKEN',
+        'WHATSAPP_APP_SECRET',
+        'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+        'WHATSAPP_BUSINESS_ACCOUNT_ID',
+        'WHATSAPP_PHONE_NUMBER_ID',
+    ];
+    static async ensureMetaWhatsAppVault() {
+        const { data: existing } = await supabase_1.supabaseAdmin
+            .from('integration_vault')
+            .select('id')
+            .eq('service_identifier', this.META_WHATSAPP_SERVICE)
+            .eq('scope', 'GLOBAL')
+            .maybeSingle();
+        if (existing?.id)
+            return existing.id;
+        const created = await this.registerIntegration({
+            service_identifier: this.META_WHATSAPP_SERVICE,
+            name: 'Meta WhatsApp Cloud API',
+            description: 'Invify platform WhatsApp Business Account credentials, webhook verify token, and Graph API config.',
+            category: 'MESSAGING',
+            scope: 'GLOBAL',
+            tenant_id: null,
+        });
+        return created.id;
+    }
+    /**
+     * Upsert Meta WhatsApp Cloud API config into Integration Vault.
+     * Only non-empty provided keys are written (partial updates allowed).
+     * Also hydrates process.env for immediate use without restart.
+     */
+    static async upsertMetaWhatsAppCredentials(values, environment = 'PRODUCTION') {
+        const vaultId = await this.ensureMetaWhatsAppVault();
+        const storedKeys = [];
+        const credentialTypeFor = (key) => {
+            if (key.includes('TOKEN') || key.includes('SECRET') || key.includes('ACCESS'))
+                return 'API_SECRET';
+            if (key.includes('URL'))
+                return 'ENDPOINT';
+            return 'API_KEY';
+        };
+        for (const key of this.META_WHATSAPP_KEYS) {
+            const raw = values[key];
+            if (raw == null)
+                continue;
+            const plaintext = String(raw).trim();
+            if (!plaintext)
+                continue;
+            await this.addCredential(vaultId, {
+                credential_type: credentialTypeFor(key),
+                environment,
+                plaintext_value: plaintext,
+                key_name: key,
+                rotate_existing: true,
+            });
+            // Immediate runtime hydration (no restart)
+            process.env[key] = plaintext;
+            // Backward-compat aliases used by older OTP path
+            if (key === 'WHATSAPP_ACCESS_TOKEN') {
+                process.env.META_ACCESS_TOKEN = plaintext;
+            }
+            storedKeys.push(key);
+        }
+        console.log(`[IntegrationVault] Meta WhatsApp credentials stored vaultId=${vaultId} env=${environment} keys=${storedKeys.join(',')}`);
+        return { vaultId, environment, keys: storedKeys };
+    }
+    /** Status-only — never returns secrets. */
+    static async getMetaWhatsAppStatus(environment = 'PRODUCTION') {
+        const keys = {};
+        for (const key of this.META_WHATSAPP_KEYS) {
+            const fromEnv = Boolean(String(process.env[key] || '').trim());
+            // Also treat META_ACCESS_TOKEN as env source for WHATSAPP_ACCESS_TOKEN
+            const fromEnvAlias = key === 'WHATSAPP_ACCESS_TOKEN'
+                ? Boolean(String(process.env.META_ACCESS_TOKEN || '').trim())
+                : false;
+            const fromVault = Boolean(await this.getDecryptedCredential(this.META_WHATSAPP_SERVICE, environment, undefined, key));
+            // Legacy vault key name
+            const fromVaultLegacy = key === 'WHATSAPP_ACCESS_TOKEN'
+                ? Boolean(await this.getDecryptedCredential(this.META_WHATSAPP_SERVICE, environment, undefined, 'META_ACCESS_TOKEN'))
+                : false;
+            keys[key] = {
+                configured: fromEnv || fromEnvAlias || fromVault || fromVaultLegacy,
+                sources: {
+                    runtimeEnv: fromEnv || fromEnvAlias,
+                    integrationVault: fromVault || fromVaultLegacy,
+                },
+            };
+        }
+        const required = [
+            'WHATSAPP_ACCESS_TOKEN',
+            'WHATSAPP_PHONE_NUMBER_ID',
+            'WHATSAPP_APP_SECRET',
+            'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+        ];
+        const ready = required.every((k) => keys[k]?.configured);
+        return {
+            serviceIdentifier: this.META_WHATSAPP_SERVICE,
+            environment,
+            ready,
+            keys,
+            webhookPath: '/webhooks/whatsapp',
+        };
+    }
+    /**
+     * Copy ACTIVE vault values into process.env when env is empty.
+     * Safe to call at boot — never logs secret values.
+     */
+    static async hydrateMetaWhatsAppFromVault(environment = 'PRODUCTION') {
+        const hydrated = [];
+        for (const key of this.META_WHATSAPP_KEYS) {
+            if (String(process.env[key] || '').trim())
+                continue;
+            let value = await this.getDecryptedCredential(this.META_WHATSAPP_SERVICE, environment, undefined, key);
+            if (!value && key === 'WHATSAPP_ACCESS_TOKEN') {
+                value = await this.getDecryptedCredential(this.META_WHATSAPP_SERVICE, environment, undefined, 'META_ACCESS_TOKEN');
+            }
+            if (value) {
+                process.env[key] = value;
+                if (key === 'WHATSAPP_ACCESS_TOKEN') {
+                    process.env.META_ACCESS_TOKEN = value;
+                }
+                hydrated.push(key);
+            }
+        }
+        return hydrated;
+    }
+}
+exports.IntegrationVaultService = IntegrationVaultService;
+//# sourceMappingURL=integration-vault.service.js.map

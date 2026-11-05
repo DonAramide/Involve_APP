@@ -7,6 +7,7 @@ export const HMO_NAV_ITEMS = [
   { id: 'registry', label: 'HMO Registry', path: '/hmo/registry', icon: 'corporate_fare', section: 'Registry' },
   { id: 'providers', label: 'Provider Network', path: '/hmo/providers', icon: 'local_hospital', section: 'Providers' },
   { id: 'plans', label: 'Health Plans', path: '/hmo/plans', icon: 'inventory_2', section: 'Plans' },
+  { id: 'catalogue', label: 'HMO Catalogue', path: '/hmo/catalogue', icon: 'account_tree', section: 'Catalogue' },
   { id: 'coverage', label: 'Benefits and Coverage', path: '/hmo/coverage', icon: 'verified_user', section: 'Coverage' },
   { id: 'enrolment', label: 'Member Enrolment', path: '/hmo/enrolment', icon: 'how_to_reg', section: 'Enrolment' },
   { id: 'members', label: 'Members and Dependants', path: '/hmo/members', icon: 'groups', section: 'Members' },
