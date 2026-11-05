@@ -257,27 +257,90 @@ Documented historical rollback path from manifest:
 
 ## 12. Hard blockers before continuing
 
-1. **Production database identity not independently confirmed** via readable production env / approved operator attestation.  
-2. **~172 dirty local paths** — release content not yet a single reviewable commit SHA.  
-3. **Migration apply map unknown** for production (and partially for staging).  
-4. **HMO monetisation / fee ownership** remains unresolved — must stay excluded.  
-5. Shared VPS — deployment must target production paths/units exclusively.
+1. **Production database identity not independently confirmed** by an authorised operator (expected ref `jjixrywfnaijvahmvcwj`).  
+2. **Migration history exports** for staging + production not yet attached — see `INVIFY_PRODUCTION_MIGRATION_MANIFEST.md`.  
+3. **Production backup + restore verification** not yet attested.  
+4. **HMO monetisation / fee ownership** remains unresolved — keep flags off; do not apply `DO_NOT_APPLY_*` fee/monetisation SQL.  
+5. Shared VPS — deployment must target production paths/units exclusively.  
+6. **Not pushed / not deployed** — release branch is local only until further authorisation.
 
 ---
 
-## 13. Immediate ask of the release owner
+## 13. Phase 1 consolidation report (2026-11-05)
 
-Please confirm (reply with values, not secrets):
+### Decisions applied
 
-1. Production Supabase project ref currently used by `invify-production-backend` (expect `jjixrywfnaijvahmvcwj` or state the new ref).  
-2. Authorisation to create curated commit(s) for the dirty approved feature set onto `release/invify-production-2026`.  
-3. Whether production base for code merge should be **`origin/main` (`fdd830b8`)** or a tree rebuilt from the **live `58cfbf85+working-copy`** filesystem release.
+| Decision | Outcome |
+|---|---|
+| DB refs expected | prod `jjixrywfnaijvahmvcwj` · staging `rpcjelhacmkhzguljdgi` (operator confirm still required) |
+| Curated commits | **Approved and executed** (4 curated commits) |
+| Integration base | `origin/main` @ `fdd830b8` |
 
-Until (1) is confirmed, **no production migrations will be executed**.
+### Merges into `release/invify-production-2026`
+
+1. `feature/va-institution-provider-routing` → merge `3ca198fd`  
+2. `feature/va-hmo-staging-candidate` → merge `398ec7e2`  
+
+(`feature/hmo-management-platform` ancestry included via the above.)
+
+### Curated commits (staged lists reviewed before each commit)
+
+| SHA | Summary |
+|---|---|
+| `3175bbee` | School ID identity, CR80/Code128, gate scan email notices + migrations `20261105*` |
+| `0aa56b16` | Operational HMO enrolment/portal/mobile coverage UX |
+| `a463caba` | Service-mode terms, institute affiliation, attendance UI |
+| `5465431d` | Supporting inventory/sync/tenant admin + this audit doc |
+
+**Release candidate tip:** `5465431d9b53308f28100833ecb2b9e01b763dc8`
+
+Docs follow-up commit may advance tip (see `git rev-parse release/invify-production-2026`).
+
+### Conflicts
+
+No unresolved merge conflicts. Merges completed cleanly.
+
+### Production live overlay comparison
+
+- Live production backend **does not** contain `modules/school-gate` or `modules/health-insurance` (features are net-new to prod).  
+- `+working-copy` on prod predates this feature set; no selective school/HMO hotfix port required from filesystem.  
+- Older `attendance.service.js` exists on prod services — distinct from new school-gate module; left as-is in Git lineage.
+
+### Intentionally excluded from curated commits (preserved in original workspace)
+
+- `_build_candidates/`, `_staging_upload/`  
+- Staging APK binaries  
+- Phase 3 staging planning docs  
+- Additional dirty copies of `DO_NOT_APPLY_*` proposals  
+- HMO finance earnings/withdrawals admin pages and monetisation-only docs  
+
+### Present on branch via staging-candidate merge (gated — do not activate)
+
+- `invify-backend/src/modules/hmo-monetisation/**`  
+- Related `DO_NOT_APPLY_*` proposal files already committed on feature history  
+
+Keep: `FEATURE_REAL_MONEY_PAYOUTS=false`, `FEE_ORCHESTRATION_LIVE` unset/false, `HMO_FEE_OWNERSHIP_APPROVED` unset.
+
+### Migration manifest
+
+Created: `docs/releases/INVIFY_PRODUCTION_MIGRATION_MANIFEST.md`  
+**No production migrations applied.**
 
 ---
 
-## 14. Audit log
+## 14. Immediate ask of the release owner
+
+1. Authorised operator confirms production + staging Supabase project refs (host/ref only).  
+2. Export migration histories for both environments.  
+3. Attest production backup/PITR readiness.  
+4. Authorise (or withhold) `20261018000000_hw_50_profit_sharing.sql`.  
+5. Authorise push of `release/invify-production-2026` when ready for review (still no deploy).
+
+Until (1)–(3) pass, **no production migrations or production deploy**.
+
+---
+
+## 15. Audit log
 
 | Time (UTC) | Action | Result |
 |---|---|---|
@@ -285,4 +348,9 @@ Until (1) is confirmed, **no production migrations will be executed**.
 | 2026-11-05T16:55 | Production MANIFEST/COMMIT read | `58cfbf85+working-copy` |
 | 2026-11-05T16:56 | Git branch matrix | Documented; dirty WIP dominant |
 | 2026-11-05T16:57 | Env identity probe | Env files unreadable; prod admin contains prod Supabase ref |
-| 2026-11-05T17:00 | This audit written | Verdict: **BLOCKED** |
+| 2026-11-05T17:00 | Initial audit written | Verdict: **BLOCKED** |
+| 2026-11-05T17:05 | Phase 0 approvals received | Curated commits + `origin/main` base authorised |
+| 2026-11-05T17:15 | Created `release/invify-production-2026` from `fdd830b8` | Worktree ready |
+| 2026-11-05T17:25 | Merged VA/HMO feature branches | Clean merges |
+| 2026-11-05T17:40 | Curated commits `3175bbee`…`5465431d` | RC SHA fixed |
+| 2026-11-05T17:50 | Migration manifest prepared | Apply still blocked |
