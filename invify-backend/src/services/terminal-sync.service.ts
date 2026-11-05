@@ -5,8 +5,45 @@ import { TerminalAuditService } from './terminal-audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { PosService } from './pos.service';
 import { resolvePosHosts } from './pos-host-endpoint';
+import { TenantInstitutePortService } from './tenant-institute-port.service';
 
 export class TerminalSyncService {
+  /** Resolve the Institute Portal affiliation for a tenant (read-only for mobile). */
+  private static async resolveInstituteAffiliation(tenantId: string | null | undefined): Promise<{
+    instituteId: string | null;
+    instituteCode: string | null;
+    instituteName: string | null;
+    instituteIsDefault: boolean;
+  }> {
+    if (!tenantId) {
+      return {
+        instituteId: null,
+        instituteCode: null,
+        instituteName: null,
+        instituteIsDefault: true,
+      };
+    }
+    try {
+      const port = new TenantInstitutePortService();
+      const map = await port.ownershipMap([tenantId]);
+      const current = map.get(tenantId);
+      return {
+        instituteId: current?.id || null,
+        instituteCode: current?.agent_code || null,
+        instituteName: current?.name || null,
+        instituteIsDefault: current?.isDefault !== false,
+      };
+    } catch (err: any) {
+      console.warn('[TerminalSync] institute affiliation lookup failed (non-fatal):', err?.message || err);
+      return {
+        instituteId: null,
+        instituteCode: null,
+        instituteName: null,
+        instituteIsDefault: true,
+      };
+    }
+  }
+
 
   /**
    * Prefer one row when duplicates exist (maybeSingle fails on >1 with PGRST116).
@@ -226,6 +263,8 @@ export class TerminalSyncService {
       systemAccessPassword: tenantDetails?.system_access_password || null,
     };
 
+    const institute = await this.resolveInstituteAffiliation(resolvedTenantId);
+
     // Step 3: USER_DEVICE — no bank TID / MPOS bundle
     if (deviceCategory !== 'COMPANY_DEVICE') {
       console.log(`[TerminalSync] Device ${deviceId} → USER_DEVICE. Returning capability profile.`);
@@ -247,9 +286,11 @@ export class TerminalSyncService {
         deviceRole,
         tenantId: resolvedTenantId,
         tenantName: tenantDetails?.name || null,
+        businessName: tenantDetails?.name || null,
         plan: tenantDetails?.plan || null,
         type: tenantDetails?.type || null,
         ...emergencyLock,
+        ...institute,
         features: {
           invoicing: true,
           inventory: true,
@@ -349,6 +390,7 @@ export class TerminalSyncService {
       plan: tenantDetails?.plan || null,
       type: tenantDetails?.type || null,
       ...emergencyLock,
+      ...institute,
       features: {
         invoicing: true,
         inventory: true,

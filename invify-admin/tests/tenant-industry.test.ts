@@ -22,8 +22,10 @@ describe('tenant industry aliases', () => {
     expect(layout).toContain("path: '/tenant/health-insurance'")
     expect(layout).toContain("path: '/tenant/id-cards'")
     expect(layout).toContain("path: '/tenant/entry-exit'")
-    expect(layout).toContain("...identityNav('SCHOOL')")
-    expect(layout).toContain('...identityNav(modeLabel)')
-    expect(layout.match(/\.\.\.identityNav\(modeLabel\)/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(layout).toContain("...identityNav('SCHOOL', terms)")
+    expect(layout).toContain('...identityNav(modeLabel, terms)')
+    expect(layout.match(/\.\.\.identityNav\(modeLabel, terms\)/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(layout).toContain("path: '/tenant/attendance'")
   })
 })
+

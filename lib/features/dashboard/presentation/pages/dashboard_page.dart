@@ -138,23 +138,39 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(width: 8),
                 ],
-                // Organization name & Plan Badge
+                // Organization name, institute affiliation & Plan Badge
                 Flexible(
-                  child: Row(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          _terminalConfig?.businessName ?? settings?.organizationName ?? 'Invify',
-                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _terminalConfig?.businessName ?? settings?.organizationName ?? 'Invify',
+                              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (settingsState.userPlan?.isValid == true &&
+                              !settingsState.userPlan!.isFreeTrial) ...[
+                            const SizedBox(width: 6),
+                            _buildPlanBadge(settingsState.userPlan!),
+                          ],
+                        ],
+                      ),
+                      if (_terminalConfig?.hasInstituteAffiliation == true)
+                        Text(
+                          _terminalConfig!.instituteDisplayLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.85),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      if (settingsState.userPlan?.isValid == true &&
-                          !settingsState.userPlan!.isFreeTrial) ...[
-                        const SizedBox(width: 6),
-                        _buildPlanBadge(settingsState.userPlan!),
-                      ],
                     ],
                   ),
                 ),
@@ -762,6 +778,22 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.teal,
         onTap: () => Navigator.pushNamed(context, '/health_wellness'),
       ),
+      if (!isSchool) ...[
+        _DashboardMenuItem(
+          id: 'id_card_admin',
+          title: 'ID CARD',
+          icon: Icons.badge,
+          color: Colors.deepPurple,
+          onTap: () => _verifyAndNavigateToAdmin(context, '/id_card_admin'),
+        ),
+        _DashboardMenuItem(
+          id: 'gate_clock',
+          title: 'GATE CLOCK',
+          icon: Icons.sensor_door_outlined,
+          color: Colors.blue,
+          onTap: () => Navigator.pushNamed(context, '/gate_clock'),
+        ),
+      ],
     ];
 
     if (isServices) {
@@ -808,6 +840,8 @@ class _DashboardPageState extends State<DashboardPage> {
           'reconciliation',
           'multi_device',
           'health_wellness',
+          'id_card_admin',
+          'gate_clock',
         ].contains(i.id)),
       ], settings);
     }
@@ -905,15 +939,8 @@ class _DashboardPageState extends State<DashboardPage> {
               : () => Navigator.pushNamed(context, '/lesson_notes_list'),
         ),
         _DashboardMenuItem(
-          id: 'my_id_card',
-          title: 'MY ID CARD',
-          icon: Icons.badge_outlined,
-          color: Colors.indigo,
-          onTap: () => _verifyAndNavigateToAdmin(context, '/my_id_card'),
-        ),
-        _DashboardMenuItem(
           id: 'id_card_admin',
-          title: 'ID CARDS',
+          title: 'ID CARD',
           icon: Icons.badge,
           color: Colors.deepPurple,
           onTap: () => _verifyAndNavigateToAdmin(context, '/id_card_admin'),

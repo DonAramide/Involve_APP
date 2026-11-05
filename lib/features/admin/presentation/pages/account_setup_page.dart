@@ -26,6 +26,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/settings/presentation/widgets/institute_affiliation_tile.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 
 class AccountSetupPage extends StatefulWidget {
   const AccountSetupPage({super.key});
@@ -39,6 +41,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   bool _virtualAccountsEnabled = false;
   bool _multiDeviceLinkage = false;
   bool _autoSyncLedger = false;
+  TerminalConfig? _terminalConfig;
 
   String _deviceSuffix = 'LOADING...';
   String _persistentId = 'INITIALIZING...';
@@ -77,9 +80,16 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     _loadPersistedToggles();
     _loadUserProfile();
     _loadFormDraft();
+    _loadInstituteAffiliation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _hydrateContactFromCloud();
     });
+  }
+
+  Future<void> _loadInstituteAffiliation() async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (!mounted) return;
+    setState(() => _terminalConfig = config);
   }
 
   Future<void> _loadFormDraft() async {
@@ -589,7 +599,11 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                             )
                           : null,
                     ),
-                    const SizedBox(height: 14),
+                    InstituteAffiliationTile(
+                      config: _terminalConfig,
+                      margin: const EdgeInsets.only(top: 8, bottom: 6),
+                    ),
+                    const SizedBox(height: 8),
 
                     // 5. Business Physical Address
                     _buildProfileInputField(

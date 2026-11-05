@@ -69,6 +69,12 @@ class TerminalConfig {
   /// Recovery password generated from tenant admin dashboard.
   final String? systemAccessPassword;
 
+  /// Institute Portal affiliation for this tenant (parent institute / agent).
+  final String? instituteId;
+  final String? instituteCode;
+  final String? instituteName;
+  final bool instituteIsDefault;
+
   const TerminalConfig({
     required this.assigned,
     this.terminalId,
@@ -117,7 +123,25 @@ class TerminalConfig {
     this.emergencyLockCode,
     this.tenantStatus,
     this.systemAccessPassword,
+    this.instituteId,
+    this.instituteCode,
+    this.instituteName,
+    this.instituteIsDefault = true,
   });
+
+  /// True when the server returned a usable institute display name.
+  bool get hasInstituteAffiliation {
+    final name = instituteName?.trim() ?? '';
+    return name.isNotEmpty;
+  }
+
+  String get instituteDisplayLabel {
+    final name = instituteName?.trim() ?? '';
+    final code = instituteCode?.trim() ?? '';
+    if (name.isEmpty) return 'Not assigned';
+    if (code.isEmpty) return name;
+    return '$name ($code)';
+  }
 
   factory TerminalConfig.fromJson(Map<String, dynamic> json) {
     final terminalId = json['terminalId']?.toString();
@@ -179,6 +203,10 @@ class TerminalConfig {
       emergencyLockCode: json['emergencyLockCode']?.toString(),
       tenantStatus: json['tenantStatus']?.toString(),
       systemAccessPassword: json['systemAccessPassword']?.toString(),
+      instituteId: json['instituteId']?.toString(),
+      instituteCode: json['instituteCode']?.toString(),
+      instituteName: json['instituteName']?.toString(),
+      instituteIsDefault: json['instituteIsDefault'] != false,
     );
   }
 
@@ -230,6 +258,10 @@ class TerminalConfig {
     'emergencyLockCode': emergencyLockCode,
     'tenantStatus': tenantStatus,
     'systemAccessPassword': systemAccessPassword,
+    'instituteId': instituteId,
+    'instituteCode': instituteCode,
+    'instituteName': instituteName,
+    'instituteIsDefault': instituteIsDefault,
   };
 
   DeviceCapabilities get capabilities => DeviceCapabilities.fromJson(features);

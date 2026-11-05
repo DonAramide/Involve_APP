@@ -46,9 +46,8 @@ class DashboardMenuCatalog {
     DashboardMenuOption(id: 'result_entry', label: 'Result Entry', modes: ['school']),
     DashboardMenuOption(id: 'attendance', label: 'Attendance', modes: ['school']),
     DashboardMenuOption(id: 'lesson_notes', label: 'Lesson Notes', modes: ['school']),
-    DashboardMenuOption(id: 'my_id_card', label: 'My ID Card', modes: ['school']),
-    DashboardMenuOption(id: 'id_card_admin', label: 'ID Cards', modes: ['school']),
-    DashboardMenuOption(id: 'gate_clock', label: 'Gate Clock', modes: ['school']),
+    DashboardMenuOption(id: 'id_card_admin', label: 'ID Card', modes: ['retail', 'school', 'services']),
+    DashboardMenuOption(id: 'gate_clock', label: 'Gate Clock', modes: ['retail', 'school', 'services']),
     DashboardMenuOption(
       id: 'health_wellness',
       label: 'Health & Wellness',
@@ -64,7 +63,13 @@ class DashboardMenuCatalog {
   ];
 
   static List<DashboardMenuOption> forMode(String mode) {
-    final normalized = mode.toLowerCase().trim();
+    var normalized = mode.toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
+    if (normalized == 'order' || normalized == 'pos' || normalized == 'invify_retail') {
+      normalized = 'retail';
+    }
+    if (normalized == 'service' || normalized == 'hospitality' || normalized == 'invify_services') {
+      normalized = 'services';
+    }
     return all.where((o) => o.modes.contains(normalized)).toList();
   }
 
