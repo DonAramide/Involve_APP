@@ -4,7 +4,8 @@ export type FeeTransactionType =
   | 'TREASURY_WITHDRAWAL'
   | 'TREASURY_TRANSFER'
   | 'SMS'
-  | 'AI_TASK';
+  | 'AI_TASK'
+  | 'HMO_SERVICE';
 
 export type FeeCalcMethod = 'FLAT' | 'PERCENTAGE' | 'HYBRID';
 export type FeeVersionStatus = 'DRAFT' | 'PUBLISHED' | 'SUPERSEDED';

@@ -580,11 +580,14 @@ export class HealthPlatformController {
   static async listProviderRegistry(req: Request, res: Response) {
     try {
       // Prefer governed listing when query filters are present; keep legacy shape otherwise.
-      const hasFilters = Boolean(req.query?.search || req.query?.status || req.query?.limit || req.query?.offset);
+      const hasFilters = Boolean(
+        req.query?.search || req.query?.status || req.query?.channel || req.query?.limit || req.query?.offset
+      );
       if (hasFilters) {
         const data = await HealthProviderGovernanceService.listProviders({
           search: String(req.query.search || ''),
           status: String(req.query.status || ''),
+          channel: String(req.query.channel || ''),
           limit: Number(req.query.limit),
           offset: Number(req.query.offset)
         });

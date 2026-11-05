@@ -158,6 +158,27 @@ describe('POS preview (in-memory, no persistence)', () => {
   })
 })
 
+describe('HMO_SERVICE catalog', () => {
+  test('Super Admin fee screens include HMO_SERVICE without dropping existing types', () => {
+    const list = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeProfilesPage.vue'), 'utf8')
+    const assessments = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeAssessmentsPage.vue'), 'utf8')
+    const distribution = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeDistributionPage.vue'), 'utf8')
+    expect(list).toMatch(/HMO_SERVICE/)
+    expect(list).toMatch(/POS_WITHDRAWAL/)
+    expect(assessments).toMatch(/HMO_SERVICE/)
+    expect(distribution).toMatch(/HMO_SERVICE/)
+  })
+
+  test('governance bank-account and HMO finance routes exist', () => {
+    const bank = findChild('governance/bank-accounts')
+    const report = findChild('admin/hmo-finance')
+    expect(bank).toBeDefined()
+    expect(bank.meta.permission).toBe('platform.bank_accounts.view')
+    expect(report).toBeDefined()
+    expect(report.meta.permission).toBe('read_finance')
+  })
+})
+
 describe('platform fee UI contracts', () => {
   test('publish requires maker-checker confirmation and uses admin API not supabase tables', () => {
     const detail = fs.readFileSync(

@@ -23,6 +23,18 @@
         style="min-width: 180px"
         @update:model-value="reload"
       />
+      <q-select
+        v-model="channelFilter"
+        :options="channelFilters"
+        emit-value
+        map-options
+        outlined
+        dense
+        :dark="isDark"
+        label="Channel"
+        style="min-width: 180px"
+        @update:model-value="reload"
+      />
       <q-btn color="teal-8" no-caps label="Refresh" :loading="loadingList" @click="reload" />
       <q-btn color="primary" no-caps label="Register HMO" icon="add" @click="openRegister" />
     </div>
@@ -51,6 +63,11 @@
       <template #body-cell-status="props">
         <q-td :props="props">
           <q-badge :color="statusColor(props.row.integration_status)" :label="statusLabel(props.row.integration_status)" />
+        </q-td>
+      </template>
+      <template #body-cell-channel="props">
+        <q-td :props="props">
+          <q-badge outline color="cyan-4" :label="channelLabel(props.row.registration_channel)" />
         </q-td>
       </template>
     </q-table>
@@ -84,6 +101,10 @@
         <q-tab-panel name="overview" class="q-px-none">
           <div class="text-caption text-grey-4">Licence: {{ detail.provider.licence_reference || 'Not recorded' }}</div>
           <div class="text-caption text-grey-4">Regulator: {{ detail.provider.regulator_type || '—' }}</div>
+          <div class="text-caption text-grey-4">
+            Registration channel:
+            <q-badge outline color="cyan-4" :label="channelLabel(detail.provider.registration_channel)" />
+          </div>
           <div class="text-caption text-grey-4">Assignable for new enrolments: {{ detail.provider.assignable ? 'Yes' : 'No' }}</div>
           <div class="text-caption text-grey-4">Linked tenants: {{ detail.provider.tenant_count ?? 0 }}</div>
           <div class="text-caption text-grey-5 q-mt-sm">{{ detail.provider.description || 'No description recorded.' }}</div>
@@ -242,6 +263,17 @@
           <q-input v-model="form.code" outlined dense :dark="isDark" label="Code (optional, lowercase)" hint="Letters, digits, underscore" />
           <q-input v-model="form.licenceReference" outlined dense :dark="isDark" label="Registration / licence number" />
           <q-select v-model="form.regulatorType" :options="regulatorOptions" emit-value map-options outlined dense :dark="isDark" label="Regulator" />
+          <q-select
+            v-model="form.registrationChannel"
+            :options="channelOptions"
+            emit-value
+            map-options
+            outlined
+            dense
+            :dark="isDark"
+            label="Registration channel *"
+            hint="Platform = Super Admin; Self-service = HMO signed up as a service; Agent = institute/bank onboarded"
+          />
           <q-input v-model="form.licenceExpiry" outlined dense :dark="isDark" label="Licence expiry (YYYY-MM-DD)" />
           <q-input v-model="form.contactEmail" outlined dense :dark="isDark" label="Official email" />
           <q-input v-model="form.contactPhone" outlined dense :dark="isDark" label="Phone" />
@@ -281,6 +313,16 @@
           <q-input v-model="form.legalName" outlined dense :dark="isDark" label="Legal name" />
           <q-input v-model="form.licenceReference" outlined dense :dark="isDark" label="Licence / registration" />
           <q-select v-model="form.regulatorType" :options="regulatorOptions" emit-value map-options outlined dense :dark="isDark" label="Regulator" />
+          <q-select
+            v-model="form.registrationChannel"
+            :options="channelOptions"
+            emit-value
+            map-options
+            outlined
+            dense
+            :dark="isDark"
+            label="Registration channel *"
+          />
           <q-input v-model="form.contactEmail" outlined dense :dark="isDark" label="Official email" />
           <q-input v-model="form.contactPhone" outlined dense :dark="isDark" label="Phone" />
           <q-input v-model="form.websiteUrl" outlined dense :dark="isDark" label="Website" />
@@ -339,8 +381,11 @@ import { useQuasar } from 'quasar'
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi'
 import {
   emptyProviderRegistrationForm,
+  PROVIDER_CHANNEL_FILTERS,
   PROVIDER_STATUS_FILTERS,
+  REGISTRATION_CHANNEL_OPTIONS,
   REGULATOR_OPTIONS,
+  providerChannelLabel,
   providerGovernanceLabel,
   providerStatusColor
 } from 'src/hmo/providerLifecycle'
@@ -356,8 +401,11 @@ const $q = useQuasar()
 
 const search = ref('')
 const statusFilter = ref('')
+const channelFilter = ref('')
 const statusFilters = PROVIDER_STATUS_FILTERS
+const channelFilters = PROVIDER_CHANNEL_FILTERS
 const regulatorOptions = REGULATOR_OPTIONS
+const channelOptions = REGISTRATION_CHANNEL_OPTIONS
 const providers = ref([])
 const stats = ref(null)
 const loadingList = ref(false)
@@ -383,6 +431,7 @@ const columns = [
   { name: 'code', label: 'Code', field: 'code', align: 'left' },
   { name: 'licence', label: 'Licence', field: (r) => r.licence_reference || '—', align: 'left' },
   { name: 'status', label: 'Status', field: 'integration_status', align: 'left' },
+  { name: 'channel', label: 'Channel', field: 'registration_channel', align: 'left' },
   { name: 'tenants', label: 'Tenants', field: (r) => r.tenant_count ?? 0, align: 'right' }
 ]
 
@@ -412,6 +461,7 @@ const auditColumns = [
 
 const statusLabel = providerGovernanceLabel
 const statusColor = providerStatusColor
+const channelLabel = providerChannelLabel
 
 const statCards = computed(() => {
   const s = stats.value || {}
@@ -525,6 +575,7 @@ async function loadList(page = pagination.value.page) {
     const res = await healthInsuranceApi.getPlatformRegistry(platformReason(), {
       search: search.value,
       status: statusFilter.value,
+      channel: channelFilter.value,
       limit,
       offset
     })
@@ -586,6 +637,7 @@ function openEdit() {
     legalName: p.legal_name || '',
     licenceReference: p.licence_reference || '',
     regulatorType: p.regulator_type || 'NHIA',
+    registrationChannel: p.registration_channel || 'platform',
     licenceExpiry: p.licence_expiry || '',
     contactEmail: p.contact_email || '',
     contactPhone: p.contact_phone || '',

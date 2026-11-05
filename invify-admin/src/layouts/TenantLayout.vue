@@ -36,7 +36,7 @@
               {{ activeBusinessName }}
             </span>
             <q-badge color="indigo-10" text-color="indigo-3" class="text-metric-sm text-weight-bold letter-spacing-1 q-ml-xs">
-              {{ (activeIndustry || 'BUSINESS').toUpperCase() }}
+              {{ industryLabel(activeIndustry) }}
             </q-badge>
             <!-- Distinct HMO Partner Identity Pill (Separated from School Identity) -->
             <q-badge v-if="assignedHmoPartner" color="teal-10" text-color="teal-2" class="text-metric-sm q-ml-xs">
@@ -209,6 +209,7 @@ import { logoutAuthenticatedSession } from '../auth/session'
 import InvifyLoadingState from '../components/InvifyLoadingState.vue'
 import { ensureTenantRealtime } from '../services/tenantSocket'
 import { useFinanceStore } from '../stores/finance.store'
+import { industryLabel, tenantIndustry } from '../utils/tenantIndustry'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -306,22 +307,30 @@ const coreNavigationTree = [
   { label: 'Devices', path: '/tenant/devices', icon: 'qr_code_2', color: 'amber-4' },
   { label: 'BI Reports & Exports', path: '/tenant/reports', icon: 'insert_chart_outlined', color: 'purple-3' },
   { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' },
+  { label: 'Bank Accounts', path: '/tenant/settings/bank-accounts', icon: 'account_balance', color: 'teal-3' },
   { label: 'Financial Platform', path: '/tenant/settings/financial-platform', icon: 'account_balance', color: 'amber-4' },
   { label: 'My Profile & Security', path: '/tenant/profile', icon: 'manage_accounts', color: 'green-4' }
 ]
 
 // Dynamic industry-specific options based on the active industry
+function identityNav(modeLabel) {
+  return [
+    { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: modeLabel },
+    { label: 'ID Cards', path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: modeLabel },
+    { label: modeLabel === 'SCHOOL' ? 'Entry and Exit' : 'Gate Clock', path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: modeLabel }
+  ]
+}
+
 const industryNavigationTree = computed(() => {
-  const mode = activeIndustry.value.toLowerCase()
+  const mode = tenantIndustry(activeIndustry.value)
+  const modeLabel = industryLabel(activeIndustry.value)
   if (mode === 'school') {
     return [
       { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
       { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
-      { label: 'ID Cards', path: '/tenant/id-cards', icon: 'badge', color: 'indigo-3', mode: 'SCHOOL' },
-      { label: 'Entry and Exit', path: '/tenant/entry-exit', icon: 'sensor_door', color: 'blue-4', mode: 'SCHOOL' },
+      ...identityNav('SCHOOL'),
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
-      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SCHOOL' },
       { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
       { label: 'Attendance', path: '/tenant/attendance', icon: 'fact_check', color: 'blue-4', mode: 'SCHOOL' },
       { label: 'Message parents', path: '/tenant/parent-messages', icon: 'campaign', color: 'teal-4', mode: 'SCHOOL' },
@@ -337,21 +346,21 @@ const industryNavigationTree = computed(() => {
     ]
   } else if (mode === 'retail') {
     return [
-      { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' },
-      { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: 'RETAIL' },
-      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'RETAIL' },
-      { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: 'RETAIL' },
-      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' },
-      { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: 'RETAIL' }
+      { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: modeLabel },
+      { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: modeLabel },
+      ...identityNav(modeLabel),
+      { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: modeLabel },
+      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
+      { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: modeLabel }
     ]
-  } else if (mode === 'services' || mode === 'service' || mode === 'hospitality' || mode === 'invify_services') {
+  } else if (mode === 'services') {
     return [
-      { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
-      { label: 'Health & Wellness', path: '/tenant/health-insurance', icon: 'health_and_safety', color: 'teal-4', mode: 'SERVICE' },
-      { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: 'SERVICE' },
-      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'SERVICE' },
-      { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: 'SERVICE' },
-      { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: 'SERVICE' }
+      { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: modeLabel },
+      ...identityNav(modeLabel),
+      { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: modeLabel },
+      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
+      { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: modeLabel },
+      { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: modeLabel }
     ]
   } else if (mode === 'logistics') {
     return [

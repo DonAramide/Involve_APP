@@ -7,7 +7,7 @@
           <div class="text-caption text-grey-5 font-mono q-mb-xs">ADMIN · PLATFORM REVENUE</div>
           <h1 class="text-h4 text-weight-bolder text-white q-my-none">Platform Fee Orchestration</h1>
           <div class="text-caption text-grey-5 q-mt-sm">
-            Global and Agent-scoped transaction fee profiles. Maker proposes a publish; a different checker must approve. School billing and tenant_fee_profiles are not used here.
+            Global and Agent-scoped transaction fee profiles, including HMO service fees. Maker proposes a publish; a different checker must approve. School billing and tenant_fee_profiles are not used here. HMO_SERVICE is catalogued here and is not posted to wallets until ownership is approved.
           </div>
         </div>
         <div class="row q-gutter-sm">
@@ -163,7 +163,7 @@ async function loadRows() {
   try {
     await loadAgents()
     if (selectedAgentId.value) {
-      const types = ['POS_WITHDRAWAL', 'VIRTUAL_ACCOUNT_INWARD_TRANSFER', 'TREASURY_WITHDRAWAL', 'TREASURY_TRANSFER', 'SMS', 'AI_TASK']
+      const types = ['POS_WITHDRAWAL', 'VIRTUAL_ACCOUNT_INWARD_TRANSFER', 'TREASURY_WITHDRAWAL', 'TREASURY_TRANSFER', 'SMS', 'AI_TASK', 'HMO_SERVICE']
       const details = await Promise.all(types.map(async (transaction_type) => {
         try {
           const { data } = await adminApi.getPlatformFeeProfile(transaction_type, { agentId: selectedAgentId.value })

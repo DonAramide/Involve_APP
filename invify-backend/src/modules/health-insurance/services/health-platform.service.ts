@@ -495,6 +495,13 @@ export class HealthPlatformService {
       throw new Error(`Failed to record HMO school link: ${linkError.message}`);
     }
 
+    try {
+      const { ensureTenantOffersFromAssignedHmo } = await import('./tenant-plan-offer-sync');
+      await ensureTenantOffersFromAssignedHmo(tenantId, ctx.userId);
+    } catch (err: any) {
+      console.warn('[HealthPlatformService.assignTenantProvider] plan offer sync:', err?.message || err);
+    }
+
     await HealthAuditService.recordEvent({
       tenantId: '00000000-0000-0000-0000-000000000000',
       actorUserId: ctx.userId,
@@ -1239,9 +1246,25 @@ export class HealthPlatformService {
   static async listProviderRegistry() {
     const { data, error } = await supabaseAdmin
       .from('hw_providers')
-      .select('id, code, display_name, integration_status, licence_reference')
+      .select('id, code, display_name, integration_status, licence_reference, registration_channel')
       .order('display_name');
-    if (error) throw new Error(`Failed to list HMO registry: ${error.message}`);
+    if (error) {
+      if (/registration_channel|column.*does not exist/i.test(error.message)) {
+        const fallback = await supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name, integration_status, licence_reference')
+          .order('display_name');
+        if (fallback.error) throw new Error(`Failed to list HMO registry: ${fallback.error.message}`);
+        const providers = fallback.data || [];
+        const tenantCounts = await collectProviderTenantCounts(providers);
+        return providers.map((provider) => ({
+          ...provider,
+          registration_channel: 'platform',
+          tenant_count: tenantCounts.get(provider.id) || 0
+        }));
+      }
+      throw new Error(`Failed to list HMO registry: ${error.message}`);
+    }
     const providers = data || [];
     const tenantCounts = await collectProviderTenantCounts(providers);
     return providers.map((provider) => ({

@@ -8,14 +8,14 @@
           <q-icon name="health_and_safety" color="teal-4" size="md" />
           <h1 class="text-h4 text-weight-bolder text-white q-my-none letter-spacing-1">Health & Wellness</h1>
           <q-badge color="teal-10" text-color="teal-3" class="text-weight-bold q-ml-sm letter-spacing-1">
-            SCHOOL MODE
+            {{ modeBadge }}
           </q-badge>
           <q-badge v-if="isSandbox" color="amber-10" text-color="amber-3" class="text-weight-bold q-ml-xs">
             SANDBOX ENGINE
           </q-badge>
         </div>
         <div class="text-caption text-grey-5 q-mt-xs">
-          Multi-Mode Health Insurance Administration — Manage student, guardian, and staff coverage, premium billing, and insurer activation.
+          {{ modeCaption }}
         </div>
       </div>
 
@@ -81,7 +81,7 @@
           </div>
           <div class="text-h4 text-weight-bolder text-white font-mono q-mt-sm">{{ metrics.totalEnrolments }}</div>
           <div class="text-caption text-grey-6 q-mt-xs font-mono">
-            {{ metrics.studentsEnrolled }} Students • {{ metrics.staffEnrolled }} Staff
+            {{ metrics.studentsEnrolled }} {{ memberNoun }} • {{ metrics.staffEnrolled }} Staff
           </div>
         </q-card>
       </div>
@@ -244,7 +244,7 @@
             <div>
               <div class="text-subtitle1 text-weight-bold">Student-Guardian Verification Matrix</div>
               <div class="text-caption text-grey-5">
-                Guardians cannot access student medical coverage until their relationship is explicitly verified by school administration.
+                Guardians cannot access dependant medical coverage until their relationship is explicitly verified by administration.
               </div>
             </div>
             <q-btn
@@ -343,30 +343,43 @@
           <div class="row items-center justify-between q-mb-md">
             <div>
               <div class="text-subtitle1 text-weight-bold">Configured HMO Plans & Tenant Offers</div>
-              <div class="text-caption text-grey-5">Partner underwriters and eligible plans offered to this school. Institution admins cannot register global HMO providers.</div>
+              <div class="text-caption text-grey-5">Partner underwriters and eligible plans offered to this {{ workplace }}. Institution admins cannot register global HMO providers.</div>
             </div>
           </div>
 
           <q-card class="bg-card-dark border-grey-9 q-pa-md q-mb-md">
-            <div class="text-subtitle2 text-weight-bold">Request HMO affiliation</div>
-            <div class="text-caption text-grey-5 q-mb-sm">Select an approved (verified) platform HMO. The request starts as pending approval.</div>
-            <div class="row q-col-gutter-sm items-end">
-              <div class="col-12 col-md-6">
-                <q-select
-                  v-model="affiliationProviderId"
-                  :options="eligibleProviderOptions"
-                  emit-value
-                  map-options
-                  dense
-                  outlined
-                  dark
-                  label="Approved HMO provider"
-                />
+            <div class="text-subtitle2 text-weight-bold">HMO affiliation</div>
+            <div v-if="assignedProvider" class="q-mt-sm">
+              <div class="text-body2 text-teal-3 text-weight-medium">{{ assignedProvider.name || assignedProvider.display_name }}</div>
+              <div class="text-caption text-grey-5">
+                Assigned from institute onboarding / platform assignment
+                <span v-if="assignedProvider.code"> · code {{ assignedProvider.code }}</span>
+                <span v-if="healthSettings?.assignmentMode"> · {{ healthSettings.assignmentMode }}</span>
               </div>
-              <div class="col-12 col-md-3">
-                <q-btn color="teal-8" no-caps label="Request affiliation" :loading="affiliationSaving" :disable="!affiliationProviderId" @click="submitAffiliation" />
+              <div v-if="activeAffiliationStatus" class="text-caption text-grey-4 q-mt-xs">
+                Link status: {{ activeAffiliationStatus }}
               </div>
             </div>
+            <template v-else>
+              <div class="text-caption text-grey-5 q-mb-sm">Select an approved (verified) platform HMO. The request starts as pending approval.</div>
+              <div class="row q-col-gutter-sm items-end">
+                <div class="col-12 col-md-6">
+                  <q-select
+                    v-model="affiliationProviderId"
+                    :options="eligibleProviderOptions"
+                    emit-value
+                    map-options
+                    dense
+                    outlined
+                    dark
+                    label="Approved HMO provider"
+                  />
+                </div>
+                <div class="col-12 col-md-3">
+                  <q-btn color="teal-8" no-caps label="Request affiliation" :loading="affiliationSaving" :disable="!affiliationProviderId" @click="submitAffiliation" />
+                </div>
+              </div>
+            </template>
             <div v-if="affiliations.length" class="q-mt-md">
               <div class="text-caption text-grey-4" v-for="link in affiliations" :key="link.id">
                 {{ link.hw_providers?.display_name || link.provider_id }} — {{ link.onboarding_status }}
@@ -374,22 +387,25 @@
             </div>
           </q-card>
 
+          <div v-if="!normalizedOffers.length" class="text-caption text-grey-5 q-mb-md">
+            No published plans are offered for this {{ workplace }} yet. When the assigned HMO publishes an active plan, it appears here automatically.
+          </div>
           <div class="row q-col-gutter-md">
-            <div v-for="offer in tenantOffers" :key="offer.id" class="col-12 col-md-4">
+            <div v-for="offer in normalizedOffers" :key="offer.id" class="col-12 col-md-4">
               <q-card class="bg-card-dark border-grey-9 q-pa-md">
                 <div class="row items-center justify-between">
-                  <div class="text-weight-bolder text-subtitle2 text-teal-3">{{ offer.plan_name || 'Standard School Plan' }}</div>
-                  <q-badge color="teal-10" text-color="teal-3">ACTIVE OFFER</q-badge>
+                  <div class="text-weight-bolder text-subtitle2 text-teal-3">{{ offer.planName }}</div>
+                  <q-badge color="teal-10" text-color="teal-3">{{ offer.statusLabel }}</q-badge>
                 </div>
-                <div class="text-caption text-grey-5 q-mt-xs">Provider: {{ offer.provider_name || 'Reliance Health' }}</div>
+                <div class="text-caption text-grey-5 q-mt-xs">Provider: {{ offer.providerName }}</div>
                 <div class="text-h6 text-white font-mono q-mt-md">
-                  {{ formatNgn(offer.custom_annual_premium || offer.annual_premium || 35000) }} / yr
+                  {{ formatNgn(offer.annualPremiumNaira) }} / {{ offer.billingLabel }}
                 </div>
-                <div class="text-caption text-grey-6 font-mono">
-                  Term: {{ formatNgn(offer.custom_term_premium || 12000) }} / term
+                <div class="text-caption text-grey-6 font-mono" v-if="offer.categoriesLabel">
+                  Categories: {{ offer.categoriesLabel }}
                 </div>
                 <div class="q-mt-sm text-caption text-grey-4">
-                  Tier: {{ offer.tier || 'STANDARD' }}
+                  {{ offer.planCode }} · v{{ offer.version }}
                 </div>
               </q-card>
             </div>
@@ -398,7 +414,15 @@
 
         <!-- TAB 6: Facilities Directory -->
         <q-tab-panel name="facilities" class="q-pa-md">
-          <div class="text-subtitle1 text-weight-bold q-mb-md">Participating Hospitals & Healthcare Centers</div>
+          <div class="row items-center justify-between q-mb-md">
+            <div>
+              <div class="text-subtitle1 text-weight-bold">Participating Hospitals & Healthcare Centers</div>
+              <div class="text-caption text-grey-5">
+                Live from your assigned HMO network. Updates made in the HMO Institution Portal appear here after refresh.
+              </div>
+            </div>
+            <q-btn dense outline color="cyan-4" icon="refresh" label="Refresh" no-caps @click="loadFacilities" />
+          </div>
           <q-table
             :rows="facilities"
             :columns="facilityColumns"
@@ -406,7 +430,13 @@
             dark
             flat
             class="bg-transparent text-grey-3 font-mono"
-          />
+          >
+            <template #no-data>
+              <div class="full-width text-center q-pa-lg text-grey-5">
+                No facilities published by {{ assignedProvider?.name || assignedProvider?.display_name || 'the assigned HMO' }} yet.
+              </div>
+            </template>
+          </q-table>
         </q-tab-panel>
 
         <!-- TAB 7: Claims Log (tenant submit + status; no HMO adjudication) -->
@@ -422,7 +452,7 @@
             <template v-slot:avatar><q-icon name="info" color="cyan-4" /></template>
             <div class="text-caption">
               Submit administrative claim or pre-authorisation records for HMO review.
-              Approval, rejection, and settlement are performed by the HMO — not from this school dashboard.
+              Approval, rejection, and settlement are performed by the HMO — not from this dashboard.
             </div>
           </q-banner>
           <q-table
@@ -779,6 +809,14 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { healthInsuranceApi } from 'src/api/healthInsuranceApi';
+import { industryLabel, industryWorkplace, tenantIndustry } from 'src/utils/tenantIndustry';
+
+const workplace = industryWorkplace()
+const modeBadge = `${industryLabel()} MODE`
+const memberNoun = tenantIndustry() === 'school' ? 'Students' : 'Members'
+const modeCaption = tenantIndustry() === 'school'
+  ? 'Health insurance administration — manage student, guardian, and staff coverage, premium billing, and insurer activation.'
+  : `Health insurance administration — manage staff, member, and dependant coverage, premium billing, and insurer activation for this ${workplace}.`
 
 const $q = useQuasar();
 
@@ -856,6 +894,7 @@ const invoiceColumns = [
 
 // Plans & Facilities & Claims
 const tenantOffers = ref([]);
+const healthSettings = ref(null);
 const eligibleProviderOptions = ref([]);
 const affiliations = ref([]);
 const affiliationProviderId = ref('');
@@ -863,7 +902,7 @@ const affiliationSaving = ref(false);
 const facilities = ref([]);
 const facilityColumns = [
   { name: 'name', label: 'FACILITY NAME', field: 'name', align: 'left' },
-  { name: 'type', label: 'TIER', field: 'facility_type', align: 'left' },
+  { name: 'type', label: 'SERVICES', field: (row) => Array.isArray(row.services) ? row.services.join(', ') : (row.facility_type || '—'), align: 'left' },
   { name: 'state', label: 'STATE', field: 'state', align: 'left' },
   { name: 'address', label: 'ADDRESS', field: 'address', align: 'left' }
 ];
@@ -940,11 +979,50 @@ const planRows = computed(() => {
   return []
 })
 
+function unwrapRelation(value) {
+  if (Array.isArray(value)) return value[0] || null
+  return value || null
+}
+
+const assignedProvider = computed(() => {
+  const fromSettings = healthSettings.value?.assignedProvider || null
+  if (fromSettings?.id || fromSettings?.name || fromSettings?.display_name) return fromSettings
+  const link = affiliations.value.find((row) => String(row.onboarding_status || '').toLowerCase() === 'active')
+  const provider = unwrapRelation(link?.hw_providers)
+  return provider || null
+})
+
+const activeAffiliationStatus = computed(() => {
+  const assignedId = assignedProvider.value?.id
+  const link = affiliations.value.find((row) => !assignedId || row.provider_id === assignedId)
+  return link?.onboarding_status || null
+})
+
+const normalizedOffers = computed(() => planRows.value.map((row) => {
+  const version = unwrapRelation(row.hw_plan_versions)
+  const plan = unwrapRelation(version?.hw_plans)
+  const provider = unwrapRelation(plan?.hw_providers)
+  const minor = Number(version?.premium_minor)
+  const billing = String(version?.billing_frequency || 'annual')
+  const categories = Array.isArray(version?.member_categories) ? version.member_categories : []
+  return {
+    id: row.id || version?.id,
+    planName: plan?.name || 'Untitled plan',
+    planCode: plan?.code || '—',
+    providerName: provider?.display_name || assignedProvider.value?.name || assignedProvider.value?.display_name || 'Assigned HMO',
+    annualPremiumNaira: Number.isFinite(minor) ? minor / 100 : 0,
+    billingLabel: billing === 'termly' ? 'term' : billing === 'monthly' ? 'mo' : billing === 'quarterly' ? 'qtr' : 'yr',
+    categoriesLabel: categories.join(', '),
+    version: version?.version ?? '—',
+    statusLabel: String(version?.status || '').toLowerCase() === 'published' ? 'PUBLISHED OFFER' : 'ACTIVE OFFER'
+  }
+}).filter((row) => row.id))
+
 const planVersionOptions = computed(() => planRows.value.map((row) => {
-  const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions
+  const version = unwrapRelation(row.hw_plan_versions)
   if (!version?.id) return null
-  const plan = Array.isArray(version.hw_plans) ? version.hw_plans[0] : version.hw_plans
-  const provider = Array.isArray(plan?.hw_providers) ? plan.hw_providers[0] : plan?.hw_providers
+  const plan = unwrapRelation(version.hw_plans)
+  const provider = unwrapRelation(plan?.hw_providers)
   const minor = Number(version.premium_minor)
   const price = Number.isFinite(minor)
     ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: version.currency || 'NGN' }).format(minor / 100)
@@ -1004,8 +1082,19 @@ function claimStatusColor(status) {
 async function loadOverviewMetrics() {
   try {
     const res = await healthInsuranceApi.getOverviewMetrics();
+    const data = res.data || {}
+    const nested = data.metrics && typeof data.metrics === 'object' ? data.metrics : {}
     if (res.data) {
-      Object.assign(metrics, res.data);
+      Object.assign(metrics, {
+        totalEnrolments: data.enrolledCount ?? nested.enrolledMembers ?? data.totalEnrolments ?? metrics.totalEnrolments,
+        activePolicies: data.activeCoverageCount ?? nested.insurerConfirmedActive ?? data.activePolicies ?? metrics.activePolicies,
+        pendingVerification: data.awaitingVerificationCount ?? nested.awaitingVerification ?? data.pendingVerification ?? 0,
+        awaitingPayment: data.awaitingActivationCount ?? nested.awaitingActivation ?? data.incompleteCount ?? data.awaitingPayment ?? 0,
+        studentsEnrolled: data.studentsEnrolled ?? nested.studentsEnrolled ?? metrics.studentsEnrolled,
+        staffEnrolled: data.staffEnrolled ?? nested.staffEnrolled ?? metrics.staffEnrolled,
+        totalBilledAmount: ((data.billedMinor ?? nested.premiumsBilledMinor ?? 0) / 100),
+        totalCollectedAmount: ((data.collectedMinor ?? nested.premiumsCollectedMinor ?? 0) / 100)
+      });
     }
   } catch (err) {
     // If table is newly created / empty, default to zero
@@ -1051,8 +1140,12 @@ async function loadInvoices() {
 
 async function loadPlansAndOffers() {
   try {
-    const res = await healthInsuranceApi.getTenantOffers();
-    tenantOffers.value = res.data?.data || res.data || [];
+    const [offersRes, settingsRes] = await Promise.all([
+      healthInsuranceApi.getTenantOffers(),
+      healthInsuranceApi.getSettings().catch(() => null)
+    ]);
+    tenantOffers.value = offersRes.data?.data || offersRes.data || [];
+    healthSettings.value = settingsRes?.data?.data || settingsRes?.data || null;
   } catch (err) {
     console.warn('Plans load:', err?.message);
   }
@@ -1064,12 +1157,16 @@ async function loadAffiliations() {
       healthInsuranceApi.listEligibleProviders(),
       healthInsuranceApi.listAffiliations()
     ]);
-    const providers = eligible?.data?.data?.providers || eligible?.data?.providers || [];
+    const payload = eligible?.data?.data || eligible?.data || {};
+    const providers = payload.providers || (Array.isArray(payload) ? payload : []);
     eligibleProviderOptions.value = providers.map((p) => ({
       label: `${p.display_name || p.code} (${p.integration_status || 'verified'})`,
       value: p.id
     }));
     affiliations.value = links?.data?.data || links?.data || [];
+    if (eligibleProviderOptions.value.length === 1) {
+      affiliationProviderId.value = eligibleProviderOptions.value[0].value;
+    }
   } catch (err) {
     console.warn('Affiliation load:', err?.message);
   }
@@ -1167,9 +1264,10 @@ async function submitAffiliation() {
 async function loadFacilities() {
   try {
     const res = await healthInsuranceApi.getFacilities();
-    facilities.value = res.data || [];
+    facilities.value = res.data?.data || res.data || [];
   } catch (err) {
     console.warn('Facilities load:', err?.message);
+    facilities.value = [];
   }
 }
 

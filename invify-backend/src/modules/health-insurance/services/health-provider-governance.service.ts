@@ -33,6 +33,10 @@ export const PROVIDER_GOVERNANCE_STATUSES = [
 
 export type ProviderGovernanceStatus = (typeof PROVIDER_GOVERNANCE_STATUSES)[number];
 
+/** How the HMO organisation entered the platform registry. */
+export const PROVIDER_REGISTRATION_CHANNELS = ['platform', 'self_service', 'agent'] as const;
+export type ProviderRegistrationChannel = (typeof PROVIDER_REGISTRATION_CHANNELS)[number];
+
 /** Only verified HMO organisations are eligible for new tenant assignments / offerings. */
 export const ASSIGNABLE_PROVIDER_STATUSES: ReadonlySet<string> = new Set(['verified']);
 
@@ -45,6 +49,7 @@ const PROVIDER_DETAIL_SELECT = [
   'regulator_type',
   'licence_expiry',
   'integration_status',
+  'registration_channel',
   'adapter_key',
   'capabilities',
   'contact_email',
@@ -102,6 +107,30 @@ function slugifyCode(input: string): string {
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .slice(0, 40);
+}
+
+function parseRegistrationChannel(
+  value: unknown,
+  fallback: ProviderRegistrationChannel = 'platform'
+): ProviderRegistrationChannel {
+  if (value === undefined || value === null || value === '') return fallback;
+  const channel = String(value).trim().toLowerCase();
+  if (!(PROVIDER_REGISTRATION_CHANNELS as readonly string[]).includes(channel)) {
+    throw httpError('registrationChannel must be platform, self_service, or agent.');
+  }
+  return channel as ProviderRegistrationChannel;
+}
+
+function registrationChannelLabel(channel: string | null | undefined): string {
+  switch (channel) {
+    case 'self_service':
+      return 'SELF_SERVICE';
+    case 'agent':
+      return 'AGENT';
+    case 'platform':
+    default:
+      return 'PLATFORM';
+  }
 }
 
 function governanceLabel(status: string | null | undefined): string {
@@ -223,6 +252,7 @@ export class HealthProviderGovernanceService {
   static async listProviders(query: {
     search?: string;
     status?: string;
+    channel?: string;
     limit?: number;
     offset?: number;
   } = {}) {
@@ -236,6 +266,8 @@ export class HealthProviderGovernanceService {
     if (status && !PROVIDER_GOVERNANCE_STATUSES.includes(status as ProviderGovernanceStatus)) {
       throw httpError('status is not a recognised provider filter.');
     }
+    const channelFilter = String(query.channel || '').trim();
+    if (channelFilter) parseRegistrationChannel(channelFilter);
 
     let q: any = supabaseAdmin
       .from('hw_providers')
@@ -243,6 +275,7 @@ export class HealthProviderGovernanceService {
       .order('display_name', { ascending: true });
 
     if (status) q = q.eq('integration_status', status);
+    if (channelFilter) q = q.eq('registration_channel', channelFilter);
     if (search) {
       q = q.or(
         `display_name.ilike.%${search}%,code.ilike.%${search}%,legal_name.ilike.%${search}%,licence_reference.ilike.%${search}%`
@@ -250,7 +283,16 @@ export class HealthProviderGovernanceService {
     }
 
     const { data, error, count } = await q.range(offset, offset + limit - 1);
-    if (error) throw httpError(`Failed to list providers: ${error.message}`, 500);
+    if (error) {
+      if (/registration_channel|column.*does not exist/i.test(error.message)) {
+        throw httpError(
+          'registration_channel is not on hw_providers yet. Apply proposals/DO_NOT_APPLY_hw_provider_registration_channel.sql on staging.',
+          503,
+          'REGISTRATION_CHANNEL_UNAVAILABLE'
+        );
+      }
+      throw httpError(`Failed to list providers: ${error.message}`, 500);
+    }
 
     const providers: any[] = data || [];
     const tenantCounts = await collectProviderTenantCounts(providers.map((p) => ({ id: p.id, code: p.code })));
@@ -258,6 +300,7 @@ export class HealthProviderGovernanceService {
       providers: providers.map((p) => ({
         ...p,
         governance_status: governanceLabel(p.integration_status),
+        registration_channel_label: registrationChannelLabel(p.registration_channel),
         assignable: this.isAssignable(p.integration_status),
         tenant_count: tenantCounts.get(p.id) || 0
       })),
@@ -314,6 +357,7 @@ export class HealthProviderGovernanceService {
       provider: {
         ...provider,
         governance_status: governanceLabel(provider.integration_status),
+        registration_channel_label: registrationChannelLabel(provider.registration_channel),
         assignable: this.isAssignable(provider.integration_status),
         tenant_count: tenantCounts.get(providerId) || 0
       },
@@ -437,6 +481,11 @@ export class HealthProviderGovernanceService {
       'Contact person email'
     );
 
+    const registrationChannel = parseRegistrationChannel(
+      body.registrationChannel ?? body.registration_channel,
+      'platform'
+    );
+
     // New registrations never auto-activate.
     const payload: Record<string, unknown> = {
       code,
@@ -446,6 +495,7 @@ export class HealthProviderGovernanceService {
       regulator_type: regulatorType,
       licence_expiry: trimOrNull(body.licenceExpiry || body.licence_expiry, 32),
       integration_status: 'pending_verification',
+      registration_channel: registrationChannel,
       contact_email: contactEmail,
       contact_phone: trimOrNull(body.contactPhone || body.contact_phone || body.phone, 40),
       support_email: optionalEmail(body.supportEmail || body.support_email, 'Support email'),
@@ -467,7 +517,8 @@ export class HealthProviderGovernanceService {
       status_changed_by: ctx.userId || null,
       capabilities: {
         ...(typeof body.capabilities === 'object' && body.capabilities ? body.capabilities : {}),
-        registered_by_platform: true,
+        registered_by_platform: registrationChannel === 'platform',
+        registration_channel: registrationChannel,
         registration_note: trimOrNull(body.registrationNote, 500)
       }
     };
@@ -481,7 +532,7 @@ export class HealthProviderGovernanceService {
     let error = insertResult.error;
 
     if (error) {
-      // Older DBs without governance columns: retry without optional fields.
+      // Older DBs without governance / channel columns: retry without optional fields.
       if (/column|does not exist|rejected/i.test(error.message)) {
         const fallback = { ...payload };
         delete fallback.description;
@@ -491,6 +542,7 @@ export class HealthProviderGovernanceService {
         delete fallback.status_reason;
         delete fallback.status_changed_at;
         delete fallback.status_changed_by;
+        delete fallback.registration_channel;
         const retry: any = await supabaseAdmin
           .from('hw_providers')
           .insert(fallback)
@@ -510,6 +562,7 @@ export class HealthProviderGovernanceService {
       code: data.code,
       displayName: data.display_name,
       status: data.integration_status,
+      registrationChannel: data.registration_channel || registrationChannel,
       licenceReference: data.licence_reference
     });
 
@@ -529,6 +582,8 @@ export class HealthProviderGovernanceService {
     return {
       ...data,
       governance_status: governanceLabel(data.integration_status),
+      registration_channel: data.registration_channel || registrationChannel,
+      registration_channel_label: registrationChannelLabel(data.registration_channel || registrationChannel),
       assignable: false
     };
   }
@@ -582,6 +637,13 @@ export class HealthProviderGovernanceService {
       }
     }
 
+    if (body.registrationChannel !== undefined || body.registration_channel !== undefined) {
+      updates.registration_channel = parseRegistrationChannel(
+        body.registrationChannel ?? body.registration_channel,
+        'platform'
+      );
+    }
+
     if (body.logoImage && typeof body.logoImage === 'string' && body.logoImage.startsWith('data:image')) {
       validateImageBase64(body.logoImage, { maxSizeBytes: 3 * 1024 * 1024 });
       updates.logo_url = await uploadBase64ToContabo(
@@ -614,6 +676,7 @@ export class HealthProviderGovernanceService {
         delete slim.contact_person_name;
         delete slim.contact_person_email;
         delete slim.contact_person_phone;
+        delete slim.registration_channel;
         const retry: any = await supabaseAdmin
           .from('hw_providers')
           .update(slim)

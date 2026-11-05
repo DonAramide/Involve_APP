@@ -87,6 +87,7 @@ describe('HealthProviderGovernanceService', () => {
       legal_name: 'Acme Health Ltd',
       licence_reference: 'NHIA/001',
       integration_status: 'pending_verification',
+      registration_channel: 'self_service',
       contact_email: 'ops@acme.test'
     };
 
@@ -109,15 +110,27 @@ describe('HealthProviderGovernanceService', () => {
       legalName: 'Acme Health Ltd',
       code: 'acme_hmo',
       licenceReference: 'NHIA/001',
-      contactEmail: 'ops@acme.test'
+      contactEmail: 'ops@acme.test',
+      registrationChannel: 'self_service'
     });
 
     expect(result.integration_status).toBe('pending_verification');
     expect(result.governance_status).toBe('PENDING_APPROVAL');
+    expect(result.registration_channel).toBe('self_service');
+    expect(result.registration_channel_label).toBe('SELF_SERVICE');
     expect(result.assignable).toBe(false);
     expect(HealthAuditService.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'provider.registered', resourceId: inserted.id })
     );
+  });
+
+  test('registerProvider rejects unknown registration channel', async () => {
+    await expect(
+      HealthProviderGovernanceService.registerProvider(ctx() as any, {
+        displayName: 'Bad Channel HMO',
+        registrationChannel: 'franchise'
+      })
+    ).rejects.toMatchObject({ message: expect.stringMatching(/registrationChannel must be/i) });
   });
 
   test('registerProvider rejects duplicate licence', async () => {

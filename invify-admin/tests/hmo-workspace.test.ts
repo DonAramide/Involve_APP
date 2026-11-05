@@ -99,6 +99,8 @@ describe('HMO workspace navigation', () => {
     expect(page).toContain('HmoProviderManagementPanel')
     expect(page).toContain('platform.providers.manage')
     expect(panel).toContain('Register HMO')
+    expect(panel).toContain('registrationChannel')
+    expect(panel).toContain('Channel')
     expect(panel).toContain('Submit for approval')
     expect(panel).toContain('tenant_count')
     expect(panel).toContain('Confirm approve')

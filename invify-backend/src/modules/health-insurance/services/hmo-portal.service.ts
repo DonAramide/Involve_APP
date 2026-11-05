@@ -12,6 +12,10 @@ import {
 } from './hmo-excel-exchange.service';
 import { validateImageBase64 } from '../../../utils/image-validator';
 import { uploadBase64ToContabo } from '../../agent-portal/utils/kyc-storage';
+import {
+  ensureTenantOffersFromAssignedHmo,
+  offerPublishedVersionToLinkedSchools
+} from './tenant-plan-offer-sync';
 
 export class HmoPortalService {
   /**
@@ -508,6 +512,14 @@ export class HmoPortalService {
       } catch {}
     }
 
+    if (status === 'active') {
+      try {
+        await ensureTenantOffersFromAssignedHmo(tenantId, actorUserId);
+      } catch (err: any) {
+        console.warn('[HmoPortalService.updateSchoolOnboarding] plan offer sync:', err?.message || err);
+      }
+    }
+
     return data || record;
   }
 
@@ -628,6 +640,19 @@ export class HmoPortalService {
 
     if (verErr) throw new Error(verErr.message);
 
+    if (isPublished && versionRow?.id) {
+      try {
+        await offerPublishedVersionToLinkedSchools(
+          providerId,
+          versionRow.id,
+          planRow.id,
+          actorUserId
+        );
+      } catch (err: any) {
+        console.warn('[HmoPortalService.createOrVersionPlan] linked-school offer sync:', err?.message || err);
+      }
+    }
+
     return {
       plan: planRow,
       version: versionRow,
@@ -656,6 +681,42 @@ export class HmoPortalService {
       .single();
 
     if (error) throw new Error(error.message);
+
+    if (status === 'active') {
+      try {
+        // Activate often happens without the "publish version" checkbox; promote latest draft.
+        const { data: versions } = await supabaseAdmin
+          .from('hw_plan_versions')
+          .select('id, status, version')
+          .eq('plan_id', planId)
+          .order('version', { ascending: false });
+        let publishedIds = (versions || [])
+          .filter((v: any) => String(v.status) === 'published')
+          .map((v: any) => String(v.id));
+        if (publishedIds.length === 0) {
+          const draft = (versions || []).find((v: any) => String(v.status) === 'draft');
+          if (draft) {
+            const { data: promoted } = await supabaseAdmin
+              .from('hw_plan_versions')
+              .update({
+                status: 'published',
+                published_at: new Date().toISOString()
+              })
+              .eq('id', draft.id)
+              .eq('status', 'draft')
+              .select('id')
+              .maybeSingle();
+            if (promoted?.id) publishedIds = [String(promoted.id)];
+          }
+        }
+        for (const versionId of publishedIds) {
+          await offerPublishedVersionToLinkedSchools(providerId, versionId, planId, null);
+        }
+      } catch (err: any) {
+        console.warn('[HmoPortalService.updatePlanStatus] linked-school offer sync:', err?.message || err);
+      }
+    }
+
     return updated;
   }
 
@@ -698,17 +759,97 @@ export class HmoPortalService {
     const tenantIds = Array.from(new Set(enrolments.map((e: any) => e.tenant_id)));
     const enrolmentIds = enrolments.map((e: any) => e.id);
 
-    const [{ data: members }, { data: tenants }, { data: policies }] = await Promise.all([
-      supabaseAdmin.from('hw_members').select('*').in('id', memberIds),
-      supabaseAdmin.from('tenants').select('id, name, business_name').in('id', tenantIds),
-      supabaseAdmin.from('hw_policies').select('*').in('enrolment_id', enrolmentIds),
-    ]);
+    const membersRes = await supabaseAdmin.from('hw_members').select('*').in('id', memberIds);
+    const policiesRes = await supabaseAdmin.from('hw_policies').select('*').in('enrolment_id', enrolmentIds);
+    const tenantsFull = await supabaseAdmin
+      .from('tenants')
+      .select('id, name, business_name, phone, owner_email, street_address, city, state, country')
+      .in('id', tenantIds);
+    let tenants: any[] | null = tenantsFull.data as any[] | null;
+    if (tenantsFull.error) {
+      const tenantsFallback = await supabaseAdmin
+        .from('tenants')
+        .select('id, name, business_name, phone, owner_email, street_address, state')
+        .in('id', tenantIds);
+      tenants = tenantsFallback.data as any[] | null;
+    }
+    const members = membersRes.data;
+    const policies = policiesRes.data;
 
     const memberMap = new Map<string, any>((members || []).map((m: any) => [m.id, m]));
     const tenantMap = new Map<string, any>((tenants || []).map((t: any) => [t.id, t]));
     const policyMap = new Map<string, any>((policies || []).map((p: any) => [p.enrolment_id, p]));
     const planById = new Map<string, any>(scope.plans.map((p: any) => [p.id, p]));
     const versionById = new Map<string, any>(scope.versions.map((v: any) => [v.id, v]));
+
+    const studentIds = Array.from(
+      new Set(
+        (members || [])
+          .map((m: any) => m.student_id)
+          .filter((id: unknown) => typeof id === 'string' && id.length > 0),
+      ),
+    ) as string[];
+
+    const studentMap = new Map<string, any>();
+    const entityPayloadByStudentId = new Map<string, any>();
+    const guardiansByStudentId = new Map<string, any[]>();
+
+    if (studentIds.length > 0) {
+      const studentsRes = await supabaseAdmin.from('students').select('*').in('id', studentIds);
+      for (const s of studentsRes.data || []) studentMap.set(s.id, s);
+
+      try {
+        const entitiesRes = await supabaseAdmin
+          .from('school_entities')
+          .select('sync_id, payload')
+          .eq('entity_type', 'student')
+          .in('sync_id', studentIds);
+        for (const ent of entitiesRes.data || []) {
+          if (ent?.sync_id) entityPayloadByStudentId.set(String(ent.sync_id), ent.payload || {});
+        }
+      } catch {
+        // school_entities may be absent on some environments
+      }
+
+      try {
+        const guardianJoined = await supabaseAdmin
+          .from('hw_guardian_links')
+          .select('student_id, relationship, is_primary, status, guardian_user_id, users:guardian_user_id(id, name, email, phone)')
+          .in('student_id', studentIds)
+          .in('status', ['verified', 'pending_verification', 'invited']);
+
+        let guardianLinks: any[] | null = guardianJoined.data as any[] | null;
+        if (guardianJoined.error || !guardianLinks) {
+          const guardianPlain = await supabaseAdmin
+            .from('hw_guardian_links')
+            .select('student_id, relationship, is_primary, status, guardian_user_id')
+            .in('student_id', studentIds)
+            .in('status', ['verified', 'pending_verification', 'invited']);
+          guardianLinks = guardianPlain.data as any[] | null;
+        }
+
+        for (const link of guardianLinks || []) {
+          const sid = String(link.student_id || '');
+          if (!sid) continue;
+          const user = Array.isArray((link as any).users) ? (link as any).users[0] : (link as any).users;
+          const list = guardiansByStudentId.get(sid) || [];
+          list.push({
+            relationship: link.relationship || null,
+            isPrimary: !!link.is_primary,
+            status: link.status || null,
+            name: user?.name || null,
+            email: user?.email || null,
+            phone: user?.phone || null,
+          });
+          guardiansByStudentId.set(sid, list);
+        }
+      } catch {
+        // guardian enrichment is optional for the queue
+      }
+    }
+
+    const schoolLocation = (t: any) =>
+      [t?.street_address, t?.city, t?.state, t?.country].filter(Boolean).join(', ') || null;
 
     let rows = enrolments.map((e: any) => {
       const m = memberMap.get(e.member_id) || {};
@@ -717,14 +858,77 @@ export class HmoPortalService {
       const ver = versionById.get(e.plan_version_id) || {};
       const plan = planById.get(ver.plan_id) || {};
       const enrolmentRef = `ENR-${String(e.id).slice(0, 8).toUpperCase()}`;
+      const student = m.student_id ? studentMap.get(m.student_id) || {} : {};
+      const entity = m.student_id ? entityPayloadByStudentId.get(String(m.student_id)) || {} : {};
+      const guardians = m.student_id ? guardiansByStudentId.get(String(m.student_id)) || [] : [];
+      const primaryGuardian =
+        guardians.find((g) => g.isPrimary) || guardians[0] || null;
+
+      const firstName = student.first_name || entity.firstName || entity.first_name || null;
+      const middleName = student.middle_name || entity.middleName || entity.middle_name || null;
+      const lastName = student.last_name || entity.lastName || entity.last_name || null;
+      const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || null;
+      const dateOfBirth =
+        student.date_of_birth || entity.dateOfBirth || entity.date_of_birth || null;
+      const gender = student.gender || entity.gender || null;
+      const currentClass =
+        student.current_class || entity.className || entity.current_class || m.cohort_label || null;
+      const admissionNumber =
+        student.admission_number || entity.admissionNumber || entity.admission_number || null;
+      const parentName =
+        student.parent_name ||
+        entity.parentName ||
+        entity.parent_name ||
+        primaryGuardian?.name ||
+        null;
+      const parentPhone =
+        student.parent_phone ||
+        entity.parentPhone ||
+        entity.parent_phone ||
+        primaryGuardian?.phone ||
+        null;
+      const parentEmail =
+        entity.parentEmail ||
+        entity.parent_email ||
+        entity.email ||
+        primaryGuardian?.email ||
+        null;
+      const memberAddress =
+        entity.address ||
+        entity.homeAddress ||
+        entity.home_address ||
+        schoolLocation(t);
 
       return {
         id: e.id,
         enrolmentReference: enrolmentRef,
         tenantId: e.tenant_id,
         schoolName: t.business_name || t.name || `School ${String(e.tenant_id).slice(0, 6)}`,
+        schoolPhone: t.phone || null,
+        schoolEmail: t.owner_email || null,
+        schoolAddress: schoolLocation(t),
+        schoolState: t.state || null,
+        schoolCity: t.city || null,
         memberId: e.member_id,
         memberCategory: m.member_category || 'student',
+        member: {
+          id: e.member_id,
+          studentId: m.student_id || null,
+          fullName,
+          firstName,
+          middleName,
+          lastName,
+          admissionNumber,
+          dateOfBirth,
+          gender,
+          currentClass,
+          address: memberAddress,
+          parentName,
+          parentPhone,
+          parentEmail,
+          parentRelationship: primaryGuardian?.relationship || null,
+          guardians,
+        },
         insurerMemberRef: m.insurer_member_ref || pol?.policy_number || null,
         cohortLabel: m.cohort_label || null,
         planId: plan.id || null,
@@ -749,7 +953,11 @@ export class HmoPortalService {
           r.enrolmentReference.toLowerCase().includes(q) ||
           String(r.insurerMemberRef || '').toLowerCase().includes(q) ||
           String(r.schoolName || '').toLowerCase().includes(q) ||
-          String(r.planName || '').toLowerCase().includes(q)
+          String(r.planName || '').toLowerCase().includes(q) ||
+          String(r.member?.fullName || '').toLowerCase().includes(q) ||
+          String(r.member?.admissionNumber || '').toLowerCase().includes(q) ||
+          String(r.member?.parentName || '').toLowerCase().includes(q) ||
+          String(r.member?.parentEmail || '').toLowerCase().includes(q),
       );
     }
 
@@ -922,12 +1130,13 @@ export class HmoPortalService {
     let invalidCount = 0;
 
     const batchItemsPayload = candidateRows.map((row: any, idx: number) => {
+      const member = row.member || {};
       const itemCandidate = {
         enrolment_reference: row.enrolmentReference,
-        member_full_name: `Member ${row.enrolmentReference}`,
+        member_full_name: member.fullName || `Member ${row.enrolmentReference}`,
         member_category: row.memberCategory || 'student',
-        date_of_birth: '2010-05-15',
-        sex: 'female',
+        date_of_birth: member.dateOfBirth || null,
+        sex: member.gender || null,
         plan_code: row.planCode || 'STD',
         period_start: row.periodStart,
         period_end: row.periodEnd,

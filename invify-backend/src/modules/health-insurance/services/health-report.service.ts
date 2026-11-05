@@ -2,6 +2,17 @@
 import { supabaseAdmin } from '../../../db/supabase';
 import { HealthContext } from '../types';
 
+const PENDING_ACTIVATION_STATUSES = [
+  'draft',
+  'enrolment_pending',
+  'awaiting_premium_payment',
+  'awaiting_insurer_activation',
+];
+
+export function countPendingActivation(enrolments: Array<{ status?: string | null }>): number {
+  return enrolments.filter((row) => PENDING_ACTIVATION_STATUSES.includes(String(row.status || ''))).length;
+}
+
 export class HealthReportService {
   /**
    * Compute authoritative Health & Wellness dashboard metrics.
@@ -27,8 +38,9 @@ export class HealthReportService {
     const enrolledCount = enrList.filter(e => !['draft', 'cancelled', 'rejected'].includes(e.status)).length;
     const activeCoverageCount = enrList.filter(e => e.status === 'active').length;
     const awaitingVerificationCount = enrList.filter(e => e.status === 'awaiting_verification').length;
-    const awaitingActivationCount = enrList.filter(e => e.status === 'awaiting_insurer_activation').length;
-    const incompleteCount = enrList.filter(e => ['draft', 'enrolment_pending'].includes(e.status)).length;
+    // School hub "Pending Activation" = created, billed, or waiting on the insurer
+    const awaitingActivationCount = countPendingActivation(enrList);
+    const incompleteCount = enrList.filter(e => ['draft'].includes(e.status)).length;
 
     // Policies expiring in next 30 days
     const now = new Date();
@@ -69,6 +81,7 @@ export class HealthReportService {
       ? Math.round((activeCoverageCount / eligibleCount) * 10000) / 100 
       : 0;
 
+    // Nested + flat camelCase so mobile/web clients can read either shape.
     return {
       metrics: {
         eligibleMembers: eligibleCount,
@@ -81,14 +94,24 @@ export class HealthReportService {
         premiumsCollectedMinor: collectedMinor,
         outstandingBalanceMinor: outstandingMinor,
         policiesExpiringIn30Days: expiringSoonCount,
-        delayedProviderSyncs: 0
+        delayedProviderSyncs: 0,
       },
+      totalMembers: totalMembers || eligibleCount || 0,
+      enrolledCount,
+      activeCoverageCount,
+      awaitingVerificationCount,
+      awaitingActivationCount,
+      incompleteCount,
+      expiringSoonCount,
+      billedMinor,
+      collectedMinor,
+      outstandingMinor,
       coverageRatePercent: coverageRate,
       freshness: {
         generatedAt: new Date().toISOString(),
         lastProviderSyncAt: new Date().toISOString(),
-        isSnapshot: false
-      }
+        isSnapshot: false,
+      },
     };
   }
 }

@@ -17,20 +17,59 @@ function httpError(message: string, status = 400, code?: string): Error {
   return err;
 }
 
+async function resolveAssignedProviderId(tenantId: string): Promise<string | null> {
+  const { data: settings } = await supabaseAdmin
+    .from('hw_tenant_settings')
+    .select('assigned_provider_id, assignment_mode, assignment_source')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (settings?.assigned_provider_id) return String(settings.assigned_provider_id);
+
+  const { data: link } = await supabaseAdmin
+    .from('hw_hmo_school_links')
+    .select('provider_id')
+    .eq('tenant_id', tenantId)
+    .eq('onboarding_status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return link?.provider_id ? String(link.provider_id) : null;
+}
+
 export class HealthAffiliationService {
-  /** Verified providers available for affiliation / offer selection. */
-  static async listEligibleProviders() {
+  /**
+   * Verified providers available for affiliation / offer selection.
+   * When the tenant already has an assigned HMO (onboarding institute code / admin assign),
+   * only that provider is returned so schools cannot request unrelated affiliations.
+   */
+  static async listEligibleProviders(ctx?: HealthContext) {
+    const assignedId = ctx?.tenantId ? await resolveAssignedProviderId(ctx.tenantId) : null;
+    if (assignedId) {
+      const { data, error } = await supabaseAdmin
+        .from('hw_providers')
+        .select('id, code, display_name, integration_status, licence_reference, logo_url, contact_email, contact_phone')
+        .eq('id', assignedId)
+        .maybeSingle();
+      if (error) throw httpError(`Failed to read assigned HMO: ${error.message}`, 500);
+      const providers = data ? [data] : [];
+      return { providers, total: providers.length, limit: 1, offset: 0, assignedOnly: true };
+    }
     return HealthProviderGovernanceService.listProviders({ status: 'verified', limit: 100, offset: 0 });
   }
 
   static async listAffiliations(ctx: HealthContext) {
-    const { data, error } = await supabaseAdmin
+    const assignedId = await resolveAssignedProviderId(ctx.tenantId);
+    let query = supabaseAdmin
       .from('hw_hmo_school_links')
       .select(
         'id, provider_id, tenant_id, institution_id, onboarding_status, tenant_type, contact_person, contact_email, notes, rejection_reason, created_at, updated_at, hw_providers(id, code, display_name, integration_status)'
       )
       .eq('tenant_id', ctx.tenantId)
       .order('updated_at', { ascending: false });
+    if (assignedId) {
+      query = query.eq('provider_id', assignedId);
+    }
+    const { data, error } = await query;
     if (error) throw httpError(`Failed to list affiliations: ${error.message}`, 500);
     return data || [];
   }
@@ -47,6 +86,15 @@ export class HealthAffiliationService {
   ) {
     const providerId = String(body.providerId || '');
     if (!UUID_RE.test(providerId)) throw httpError('providerId must be a UUID.');
+
+    const assignedId = await resolveAssignedProviderId(ctx.tenantId);
+    if (assignedId && assignedId !== providerId) {
+      throw httpError(
+        'This school is already assigned to an HMO from onboarding. Affiliation requests are limited to that HMO.',
+        409,
+        'ASSIGNED_HMO_LOCKED'
+      );
+    }
 
     const { data: provider, error: providerError } = await supabaseAdmin
       .from('hw_providers')

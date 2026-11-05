@@ -929,6 +929,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' },
         { label: 'Institute Commissions & Billing', path: '/admin/agents/commissions', icon: 'account_balance_wallet', color: 'green-4' },
         { label: 'Platform Fee Orchestration', path: '/admin/platform-fees', icon: 'request_quote', color: 'teal-4', badge: 'Fees', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'HMO Financial Reconciliation', path: '/admin/hmo-finance', icon: 'health_and_safety', color: 'teal-3' },
         { label: 'Fee Assessments (read-only)', path: '/admin/platform-fees/assessments', icon: 'fact_check', color: 'teal-3' },
         { label: 'Fee Distribution', path: '/admin/platform-fees/distribution', icon: 'account_tree', color: 'teal-3' }
       ]
@@ -944,6 +945,7 @@ const activeNavigationTree = computed(() => {
         { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
         { label: 'Enterprise Support Desk', path: '/governance/support', icon: 'headset_mic', color: 'amber-4', badge: 'TICKETS', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Provisioning Issues', path: '/governance/provisioning-issues', icon: 'report_problem', color: 'red-4', badge: 'ERRORS', badgeBg: 'red-10', badgeColor: 'red-2' },
+        { label: 'Bank Account Verification', path: '/governance/bank-accounts', icon: 'account_balance', color: 'teal-3' },
         { label: 'Policy Governance', path: '/governance/policy', icon: 'policy', color: 'indigo-3' },
         { label: 'Integrity Center', path: '/governance/integrity', icon: 'security', color: 'grey-4' },
         { label: 'Trust Scoring', path: '/governance/trust', icon: 'thumb_up', color: 'cyan-3' },
