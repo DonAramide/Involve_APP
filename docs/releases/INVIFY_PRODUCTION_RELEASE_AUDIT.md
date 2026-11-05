@@ -4,7 +4,8 @@
 **Audit started (UTC):** 2026-11-05T16:54Z  
 **Auditor workspace:** `C:\dev\Involve_APP_health`  
 **Release intent:** Controlled production release of registration, attendance, Gate Clock, ID Cards (incl. 12-char Invify identity), and **operational** HMO — **excluding** unresolved HMO monetisation / live payouts.  
-**Current verdict:** **PRODUCTION RELEASE BLOCKED** pending gates in §12.
+**Current verdict:** **PHASE 1 CONSOLIDATION COMPLETE — PRODUCTION DEPLOY/MIGRATE STILL BLOCKED** pending DB identity confirmation + backup gates (§12).  
+**Release candidate SHA:** `5465431d9b53308f28100833ecb2b9e01b763dc8` (`release/invify-production-2026`)
 
 ---
 
@@ -106,8 +107,8 @@ Counts are `git rev-list --left-right --count origin/main...<branch>` → `behin
 | Production base (live) | `58cfbf85…` (+ working-copy overlays since 2026-10-02/07) |
 | Git integration base (proposed) | `origin/main` = `fdd830b8…` (**contains** prod base) |
 | Staging runtime candidate | Host path `candidate-20261028` + overlays; git tip historically `b4956971` / current dirty `4cdfc54a` |
-| Release integration branch (proposed) | `release/invify-production-2026` — **not created yet** |
-| Release candidate SHA | **TBD** after curated commit + merges + checks |
+| Release integration branch | `release/invify-production-2026` (worktree `C:\dev\_wt_invify_release_2026`) |
+| Release candidate SHA | `5465431d9b53308f28100833ecb2b9e01b763dc8` |
 
 ---
 
