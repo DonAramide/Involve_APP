@@ -16,7 +16,12 @@ import {
   readMyCardThroughDatabase,
   batchThroughDatabase,
 } from './school-card.persistence';
-import { listGateSessionsThroughDatabase, scanHttpStatus, scanThroughDatabase } from './school-gate.scan';
+import {
+  deliverQueuedGateEmails,
+  listGateSessionsThroughDatabase,
+  scanHttpStatus,
+  scanThroughDatabase,
+} from './school-gate.scan';
 
 export function createUnappliedSchoolCardService(): SchoolCardService {
   return new SchoolCardService(new UnappliedSchoolCardStore());
@@ -122,6 +127,15 @@ export function registerSchoolCardRoutes(
   });
   route('post', '/api/school/gate/scans', async (req, res) => {
     const result = await scanThroughDatabase(actor(req), body(req));
+    // Fire-and-forget parent/staff clock emails after the scan commits.
+    if (result.notificationStatus === 'queued' && result.sessionId) {
+      const a = actor(req);
+      void deliverQueuedGateEmails({
+        tenantId: String(a.tenantId || ''),
+        sessionId: result.sessionId,
+        direction: result.direction,
+      }).catch((err) => console.warn('[GateScan] notification delivery error:', err?.message || err));
+    }
     res.status(scanHttpStatus(result)).json(result);
   });
   route('get', '/api/school/gate/sessions', async (req, res) => {

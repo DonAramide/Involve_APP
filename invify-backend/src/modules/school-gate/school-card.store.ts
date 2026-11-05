@@ -321,6 +321,18 @@ function assertUnique(state: StoreState, card: CardRow): void {
   if ([...state.cards.values()].some((row) => row.tokenSha256 === card.tokenSha256)) {
     throw new SchoolCardError('This barcode was already issued.', 409, 'TOKEN_CONFLICT');
   }
+  if (card.invifyCode) {
+    const code = card.invifyCode.toUpperCase();
+    // Replacement may re-use the same identity on the successor card while the predecessor is still active in-transaction.
+    if ([...state.cards.values()].some((row) =>
+      row.tenantId === card.tenantId
+      && row.invifyCode === code
+      && row.id !== card.id
+      && row.id !== card.replacesCardId
+      && (row.status === 'active' || row.status === 'pending'))) {
+      throw new SchoolCardError('This identity code was already issued.', 409, 'TOKEN_CONFLICT');
+    }
+  }
   const samePerson = (row: CardRow) => row.tenantId === card.tenantId && row.subjectType === card.subjectType && row.studentId === card.studentId && row.staffId === card.staffId && row.adminUserId === card.adminUserId;
   if (card.status === 'active' && [...state.cards.values()].some((row) => row.status === 'active' && samePerson(row))) {
     throw new SchoolCardError('This person already has an active card. Replace it instead.', 409, 'CARD_ALREADY_ACTIVE');

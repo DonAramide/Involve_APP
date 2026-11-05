@@ -6,6 +6,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:image/image.dart' as img; // Import image package
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
+import '../esc_pos_text.dart';
 
 class CrossPlatformPrinterService implements IPrinterService {
   BluetoothDevice? _connectedDevice;
@@ -165,7 +166,7 @@ class CrossPlatformPrinterService implements IPrinterService {
     for (final cmd in commands) {
       try {
         if (cmd is TextCommand) {
-          final sanitized = cmd.text.replaceAll('₦', 'N');
+          final sanitized = sanitizeEscPosText(cmd.text);
           bytes += generator.text(
             sanitized,
             styles: PosStyles(
@@ -187,8 +188,24 @@ class CrossPlatformPrinterService implements IPrinterService {
                if (image.width > maxWidth) {
                  resized = img.copyResize(image, width: maxWidth);
                }
-               bytes += generator.image(resized, align: _getAlign(cmd.align));
+               if (cmd.useRaster) {
+                 bytes += generator.imageRaster(resized, align: _getAlign(cmd.align));
+               } else {
+                 bytes += generator.image(resized, align: _getAlign(cmd.align));
+               }
             }
+          }
+        } else if (cmd is BarcodeCommand) {
+          final payload = cmd.data.trim();
+          if (payload.isNotEmpty) {
+            final data = '{B$payload'.split('');
+            bytes += generator.barcode(
+              Barcode.code128(data),
+              textPos: BarcodeText.none,
+              align: _getAlign(cmd.align),
+              width: paperWidth >= 80 ? 2 : 1,
+              height: 80,
+            );
           }
         }
       } catch (e) {

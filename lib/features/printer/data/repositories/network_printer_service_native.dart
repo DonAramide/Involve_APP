@@ -5,6 +5,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:image/image.dart' as img;
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
+import '../esc_pos_text.dart';
 
 class NetworkPrinterService implements IPrinterService {
   Socket? _socket;
@@ -61,7 +62,7 @@ class NetworkPrinterService implements IPrinterService {
 
     for (var cmd in commands) {
       if (cmd is TextCommand) {
-        String sanitizedText = cmd.text.replaceAll('₦', 'N');
+        final sanitizedText = sanitizeEscPosText(cmd.text);
         PosStyles styles = PosStyles(
           align: cmd.align == 'center' ? PosAlign.center : (cmd.align == 'right' ? PosAlign.right : PosAlign.left),
           bold: cmd.isBold,
@@ -80,8 +81,32 @@ class NetworkPrinterService implements IPrinterService {
             if (image.width > maxWidth) {
               resized = img.copyResize(image, width: maxWidth);
             }
-            bytes += generator.image(resized, align: cmd.align == 'center' ? PosAlign.center : (cmd.align == 'right' ? PosAlign.right : PosAlign.left));
+            final align = cmd.align == 'center'
+                ? PosAlign.center
+                : (cmd.align == 'right' ? PosAlign.right : PosAlign.left);
+            if (cmd.useRaster) {
+              bytes += generator.imageRaster(resized, align: align);
+            } else {
+              bytes += generator.image(resized, align: align);
+            }
           }
+        }
+      } else if (cmd is BarcodeCommand) {
+        final payload = cmd.data.trim();
+        if (payload.isNotEmpty) {
+          try {
+            final data = '{B$payload'.split('');
+            final align = cmd.align == 'center'
+                ? PosAlign.center
+                : (cmd.align == 'right' ? PosAlign.right : PosAlign.left);
+            bytes += generator.barcode(
+              Barcode.code128(data),
+              textPos: BarcodeText.none,
+              align: align,
+              width: paperWidth >= 80 ? 2 : 1,
+              height: 80,
+            );
+          } catch (_) {}
         }
       }
     }

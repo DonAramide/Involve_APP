@@ -180,25 +180,33 @@ describe('school ID cards', () => {
     const first = service.issue(owner, { subjectType: 'student', subjectId: studentA });
     const second = service.issue(owner, { subjectType: 'staff', subjectId: staffA });
     expect(first.barcodeValue).not.toBe(second.barcodeValue);
-    expect(first.barcodeValue.length).toBe(43);
+    expect(first.barcodeValue).toHaveLength(12);
+    expect(first.cardIdentityCode).toBe(first.barcodeValue);
+    expect(first.verificationToken.length).toBeGreaterThanOrEqual(20);
+    expect(first.face.barcodeValue).toBe(first.barcodeValue);
+    expect(first.face.verificationToken).toBe(first.verificationToken);
     const stored = store.findCard(first.card.id)!;
     expect(stored.tokenSha256).toHaveLength(64);
-    expect(stored.tokenSha256).not.toBe(first.barcodeValue);
-    expect(JSON.stringify(stored)).not.toContain(first.barcodeValue);
+    expect(stored.invifyCode).toBe(first.barcodeValue);
+    expect(stored.tokenSha256).not.toBe(first.verificationToken);
+    expect(JSON.stringify(stored)).not.toContain(first.verificationToken);
     const listed = JSON.stringify(service.listCards(owner));
-    expect(listed).not.toContain(first.barcodeValue);
+    expect(listed).not.toContain(first.verificationToken);
     expect(listed).not.toContain(stored.tokenSha256);
-    expect(logs.join('\n')).not.toContain(first.barcodeValue);
+    expect(logs.join('\n')).not.toContain(first.verificationToken);
     expect(logs.join('\n')).not.toContain(stored.tokenSha256);
     spy.mockRestore();
     info.mockRestore();
 
     expect(service.lookupToken(owner, first.barcodeValue)?.printedCode).toBe('ADM-2041');
+    expect(service.lookupToken(owner, first.verificationToken)?.printedCode).toBe('ADM-2041');
     expect(service.lookupToken(actor(ownerB, 'owner', tenantB), first.barcodeValue)).toBeNull();
     service.revoke(owner, first.card.id, 'Card was reported lost');
     expect(service.lookupToken(owner, first.barcodeValue)).toBeNull();
+    expect(service.lookupToken(owner, first.verificationToken)).toBeNull();
     store.expireForTest(second.card.id);
     expect(service.lookupToken(owner, second.barcodeValue)).toBeNull();
+    expect(service.lookupToken(owner, second.verificationToken)).toBeNull();
     expect(store.sessionCount).toBe(0);
     expect(store.attendanceWrites).toBe(0);
   });
@@ -215,6 +223,7 @@ describe('school ID cards', () => {
     expect(cards).toHaveLength(1);
     expect(cards[0].status).toBe('active');
     expect(cards[0].id).toBe(issued.card.id);
+    expect(service.lookupToken(owner, issued.verificationToken)?.id).toBe(issued.card.id);
     expect(service.lookupToken(owner, issued.barcodeValue)?.id).toBe(issued.card.id);
 
     store.failAuditAction = null;
@@ -238,14 +247,17 @@ describe('school ID cards', () => {
     service.saveSettings(owner, {});
     const issued = service.issue(owner, { subjectType: 'student', subjectId: studentA });
     const replaced = service.replace(owner, issued.card.id);
-    expect(replaced.barcodeValue).not.toBe(issued.barcodeValue);
-    expect(service.lookupToken(owner, issued.barcodeValue)).toBeNull();
+    // Identity code is stable across replacement; verification token rotates.
+    expect(replaced.barcodeValue).toBe(issued.barcodeValue);
+    expect(replaced.verificationToken).not.toBe(issued.verificationToken);
+    expect(service.lookupToken(owner, issued.verificationToken)).toBeNull();
+    expect(service.lookupToken(owner, replaced.verificationToken)?.printedName).toBe('Amaka Okonkwo');
     expect(service.lookupToken(owner, replaced.barcodeValue)?.printedName).toBe('Amaka Okonkwo');
     expect(store.listCards(tenantA).filter((card) => card.status === 'active')).toHaveLength(1);
     expect(store.listCards(tenantA).some((card) => card.status === 'revoked' && card.revokeKind === 'replaced')).toBe(true);
     expect(store.sessionCount).toBe(0);
     const listed = JSON.stringify(service.listCards(owner));
-    expect(listed).not.toContain(replaced.barcodeValue);
+    expect(listed).not.toContain(replaced.verificationToken);
     expect(listed).not.toContain(store.findCard(replaced.card.id)!.tokenSha256);
   });
 
@@ -269,7 +281,10 @@ describe('school ID cards', () => {
     expect(new Set(printed.map((item) => item.face.pairId)).size).toBe(3);
     expect(printed.map((item) => item.face.category)).toEqual(['STUDENT', 'STAFF', 'ADMIN']);
     printed.forEach((item) => {
+      expect(item.barcodeValue).toHaveLength(12);
       expect(item.face.barcodeValue).toBe(item.barcodeValue);
+      expect(item.face.cardIdentityCode).toBe(item.barcodeValue);
+      expect(item.verificationToken.length).toBeGreaterThanOrEqual(20);
       expect(item.face.photoUrl).toBeNull();
       expect(JSON.stringify(item.face)).not.toContain(item.card.id === printed[2].card.id ? ownerA : '___');
     });
@@ -299,33 +314,43 @@ describe('school ID cards', () => {
 
   test('tokens are random secrets rather than hashes of identity values', () => {
     const token = createBarcodeToken();
-    expect(token.raw).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(token.raw).toMatch(/^[A-Za-z0-9_-]{20}$/);
     expect(token.sha256).toBe(sha256Hex(token.raw));
     expect(() => rejectPredictableToken(sha256Hex('ADM-2041'), ['ADM-2041'])).toThrow(/random secret/);
   });
 
   test('the replacement contract is one transaction and does not touch attendance or sessions', () => {
+    // Replacement is a single DB transaction (BEGIN … COMMIT) over school_id_cards + audit only.
     expect(REPLACEMENT_SQL[0]).toBe('BEGIN');
     expect(REPLACEMENT_SQL[REPLACEMENT_SQL.length - 1]).toBe('COMMIT');
     expect(REPLACEMENT_SQL.map((sql) => sql.toLowerCase()).join('\n')).toContain('pending');
     expect(replacementSqlTouchesAttendanceOrSessions(REPLACEMENT_SQL)).toBe(false);
+
+    const replacementText = REPLACEMENT_SQL.join('\n').toLowerCase();
+    expect(replacementText).not.toContain('attendance_records');
+    expect(replacementText).not.toContain('student_attendance');
+    expect(replacementText).not.toContain('school_entry_exit_sessions');
+    expect(replacementText).not.toContain('school_entry_exit_events');
+    expect(replacementText).toContain('school_id_cards');
+    expect(replacementText).toContain('school_gate_audit_events');
+
+    // Card issue/replace modules must not write attendance or Gate Clock sessions.
+    // Gate Clock session SQL lives only in school-gate.scan.ts and is covered by school-gate-scan tests.
     const directory = path.join(__dirname, '../src/modules/school-gate');
-    // Card issue and replacement must not open gate sessions. Session writes belong only in the scan module.
-    const issuanceSource = fs.readdirSync(directory)
-      .filter((file) => file !== 'school-card.transaction.ts' && file !== 'school-gate.scan.ts')
+    const cardSources = fs
+      .readdirSync(directory)
+      .filter((file) => file.startsWith('school-card.') && file.endsWith('.ts') && file !== 'school-card.transaction.ts')
       .map((file) => fs.readFileSync(path.join(directory, file), 'utf8'))
       .join('\n');
-    expect(issuanceSource).not.toContain('attendance_records');
-    expect(issuanceSource).not.toContain('student_attendance');
-    expect(issuanceSource).not.toContain('AttendanceService');
-    expect(issuanceSource).not.toContain('school_entry_exit_sessions');
-    expect(issuanceSource).not.toContain('checkTenantPermission');
-    expect(issuanceSource).not.toContain('resolveTenantScope');
-    const scanSource = fs.readFileSync(path.join(directory, 'school-gate.scan.ts'), 'utf8');
-    expect(scanSource).toContain('school_entry_exit_sessions');
-    expect(scanSource).not.toContain('attendance_records');
-    expect(scanSource).not.toContain('student_attendance');
-    expect(scanSource).not.toContain('AttendanceService');
+    expect(cardSources).not.toContain('attendance_records');
+    expect(cardSources).not.toContain('student_attendance');
+    expect(cardSources).not.toContain('AttendanceService');
+    expect(cardSources).not.toContain('school_entry_exit_sessions');
+    expect(cardSources).not.toContain('school_entry_exit_events');
+    expect(cardSources).not.toContain('checkTenantPermission');
+    expect(cardSources).not.toContain('resolveTenantScope');
+
+    expect(fs.existsSync(path.join(directory, 'school-gate.scan.ts'))).toBe(true);
   });
 
   test('the live route service reports that the schema is unapplied and still refuses scan-only roles', async () => {
@@ -356,6 +381,7 @@ describe('school ID cards', () => {
       staffId: null,
       adminUserId: null,
       tokenSha256: sha256Hex('not-a-stored-secret'),
+      invifyCode: 'HBRAMA000001',
       status: 'active',
       issuedAt: new Date().toISOString(),
       expiresAt: null,

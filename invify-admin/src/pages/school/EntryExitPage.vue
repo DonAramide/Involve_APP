@@ -1,12 +1,12 @@
 <template>
   <q-page class="q-pa-md">
-    <div class="text-h5 text-weight-bold text-indigo-9">Entry and Exit</div>
-    <div class="text-caption text-grey-7 q-mb-md">Gate sessions for this school. Classroom attendance is a separate report.</div>
+    <div class="text-h5 text-weight-bold text-indigo-9">{{ pageTitle }}</div>
+    <div class="text-caption id-card-page-copy q-mb-md">{{ pageCaption }}</div>
 
-    <q-banner v-if="schemaUnapplied" class="bg-amber-2 q-mb-md" rounded>
+    <q-banner v-if="schemaUnapplied" class="id-card-warning-banner q-mb-md" rounded>
       Gate history is not available from the server yet. Scans are not saved until school-gate persistence is enabled.
     </q-banner>
-    <q-banner v-if="errorMessage" class="bg-red-1 q-mb-md" rounded>{{ errorMessage }}</q-banner>
+    <q-banner v-if="errorMessage" class="bg-red-9 text-red-1 q-mb-md" rounded>{{ errorMessage }}</q-banner>
 
     <div class="row q-gutter-sm q-mb-md">
       <q-btn-toggle v-model="state" toggle-color="primary" :options="stateOptions" @update:model-value="load" />
@@ -37,9 +37,22 @@
 
 <script>
 import { schoolGateApi } from '../../api/schoolGate'
+import { serviceModeTerms } from '../../utils/serviceModeTerms'
+import { tenantIndustry } from '../../utils/tenantIndustry'
 
 export default {
   name: 'EntryExitPage',
+  computed: {
+    terms () {
+      return serviceModeTerms(tenantIndustry())
+    },
+    pageTitle () {
+      return this.terms.gateClockTitle
+    },
+    pageCaption () {
+      return this.terms.gateClockBlurb
+    }
+  },
   data () {
     return {
       loading: false,
@@ -91,8 +104,8 @@ export default {
         const code = error?.response?.data?.code
         this.sessions = []
         if (code === 'SCHOOL_GATE_SCHEMA_UNAPPLIED') this.schemaUnapplied = true
-        else if (code === 'FORBIDDEN') this.errorMessage = 'Entry and exit history is limited to the school owner and a tenant administrator.'
-        else this.errorMessage = 'Entry and exit history could not be loaded.'
+        else if (code === 'FORBIDDEN') this.errorMessage = 'Gate history is limited to the owner and a tenant administrator.'
+        else this.errorMessage = 'Gate history could not be loaded.'
       } finally {
         this.loading = false
       }
@@ -100,3 +113,11 @@ export default {
   }
 }
 </script>
+
+<style>
+.id-card-warning-banner,
+.id-card-warning-banner .q-banner__content {
+  background: #78350f !important;
+  color: #fff7ed !important;
+}
+</style>

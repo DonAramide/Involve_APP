@@ -5,6 +5,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:image/image.dart' as img;
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
+import '../esc_pos_text.dart';
 
 /// USB Printer Service for Xprinter and other USB thermal printers
 /// Supports Android only (USB OTG required)
@@ -114,7 +115,7 @@ class UsbPrinterService implements IPrinterService {
       for (var cmd in commands) {
         if (cmd is TextCommand) {
           bytes += generator.text(
-            cmd.text,
+            sanitizeEscPosText(cmd.text),
             styles: PosStyles(
               align: _getAlign(cmd.align),
               bold: cmd.isBold,
@@ -133,8 +134,26 @@ class UsbPrinterService implements IPrinterService {
               if (image.width > maxWidth) {
                 resized = img.copyResize(image, width: maxWidth);
               }
-              bytes += generator.image(resized, align: _getAlign(cmd.align));
+              if (cmd.useRaster) {
+                bytes += generator.imageRaster(resized, align: _getAlign(cmd.align));
+              } else {
+                bytes += generator.image(resized, align: _getAlign(cmd.align));
+              }
             }
+          }
+        } else if (cmd is BarcodeCommand) {
+          final payload = cmd.data.trim();
+          if (payload.isNotEmpty) {
+            try {
+              final data = '{B$payload'.split('');
+              bytes += generator.barcode(
+                Barcode.code128(data),
+                textPos: BarcodeText.none,
+                align: _getAlign(cmd.align),
+                width: paperWidth >= 80 ? 2 : 1,
+                height: 80,
+              );
+            } catch (_) {}
           }
         }
       }

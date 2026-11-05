@@ -64,6 +64,24 @@ function scripted(state: {
       if (normalized === 'BEGIN' || normalized === 'COMMIT' || normalized === 'ROLLBACK') return { rows: [], rowCount: 0 };
       if (normalized.includes('pg_advisory_xact_lock')) return { rows: [], rowCount: 1 };
       if (normalized.includes('FROM public.school_id_cards')) return { rows: state.card ? [state.card] : [], rowCount: state.card ? 1 : 0 };
+      if (normalized.includes('UPDATE public.school_id_card_settings')) {
+        const current = state.settings || settings();
+        if (
+          current.notify_student_arrival === false
+          && current.notify_student_departure === false
+          && current.notify_staff_arrival === false
+          && current.notify_staff_departure === false
+        ) {
+          state.settings = {
+            ...current,
+            notify_student_arrival: true,
+            notify_student_departure: true,
+            notify_staff_arrival: true,
+            notify_staff_departure: true,
+          };
+        }
+        return { rows: [], rowCount: 1 };
+      }
       if (normalized.includes('FROM public.school_id_card_settings')) return { rows: [state.settings || settings()], rowCount: 1 };
       if (normalized.includes('FROM public.students')) return { rows: state.studentFound === false ? [] : [{ id: studentA }], rowCount: state.studentFound === false ? 0 : 1 };
       if (normalized.includes('FROM public.tenant_staff')) return { rows: [{ is_active: state.staffActive !== false }], rowCount: 1 };
@@ -94,6 +112,7 @@ function input(direction: 'arrival' | 'departure', tenantId = tenantA) {
     actorUserId: teacherA,
     direction,
     tokenSha256: sha256Hex(rawToken),
+    invifyCode: null as string | null,
     deviceLabel: 'mobile',
   };
 }
@@ -115,7 +134,8 @@ describe('school gate scans', () => {
     expect(eventActions(client.queries)).toEqual(['arrival_accepted']);
     expect(client.queries.some((query) => query.text.includes('pg_advisory_xact_lock'))).toBe(true);
     expect(client.queries.some((query) => query.text.includes('INSERT INTO public.school_entry_exit_sessions'))).toBe(true);
-    expect(client.queries.some((query) => query.text.includes("'skipped'") && query.params?.[3] === 'notifications_disabled')).toBe(true);
+    // Legacy all-off settings are auto-enabled; with no guardian email → no_verified_recipient.
+    expect(client.queries.some((query) => query.text.includes("'skipped'") && query.params?.[3] === 'no_verified_recipient')).toBe(true);
     expect(client.queries.at(-1)?.text).toBe('COMMIT');
     const dumped = JSON.stringify(client.queries);
     expect(dumped).not.toContain(rawToken);
@@ -154,7 +174,7 @@ describe('school gate scans', () => {
     expect(closed.sessionId).toBe('sess-open');
     expect(open.queries.some((query) => query.text.includes('UPDATE public.school_entry_exit_sessions'))).toBe(true);
     expect(eventActions(open.queries)).toEqual(['departure_accepted']);
-    expect(open.queries.some((query) => query.params?.[3] === 'notifications_disabled')).toBe(true);
+    expect(open.queries.some((query) => query.params?.[3] === 'no_verified_recipient')).toBe(true);
   });
 
   test('unknown, revoked, inactive, and cross-tenant tokens do not open a session', async () => {
