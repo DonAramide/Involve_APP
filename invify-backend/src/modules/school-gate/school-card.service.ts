@@ -412,6 +412,8 @@ export class SchoolCardService {
       fullName: identity.printedName,
       printedCode: identity.printedCode,
       detail: settings.showClassOrDepartment ? identity.printedDetail : null,
+      hmoName: null,
+      enrolleeId: null,
       category: identity.subjectType === 'student' ? 'STUDENT' : identity.subjectType === 'staff' ? 'STAFF' : 'ADMIN',
       statusLabel: settings.showStatus ? identity.statusLabel : null,
       barcodeValue: identityCode,
@@ -510,6 +512,9 @@ function parseExpiry(issuedAt: string, value: unknown): string | null {
 }
 
 function toPublic(card: CardRow): PublicCard {
+  const code = card.invifyCode && /^[A-Z0-9]{12}$/i.test(card.invifyCode)
+    ? card.invifyCode.toUpperCase()
+    : null;
   return {
     id: card.id,
     subjectType: card.subjectType,
@@ -522,6 +527,7 @@ function toPublic(card: CardRow): PublicCard {
     issuedAt: card.issuedAt,
     expiresAt: card.expiresAt,
     revokeKind: card.revokeKind,
+    invifyCode: code,
   };
 }
 

@@ -140,6 +140,8 @@ export interface PublicCard {
   issuedAt: string;
   expiresAt: string | null;
   revokeKind: RevokeKind | null;
+  /** Printed 12-char Invify identity when present — safe for gate offline roster sync. */
+  invifyCode?: string | null;
 }
 
 export interface CardFace {
@@ -154,6 +156,10 @@ export interface CardFace {
   fullName: string;
   printedCode: string;
   detail: string | null;
+  /** Active HMO / insurer display name for student cards (null when not enrolled). */
+  hmoName: string | null;
+  /** Insurer enrollee / member reference (formerly policy number label on the card). */
+  enrolleeId: string | null;
   category: 'STUDENT' | 'STAFF' | 'ADMIN';
   statusLabel: string | null;
   /** Printed Code 128 payload — MUST be the 12-char identity code when issued. */

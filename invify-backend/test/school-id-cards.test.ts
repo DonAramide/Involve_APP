@@ -308,7 +308,11 @@ describe('school ID cards', () => {
       signatoryDesignation: 'Principal',
     });
     expect(saved.staffTemplate).toBe('compact_barcode');
-    expect(saved.notifyStudentArrival).toBe(false);
+    // Product default: notify_* true so gate emails are not silently suppressed by DB triggers.
+    expect(saved.notifyStudentArrival).toBe(true);
+    expect(saved.notifyStudentDeparture).toBe(true);
+    expect(saved.notifyStaffArrival).toBe(true);
+    expect(saved.notifyStaffDeparture).toBe(true);
     expect(service.templates(owner)).toHaveLength(6);
   });
 

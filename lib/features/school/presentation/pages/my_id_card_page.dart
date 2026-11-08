@@ -128,6 +128,8 @@ class _MyIdCardPageState extends State<MyIdCardPage> {
                     category: (_card!['category'] ?? 'ADMIN').toString(),
                     printedCode: _card!['printedCode']?.toString() ?? '',
                     detail: (_card!['printedDetail'] ?? _card!['detail'])?.toString(),
+                    hmoName: _card!['hmoName']?.toString(),
+                    enrolleeId: (_card!['enrolleeId'] ?? _card!['policyNumber'])?.toString(),
                     accentHex: _card!['accentColor']?.toString(),
                     barcodeValue: null,
                     terms: terms,

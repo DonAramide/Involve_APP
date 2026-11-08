@@ -15,6 +15,8 @@ class SchoolIdCardPreview extends StatelessWidget {
   final String category;
   final String printedCode;
   final String? detail;
+  final String? hmoName;
+  final String? enrolleeId;
   final String? accentHex;
   final Uint8List? photoBytes;
   final String? barcodeValue;
@@ -33,6 +35,8 @@ class SchoolIdCardPreview extends StatelessWidget {
     required this.category,
     required this.printedCode,
     this.detail,
+    this.hmoName,
+    this.enrolleeId,
     this.accentHex,
     this.photoBytes,
     this.barcodeValue,
@@ -271,6 +275,10 @@ class SchoolIdCardPreview extends StatelessWidget {
                               : 'Role',
                           detail!.trim(),
                         ),
+                      if (category.toUpperCase() == 'STUDENT' && (hmoName ?? '').trim().isNotEmpty)
+                        _meta('HMO', hmoName!.trim()),
+                      if (category.toUpperCase() == 'STUDENT' && (enrolleeId ?? '').trim().isNotEmpty)
+                        _meta('Enrollee ID', enrolleeId!.trim()),
                     ],
                   ),
                 ),

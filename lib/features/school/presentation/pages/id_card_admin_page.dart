@@ -14,6 +14,7 @@ import 'package:involve_app/features/invoicing/domain/templates/invoice_template
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import 'package:involve_app/features/school/data/services/gate_clock_offline_service.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/widgets/id_card_identity_code.dart';
 import 'package:involve_app/features/school/presentation/widgets/id_card_landscape_print.dart';
@@ -95,12 +96,17 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
       });
     } on FinanceApiException catch (error) {
       setState(() {
-        _error = error.message;
+        // FinanceApiClient maps bare 404s to a generic "finance endpoint" string;
+        // rewrite so school ID Card UX matches the real cause (route/schema not live).
+        _error = _failure(error.statusCode, error.data) ??
+            _rewriteEndpointMissing(error.message) ??
+            error.message;
         _loading = false;
       });
     } on DioException catch (error) {
       setState(() {
         _error = _failure(error.response?.statusCode, error.response?.data) ??
+            _rewriteEndpointMissing(error.message) ??
             'The ID card list could not be loaded.';
         _loading = false;
       });
@@ -158,6 +164,24 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
           'Card issued, but no 12-character identity code was returned. '
           'Apply the invify_code migration on the server and re-issue.',
         );
+      } else {
+        // Keep Gate Clock offline roster current without waiting for a full sync.
+        final cardMap = first?['card'] is Map
+            ? Map<String, dynamic>.from(first!['card'] as Map)
+            : null;
+        try {
+          await GateClockOfflineService(_client()).rememberIssuedCard(
+            invifyCode: identity,
+            cardId: cardMap?['id']?.toString() ?? '',
+            subjectType: person.subjectType,
+            subjectId: person.subjectId,
+            printedName: face?['fullName']?.toString() ??
+                face?['printedName']?.toString() ??
+                person.name,
+            printedCode: face?['printedCode']?.toString() ?? person.printedCode,
+            expiresAt: cardMap?['expiresAt']?.toString(),
+          );
+        } catch (_) {}
       }
       if (!mounted) return;
       final photo = _localPhotoFor(person);
@@ -199,6 +223,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
         person.name;
     final code = face?['printedCode']?.toString() ?? person.printedCode;
     final detail = (face?['printedDetail'] ?? face?['detail'] ?? person.detail)?.toString();
+    final hmoName = face?['hmoName']?.toString();
+    final enrolleeId = (face?['enrolleeId'] ?? face?['policyNumber'])?.toString();
     final category = (face?['category'] ?? person.subjectType).toString().toUpperCase();
     final address = face?['address']?.toString();
     final accent = face?['accentColor']?.toString();
@@ -229,6 +255,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
         category: printCategory.isEmpty ? terms.beneficiary.toUpperCase() : printCategory,
         printedCode: code,
         detail: detail,
+        hmoName: category.toUpperCase() == 'STUDENT' ? hmoName : null,
+        enrolleeId: category.toUpperCase() == 'STUDENT' ? enrolleeId : null,
         address: address,
         accentHex: accent,
         photoBytes: photo,
@@ -294,6 +322,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
                       category: category.isEmpty ? 'STUDENT' : category,
                       printedCode: code,
                       detail: detail,
+                      hmoName: category.toUpperCase() == 'STUDENT' ? hmoName : null,
+                      enrolleeId: category.toUpperCase() == 'STUDENT' ? enrolleeId : null,
                       accentHex: accent,
                       photoBytes: photo,
                       barcodeValue: barcodePayload,
@@ -467,6 +497,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
         : 'Role';
 
     // Always re-render at thermal-native DPI (do not downscale the 300 DPI preview).
+    final hmoName = face?['hmoName']?.toString();
+    final enrolleeId = (face?['enrolleeId'] ?? face?['policyNumber'])?.toString();
     final thermalFront = await IdCardLandscapePrint.renderSide(
       side: 'front',
       paperWidthMm: paperWidth,
@@ -475,6 +507,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
       category: category.isEmpty ? terms.beneficiary.toUpperCase() : category,
       printedCode: code,
       detail: detail,
+      hmoName: rawCategory.toLowerCase() == 'student' ? hmoName : null,
+      enrolleeId: rawCategory.toLowerCase() == 'student' ? enrolleeId : null,
       address: address,
       accentHex: accent,
       photoBytes: photo,
@@ -590,7 +624,8 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
     if (status != null && status < 400) return null;
     final code = _code(data);
     if (code == 'SCHOOL_GATE_SCHEMA_UNAPPLIED' || status == 404) {
-      return 'ID cards are not available from the server yet.';
+      return 'ID cards are not available on the production server yet '
+          '(API route missing or school ID-card database migration not applied).';
     }
     if (status == 401 || (data is Map && data['error']?.toString().contains('Authorization') == true)) {
       return 'Sign in again on this device (authorization missing). Then reopen ID Card.';
@@ -600,6 +635,21 @@ class _IdCardAdminPageState extends State<IdCardAdminPage> {
     }
     if (data is Map && data['error'] != null) return data['error'].toString();
     return 'The ID card request could not be completed.';
+  }
+
+  /// Maps generic FinanceApiClient 404 wording to an ID-card-specific explanation.
+  String? _rewriteEndpointMissing(String? message) {
+    final t = (message ?? '').toLowerCase();
+    if (t.contains('finance endpoint') ||
+        t.contains('endpoint is not available') ||
+        t.contains('endpoint not found') ||
+        t.contains('route not found') ||
+        t.contains('cannot get') ||
+        t.contains('requested resource was not found')) {
+      return 'ID cards are not available on the production server yet '
+          '(API route missing or school ID-card database migration not applied).';
+    }
+    return null;
   }
 
   String? _code(Object? data) => data is Map ? data['code']?.toString() : null;

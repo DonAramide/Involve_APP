@@ -22,6 +22,12 @@ import {
   scanHttpStatus,
   scanThroughDatabase,
 } from './school-gate.scan';
+import {
+  readParentGateNotify,
+  saveParentGateNotify,
+  readStaffGateNotify,
+  saveStaffGateNotify,
+} from './school-gate.notify';
 
 export function createUnappliedSchoolCardService(): SchoolCardService {
   return new SchoolCardService(new UnappliedSchoolCardStore());
@@ -140,6 +146,18 @@ export function registerSchoolCardRoutes(
   });
   route('get', '/api/school/gate/sessions', async (req, res) => {
     res.json(await listGateSessionsThroughDatabase(actor(req), req.query as Record<string, unknown>));
+  });
+  route('get', '/api/school/gate/notify/parent', async (req, res) => {
+    res.json(await readParentGateNotify(actor(req), req.query as Record<string, unknown>));
+  });
+  route('put', '/api/school/gate/notify/parent', async (req, res) => {
+    res.json(await saveParentGateNotify(actor(req), body(req)));
+  });
+  route('get', '/api/school/gate/notify/staff', async (req, res) => {
+    res.json(await readStaffGateNotify(actor(req), req.query as Record<string, unknown>));
+  });
+  route('put', '/api/school/gate/notify/staff', async (req, res) => {
+    res.json(await saveStaffGateNotify(actor(req), body(req)));
   });
 }
 

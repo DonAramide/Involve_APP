@@ -44,6 +44,8 @@ class IdCardLandscapePrint {
     required String category,
     required String printedCode,
     String? detail,
+    String? hmoName,
+    String? enrolleeId,
     String? address,
     String? disclaimer,
     String? returnHint,
@@ -96,6 +98,8 @@ class IdCardLandscapePrint {
         category: category,
         printedCode: printedCode,
         detail: detail,
+        hmoName: hmoName,
+        enrolleeId: enrolleeId,
         groupFieldLabel: groupFieldLabel,
         photoBytes: photoBytes,
         logoBytes: logoBytes,
@@ -202,6 +206,8 @@ class IdCardLandscapePrint {
     required String category,
     required String printedCode,
     String? detail,
+    String? hmoName,
+    String? enrolleeId,
     String? groupFieldLabel,
     Uint8List? photoBytes,
     Uint8List? logoBytes,
@@ -312,7 +318,25 @@ class IdCardLandscapePrint {
       _drawText(
         canvas,
         '$field: ${detail!.trim()}',
-        Rect.fromLTWH(infoLeft, y, infoWidth, pt(12, dpi)),
+        Rect.fromLTWH(infoLeft, y, infoWidth, pt(11, dpi)),
+        TextStyle(color: const Color(0xFF111111), fontWeight: FontWeight.w800, fontSize: personMeta),
+      );
+      y += pt(11, dpi);
+    }
+    if ((hmoName ?? '').trim().isNotEmpty) {
+      _drawText(
+        canvas,
+        'HMO: ${hmoName!.trim()}',
+        Rect.fromLTWH(infoLeft, y, infoWidth, pt(11, dpi)),
+        TextStyle(color: const Color(0xFF111111), fontWeight: FontWeight.w800, fontSize: personMeta),
+      );
+      y += pt(11, dpi);
+    }
+    if ((enrolleeId ?? '').trim().isNotEmpty) {
+      _drawText(
+        canvas,
+        'Enrollee ID: ${enrolleeId!.trim()}',
+        Rect.fromLTWH(infoLeft, y, infoWidth, pt(11, dpi)),
         TextStyle(color: const Color(0xFF111111), fontWeight: FontWeight.w800, fontSize: personMeta),
       );
     }
