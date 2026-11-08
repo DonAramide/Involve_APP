@@ -64,12 +64,14 @@ function Repair-FlutterAssetManifest {
 
     $sdk = $env:ANDROID_SDK_ROOT
     if (-not $sdk) { $sdk = $env:ANDROID_HOME }
-    if (-not $sdk) { $sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
+    if (-not $sdk) { $sdk = "C:\Android\Sdk" }
+    if (-not (Test-Path $sdk)) { $sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
     $javaCandidates = @(
         $env:JAVA_HOME,
         'C:\Program Files\Android\Android Studio\jbr',
+        'C:\dev\jdk-17',
         (Get-ChildItem "C:\Program Files\Microsoft\jdk-*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName)
-    ) | Where-Object { $_ }
+    ) | Where-Object { $_ -and ($_ -notmatch '^[A-Z]:\\Program Files\\Android\\Android Studio1\\') }
     $resolvedJava = $javaCandidates | Where-Object {
         try { Test-Path (Join-Path $_ 'bin\java.exe') } catch { $false }
     } | Select-Object -First 1
@@ -77,16 +79,65 @@ function Repair-FlutterAssetManifest {
     $apksigner = Get-ChildItem -Path (Join-Path $sdk "build-tools") -Filter "apksigner.bat" -Recurse -ErrorAction SilentlyContinue |
         Sort-Object FullName -Descending |
         Select-Object -First 1
-    $ks = Join-Path $env:USERPROFILE ".android\debug.keystore"
-    if ($apksigner -and (Test-Path $ks)) {
-        & $apksigner.FullName sign --ks $ks --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey $apkFull
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[Invify] Re-signed APK with debug keystore" -ForegroundColor Cyan
-        } else {
-            Write-Host "[Invify] apksigner failed; install may be rejected" -ForegroundColor Yellow
+
+    # After ZIP mutation the APK signature is invalid and must be re-applied.
+    # Production/staging MUST use the release keystore from android/key.properties.
+    # Never fall back to the debug keystore for those targets.
+    $keyPropsPath = Join-Path $PSScriptRoot "android\key.properties"
+    $useReleaseSigning = ($Target -eq 'production' -or $Target -eq 'staging') -or (Test-Path $keyPropsPath)
+
+    if ($Target -eq 'production' -or $Target -eq 'staging') {
+        if (-not (Test-Path $keyPropsPath)) {
+            throw "Refuse AssetManifest re-sign: android/key.properties missing for $Target (debug keystore forbidden)."
         }
+    }
+
+    if (-not $apksigner) {
+        throw "apksigner not found under $sdk; cannot re-sign after AssetManifest repair."
+    }
+
+    if ($useReleaseSigning -and (Test-Path $keyPropsPath)) {
+        $props = @{}
+        Get-Content $keyPropsPath | ForEach-Object {
+            if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
+            $k, $v = $_.Split('=', 2)
+            $props[$k.Trim()] = $v.Trim()
+        }
+        foreach ($required in @('storeFile', 'storePassword', 'keyAlias', 'keyPassword')) {
+            if ([string]::IsNullOrWhiteSpace($props[$required])) {
+                throw "android/key.properties missing required field: $required"
+            }
+        }
+        $storeFile = $props['storeFile']
+        if (-not [System.IO.Path]::IsPathRooted($storeFile)) {
+            $storeFile = Join-Path (Join-Path $PSScriptRoot "android") $storeFile
+        }
+        if (-not (Test-Path $storeFile)) {
+            throw "Release keystore file not found at configured storeFile path."
+        }
+        # Passwords via env-file style args only for this process; do not Write-Host them.
+        & $apksigner.FullName sign `
+            --ks $storeFile `
+            --ks-pass ("pass:" + $props['storePassword']) `
+            --ks-key-alias $props['keyAlias'] `
+            --key-pass ("pass:" + $props['keyPassword']) `
+            $apkFull
+        if ($LASTEXITCODE -ne 0) {
+            throw "Release apksigner failed after AssetManifest repair."
+        }
+        Write-Host "[Invify] Re-signed APK with release keystore (alias redacted)" -ForegroundColor Cyan
+    } elseif ($Target -eq 'local' -or $Target -eq 'usb' -or $BuildMode -eq 'debug') {
+        $ks = Join-Path $env:USERPROFILE ".android\debug.keystore"
+        if (-not (Test-Path $ks)) {
+            throw "debug.keystore not found for local/usb re-sign."
+        }
+        & $apksigner.FullName sign --ks $ks --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey $apkFull
+        if ($LASTEXITCODE -ne 0) {
+            throw "Debug apksigner failed after AssetManifest repair."
+        }
+        Write-Host "[Invify] Re-signed APK with debug keystore (local/usb only)" -ForegroundColor Yellow
     } else {
-        Write-Host "[Invify] apksigner/debug.keystore not found; APK may need a debug re-sign" -ForegroundColor Yellow
+        throw "No safe signing path for AssetManifest re-sign (target=$Target)."
     }
 }
 
@@ -133,6 +184,12 @@ if ($Target -eq 'production' -or $Target -eq 'staging') {
         if ([string]$parsed.SUPABASE_URL -notmatch 'jjixrywfnaijvahmvcwj') { Write-Host 'Refuse: production SUPABASE_URL mismatch' -ForegroundColor Red; exit 2 }
         if ([string]$parsed.API_BASE_URL -match 'staging\.invify\.org' -or [string]$parsed.SUPABASE_URL -match 'rpcjelhacmkhzguljdgi') {
             Write-Host 'Refuse: production target contains staging markers' -ForegroundColor Red; exit 2
+        }
+        $keyPropsGate = Join-Path $PSScriptRoot 'android\key.properties'
+        if (-not (Test-Path $keyPropsGate)) {
+            Write-Host 'Refuse: production release requires android/key.properties + authorised upload keystore.' -ForegroundColor Red
+            Write-Host 'Debug signing is forbidden for production. See docs/releases/INVIFY_ANDROID_PRODUCTION_SIGNING_AUDIT.md' -ForegroundColor Red
+            exit 2
         }
     }
 }
