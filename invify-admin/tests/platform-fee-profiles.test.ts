@@ -14,7 +14,7 @@ function findChild(path) {
 }
 
 describe('platform fee profile routes', () => {
-  test('list and detail require admin_deploy and auth', () => {
+  test('list/detail/distribution/assessments are read_finance; mutations stay admin_deploy', () => {
     const list = findChild('admin/platform-fees')
     const detail = findChild('admin/platform-fees/:transactionType')
     const assessments = findChild('admin/platform-fees/assessments')
@@ -33,23 +33,30 @@ describe('platform fee profile routes', () => {
     expect(stakeholderDetail).toBeDefined()
     expect(withdrawals).toBeDefined()
     expect(withdrawalDetail).toBeDefined()
-    expect(distribution.meta.permission).toBe('admin_deploy')
-    expect(stakeholders.meta.permission).toBe('admin_deploy')
-    expect(withdrawals.meta.permission).toBe('admin_deploy')
-    expect(assessments.meta.permission).toBe('admin_deploy')
-    expect(assessmentDetail.meta.permission).toBe('admin_deploy')
+    // Read surfaces — finance operators may inspect profiles/assessments/distribution.
     expect(list.meta.requiresAuth).toBe(true)
-    expect(list.meta.permission).toBe('admin_deploy')
-    expect(detail.meta.permission).toBe('admin_deploy')
+    expect(list.meta.permission).toBe('read_finance')
+    expect(detail.meta.permission).toBe('read_finance')
+    expect(distribution.meta.permission).toBe('read_finance')
+    expect(assessments.meta.permission).toBe('read_finance')
+    expect(assessmentDetail.meta.permission).toBe('read_finance')
+    // Maker-checker mutation surfaces remain deploy-gated.
+    expect(stakeholders.meta.permission).toBe('admin_deploy')
+    expect(stakeholderDetail.meta.permission).toBe('admin_deploy')
+    expect(withdrawals.meta.permission).toBe('admin_deploy')
+    expect(withdrawalDetail.meta.permission).toBe('admin_deploy')
   })
 
   test('tenant cashier cannot access platform fee configuration', () => {
     const perms = permissionsForOperatorRole('cashier')
     expect(perms).not.toContain('admin_deploy')
+    expect(perms).not.toContain('read_finance')
   })
 
-  test('ADMIN_FINANCE and ADMIN_TREASURY still lack admin_deploy', () => {
-    expect(permissionsForOperatorRole('ADMIN_FINANCE')).not.toContain('admin_deploy')
+  test('ADMIN_FINANCE can read finance surfaces but still lacks admin_deploy', () => {
+    const finance = permissionsForOperatorRole('ADMIN_FINANCE')
+    expect(finance).toContain('read_finance')
+    expect(finance).not.toContain('admin_deploy')
     expect(permissionsForOperatorRole('ADMIN_TREASURY')).not.toContain('admin_deploy')
   })
 
@@ -198,7 +205,7 @@ describe('platform fee UI contracts', () => {
     expect(detail).toMatch(/You cannot approve your own proposal/)
     expect(detail).toMatch(/publish-checker-mfa/)
     expect(detail).toMatch(/promptCheckerMfa/)
-    expect(detail).toMatch(/publishPlatformFeeVersion\(type, \{ otp \}\)/)
+    expect(detail).toMatch(/publishPlatformFeeVersion\(type, agentPayload\(\{ otp \}\)\)/)
     expect(api).toMatch(/\/propose/)
     expect(api).toMatch(/\/reject/)
     expect(api).toMatch(/\/api\/admin\/platform-fees/)

@@ -115,14 +115,21 @@ class FakeDb {
           return q;
         },
         update(patch: any) {
-          return {
+          const filters: Array<{ col: string; val: any }> = [];
+          const q: any = {
             eq(col: string, val: any) {
-              self.versions = self.versions.map((row) =>
-                String(row[col]) === String(val) ? { ...row, ...patch, updated_at: '2026-09-26T12:00:00.000Z' } : row,
-              );
-              return Promise.resolve({ data: null, error: null });
+              filters.push({ col, val });
+              return q;
+            },
+            then(resolve: any, reject: any) {
+              self.versions = self.versions.map((row) => {
+                const matched = filters.every((f) => String(row[f.col]) === String(f.val));
+                return matched ? { ...row, ...patch, updated_at: '2026-09-26T12:00:00.000Z' } : row;
+              });
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
             },
           };
+          return q;
         },
         insert(row: any) {
           const rec = {
