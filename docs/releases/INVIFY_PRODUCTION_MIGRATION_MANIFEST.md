@@ -1,126 +1,101 @@
-# INVIFY PRODUCTION MIGRATION MANIFEST
+﻿# INVIFY PRODUCTION MIGRATION MANIFEST
 
 **Branch:** `release/invify-production-2026`  
-**Release candidate SHA:** `5465431d9b53308f28100833ecb2b9e01b763dc8`  
-**Prepared (UTC):** 2026-11-05  
-**Expected DB refs:** production `jjixrywfnaijvahmvcwj` · staging `rpcjelhacmkhzguljdgi`  
-**Status:** **PREPARED — NOT APPLIED.** Production DB identity still requires authorised operator confirmation before any apply.
+**Release candidate SHA:** `bb715b9adf9f8af4c19279cdfb706af44ac1f7c1`  
+**Updated (UTC):** 2026-11-05 (Phase 2.6)  
+**DB refs:** production `jjixrywfnaijvahmvcwj` · staging `rpcjelhacmkhzguljdgi`  
+
+**Companion docs:**
+
+- `INVIFY_PHASE2_6_DATABASE_SECURITY_INVENTORY.md`
+- `INVIFY_PRODUCTION_MIGRATION_BASELINE_STRATEGY.md`
+- `INVIFY_PRODUCTION_RECOVERY_READINESS.md`
+- `INVIFY_PHASE2_FINAL_GATE_REPORT.md`
+
+**Status:** **PREPARED — NOT APPLIED. GATE BLOCKED.**
 
 ---
 
-## How to use this manifest
+## Tracking
 
-1. Operator confirms production/staging `SUPABASE_URL` project refs (host only).  
-2. Export `supabase_migrations.schema_migrations` (or project equivalent) from **both** environments.  
-3. Fill the **Verified staging** / **Verified production** columns.  
-4. Take and verify a production backup.  
-5. Apply only rows classified **Pending production migration** that are also **Approved for this release**.
-
----
-
-## Classification legend
-
-| Class | Meaning |
-|---|---|
-| Already applied | Present in target env migration history |
-| Pending production migration | In release Git; not yet confirmed on production |
-| Staging-only | Applied or intended only on staging |
-| Duplicate | Overlaps another migration / superseded |
-| Requires data backfill | Schema alone insufficient |
-| Requires explicit approval | Business/security risk beyond this release |
-| Excluded | Must not run in this production release |
-
-Until history exports exist, feature migrations below are marked **Pending verification** for both environments.
-
----
-
-## A. Release-critical feature migrations (Oct–Nov 2026)
-
-| Filename | Purpose | Dependencies | Staging | Production | Class | Data impact | Rollback | Approval |
-|---|---|---|---|---|---|---|---|---|
-| `20261015000000_school_attendance_management.sql` | School attendance schema | Prior school tables | Pending verification | Pending verification | Pending production migration* | Additive attendance structures | Forward-fix preferred | Included if not already applied |
-| `20261015010000_hw_00_foundation.sql` | HMO foundation | — | Pending verification | Pending verification | Pending production migration* | New HMO foundation tables | Limited | Included (operational HMO) |
-| `20261015020000_hw_10_people.sql` | HMO people | hw_00 | Pending verification | Pending verification | Pending production migration* | People/profile links | Limited | Included |
-| `20261015030000_hw_20_policies_enrolments.sql` | Policies / enrolments | hw_10 | Pending verification | Pending verification | Pending production migration* | Enrolment rows | Limited | Included |
-| `20261015040000_hw_30_billing_payments.sql` | HMO billing/payments | hw_20 | Pending verification | Pending verification | Pending production migration* | Billing artefacts | Limited | Included (preserve insurer activation rules) |
-| `20261015050000_hw_40_rls_audit.sql` | HMO RLS/audit | hw_* | Pending verification | Pending verification | Pending production migration* | Policies | Limited | Included |
-| `20261018000000_hw_50_profit_sharing.sql` | Profit sharing | hw_* | Pending verification | Pending verification | **Requires explicit approval** | Earnings structures | Limited | **Review before apply** — monetisation adjacency |
-| `20261020000000_institution_registry_and_routing_policy.sql` | Institution registry / routing | — | Pending verification | Pending verification | Pending production migration* | Registry tables | Limited | Included |
-| `20261022000000_hw_60_hmo_institution_portal.sql` | Institution portal | registry + hw_* | Pending verification | Pending verification | Pending production migration* | Portal structures | Limited | Included |
-| `20261023000000_hw_70_tenant_mobile_hmo_experience.sql` | Mobile HMO experience | hw_* | Pending verification | Pending verification | Pending production migration* | Experience tables | Limited | Included |
-| `20261024000000_institution_category_and_tenant_branding.sql` | Category / branding | registry | Pending verification | Pending verification | Pending production migration* | Metadata columns | Limited | Included |
-| `20261025000000_hw_facility_logo_and_coordinates.sql` | Facility logo/coords | hw_* | Pending verification | Pending verification | Pending production migration* | Media/geo fields | Limited | Included |
-| `20261026120000_hw_platform_entitlements.sql` | Platform entitlements | hw_* | Pending verification | Pending verification | Pending production migration* | Entitlement rows | Limited | Included |
-| `20261026220000_hw_bank_hmo_offerings.sql` | Bank / HMO offerings | hw_* | Pending verification | Pending verification | Pending production migration* | Offering links | Limited | Included (governance UI may depend) |
-| `20261026233000_school_id_cards_and_entry_exit.sql` | ID cards + gate entry/exit | school + settings | Pending verification (staging programme used) | Pending verification | Pending production migration* | Cards, sessions, notifications, triggers | **Difficult** (triggers/guards) | **Required** for Gate/ID |
-| `20261105060000_school_id_card_invify_code.sql` | 12-char Invify identity | `20261026233000` | Staging programme applied | Pending verification | Pending production migration | New identity columns/functions | Forward-compatible | **Required** |
-| `20261105130000_school_gate_notify_defaults_on.sql` | Gate notify defaults ON | `20261026233000` | Intent applied via SQL/app | Pending verification | Pending production migration | Updates settings defaults/rows | Reversible UPDATE | Included |
-
-\*Reclassify to **Already applied** once production history export confirms.
-
----
-
-## B. Explicitly excluded (do not apply this release)
-
-| Artifact | Reason | Class |
+| Env | Tracker | Notes |
 |---|---|---|
-| `proposals/DO_NOT_APPLY_hmo_monetisation_grants.sql` | Unresolved fee ownership | Excluded |
-| `proposals/DO_NOT_APPLY_hmo_service_fee_catalog.sql` (+ seed) | Unresolved fee ownership | Excluded |
-| `proposals/DO_NOT_APPLY_hw_platform_finance_grants.sql` | Finance grants prep | Excluded |
-| `proposals/DO_NOT_APPLY_bank_account_update_requests.sql` | Needs Phase 7 explicit authorisation beyond prep | Excluded until approved |
-| `proposals/DO_NOT_APPLY_hw_provider_registration_channel.sql` | Marked do-not-apply | Excluded |
-| `proposals/DO_NOT_APPLY_hw_claims_workflow.sql` | Marked do-not-apply proposal | Excluded unless superseded by applied hw_* migrations |
-| Other `DO_NOT_APPLY_*` / `PENDING_APPROVAL_*` | Safety | Excluded |
+| Staging | `supabase_migrations.schema_migrations` (5 rows) | Incomplete vs objects → partial/manual |
+| Production | **Relation does not exist** | Baseline strategy designed; **not created this phase** |
 
-Runtime note: `invify-backend/src/modules/hmo-monetisation/**` is present on the release branch via `feature/va-hmo-staging-candidate` merge for **gated** bank-governance/code paths. **Do not** set `HMO_FEE_OWNERSHIP_APPROVED`, enable wallet debits, earnings posting, or live payouts.
+Forbidden: blind `supabase db push`; marking applied from partial objects alone.
 
 ---
 
-## C. Pre-October baseline migrations
+## Security inventory snapshot (RPC OpenAPI)
 
-All earlier `invify-backend/supabase/migrations/20260*` files (fee orchestration, ledger, devices, inventory, etc.) are assumed part of the existing production lineage unless history export shows gaps.
+| | Staging | Production |
+|---|---|---|
+| Exposed RPC count | 48 | 20 |
+| Gate `school_gate_*` | Present / callable samples | Absent |
+| `inst_*` | Present | Absent |
+| `hw_current_hmo_provider_ids` | Present | Absent |
+| Shared fee/ledger/payout RPCs | Present | Present |
+| Prod-only | — | `fee_reserve_withdrawal`, `get_tenant_dashboard_stats` |
 
-| Action | Detail |
-|---|---|
-| Diff | Compare full filenames to production migration history |
-| Do not | Replay entire baseline blindly |
-| Flag | Any missing baseline migration as **Requires explicit approval** before apply |
-
----
-
-## D. Destructive / irreversible screen
-
-Stop and report if any pending migration:
-
-- Drops tenant tables or truncates tenant data  
-- Rewrites enums incompatibly without forward path  
-- Seeds production with test data  
-- Enables live fee posting / payouts  
-
-None of the **required** ID-card / Invify-code / gate-notify migrations are intended to drop tenant data; still review SQL text before apply.
+Full trigger/RLS/SECURITY DEFINER catalog: **outstanding** — run `docs/releases/exports/phase2_6-operator-inventory.sql`.
 
 ---
 
-## E. Apply order (when authorised)
+## Release-critical migrations
 
-1. Confirm backups + project refs.  
-2. Apply any missing `20261015*` attendance/HMO foundation chain in timestamp order.  
-3. Apply institution/HMO portal chain `20261020*`–`20261026*`.  
-4. Apply `20261026233000_school_id_cards_and_entry_exit.sql` if missing.  
-5. Apply `20261105060000_school_id_card_invify_code.sql`.  
-6. Apply `20261105130000_school_gate_notify_defaults_on.sql`.  
-7. Skip all `DO_NOT_APPLY_*`.  
-8. Hold `20261018000000_hw_50_profit_sharing.sql` until explicit approval.
+| Filename | Staging | Production | Class | Safe exec? | Notes |
+|---|---|---|---|---|---|
+| `20261015000000_school_attendance_management.sql` | Recorded + objects | Objects; no tracker | Partial/manual on prod | No re-apply | |
+| `20261015010000`…`hw_40` | Objects; not recorded | Objects; no tracker | Partial/manual | No re-apply | |
+| `20261018000000_hw_50_profit_sharing.sql` | Objects; 0 rows | Objects; empty | **ON HOLD** | No | Monetisation off |
+| `20261020000000_institution_registry_and_routing_policy.sql` | Partial/manual | **Pending** | Pending prod | After review | Watch `WITH CHECK (true)` insert policy |
+| `20261022000000_hw_60_hmo_institution_portal.sql` | Partial/manual | **Pending** | Pending prod | After registry | |
+| `20261023000000_hw_70_tenant_mobile_hmo_experience.sql` | Partial/manual | **Pending** | Pending prod | After portal | Data backfill UPDATE |
+| `20261024000000_institution_category_and_tenant_branding.sql` | NO-OP | NO-OP | **Excluded** | No | |
+| `20261025000000_hw_facility_logo_and_coordinates.sql` | Partial/manual | **Pending** | Pending prod | Yes | Idempotent |
+| `20261026120000_hw_platform_entitlements.sql` | Partial/manual | **Pending** | Pending prod | Review UUID constraint | |
+| `20261026220000_hw_bank_hmo_offerings.sql` | Partial/manual | **Pending** | Pending prod | Yes | |
+| `20261026233000_school_id_cards_and_entry_exit.sql` | Partial/manual | **Pending** | Pending prod | High scrutiny | Triggers/RLS must be proven |
+| `20261105060000_school_id_card_invify_code.sql` | Partial/manual | **Pending** | Pending prod | After ID cards | Backfill codes |
+| `20261105130000_school_gate_notify_defaults_on.sql` | Needs data backfill (flags false) | **Pending** | Pending + staging backfill | After settings | |
+| `proposals/DO_NOT_APPLY_*` | — | — | **Excluded** | No | |
 
 ---
 
-## F. Verification queries (operator; no secrets)
+## Production apply order (when authorised)
 
-After apply, confirm presence of:
+Prerequisites: recovery checklist complete; operator catalog inventory attached; baseline method approved.
 
-- `public.school_id_cards` (+ Invify identity columns/functions from 20261105)  
-- `public.school_entry_exit_sessions` / notifications  
-- HMO foundation tables from hw_* chain  
-- `school_id_card_settings.notify_*` defaults true where intended  
+1. Institution registry  
+2. HMO institution portal  
+3. HMO mobile assignment columns  
+4. Facility geolocation  
+5. Platform entitlements  
+6. Bank HMO offerings  
+7. School ID cards + entry/exit  
+8. Invify identity code  
+9. Gate notification defaults  
 
-Do not print connection strings or keys.
+Skip: category no-op, hw_50 reapply, DO_NOT_APPLY_*, baseline replays.
+
+---
+
+## Financial restrictions (unchanged)
+
+- Do not reapply `hw_50_profit_sharing`  
+- Do not apply HMO monetisation / wallet / earnings / live payout proposals  
+- Preserve `FEATURE_REAL_MONEY_PAYOUTS=false`  
+- Keep `HMO_FEE_OWNERSHIP_APPROVED` unset  
+- Keep live fee orchestration off  
+
+---
+
+## Exact remaining blockers
+
+1. **Production backup / PITR / restore-test attestation** (`INVIFY_PRODUCTION_RECOVERY_READINESS.md`).  
+2. **Operator catalog inventory** (functions ACLs, triggers, RLS policies) for staging + production.  
+3. **Approved baseline tracker initialisation plan** (create later — not in this phase).  
+4. Explicit owner approval of pending SQL order + review of permissive institution audit INSERT policy and entitlements UUID constraint.
+
+**Phase 2.6 verdict:** not ready for production migration execution.

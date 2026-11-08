@@ -4,8 +4,9 @@
 **Audit started (UTC):** 2026-11-05T16:54Z  
 **Auditor workspace:** `C:\dev\Involve_APP_health`  
 **Release intent:** Controlled production release of registration, attendance, Gate Clock, ID Cards (incl. 12-char Invify identity), and **operational** HMO — **excluding** unresolved HMO monetisation / live payouts.  
-**Current verdict:** **PHASE 1 CONSOLIDATION COMPLETE — PRODUCTION DEPLOY/MIGRATE STILL BLOCKED** pending DB identity confirmation + backup gates (§12).  
-**Release candidate SHA:** `db44014a711df392d38eccce0fee8759d8bc143e` (`release/invify-production-2026`)
+**Current verdict:** **PHASE 2.6 — BLOCKED** (backup/PITR/restore attestation; full pg catalog security inventory outstanding; production migration tracker absent; pending SQL reviewed but not authorised).  
+**Release candidate SHA:** `bb715b9adf9f8af4c19279cdfb706af44ac1f7c1` (`release/invify-production-2026`)  
+**Phase 2.6:** `INVIFY_PHASE2_6_DATABASE_SECURITY_INVENTORY.md` · `INVIFY_PRODUCTION_MIGRATION_BASELINE_STRATEGY.md` · `INVIFY_PRODUCTION_RECOVERY_READINESS.md`
 
 ---
 
@@ -108,7 +109,7 @@ Counts are `git rev-list --left-right --count origin/main...<branch>` → `behin
 | Git integration base (proposed) | `origin/main` = `fdd830b8…` (**contains** prod base) |
 | Staging runtime candidate | Host path `candidate-20261028` + overlays; git tip historically `b4956971` / current dirty `4cdfc54a` |
 | Release integration branch | `release/invify-production-2026` (worktree `C:\dev\_wt_invify_release_2026`) |
-| Release candidate SHA | `db44014a711df392d38eccce0fee8759d8bc143e` |
+| Release candidate SHA | `bb715b9adf9f8af4c19279cdfb706af44ac1f7c1` |
 
 ---
 
@@ -119,7 +120,7 @@ Counts are `git rev-list --left-right --count origin/main...<branch>` → `behin
 | Environment | Supabase project ref | Notes |
 |---|---|---|
 | Staging (app data) | `rpcjelhacmkhzguljdgi` | Phase 3H/3I/3J docs |
-| Production (app data) | `jjixrywfnaijvahmvcwj` | Phase 3I runbook; **must re-confirm** |
+| Production (app data) | `jjixrywfnaijvahmvcwj` | Phase 2 confirmed from live production process environ |
 
 ### 4.2 Independent confirmation status
 
@@ -257,12 +258,13 @@ Documented historical rollback path from manifest:
 
 ## 12. Hard blockers before continuing
 
-1. **Production database identity not independently confirmed** by an authorised operator (expected ref `jjixrywfnaijvahmvcwj`).  
-2. **Migration history exports** for staging + production not yet attached — see `INVIFY_PRODUCTION_MIGRATION_MANIFEST.md`.  
-3. **Production backup + restore verification** not yet attested.  
-4. **HMO monetisation / fee ownership** remains unresolved — keep flags off; do not apply `DO_NOT_APPLY_*` fee/monetisation SQL.  
-5. Shared VPS — deployment must target production paths/units exclusively.  
-6. **Not pushed / not deployed** — release branch is local only until further authorisation.
+1. ~~Production database identity~~ ✅ Phase 2: `jjixrywfnaijvahmvcwj` (live process environ).  
+2. ~~Staging database identity~~ ✅ Phase 2: `rpcjelhacmkhzguljdgi` (authorised staging env + admin assets).  
+3. **Production backup + restore / PITR verification** not yet attested — **hard blocker**.  
+4. SQL-level migration history still unavailable without DB URL / operator SQL console; object-presence exports are attached under `docs/releases/exports/`.  
+5. **HMO monetisation / fee ownership** remains unresolved — keep flags off; `hw_50` tables already exist (ON HOLD / no re-apply / no enablement).  
+6. Shared VPS — deployment must target production paths/units exclusively.  
+7. **Not pushed / not deployed** — release branch is local only until further authorisation.
 
 ---
 
@@ -272,7 +274,7 @@ Documented historical rollback path from manifest:
 
 | Decision | Outcome |
 |---|---|
-| DB refs expected | prod `jjixrywfnaijvahmvcwj` · staging `rpcjelhacmkhzguljdgi` (operator confirm still required) |
+| DB refs confirmed | prod `jjixrywfnaijvahmvcwj` · staging `rpcjelhacmkhzguljdgi` (Phase 2) |
 | Curated commits | **Approved and executed** (4 curated commits) |
 | Integration base | `origin/main` @ `fdd830b8` |
 
@@ -292,7 +294,7 @@ Documented historical rollback path from manifest:
 | `a463caba` | Service-mode terms, institute affiliation, attendance UI |
 | `5465431d` | Supporting inventory/sync/tenant admin + this audit doc |
 
-**Release candidate tip:** `db44014a711df392d38eccce0fee8759d8bc143e`
+**Release candidate tip:** `bb715b9adf9f8af4c19279cdfb706af44ac1f7c1`
 
 Docs follow-up commit may advance tip (see `git rev-parse release/invify-production-2026`).
 
@@ -330,13 +332,15 @@ Created: `docs/releases/INVIFY_PRODUCTION_MIGRATION_MANIFEST.md`
 
 ## 14. Immediate ask of the release owner
 
-1. Authorised operator confirms production + staging Supabase project refs (host/ref only).  
-2. Export migration histories for both environments.  
-3. Attest production backup/PITR readiness.  
-4. Authorise (or withhold) `20261018000000_hw_50_profit_sharing.sql`.  
+1. ~~Authorised operator confirms production + staging Supabase project refs (host/ref only).~~ ✅ Phase 2: prod `jjixrywfnaijvahmvcwj` (live process); staging `rpcjelhacmkhzguljdgi` (authorised `.env.staging` + admin assets).  
+2. ~~Export migration histories for both environments.~~ ⚠️ Object-presence exports done; SQL `schema_migrations` history still unavailable without DB URL / SQL RPC / operator console.  
+3. **Attest production backup/PITR readiness** (availability, timestamp, scope, PITR, restore test, procedure, owner). ❌ outstanding — **hard blocker**.  
+4. Authorise (or withhold) operational use of already-present `hw_50` profit-sharing schema (ON HOLD; tables already exist — do not re-apply).  
 5. Authorise push of `release/invify-production-2026` when ready for review (still no deploy).
 
-Until (1)–(3) pass, **no production migrations or production deploy**.
+Until (3) passes, **no production migrations or production deploy**.
+
+Phase 2 deliverable: `docs/releases/INVIFY_PHASE2_DATABASE_RECONCILIATION.md`.
 
 ---
 
@@ -354,4 +358,23 @@ Until (1)–(3) pass, **no production migrations or production deploy**.
 | 2026-11-05T17:25 | Merged VA/HMO feature branches | Clean merges |
 | 2026-11-05T17:40 | Curated commits `3175bbee`…`5465431d` | RC SHA fixed |
 | 2026-11-05T17:50 | Migration manifest prepared | Apply still blocked |
+| 2026-11-05T18:15 | Phase 2 identity probes | Prod ref confirmed from live environ |
+| 2026-11-05T18:30 | Phase 2 schema presence exports | Staging+prod classified; backup attestation still missing |
+| 2026-11-05T18:35 | Phase 2 reconciliation doc written | Verdict: **BLOCKED** |
+| 2026-11-05T22:40 | Phase 2.5 operator history screenshots | Staging 5 rows; prod tracker **missing** |
+| 2026-11-05T22:45 | Phase 2.5 final gate report | Verdict: **BLOCKED** |
+| 2026-11-05T23:10 | Phase 2.6 OpenAPI RPC inventory (stg 48 / prod 20) | Gate/inst RPCs staging-only |
+| 2026-11-05T23:20 | Phase 2.6 security + baseline + recovery docs | Verdict: **BLOCKED** |
+
+---
+
+## 16. SHA discrepancy note (Phase 2)
+
+| Pointer | SHA |
+|---|---|
+| Last curated feature commit | `5465431d9b53308f28100833ecb2b9e01b763dc8` |
+| Intermediate docs commit | `db44014a711df392d38eccce0fee8759d8bc143e` |
+| **Actual release-candidate HEAD** | `bb715b9adf9f8af4c19279cdfb706af44ac1f7c1` |
+
+Docs updated to the actual HEAD. No commits amended.
 
