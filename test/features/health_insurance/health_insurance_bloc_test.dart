@@ -175,6 +175,8 @@ class FakeHealthInsuranceRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async {
     if (shouldThrow) throw Exception('Failed to create enrolment');
     return testEnrolments.first;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/soft_keyboard.dart';
 import '../../../../features/settings/domain/entities/staff.dart';
 import '../../../../features/settings/presentation/bloc/staff_bloc.dart';
 import '../../../../features/settings/presentation/bloc/staff_state.dart';
@@ -160,6 +161,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                     ],
                     TextField(
                       controller: _codeController,
+                      autofocus: true,
                       decoration: InputDecoration(
                         labelText: isLocked ? 'Unlock Code' : 'Enter 4-digit Key',
                         errorText: _error ?? (settingsState.error != null && isLocked ? settingsState.error : null),
@@ -172,6 +174,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                       obscureText: !isLocked,
                       keyboardType: isLocked ? TextInputType.text : TextInputType.number,
                       maxLength: isLocked ? null : 4,
+                      onTap: SoftKeyboard.forceShow,
                     ),
                   ],
                 ),

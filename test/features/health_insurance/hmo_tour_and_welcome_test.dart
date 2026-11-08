@@ -40,6 +40,8 @@ class MockHealthInsuranceRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async =>
       throw UnimplementedError();
 
@@ -157,6 +159,7 @@ void main() {
       await tester.pumpWidget(wrapWithTheme(
         HmoGuidedTourPage(
           schoolName: 'Greenwood High',
+          businessMode: 'school',
           hmoProviderName: 'Metro Health HMO',
           onFinish: () => tourFinished = true,
         ),

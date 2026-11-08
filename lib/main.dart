@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/soft_keyboard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -941,8 +942,10 @@ class _InvolveAppState extends State<InvolveApp> {
               ),
             ),
             navigatorObservers: [AppRouteObserver(context)],
-            builder: (context, child) => IdleLogoutGuard(
-              child: child ?? const SizedBox.shrink(),
+            builder: (context, child) => SoftKeyboardEnforcer(
+              child: IdleLogoutGuard(
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
             home: const LandingPage(),
             routes: {

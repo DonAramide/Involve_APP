@@ -1113,7 +1113,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Policy Number:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('Enrollee ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   Text(
                     enrolment.policyNumber ?? 'Pending Confirmation',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -1482,7 +1482,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Policy Number:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text('Enrollee ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                       Text(
                         enrolment.policyNumber ?? 'Pending Activation',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),

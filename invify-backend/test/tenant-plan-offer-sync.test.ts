@@ -41,15 +41,24 @@ describe('ensureTenantOffersFromAssignedHmo', () => {
         };
       }
       if (table === 'hw_plan_versions') {
+        const rows = [{ id: 'ver-1', plan_id: 'plan-1', status: 'published', version: 1 }];
+        const result = { data: rows, error: null };
+        const node: any = {
+          eq: () => node,
+          order: () => node,
+          then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
+        };
         return {
           select: () => ({
-            in: () => ({
-              eq: async () => ({
-                data: [{ id: 'ver-1', plan_id: 'plan-1', status: 'published' }],
-                error: null
-              })
-            })
-          })
+            in: () => node,
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                maybeSingle: async () => ({ data: rows[0], error: null }),
+              }),
+            }),
+          }),
         };
       }
       if (table === 'tenants') {

@@ -62,6 +62,8 @@ class StagingUatFakeRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async {
     return enrolments.first;
   }
