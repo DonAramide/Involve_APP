@@ -2,7 +2,7 @@ import { SchoolCardError, SCHEMA_UNAPPLIED } from './school-card.errors';
 import { assertCardManager, assertScanOperator } from './school-card.access';
 import { schemaProbeIsReady, schoolCardSqlRequested } from './school-card.persistence';
 import { runSchoolCardTransaction, SqlQueryClient } from './school-card.sql';
-import { isInvifyCode, normalizeInvifyCode } from './school-card.identity';
+import { alnumUpper, isInvifyCode, normalizeInvifyCode } from './school-card.identity';
 import { sha256Hex } from './school-card.token';
 import { CardActor } from './school-card.types';
 
@@ -105,11 +105,29 @@ export function parseGateScanToken(raw: unknown): { tokenSha256: string | null; 
     throw new SchoolCardError('Scan the card barcode. Typed names and identity numbers are not accepted.', 400, 'INVALID_TOKEN');
   }
   const trimmed = raw.trim();
-  if (isInvifyCode(trimmed) || /^[A-Za-z0-9]{12}$/.test(trimmed)) {
-    return { tokenSha256: null, invifyCode: normalizeInvifyCode(trimmed) };
+  // HID wedges often prefix junk such as `{` before the printed identity:
+  // `{BTHMTMY00000` → `BTHMTMY00000`. Braces are never part of Invify codes.
+  const stripped = trimmed.replace(/^[^A-Za-z0-9_-]+/, '').replace(/[^A-Za-z0-9_-]+$/, '');
+  const alnum = alnumUpper(stripped);
+  if (alnum.length === 12 && (isInvifyCode(alnum) || /^[A-Z0-9]{12}$/.test(alnum))) {
+    return { tokenSha256: null, invifyCode: normalizeInvifyCode(alnum) };
+  }
+  if (isInvifyCode(stripped) || /^[A-Za-z0-9]{12}$/.test(stripped)) {
+    return { tokenSha256: null, invifyCode: normalizeInvifyCode(stripped) };
+  }
+  if (/^[A-Za-z0-9_-]{20,128}$/.test(stripped)) {
+    return { tokenSha256: sha256Hex(stripped), invifyCode: null };
   }
   if (/^[A-Za-z0-9_-]{20,128}$/.test(trimmed)) {
     return { tokenSha256: sha256Hex(trimmed), invifyCode: null };
+  }
+  if (alnum.length > 0 && alnum.length !== 12 && alnum.length < 20) {
+    throw new SchoolCardError(
+      `That barcode is not a valid Invify identity (got ${alnum.length} characters after cleanup, need exactly 12). ` +
+        `Ignore any leading "{" from the scanner and compare with the printed code under the barcode.`,
+      400,
+      'INVALID_TOKEN',
+    );
   }
   throw new SchoolCardError('Scan the card barcode. Typed names and identity numbers are not accepted.', 400, 'INVALID_TOKEN');
 }
@@ -204,7 +222,7 @@ export async function executeGateScan(client: SqlQueryClient, input: GateScanInp
       );
       const sessionId = String((inserted.rows[0] as { id: string }).id);
       await insertEvent(query, input, { action: 'arrival_accepted', card, sessionId });
-      const notificationStatus = await recordNotification(
+      const notificationStatus = await safeRecordNotification(
         query, input.tenantId, sessionId, card, 'arrival', settings, input.actorUserId,
       );
       return result(input, 'arrival_accepted', sessionId, person, notificationStatus);
@@ -220,7 +238,7 @@ export async function executeGateScan(client: SqlQueryClient, input: GateScanInp
       [open.id, input.actorUserId, input.tenantId],
     );
     await insertEvent(query, input, { action: 'departure_accepted', card, sessionId: open.id });
-    const notificationStatus = await recordNotification(
+    const notificationStatus = await safeRecordNotification(
       query, input.tenantId, open.id, card, 'departure', settings, input.actorUserId,
     );
     return result(input, 'departure_accepted', open.id, person, notificationStatus);
@@ -478,6 +496,34 @@ async function insertEvent(
   );
 }
 
+/**
+ * Clock-in/out must commit even when guardian/staff email provisioning fails.
+ * Those SQL errors were previously remapped to SCHOOL_GATE_SCHEMA_UNAPPLIED and
+ * rolled back the whole scan (tablet showed "Gate scans are not being saved yet").
+ */
+async function safeRecordNotification(
+  query: SqlQueryClient['query'],
+  tenantId: string,
+  sessionId: string,
+  card: CardHit,
+  direction: GateDirection,
+  settings: SettingsHit,
+  actorUserId: string,
+): Promise<'skipped' | 'queued'> {
+  try {
+    return await recordNotification(query, tenantId, sessionId, card, direction, settings, actorUserId);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[GateScan] notification path failed; scan still committed:', message);
+    try {
+      await skip(query, tenantId, sessionId, direction, 'no_verified_recipient');
+    } catch (skipErr: unknown) {
+      console.warn('[GateScan] could not write skipped notification row:', skipErr instanceof Error ? skipErr.message : skipErr);
+    }
+    return 'skipped';
+  }
+}
+
 async function recordNotification(
   query: SqlQueryClient['query'],
   tenantId: string,
@@ -558,28 +604,40 @@ async function ensureGuardianContactsFromParent(
   );
   if (existing.rows.length > 0) return;
 
-  const student = await query(
-    `SELECT parent_id, parent_name, parent_phone FROM public.students WHERE id = $1 AND tenant_id = $2`,
-    [studentId, tenantId],
+  // Prefer school_entities payload — staging students may lack parent_* columns.
+  const linked = await query(
+    `SELECT
+       coalesce(e.payload->>'parentName', e.payload->>'parent_name', 'Parent / Guardian') AS parent_name,
+       coalesce(e.payload->>'parentPhone', e.payload->>'parent_phone', '') AS parent_phone,
+       coalesce(e.payload->>'parentSyncId', e.payload->>'parentId', e.payload->>'parent_id', '') AS parent_sync_id
+     FROM public.school_entities e
+     WHERE e.tenant_id = $1
+       AND e.entity_type = 'student'
+       AND (
+         e.sync_id = $2::text
+         OR coalesce(e.payload->>'syncId', '') = $2::text
+       )
+     ORDER BY e.updated_at DESC NULLS LAST
+     LIMIT 1`,
+    [tenantId, studentId],
   );
-  const row = student.rows[0] as {
-    parent_id?: string | null;
+  const row = linked.rows[0] as {
     parent_name?: string | null;
     parent_phone?: string | null;
+    parent_sync_id?: string | null;
   } | undefined;
   const parentPhone = String(row?.parent_phone || '').trim();
   const parentName = String(row?.parent_name || 'Parent / Guardian').trim() || 'Parent / Guardian';
-  const parentId = row?.parent_id != null ? String(row.parent_id) : '';
+  const parentSyncId = String(row?.parent_sync_id || '').trim();
 
   const candidates: Array<{ email: string; name: string }> = [];
-
-  if (parentId) {
+  if (parentSyncId) {
     const byId = await query(
       `SELECT email, name FROM public.customers
        WHERE tenant_id = $1 AND id::text = $2::text
          AND email IS NOT NULL AND position('@' in email) > 1
        LIMIT 1`,
-      [tenantId, parentId],
+      [tenantId, parentSyncId],
     );
     for (const match of byId.rows as Array<{ email?: string; name?: string }>) {
       const email = String(match.email || '').trim();
@@ -588,7 +646,6 @@ async function ensureGuardianContactsFromParent(
       }
     }
   }
-
   const digits = parentPhone.replace(/\D/g, '');
   if (digits.length >= 7) {
     const matches = await query(
@@ -693,11 +750,13 @@ export async function deliverQueuedGateEmails(opts: {
               s.opened_at, s.closed_at, s.subject_type,
               coalesce(c.printed_name, '') AS printed_name,
               coalesce(c.printed_code, '') AS printed_code,
-              coalesce(t.name, 'School') AS school_name
+              coalesce(t.name, 'School') AS school_name,
+              coalesce(g.guardian_name, '') AS family_name
        FROM public.school_entry_exit_notifications n
        JOIN public.school_entry_exit_sessions s ON s.id = n.session_id
        LEFT JOIN public.school_id_cards c ON c.id = s.card_id
        LEFT JOIN public.tenants t ON t.id = n.tenant_id
+       LEFT JOIN public.school_entry_exit_guardian_contacts g ON g.id = n.guardian_contact_id
        WHERE n.tenant_id = $1 AND n.session_id = $2 AND n.direction = $3 AND n.status = 'queued'`,
       [opts.tenantId, opts.sessionId, opts.direction],
     );
@@ -715,6 +774,7 @@ export async function deliverQueuedGateEmails(opts: {
           schoolName: String(row.school_name || 'School'),
           personName: String(row.printed_name || 'Student'),
           personCode: String(row.printed_code || ''),
+          familyName: String(row.family_name || '').trim() || null,
           subjectType: String(row.subject_type || 'student'),
           direction: opts.direction,
           recordedAt: opts.direction === 'departure' && row.closed_at ? String(row.closed_at) : String(row.opened_at || new Date().toISOString()),

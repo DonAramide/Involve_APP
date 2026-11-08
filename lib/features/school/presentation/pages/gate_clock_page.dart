@@ -12,12 +12,13 @@ import 'package:involve_app/core/service_mode/service_mode_terms.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/core/services/service_locator.dart';
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/features/school/data/services/gate_clock_offline_service.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 /// Continuous gate clock: camera + USB/wedge barcode scanner.
-/// Shows Welcome / Goodbye with name, photo, and recorded date/time.
+/// Offline-first: validate locally, show Welcome/Goodbye, sync to server later.
 class GateClockPage extends StatefulWidget {
   static const String routeName = '/gate_clock';
 
@@ -59,8 +60,11 @@ class _GateClockPageState extends State<GateClockPage> {
   Timer? _wedgeDebounce;
   final StringBuffer _hardwareBuffer = StringBuffer();
   Timer? _hardwareIdle;
+  int _rosterCount = 0;
+  int _pendingCount = 0;
 
   _GateResult? _result;
+  GateClockOfflineService? _offline;
 
   FinanceApiClient _client() {
     if (!sl.isRegistered<FinanceApiClient>()) {
@@ -77,6 +81,10 @@ class _GateClockPageState extends State<GateClockPage> {
     return sl<FinanceApiClient>();
   }
 
+  GateClockOfflineService _offlineService() {
+    return _offline ??= GateClockOfflineService(_client());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -84,7 +92,37 @@ class _GateClockPageState extends State<GateClockPage> {
     // USB/HID wedge scanners inject key events; capture at the hardware level so
     // focus quirks (Offstage TextField, Soft keyboard) cannot drop scans.
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureWedgeFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureWedgeFocus();
+      unawaited(_bootstrapOffline());
+    });
+  }
+
+  Future<void> _bootstrapOffline() async {
+    final svc = _offlineService();
+    final localCards = await svc.store.loadCards();
+    final pending = await svc.store.loadPending();
+    if (mounted) {
+      setState(() {
+        _rosterCount = localCards.length;
+        _pendingCount = pending.length;
+      });
+    }
+    // Refresh roster + drain queue in the background — never blocks scanning.
+    unawaited(() async {
+      final n = await svc.refreshRosterFromServer();
+      final synced = await svc.syncPendingToServer();
+      final cards = await svc.store.loadCards();
+      final left = await svc.store.loadPending();
+      if (!mounted) return;
+      setState(() {
+        if (n >= 0) _rosterCount = cards.length;
+        _pendingCount = left.length;
+      });
+      if (synced > 0) {
+        debugPrint('[GateClock] synced $synced pending scan(s); ${_pendingCount} left');
+      }
+    }());
   }
 
   @override
@@ -100,9 +138,16 @@ class _GateClockPageState extends State<GateClockPage> {
   }
 
   /// Pull a usable gate token out of noisy camera/scanner payloads.
+  ///
+  /// HID wedges sometimes prefix a junk char (commonly `{`) before the real
+  /// 12-char Invify identity — that brace is **not** part of the printed code.
   String? _extractToken(String? raw) {
     if (raw == null) return null;
-    final trimmed = raw.trim();
+    var trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    // Strip leading/trailing non-token junk: `{BTHMTMY000003` → `BTHMTMY000003`.
+    trimmed = trimmed.replaceFirst(RegExp(r'^[^A-Za-z0-9_-]+'), '');
+    trimmed = trimmed.replaceFirst(RegExp(r'[^A-Za-z0-9_-]+$'), '');
     if (trimmed.isEmpty) return null;
     if (_tokenPattern.hasMatch(trimmed)) return trimmed;
     // Opaque first when long — never slice the first 12 chars off a secret token.
@@ -112,9 +157,13 @@ class _GateClockPageState extends State<GateClockPage> {
         return opaque.group(0);
       }
     }
-    // Bounded 12-char identity inside OCR noise (spaces/punctuation around it).
-    final id = RegExp(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{12})(?:[^A-Za-z0-9]|$)').firstMatch(trimmed);
+    // Bounded 12-char identity inside OCR / scanner noise.
+    final id = RegExp(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{12})(?:[^A-Za-z0-9]|$)')
+        .firstMatch(trimmed);
     if (id != null) return id.group(1);
+    // Last resort: drop every non-alnum and accept exactly 12.
+    final alnum = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    if (RegExp(r'^[A-Za-z0-9]{12}$').hasMatch(alnum)) return alnum;
     return null;
   }
 
@@ -204,87 +253,52 @@ class _GateClockPageState extends State<GateClockPage> {
     _wedgeController.clear();
 
     try {
-      final response = await _client().post(
-        '/api/school/gate/scans',
-        data: {
-          'direction': _direction,
-          'token': token,
-          'deviceLabel': 'mobile-gate',
-        },
+      // Offline-first: accept/reject on-device, then queue for server sync.
+      final local = await _offlineService().processOffline(
+        direction: _direction,
+        token: token,
+        deviceLabel: 'mobile-gate',
       );
-      final body = response.data is Map
-          ? Map<String, dynamic>.from(response.data as Map)
-          : <String, dynamic>{};
-      final person = body['person'] is Map
-          ? Map<String, dynamic>.from(body['person'] as Map)
-          : null;
-      final outcome = body['outcome']?.toString();
-      final recordedAt = DateTime.tryParse(body['recordedAt']?.toString() ?? '') ??
-          DateTime.now();
-      final accepted = outcome == 'arrival_accepted' || outcome == 'departure_accepted';
+      final person = local.person;
       final photo = _localPhotoFor(person);
-
       if (!mounted) return;
       setState(() {
         _result = _GateResult(
           welcome: _direction == 'arrival',
-          accepted: accepted,
-          title: _titleFor(outcome, _direction),
-          subtitle: _subtitleFor(outcome, person),
+          accepted: local.accepted,
+          title: _titleFor(local.outcome, _direction),
+          subtitle: _subtitleFor(local.outcome, person, queued: true),
           name: person?['printedName']?.toString() ?? '',
           code: person?['printedCode']?.toString() ?? '',
           subjectType: person?['subjectType']?.toString() ?? '',
-          recordedAt: recordedAt,
+          recordedAt: local.recordedAt,
           photo: photo,
-          outcome: outcome ?? '',
+          outcome: local.outcome,
         );
         _busy = false;
         _armCooldown();
       });
-    } on FinanceApiException catch (error) {
-      final data = error.data;
-      final outcome = data is Map ? data['outcome']?.toString() : null;
-      final person = data is Map && data['person'] is Map
-          ? Map<String, dynamic>.from(data['person'] as Map)
-          : null;
-      if (outcome != null) {
-        final recordedAt = DateTime.tryParse(data is Map ? (data['recordedAt']?.toString() ?? '') : '') ??
-            DateTime.now();
-        if (!mounted) return;
-        setState(() {
-          _result = _GateResult(
-            welcome: _direction == 'arrival',
-            accepted: false,
-            title: _titleFor(outcome, _direction),
-            subtitle: _subtitleFor(outcome, person),
-            name: person?['printedName']?.toString() ?? '',
-            code: person?['printedCode']?.toString() ?? '',
-            subjectType: person?['subjectType']?.toString() ?? '',
-            recordedAt: recordedAt,
-            photo: _localPhotoFor(person),
-            outcome: outcome,
-          );
-          _busy = false;
-          _armCooldown();
-        });
-      } else {
-        final code = data is Map ? data['code']?.toString() : null;
-        _fail(
-          code == 'SCHOOL_GATE_SCHEMA_UNAPPLIED'
-              ? 'Gate scans are not being saved yet.'
-              : error.statusCode == 401
-                  ? 'Sign in again on this device (authorization missing).'
-                  : error.message,
-        );
-      }
+      unawaited(_flushPending());
     } catch (_) {
-      _fail('The scan could not be sent.');
+      _fail('The scan could not be recorded on this device.');
     } finally {
       _wedgeSubmitLock = null;
       if (mounted && _busy) setState(() => _busy = false);
       _wedgeController.clear();
       _ensureWedgeFocus();
     }
+  }
+
+  Future<void> _flushPending() async {
+    final svc = _offlineService();
+    await svc.syncPendingToServer();
+    final left = await svc.store.loadPending();
+    final cards = await svc.store.loadCards();
+    if (!mounted) return;
+    setState(() {
+      _pendingCount = left.length;
+      _rosterCount = cards.length;
+    });
   }
 
   void _fail(String message) {
@@ -414,20 +428,27 @@ class _GateClockPageState extends State<GateClockPage> {
     }
   }
 
-  String _subtitleFor(String? outcome, Map<String, dynamic>? person) {
+  String _subtitleFor(String? outcome, Map<String, dynamic>? person, {bool queued = false}) {
     final name = person?['printedName']?.toString() ?? '';
+    final syncNote = queued ? ' Will sync when online.' : '';
     switch (outcome) {
       case 'arrival_accepted':
-        return name.isEmpty ? 'Clock-in saved on the server.' : 'Welcome, $name. Clock-in saved.';
+        return name.isEmpty
+            ? 'Clock-in saved on this device.$syncNote'
+            : 'Welcome, $name. Clock-in saved on this device.$syncNote';
       case 'departure_accepted':
-        return name.isEmpty ? 'Clock-out saved on the server.' : 'Goodbye, $name. Clock-out saved.';
+        return name.isEmpty
+            ? 'Clock-out saved on this device.$syncNote'
+            : 'Goodbye, $name. Clock-out saved on this device.$syncNote';
       case 'duplicate_open':
       case 'duplicate_window':
         return 'This person is already clocked in.';
       case 'departure_without_session':
         return 'There is no open clock-in to close.';
       case 'unknown_token':
-        return 'This barcode is not an active card for this school.';
+        return _rosterCount == 0
+            ? 'No card roster on this device yet. Connect once to download active cards.'
+            : 'This barcode is not an active card on this device.';
       case 'revoked_card':
         return 'This card has been revoked.';
       case 'expired_card':
@@ -493,9 +514,19 @@ class _GateClockPageState extends State<GateClockPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Hold the barcode steady and close for camera, or pull the USB scanner trigger. '
-                  'Use the torch if the print is faint.',
+                  'Offline-first gate: scans are validated on this device, then sent to the server when online. '
+                  'Hold the barcode steady for camera, or pull the USB scanner trigger.',
                   style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _rosterCount <= 0
+                      ? 'Card roster: not loaded yet'
+                      : 'Card roster: $_rosterCount'
+                          '${_pendingCount > 0 ? ' · Pending sync: $_pendingCount' : ''}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 // ExcludeFocus: scanner Enter must not toggle Clock in/out.

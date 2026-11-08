@@ -37,6 +37,7 @@ import '../bloc/school_state.dart';
 import 'parent_credit_breakdown_page.dart';
 import 'student_profile_page.dart';
 import '../widgets/parent_transaction_history.dart';
+import '../widgets/gate_notify_section.dart';
 
 class ParentProfilePage extends StatefulWidget {
   final int parentId;
@@ -253,6 +254,13 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
             padding: const EdgeInsets.all(16),
             children: [
               _parentContactCard(context, parent),
+              const SizedBox(height: 12),
+              GateNotifySection.parent(
+                guardianName: parent.fullName,
+                phone: _parentPhone(parent, children),
+                email: parent.email,
+                parentSyncId: parent.syncId,
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -436,17 +444,22 @@ class _ParentProfilePageState extends State<ParentProfilePage> {
     );
   }
 
+  String _parentPhone(SchoolParent parent, List<Student> children) {
+    final own = (parent.phone ?? '').trim();
+    if (own.isNotEmpty) return own;
+    return children
+        .map((s) => (s.parentPhone ?? '').trim())
+        .firstWhere((p) => p.isNotEmpty, orElse: () => '');
+  }
+
   Widget _parentContactCard(BuildContext context, SchoolParent parent) {
     final state = context.watch<SchoolBloc>().state;
-    final fromChildren = state.students
+    final children = state.students
         .where((s) =>
             (parent.id != null && s.parentId == parent.id) ||
             s.parentKey == parent.parentKey)
-        .map((s) => (s.parentPhone ?? '').trim())
-        .firstWhere((p) => p.isNotEmpty, orElse: () => '');
-    final phone = (parent.phone ?? '').trim().isNotEmpty
-        ? (parent.phone ?? '').trim()
-        : fromChildren;
+        .toList();
+    final phone = _parentPhone(parent, children);
     final email = (parent.email ?? '').trim();
     final address = (parent.address ?? '').trim();
     return Card(

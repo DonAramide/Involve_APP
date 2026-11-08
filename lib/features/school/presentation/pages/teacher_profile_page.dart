@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 import '../widgets/teacher_form_dialog.dart';
+import '../widgets/gate_notify_section.dart';
 
 class TeacherProfilePage extends StatelessWidget {
   final Teacher teacher;
@@ -190,6 +191,11 @@ class TeacherProfilePage extends StatelessWidget {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                GateNotifySection.staff(
+                  staffName: currentTeacher.fullName,
+                  phone: currentTeacher.phone,
                 ),
               ],
             ),
