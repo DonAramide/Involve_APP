@@ -26,6 +26,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_state.dart'
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
+import 'package:involve_app/core/utils/soft_keyboard.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
@@ -337,6 +338,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
                 padding: const EdgeInsets.all(12.0),
                 child: TextField(
                   controller: _searchController,
+                  // HID barcode scanners suppress the soft IME; tap re-requests it.
+                  onTap: SoftKeyboard.forceShow,
                   decoration: InputDecoration(
                     hintText: settings?.searchItemsHint ?? 'Search products...',
                     prefixIcon: const Icon(Icons.search),
@@ -515,6 +518,12 @@ class _ItemSelectorState extends State<_ItemSelector> {
     );
   }
 
+  /// Clears barcode/search input after a product is selected so the next scan is ready.
+  void _clearBarcodeSearch() {
+    if (_searchController.text.isEmpty && _searchQuery.isEmpty) return;
+    _searchController.clear();
+  }
+
   Future<void> _handleItemAdd(BuildContext context, Item item, AppSettings? settings) async {
     final schoolFee = settings?.businessMode == 'school' || item.businessMode == 'school';
     if (item.type == 'service' && !schoolFee) {
@@ -543,21 +552,26 @@ class _ItemSelectorState extends State<_ItemSelector> {
           qty,
           serviceMeta: jsonEncode(result),
         ));
+        _clearBarcodeSearch();
       }
     } else {
       if (settings?.confirmPriceOnSelection == true) {
-        _showPriceConfirmation(context, item, settings?.currency ?? '₦');
+        final added = await _showPriceConfirmation(context, item, settings?.currency ?? '₦');
+        if (added) {
+          _clearBarcodeSearch();
+        }
       } else {
         context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1));
+        _clearBarcodeSearch();
       }
     }
   }
 
-  Future<void> _showPriceConfirmation(BuildContext context, Item item, String currency) async {
+  Future<bool> _showPriceConfirmation(BuildContext context, Item item, String currency) async {
     final controller = TextEditingController(text: item.price.toStringAsFixed(2));
     final invoiceBloc = context.read<InvoiceBloc>();
     
-    return showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Price'),
@@ -579,7 +593,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
           ElevatedButton(
             onPressed: () {
               final newPrice = double.tryParse(controller.text);
@@ -587,14 +601,15 @@ class _ItemSelectorState extends State<_ItemSelector> {
                 // Update item price and add to invoice
                 final updatedItem = item.copyWith(price: newPrice);
                 invoiceBloc.add(AddItemToInvoice(updatedItem, 1));
+                Navigator.pop(ctx, true);
               }
-              Navigator.pop(ctx);
             },
             child: const Text('CONFIRM'),
           ),
         ],
       ),
     );
+    return confirmed == true;
   }
 }
 

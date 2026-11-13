@@ -1,7 +1,13 @@
 package com.invify.invoice_app
 
+import android.content.Context
+import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Handler
 import android.os.Looper
+import android.view.InputDevice
+import android.view.inputmethod.InputMethodManager
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,7 +20,35 @@ import com.invify.morefunsdk.open.MoreFunMposSdk
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.invify.app/mpos"
+    private val SOFT_KEYBOARD_CHANNEL = "com.invify.app/soft_keyboard"
     private lateinit var mposChannel: MethodChannel
+
+    /**
+     * USB/BT barcode scanners register as hardware keyboards. Android then hides
+     * the soft IME for every EditText. Treat the device as having no hard keyboard
+     * for IME purposes so PIN/search fields still show the system keypad. Scanner
+     * key events continue to work normally.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        val config = Configuration(newBase.resources.configuration)
+        config.keyboard = Configuration.KEYBOARD_NOKEYS
+        config.hardKeyboardHidden = Configuration.HARDKEYBOARDHIDDEN_YES
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
+
+    override fun getResources(): Resources {
+        val res = super.getResources()
+        val config = Configuration(res.configuration)
+        if (config.keyboard != Configuration.KEYBOARD_NOKEYS ||
+            config.hardKeyboardHidden != Configuration.HARDKEYBOARDHIDDEN_YES
+        ) {
+            config.keyboard = Configuration.KEYBOARD_NOKEYS
+            config.hardKeyboardHidden = Configuration.HARDKEYBOARDHIDDEN_YES
+            @Suppress("DEPRECATION")
+            res.updateConfiguration(config, res.displayMetrics)
+        }
+        return res
+    }
 
     // ── Kept at class level so the lambda stored in MposSdk.transactionListener
     //    can resolve it after ProcessingTransactionActivity finishes.
@@ -25,6 +59,24 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SOFT_KEYBOARD_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "forceShow" -> {
+                        forceShowSoftKeyboard()
+                        result.success(null)
+                    }
+                    "hide" -> {
+                        hideSoftKeyboard()
+                        result.success(null)
+                    }
+                    "hasExternalKeyboard" -> {
+                        result.success(hasExternalHardwareKeyboard())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         
         mposChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         mposChannel.setMethodCallHandler { call, result ->
@@ -421,6 +473,70 @@ class MainActivity: FlutterActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * USB/BT wedge scanners appear as non-virtual hardware keyboards. Our
+     * [attachBaseContext] spoofs KEYBOARD_NOKEYS for IME policy, so detection
+     * must use [InputDevice] instead of [Configuration.keyboard].
+     */
+    private fun hasExternalHardwareKeyboard(): Boolean {
+        for (id in InputDevice.getDeviceIds()) {
+            val device = InputDevice.getDevice(id) ?: continue
+            if (device.isVirtual) continue
+            val sources = device.sources
+            val isKeyboard = (sources and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
+            if (!isKeyboard) continue
+            if (device.keyboardType == InputDevice.KEYBOARD_TYPE_NONE) continue
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Show soft IME for the focused field.
+     * With a HID scanner attached, Android suppresses the soft keypad — use a
+     * stronger show. Without a scanner, use a normal show so phones are not
+     * left in SOFT_INPUT_STATE_ALWAYS_VISIBLE (that stuck the keypad everywhere).
+     */
+    private fun forceShowSoftKeyboard() {
+        val view = currentFocus ?: window?.decorView ?: return
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
+        val hasHw = hasExternalHardwareKeyboard()
+        if (hasHw) {
+            // Temporary — [hideSoftKeyboard] clears this when focus leaves the field.
+            window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
+            view.post {
+                @Suppress("DEPRECATION")
+                imm.showSoftInput(view, InputMethodManager.SHOW_FORCED)
+            }
+        } else {
+            window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            )
+            view.post {
+                imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
+    }
+
+    /** Dismiss soft IME and clear sticky visibility flags. */
+    private fun hideSoftKeyboard() {
+        val view = currentFocus ?: window?.decorView
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        if (view != null && imm != null) {
+            imm.hideSoftInputFromWindow(view.windowToken, 0)
+        }
+        window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
+        // Restore normal adjust mode so later TextFields can show the IME naturally.
+        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
     private fun isMoreFunDevice(deviceType: String): Boolean {

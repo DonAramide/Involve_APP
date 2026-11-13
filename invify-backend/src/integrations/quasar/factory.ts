@@ -12,7 +12,9 @@ function describeKey(sk: string): string {
 
 export type GetQuasarServiceOptions = {
   /**
-   * Tenant operating VA only: quasar_integrations row, no env/vault/demo-key fallback.
+   * Tenant-isolated Quasar ops (all virtual-account creates/lookups that mint or
+   * recover tenant VAs): require a quasar_integrations row for this Invify tenant.
+   * Never falls back to Integration Vault, env QUASAR_API_KEY, or demo keys.
    */
   tenantIntegrationOnly?: boolean;
 };
@@ -58,8 +60,19 @@ async function getQuasarServiceFromTenantIntegration(tenantId: string): Promise<
 }
 
 /**
+ * Tenant VA create/recover only — fail closed if quasar_integrations is missing.
+ * Use for every createVirtualAccount (and VA recover) path so wallets never mint
+ * under an unrelated platform/env API key.
+ */
+export const getQuasarServiceForTenantVa = (
+  tenantId: string,
+): Promise<QuasarService> => getQuasarService(tenantId, { tenantIntegrationOnly: true });
+
+/**
  * Factory function to retrieve a correctly initialized QuasarService.
- * Prefer live tenant keys for production financial / POS APIs.
+ * Default path prefers tenant integration/vault, then may use env QUASAR_API_KEY
+ * for legitimate platform-level / POS / payout bridges that still allow fallback.
+ * Virtual-account minting must use getQuasarServiceForTenantVa instead.
  */
 export const getQuasarService = async (
   tenantId: string,

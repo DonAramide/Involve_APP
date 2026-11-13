@@ -14,7 +14,7 @@ function findChild(path) {
 }
 
 describe('platform fee profile routes', () => {
-  test('list and detail require admin_deploy and auth', () => {
+  test('list/detail/distribution/assessments are read_finance; mutations stay admin_deploy', () => {
     const list = findChild('admin/platform-fees')
     const detail = findChild('admin/platform-fees/:transactionType')
     const assessments = findChild('admin/platform-fees/assessments')
@@ -33,23 +33,30 @@ describe('platform fee profile routes', () => {
     expect(stakeholderDetail).toBeDefined()
     expect(withdrawals).toBeDefined()
     expect(withdrawalDetail).toBeDefined()
-    expect(distribution.meta.permission).toBe('admin_deploy')
-    expect(stakeholders.meta.permission).toBe('admin_deploy')
-    expect(withdrawals.meta.permission).toBe('admin_deploy')
-    expect(assessments.meta.permission).toBe('admin_deploy')
-    expect(assessmentDetail.meta.permission).toBe('admin_deploy')
+    // Read surfaces — finance operators may inspect profiles/assessments/distribution.
     expect(list.meta.requiresAuth).toBe(true)
-    expect(list.meta.permission).toBe('admin_deploy')
-    expect(detail.meta.permission).toBe('admin_deploy')
+    expect(list.meta.permission).toBe('read_finance')
+    expect(detail.meta.permission).toBe('read_finance')
+    expect(distribution.meta.permission).toBe('read_finance')
+    expect(assessments.meta.permission).toBe('read_finance')
+    expect(assessmentDetail.meta.permission).toBe('read_finance')
+    // Maker-checker mutation surfaces remain deploy-gated.
+    expect(stakeholders.meta.permission).toBe('admin_deploy')
+    expect(stakeholderDetail.meta.permission).toBe('admin_deploy')
+    expect(withdrawals.meta.permission).toBe('admin_deploy')
+    expect(withdrawalDetail.meta.permission).toBe('admin_deploy')
   })
 
   test('tenant cashier cannot access platform fee configuration', () => {
     const perms = permissionsForOperatorRole('cashier')
     expect(perms).not.toContain('admin_deploy')
+    expect(perms).not.toContain('read_finance')
   })
 
-  test('ADMIN_FINANCE and ADMIN_TREASURY still lack admin_deploy', () => {
-    expect(permissionsForOperatorRole('ADMIN_FINANCE')).not.toContain('admin_deploy')
+  test('ADMIN_FINANCE can read finance surfaces but still lacks admin_deploy', () => {
+    const finance = permissionsForOperatorRole('ADMIN_FINANCE')
+    expect(finance).toContain('read_finance')
+    expect(finance).not.toContain('admin_deploy')
     expect(permissionsForOperatorRole('ADMIN_TREASURY')).not.toContain('admin_deploy')
   })
 
@@ -158,6 +165,27 @@ describe('POS preview (in-memory, no persistence)', () => {
   })
 })
 
+describe('HMO_SERVICE catalog', () => {
+  test('Super Admin fee screens include HMO_SERVICE without dropping existing types', () => {
+    const list = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeProfilesPage.vue'), 'utf8')
+    const assessments = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeAssessmentsPage.vue'), 'utf8')
+    const distribution = fs.readFileSync(path.join(__dirname, '../src/pages/admin/PlatformFeeDistributionPage.vue'), 'utf8')
+    expect(list).toMatch(/HMO_SERVICE/)
+    expect(list).toMatch(/POS_WITHDRAWAL/)
+    expect(assessments).toMatch(/HMO_SERVICE/)
+    expect(distribution).toMatch(/HMO_SERVICE/)
+  })
+
+  test('governance bank-account and HMO finance routes exist', () => {
+    const bank = findChild('governance/bank-accounts')
+    const report = findChild('admin/hmo-finance')
+    expect(bank).toBeDefined()
+    expect(bank.meta.permission).toBe('platform.bank_accounts.view')
+    expect(report).toBeDefined()
+    expect(report.meta.permission).toBe('read_finance')
+  })
+})
+
 describe('platform fee UI contracts', () => {
   test('publish requires maker-checker confirmation and uses admin API not supabase tables', () => {
     const detail = fs.readFileSync(
@@ -177,7 +205,7 @@ describe('platform fee UI contracts', () => {
     expect(detail).toMatch(/You cannot approve your own proposal/)
     expect(detail).toMatch(/publish-checker-mfa/)
     expect(detail).toMatch(/promptCheckerMfa/)
-    expect(detail).toMatch(/publishPlatformFeeVersion\(type, \{ otp \}\)/)
+    expect(detail).toMatch(/publishPlatformFeeVersion\(type, agentPayload\(\{ otp \}\)\)/)
     expect(api).toMatch(/\/propose/)
     expect(api).toMatch(/\/reject/)
     expect(api).toMatch(/\/api\/admin\/platform-fees/)

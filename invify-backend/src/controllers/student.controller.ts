@@ -1,7 +1,8 @@
 // invify-backend/src/controllers/student.controller.ts
 import { Request, Response } from 'express';
 import { StudentService } from '../services/student.service';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
+import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
 import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { isUuid, toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
@@ -146,8 +147,9 @@ export class StudentController {
         });
       }
 
-      const quasar = await getQuasarService(tenantId);
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
       const reference = `VA-STU-${quasarChildId.substring(0, 8)}-${Date.now()}`;
+      const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
 
       let quasarAccount: any;
       try {
@@ -159,6 +161,7 @@ export class StudentController {
           firstName: first,
           lastName: last,
           parentShareBps: 0,
+          institutionCode,
           metadata: {
             type: String(externalKey).startsWith('par-') ? 'parent_account' : 'student_account',
             tenantId,
@@ -171,6 +174,7 @@ export class StudentController {
               : 'school_student_provisioning',
             externalStudentKey: externalKey,
             invifyCustomerId,
+            ...(institutionCode ? { institutionCode } : {}),
           },
         });
       } catch (createErr: any) {
@@ -300,7 +304,7 @@ export class StudentController {
         try {
           const tenant = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
           const key = String(req.params.studentId || '').trim();
-          const quasar = await getQuasarService(tenant);
+          const quasar = await getQuasarServiceForTenantVa(tenant);
           const recovered = await StudentController.fetchQuasarVa(
             quasar,
             toQuasarChildUuid(tenant, key),

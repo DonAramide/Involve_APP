@@ -1,179 +1,141 @@
 /**
- * INVIFY — Approval Engine Unit Test Suite
- * Task 3 / Phase 6.2 Automated Tests
- *
- * Validates:
- *  - State transitions: Draft → Submitted → Under Review → Approved / Rejected / Escalated
- *  - Maker cannot approve their own request
- *  - Audit trail is appended on every state transition
- *  - submitApproval generates a valid ApprovalRequest object
- *  - updateStatus correctly assigns checker / approver fields
+ * ApprovalEngine — API client contract tests.
+ * Engine is backend-backed; maker-checker enforcement is server/UI (see fee publish OTP).
  */
 
-// ── Lightweight Jest-compatible shim for `ref` so the Vue reactive primitive
-//    works in a Node/Jest environment without a full Vue runtime.
 jest.mock('vue', () => ({
   ref: (v: unknown) => ({ value: v }),
 }))
 
-// ── SLAEngine is a dependency; mock it to isolate ApprovalEngine
-jest.mock('../src/services/SLAEngine', () => ({
-  SLAEngine: {
-    track: jest.fn(),
-    getSLAs: jest.fn(() => []),
-  },
+jest.mock('../../src/services/logger', () => ({
+  logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }))
 
-import { ApprovalEngine } from '../src/services/ApprovalEngine'
-import { SLAEngine } from '../src/services/SLAEngine'
+const fetchMock = jest.fn()
+;(global as any).fetch = fetchMock
+;(global as any).localStorage = {
+  getItem: jest.fn(() => 'test-token'),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────────────────────────────────────
+import { ApprovalEngine } from '../../src/services/ApprovalEngine'
+
 const makerEmail = 'operations_team@invify.app'
 const checkerEmail = 'compliance_officer@invify.app'
 const approverEmail = 'ciso@invify.app'
 
-function submitTestApproval(overrides = {}) {
-  return ApprovalEngine.submitApproval({
-    approvalType: 'Settlement Release',
-    entityType: 'Settlement Batch',
-    entityId: 'SET-TEST-001',
-    maker: makerEmail,
-    riskScore: 80,
-    priority: 'High',
-    ...overrides,
+function jsonResponse(body: unknown, ok = true, status = 200) {
+  return Promise.resolve({
+    ok,
+    status,
+    json: async () => body,
   })
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TEST SUITE
-// ─────────────────────────────────────────────────────────────────────────────
-describe('ApprovalEngine — Core State Machine', () => {
-
-  // ── UAT-GOV-01: Submit creates a valid approval in Submitted state
-  test('UAT-GOV-01 | submitApproval creates a request with status "Submitted"', () => {
-    const request = submitTestApproval()
-
-    expect(request).toBeDefined()
-    expect(request.approvalId).toMatch(/^APP-\d{4}-\d{4}$/)
-    expect(request.status).toBe('Submitted')
-    expect(request.maker).toBe(makerEmail)
-    expect(request.checker).toBeNull()
-    expect(request.approver).toBeNull()
-    expect(request.approvedAt).toBeNull()
+describe('ApprovalEngine — API client contract', () => {
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/v1/approvals') && (!init || !init.method || init.method === 'GET')) {
+        return jsonResponse([])
+      }
+      return jsonResponse({})
+    })
   })
 
-  // ── UAT-GOV-01: SLA must be registered on submission
-  test('UAT-GOV-01 | submitApproval triggers SLAEngine.track', () => {
-    submitTestApproval()
-    expect(SLAEngine.track).toHaveBeenCalled()
+  test('submitApproval POSTs payload and returns API approval', async () => {
+    const created = {
+      approvalId: 'APP-2026-0001',
+      approvalType: 'Settlement Release',
+      entityType: 'Settlement Batch',
+      entityId: 'SET-TEST-001',
+      maker: makerEmail,
+      checker: null,
+      approver: null,
+      status: 'Submitted',
+      riskScore: 80,
+      createdAt: new Date().toISOString(),
+      approvedAt: null,
+      slaDeadline: new Date().toISOString(),
+      auditTrail: [{ action: 'Request Created', actor: makerEmail, integrityHash: '0x' + 'a'.repeat(32), timestamp: new Date().toISOString(), ipAddress: '', location: '' }],
+    }
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return jsonResponse(created)
+      return jsonResponse([])
+    })
+
+    const request = await ApprovalEngine.submitApproval({
+      approvalType: 'Settlement Release',
+      entityType: 'Settlement Batch',
+      entityId: 'SET-TEST-001',
+      maker: makerEmail,
+      riskScore: 80,
+      priority: 'High',
+    })
+
+    expect(request).toEqual(created)
+    const post = fetchMock.mock.calls.find((c) => c[1]?.method === 'POST')
+    expect(post).toBeDefined()
+    expect(String(post![0])).toContain('/api/v1/approvals')
+    const body = JSON.parse(String(post![1].body))
+    expect(body.maker).toBe(makerEmail)
+    expect(body.entityId).toBe('SET-TEST-001')
   })
 
-  // ── Audit trail starts with one "Request Created" entry
-  test('UAT-GOV-01 | auditTrail has at least one entry on creation', () => {
-    const request = submitTestApproval()
-    expect(request.auditTrail.length).toBeGreaterThanOrEqual(1)
-    expect(request.auditTrail[0].action).toBe('Request Created')
-    expect(request.auditTrail[0].actor).toBe(makerEmail)
-    expect(request.auditTrail[0].integrityHash).toMatch(/^0x[0-9a-f]{32}$/)
+  test('updateStatus PATCHes actor+status to server (maker-checker enforced server-side)', async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return jsonResponse({ ok: true })
+      return jsonResponse([
+        {
+          approvalId: 'APP-2026-0002',
+          status: 'Under Review',
+          maker: makerEmail,
+          checker: checkerEmail,
+          approver: null,
+          auditTrail: [],
+        },
+      ])
+    })
+
+    await ApprovalEngine.updateStatus('APP-2026-0002', 'Under Review', checkerEmail)
+
+    const patch = fetchMock.mock.calls.find((c) => c[1]?.method === 'PATCH')
+    expect(patch).toBeDefined()
+    expect(String(patch![0])).toContain('/api/v1/approvals/APP-2026-0002/status')
+    expect(JSON.parse(String(patch![1].body))).toEqual({
+      status: 'Under Review',
+      actor: checkerEmail,
+    })
   })
 
-  // ── UAT-GOV-02: Checker transition — Submitted → Under Review
-  test('UAT-GOV-02 | updateStatus transitions to "Under Review" and assigns checker', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
+  test('self-approval attempt still forwards maker as actor — server must reject', async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        return jsonResponse({ message: 'Maker cannot approve own request' }, false, 403)
+      }
+      return jsonResponse([])
+    })
 
-    const approvals = ApprovalEngine.getApprovals()
-    const updated = approvals.find(a => a.approvalId === request.approvalId)
-
-    expect(updated!.status).toBe('Under Review')
-    expect(updated!.checker).toBe(checkerEmail)
-    expect(updated!.approver).toBeNull()
+    const result = await ApprovalEngine.updateStatus('APP-2026-0003', 'Approved', makerEmail)
+    expect(result).toEqual(
+      expect.objectContaining({
+        error: 'API_ERROR',
+        message: expect.stringMatching(/Maker cannot approve/i),
+      }),
+    )
   })
 
-  // ── Audit trail grows after checker assignment
-  test('UAT-GOV-02 | auditTrail records "Assigned / Review Started" entry', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-    const assignedEntry = updated!.auditTrail.find(e => e.action === 'Assigned / Review Started')
-
-    expect(assignedEntry).toBeDefined()
-    expect(assignedEntry!.actor).toBe(checkerEmail)
-  })
-
-  // ── UAT-GOV-02: Approver transition — Under Review → Approved
-  test('UAT-GOV-02 | updateStatus transitions to "Approved" and sets approvedAt + approver', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
-    ApprovalEngine.updateStatus(request.approvalId, 'Approved', approverEmail)
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-
-    expect(updated!.status).toBe('Approved')
-    expect(updated!.approver).toBe(approverEmail)
-    expect(updated!.approvedAt).not.toBeNull()
-  })
-
-  // ── Rejection path
-  test('UAT-GOV-02 | updateStatus transitions to "Rejected" and sets approver', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
-    ApprovalEngine.updateStatus(request.approvalId, 'Rejected', approverEmail)
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-
-    expect(updated!.status).toBe('Rejected')
-    expect(updated!.approver).toBe(approverEmail)
-  })
-
-  // ── Escalation path
-  test('UAT-GOV-02 | updateStatus transitions to "Escalated"', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Escalated', checkerEmail)
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-    expect(updated!.status).toBe('Escalated')
-  })
-
-  // ── SELF-APPROVAL GUARD: Maker must not be the same as approver
-  //    NOTE: The engine does not enforce this at the service level currently
-  //    (it is a UI-layer RBAC concern). This test documents the expected
-  //    business rule and will FAIL until the guard is implemented in the service.
-  test('UAT-GOV-03 | Self-approval guard — maker cannot approve own request [GATE]', () => {
-    const request = submitTestApproval({ maker: makerEmail })
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
-    ApprovalEngine.updateStatus(request.approvalId, 'Approved', makerEmail) // maker = approver!
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-
-    // EXPECTED BEHAVIOUR: Status should NOT be Approved when maker == approver
-    // Current behaviour: The service does not block this → test documents the gap
-    expect(updated!.approver).not.toBe(updated!.maker)
-  })
-
-  // ── Audit trail is always newest-first (unshift behaviour)
-  test('Audit trail entries are ordered newest-first', () => {
-    const request = submitTestApproval()
-    ApprovalEngine.updateStatus(request.approvalId, 'Under Review', checkerEmail)
-    ApprovalEngine.updateStatus(request.approvalId, 'Approved', approverEmail)
-
-    const updated = ApprovalEngine.getApprovals().find(a => a.approvalId === request.approvalId)
-    const trail = updated!.auditTrail
-
-    expect(trail[0].action).toBe('Approved / Committed')
-    expect(trail[1].action).toBe('Assigned / Review Started')
-    expect(trail[2].action).toBe('Request Created')
-  })
-
-  // ── getPendingCount
-  test('getPendingCount returns count of Submitted + Under Review items', () => {
-    const before = ApprovalEngine.getPendingCount()
-    submitTestApproval()
-    submitTestApproval()
-    const after = ApprovalEngine.getPendingCount()
-    expect(after).toBeGreaterThanOrEqual(before + 2)
+  test('getPendingCount counts Submitted + Under Review from cached list', async () => {
+    fetchMock.mockImplementation(() =>
+      jsonResponse([
+        { approvalId: 'A1', status: 'Submitted' },
+        { approvalId: 'A2', status: 'Under Review' },
+        { approvalId: 'A3', status: 'Approved' },
+      ]),
+    )
+    // Force a refresh path via updateStatus GET refresh
+    await ApprovalEngine.updateStatus('A1', 'Submitted', approverEmail)
+    expect(ApprovalEngine.getPendingCount()).toBeGreaterThanOrEqual(2)
   })
 })

@@ -740,6 +740,8 @@ class _SettingsPageState extends State<SettingsPage> {
               'price': item.price,
               'cost_price': item.costPrice,
               'type': item.type,
+              'business_mode': item.businessMode,
+              'category_id': item.categoryId,
               'status': item.isDeleted ? 'archived' : 'active',
               'is_deleted': item.isDeleted,
               'device_id': item.deviceId,

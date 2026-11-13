@@ -175,6 +175,8 @@ class FakeHealthInsuranceRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async {
     if (shouldThrow) throw Exception('Failed to create enrolment');
     return testEnrolments.first;
@@ -196,6 +198,17 @@ class FakeHealthInsuranceRepository implements HealthInsuranceRepository {
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId) async {
     if (shouldThrow) throw Exception('Sandbox activation failed');
     return {'status': 'activated'};
+  }
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {
+    if (shouldThrow) throw Exception('Dismiss failed');
+  }
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    if (shouldThrow) throw Exception('Repush failed');
+    return testEnrolments.first;
   }
 }
 

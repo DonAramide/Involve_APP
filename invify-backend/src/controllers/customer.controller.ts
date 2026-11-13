@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
+import {
+  resolveVaCounterpartyOwnerId,
+  resolveVaInstitutionCodeForTenant,
+} from '../integrations/quasar/va-institution-code';
 import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
@@ -65,8 +69,9 @@ export class CustomerController {
         });
       }
 
-      const quasar = await getQuasarService(tenantId);
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
       const reference = `VA-CUST-${customerId.substring(0, 8)}-${Date.now()}`;
+      const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
       
       const quasarAccount = await quasar.createVirtualAccount({
         childId: customerId, 
@@ -75,7 +80,12 @@ export class CustomerController {
         phone: String(phone).trim(),
         firstName: name?.split(' ')[0] || 'Valued',
         lastName: name?.split(' ').slice(1).join(' ') || 'Customer',
-        metadata: { source: 'customer_provisioning', phone: phone }
+        institutionCode,
+        metadata: {
+          source: 'customer_provisioning',
+          phone: phone,
+          ...(institutionCode ? { institutionCode } : {}),
+        },
       });
 
       const acctName = (quasarAccount as any).accountName || name;
@@ -256,25 +266,28 @@ export class CustomerController {
         // Safe to ignore if table/record query fails, fall back to default email
       }
 
-      const quasar = await getQuasarService(tenantId);
-      const platformId = 'platform-admin-owner-id';
+      const quasar = await getQuasarServiceForTenantVa(tenantId);
+      const counterpartyOwnerId = resolveVaCounterpartyOwnerId(tenantId);
 
       const staffPhone = String(phone || defaultPhone || '').trim();
       if (!staffPhone) {
         return res.status(400).json({ error: 'Customer phone number is required' });
       }
+      const institutionCode = await resolveVaInstitutionCodeForTenant(tenantId);
       const quasarAccount = await quasar.createVirtualAccount({
         childId: userId,
-        parentId: platformId,
+        parentId: counterpartyOwnerId,
         email: email || defaultEmail,
         phone: staffPhone,
         firstName: companyName,
         lastName: customLastName,
         parentShareBps: 0,
+        institutionCode,
         metadata: { 
           type: 'staff_account', 
           tenantId: tenantId, 
-          phone: staffPhone 
+          phone: staffPhone,
+          ...(institutionCode ? { institutionCode } : {}),
         }
       });
 

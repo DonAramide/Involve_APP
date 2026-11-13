@@ -40,6 +40,8 @@ class MockHealthInsuranceRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async =>
       throw UnimplementedError();
 
@@ -55,6 +57,14 @@ class MockHealthInsuranceRepository implements HealthInsuranceRepository {
 
   @override
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId) async => {};
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {}
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    throw UnimplementedError();
+  }
 }
 
 void main() {
@@ -149,6 +159,7 @@ void main() {
       await tester.pumpWidget(wrapWithTheme(
         HmoGuidedTourPage(
           schoolName: 'Greenwood High',
+          businessMode: 'school',
           hmoProviderName: 'Metro Health HMO',
           onFinish: () => tourFinished = true,
         ),

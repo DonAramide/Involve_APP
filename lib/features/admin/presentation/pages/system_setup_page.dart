@@ -22,6 +22,8 @@ import 'package:involve_app/features/school_finance/domain/repositories/finance_
 import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 import 'package:involve_app/core/utils/nigerian_banks.dart';
 import 'package:involve_app/core/utils/phone_number_input.dart';
+import 'package:involve_app/features/settings/presentation/widgets/institute_affiliation_tile.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -32,6 +34,19 @@ class SystemSetupPage extends StatefulWidget {
 
 class _SystemSetupPageState extends State<SystemSetupPage> {
   bool _isLoadingDialogShowing = false;
+  TerminalConfig? _terminalConfig;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstituteAffiliation();
+  }
+
+  Future<void> _loadInstituteAffiliation() async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (!mounted) return;
+    setState(() => _terminalConfig = config);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +87,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 state.isBusinessLocked 
                   ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
                   : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
+                InstituteAffiliationTile(config: _terminalConfig),
                 _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
                 _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
                 _buildTextTile(context, 'CAC Number', settings.cacNumber ?? '', (val) => _update(context, settings.copyWith(cacNumber: val))),

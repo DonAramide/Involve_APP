@@ -37,9 +37,9 @@ class CoverageStatusBadge extends StatelessWidget {
       color = Colors.blueGrey;
       icon = Icons.pending_actions;
     } else if (status == EnrolmentLifecycleStatus.enrolmentPending) {
-      label = 'Draft / Incomplete';
-      color = Colors.grey;
-      icon = Icons.edit_note;
+      label = 'Pending Activation';
+      color = Colors.deepOrange;
+      icon = Icons.hourglass_top;
     } else if (status == EnrolmentLifecycleStatus.lapsed ||
         policyStatus == PolicyLifecycleStatus.lapsed) {
       label = 'Coverage Lapsed';

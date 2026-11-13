@@ -1,0 +1,244 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FeatureGateService = exports.BuildVariantService = exports.BuildVariant = void 0;
+/**
+ * Explicit environment / build-variant resolution.
+ *
+ * Safety rules (Phase 3):
+ * - NODE_ENV=production OR APP_ENV=production requires BUILD_VARIANT=PROD (or APP_ENV=production with BUILD_VARIANT=PROD).
+ * - Missing BUILD_VARIANT never silently becomes LOCAL when the process claims production.
+ * - Staging must be explicit BUILD_VARIANT=STAGING (or APP_ENV=staging).
+ */
+var BuildVariant;
+(function (BuildVariant) {
+    BuildVariant["LOCAL"] = "LOCAL";
+    BuildVariant["STAGING"] = "STAGING";
+    BuildVariant["PROD"] = "PROD";
+})(BuildVariant || (exports.BuildVariant = BuildVariant = {}));
+function resolveVariant() {
+    const rawVariant = (process.env.BUILD_VARIANT || '').trim().toUpperCase();
+    const appEnv = (process.env.APP_ENV || '').trim().toLowerCase();
+    const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+    const buildProfile = (process.env.BUILD_PROFILE || '').trim().toLowerCase();
+    const claimsProduction = nodeEnv === 'production' ||
+        appEnv === 'production' ||
+        buildProfile === 'production';
+    const claimsStaging = nodeEnv === 'staging' ||
+        appEnv === 'staging' ||
+        buildProfile === 'staging';
+    if (rawVariant === 'PROD' || rawVariant === 'PRODUCTION') {
+        return BuildVariant.PROD;
+    }
+    if (rawVariant === 'STAGING') {
+        return BuildVariant.STAGING;
+    }
+    if (rawVariant === 'LOCAL' || rawVariant === 'DEVELOPMENT' || rawVariant === 'DEV') {
+        if (claimsProduction) {
+            throw new Error(`[BuildVariant] Refusing LOCAL while NODE_ENV/APP_ENV claims production. Set BUILD_VARIANT=PROD explicitly.`);
+        }
+        if (claimsStaging) {
+            throw new Error(`[BuildVariant] Refusing LOCAL while NODE_ENV/APP_ENV claims staging. Set BUILD_VARIANT=STAGING explicitly.`);
+        }
+        return BuildVariant.LOCAL;
+    }
+    // BUILD_VARIANT unset
+    if (claimsProduction) {
+        throw new Error(`[BuildVariant] BUILD_VARIANT is required when NODE_ENV/APP_ENV/BUILD_PROFILE indicates production. Set BUILD_VARIANT=PROD.`);
+    }
+    if (claimsStaging) {
+        return BuildVariant.STAGING;
+    }
+    // Default LOCAL only for explicit non-production local/test development
+    return BuildVariant.LOCAL;
+}
+class BuildVariantService {
+    static instance;
+    variant;
+    constructor() {
+        this.variant = resolveVariant();
+    }
+    static getInstance() {
+        if (!BuildVariantService.instance) {
+            BuildVariantService.instance = new BuildVariantService();
+        }
+        return BuildVariantService.instance;
+    }
+    // ONLY for testing
+    static resetInstance() {
+        BuildVariantService.instance = undefined;
+    }
+    getVariant() {
+        return this.variant;
+    }
+    isLocal() {
+        return this.variant === BuildVariant.LOCAL;
+    }
+    isStaging() {
+        return this.variant === BuildVariant.STAGING;
+    }
+    isProd() {
+        return this.variant === BuildVariant.PROD;
+    }
+    isSimulatorAllowed() {
+        if (this.isLocal())
+            return true;
+        if (this.isStaging())
+            return process.env.ENABLE_SIMULATOR === 'true';
+        return false; // PROD never allows simulators
+    }
+    getLoggingLevel() {
+        if (this.isLocal())
+            return 'debug';
+        if (this.isStaging())
+            return 'info';
+        return 'warn'; // PROD
+    }
+    getAgentPortalUrl() {
+        if (this.isLocal()) {
+            return process.env.LOCAL_AGENT_PORTAL_URL || `${this.getAppPortalBaseUrl()}/institute/login`;
+        }
+        if (this.isStaging()) {
+            return process.env.STAGING_AGENT_PORTAL_URL || `${this.getAppPortalBaseUrl()}/institute/login`;
+        }
+        // Production
+        const prodUrl = process.env.PROD_AGENT_PORTAL_URL || '';
+        if (!prodUrl) {
+            return `${this.getAppPortalBaseUrl()}/institute/login`;
+        }
+        return prodUrl;
+    }
+    /**
+     * Canonical web portal origin for login / welcome / profile emails.
+     * Single source of truth — production must never silently fall back to staging.
+     */
+    getAppPortalBaseUrl() {
+        if (this.isLocal()) {
+            const local = (process.env.LOCAL_APP_URL || process.env.APP_URL || 'http://localhost:9000').trim().replace(/\/$/, '');
+            if (!local) {
+                throw new Error('[BuildVariantService] LOCAL_APP_URL/APP_URL resolved empty for LOCAL');
+            }
+            return local;
+        }
+        if (this.isStaging()) {
+            const staging = (process.env.STAGING_APP_URL ||
+                process.env.APP_URL ||
+                'https://staging.invify.org')
+                .trim()
+                .replace(/\/$/, '');
+            if (!staging) {
+                throw new Error('[BuildVariantService] STAGING_APP_URL/APP_URL resolved empty for STAGING');
+            }
+            this.assertPortalUrlSafe(staging, 'STAGING');
+            return staging;
+        }
+        // PRODUCTION — canonical default is app.invify.org; never staging.
+        const explicit = (process.env.PROD_APP_URL || process.env.APP_URL || '').trim().replace(/\/$/, '');
+        const prod = explicit || 'https://app.invify.org';
+        if (!prod) {
+            throw new Error('[BuildVariantService] Production app portal URL is missing. Set PROD_APP_URL (or APP_URL) to https://app.invify.org');
+        }
+        this.assertPortalUrlSafe(prod, 'PROD');
+        if (/staging\.invify\.org|rpcjelhacmkhzguljdgi/i.test(prod)) {
+            throw new Error(`[BuildVariantService] Refusing PRODUCTION portal URL that references staging infrastructure: ${prod}`);
+        }
+        return prod;
+    }
+    /**
+     * Full login URL for admin, tenant, or Institute (agent) portals.
+     */
+    getLoginUrl(portal = 'admin') {
+        const base = this.getAppPortalBaseUrl();
+        if (portal === 'tenant')
+            return `${base}/tenant/login`;
+        if (portal === 'agent')
+            return `${base}/institute/login`;
+        return `${base}/admin/login`;
+    }
+    assertPortalUrlSafe(url, variantLabel) {
+        const lower = url.toLowerCase();
+        if (variantLabel === 'PROD') {
+            if (!lower.startsWith('https://')) {
+                throw new Error(`[BuildVariantService] PRODUCTION portal URL must use HTTPS: ${url}`);
+            }
+            const banned = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.', '10.0.', 'ngrok', 'staging.'];
+            if (banned.some((b) => lower.includes(b))) {
+                throw new Error(`[BuildVariantService] Refusing PRODUCTION portal URL with banned host marker: ${url}`);
+            }
+        }
+    }
+    /**
+     * Environment-scoped Supabase configuration.
+     * Staging/Production never fall back to hardcoded project URLs or dummy keys.
+     */
+    getSupabaseConfig() {
+        let url = '';
+        let key = '';
+        let serviceRoleKey = '';
+        if (this.isLocal()) {
+            url = process.env.LOCAL_SUPABASE_URL || process.env.DEV_SUPABASE_URL || '';
+            key = process.env.LOCAL_SUPABASE_KEY || process.env.DEV_SUPABASE_KEY || process.env.SUPABASE_KEY || '';
+            serviceRoleKey =
+                process.env.LOCAL_SUPABASE_SERVICE_KEY ||
+                    process.env.DEV_SUPABASE_SERVICE_KEY ||
+                    process.env.SUPABASE_SERVICE_KEY ||
+                    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+                    '';
+            const host = url.toLowerCase();
+            if (host.includes('supabase.co') || host.includes('rpcjelhacmkhzguljdgi') || host.includes('jjixrywfnaijvahmvcwj')) {
+                throw new Error('[BuildVariantService] LOCAL must use LOCAL_SUPABASE_URL on loopback (http://127.0.0.1:54321). Refusing remote Supabase.');
+            }
+        }
+        else if (this.isStaging()) {
+            url = process.env.STAGING_SUPABASE_URL || '';
+            key = process.env.STAGING_SUPABASE_PUBLISHABLE_KEY || process.env.STAGING_SUPABASE_KEY || '';
+            serviceRoleKey = process.env.STAGING_SUPABASE_SECRET_KEY || process.env.STAGING_SUPABASE_SERVICE_KEY || '';
+        }
+        else if (this.isProd()) {
+            url = process.env.PROD_SUPABASE_URL || '';
+            key = process.env.PROD_SUPABASE_PUBLISHABLE_KEY || process.env.PROD_SUPABASE_KEY || '';
+            serviceRoleKey = process.env.PROD_SUPABASE_SECRET_KEY || process.env.PROD_SUPABASE_SERVICE_KEY || '';
+        }
+        this.assertNoDevEndpoint(url);
+        if (!url || !key || !serviceRoleKey) {
+            if (this.isStaging()) {
+                throw new Error(`[BuildVariantService] STAGING requires STAGING_SUPABASE_URL, STAGING_SUPABASE_PUBLISHABLE_KEY, and STAGING_SUPABASE_SECRET_KEY. ` +
+                    `For local laptop use BUILD_VARIANT=LOCAL and npm run dev. ` +
+                    `For staging, copy .env.staging.example to .env.staging and run npm run dev:staging.`);
+            }
+            if (this.isProd()) {
+                throw new Error(`[BuildVariantService] PRODUCTION requires PROD_SUPABASE_URL, PROD_SUPABASE_PUBLISHABLE_KEY, and PROD_SUPABASE_SECRET_KEY`);
+            }
+            if (!url || !key) {
+                console.warn(`[BuildVariantService] Warning: Missing Supabase credentials for variant ${this.variant}`);
+            }
+        }
+        return { url, key, serviceRoleKey };
+    }
+    assertNoDevEndpoint(url) {
+        if (!url || this.isLocal())
+            return;
+        const lower = url.toLowerCase();
+        const banned = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.', '10.0.', 'ngrok'];
+        if (banned.some((b) => lower.includes(b))) {
+            throw new Error(`[BuildVariantService] Refusing ${this.variant}: Supabase URL looks like a development endpoint`);
+        }
+    }
+}
+exports.BuildVariantService = BuildVariantService;
+class FeatureGateService {
+    static isFeatureEnabled(featureName) {
+        const variantService = BuildVariantService.getInstance();
+        switch (featureName) {
+            case 'mock_data':
+                return variantService.isLocal();
+            case 'real_money_payouts':
+                return process.env.FEATURE_REAL_MONEY_PAYOUTS === 'true' && variantService.isProd();
+            case 'verbose_telemetry':
+                return variantService.isLocal() || variantService.isStaging();
+            default:
+                return process.env[`FEATURE_${featureName.toUpperCase()}`] === 'true';
+        }
+    }
+}
+exports.FeatureGateService = FeatureGateService;
+//# sourceMappingURL=build-variant.js.map

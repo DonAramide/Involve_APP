@@ -1,0 +1,1128 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AuthController = void 0;
+const supabase_1 = require("../db/supabase");
+const user_device_service_1 = require("../services/user-device.service");
+const constants_1 = require("../config/constants");
+const gov_audit_service_1 = require("../services/gov-audit.service");
+const otplib_1 = require("otplib");
+const qrcode_1 = __importDefault(require("qrcode"));
+const mfa_challenge_service_1 = require("../services/mfa-challenge.service");
+const auth_session_service_1 = require("../services/auth-session.service");
+const password_policy_1 = require("../utils/password-policy");
+/** Love School (device / JWT from live tablet sessions). */
+const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
+const LOVE_SCHOOL_OWNER_ID = 'eb9f0b3c-c874-4d96-b624-5d4d63a60e4e';
+function mfaSnapshotFromProfile(profile, overrides = {}) {
+    return {
+        id: profile.id,
+        email: profile.email,
+        role: profile.role,
+        tenantId: profile.tenant_id,
+        name: profile.name,
+        mfaSecret: profile.mfa_secret,
+        mfaEnabled: !!profile.mfa_enabled,
+        ...overrides,
+    };
+}
+function isAuthConnectivityFailure(err) {
+    const msg = String(err?.message || err || '');
+    const causeMsg = String(err?.cause?.message || err?.cause || '');
+    const code = err?.code || err?.cause?.code;
+    return (code === 'UND_ERR_CONNECT_TIMEOUT' ||
+        /fetch failed/i.test(msg) ||
+        /ConnectTimeoutError/i.test(msg) ||
+        /Connect Timeout/i.test(msg) ||
+        /timeout/i.test(msg) ||
+        /fetch failed/i.test(causeMsg) ||
+        /Connect Timeout/i.test(causeMsg) ||
+        /network/i.test(msg));
+}
+function offlineAuthAllowed(variantService) {
+    // LOCAL only — never staging or production, even on connectivity failure
+    if (variantService.isProd() || variantService.isStaging())
+        return false;
+    if (process.env.NODE_ENV === 'production' ||
+        process.env.APP_ENV === 'production' ||
+        process.env.BUILD_PROFILE === 'production') {
+        return false;
+    }
+    return process.env.OFFLINE_LOCAL_AUTH === 'true' && variantService.isLocal();
+}
+const PLATFORM_STAFF_ROLES = new Set([
+    'SUPER_ADMIN',
+    'STAFF',
+    'ADMIN_FINANCE',
+    'ADMIN_TREASURY',
+    'ADMIN_RISK',
+    'ADMIN_OPS',
+    'ADMIN_EXECUTIVE',
+    'ADMIN_DEPLOY',
+]);
+function normalizeLoginPortal(raw, isolationTier) {
+    const portal = String(raw || '').trim().toLowerCase();
+    if (portal === 'admin' || portal === 'ops' || portal === 'staff')
+        return 'admin';
+    if (portal === 'tenant' || portal === 'owner')
+        return 'tenant';
+    const tier = String(isolationTier || '').trim().toLowerCase();
+    if (tier === 'staff' || tier === 'sso')
+        return 'admin';
+    if (tier === 'admin' || tier === 'pro')
+        return 'tenant';
+    return null;
+}
+function isPlatformStaffRole(roleRaw) {
+    const roles = String(roleRaw || '')
+        .split(',')
+        .map((r) => r.trim().toUpperCase().replace(/-/g, '_'))
+        .filter(Boolean);
+    return roles.some((r) => PLATFORM_STAFF_ROLES.has(r));
+}
+/** Reject cross-portal login (tenant creds on /admin/login and vice versa). */
+function assertPortalRoleAllowed(portal, role) {
+    if (!portal) {
+        return {
+            ok: false,
+            status: 400,
+            body: {
+                error: 'PORTAL_REQUIRED',
+                message: 'Login portal is required. Use /admin/login or /tenant/login.',
+                code: 'PORTAL_REQUIRED',
+            },
+        };
+    }
+    const isStaff = isPlatformStaffRole(role);
+    if (portal === 'admin' && !isStaff) {
+        return {
+            ok: false,
+            status: 403,
+            body: {
+                error: 'WRONG_LOGIN_PORTAL',
+                message: 'This account belongs to a tenant workspace. Sign in at /tenant/login.',
+                code: 'WRONG_LOGIN_PORTAL',
+            },
+        };
+    }
+    if (portal === 'tenant' && isStaff) {
+        return {
+            ok: false,
+            status: 403,
+            body: {
+                error: 'WRONG_LOGIN_PORTAL',
+                message: 'This account belongs to platform Admin / Ops. Sign in at /admin/login.',
+                code: 'WRONG_LOGIN_PORTAL',
+            },
+        };
+    }
+    return { ok: true };
+}
+function resolveOfflineIdentity(emailRaw) {
+    // LOCAL-only helper. Never elevates to SUPER_ADMIN based on email substring heuristics.
+    const email = (emailRaw || '').trim().toLowerCase();
+    if (email === 'olive@invify.com') {
+        return {
+            role: 'TENANT_OPERATOR',
+            tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+            userId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+        };
+    }
+    if (email === 'info.iips.ng@gmail.com' ||
+        (email.includes('love') && email.includes('school'))) {
+        return {
+            role: 'owner',
+            tenantId: LOVE_SCHOOL_TENANT_ID,
+            userId: LOVE_SCHOOL_OWNER_ID,
+        };
+    }
+    // Default least-privilege local sandbox identity (not super_admin)
+    return {
+        role: 'TENANT_OPERATOR',
+        tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+        userId: '88a18bc0-d128-4e1b-b413-58019ab268f7',
+    };
+}
+function buildOfflineToken(email, identity) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret.length < 16) {
+        throw new Error('JWT_SECRET is required to issue local offline tokens');
+    }
+    const jwt = require('jsonwebtoken');
+    return jwt.sign({
+        id: identity.userId,
+        sub: identity.userId,
+        email,
+        role: identity.role,
+        tenantId: identity.tenantId,
+    }, secret, { expiresIn: '7d', algorithm: 'HS256' });
+}
+async function validateDeviceOrBlock(userId, email, req) {
+    try {
+        let enforce = false;
+        try {
+            const { data, error } = await supabase_1.supabase.from('system_configurations').select('config_value').eq('config_key', 'enforce_device_control').single();
+            if (!error && data) {
+                enforce = data.config_value === true || data.config_value === 'true';
+            }
+        }
+        catch (dbErr) {
+            enforce = false;
+        }
+        if (!enforce)
+            return { allowed: true };
+        const deviceId = req.body.deviceId;
+        if (!deviceId) {
+            return {
+                allowed: false,
+                errorResponse: {
+                    error: 'DEVICE_APPROVAL_REQUIRED',
+                    message: 'Secure device identity footprint is missing. Device control is strictly enforced.'
+                }
+            };
+        }
+        const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const userAgent = req.headers['user-agent'] || '';
+        const verification = await user_device_service_1.UserDeviceService.verifyDevice(userId, deviceId, email, { ipAddress: String(ipAddress), userAgent });
+        if (!verification.isApproved) {
+            return {
+                allowed: false,
+                errorResponse: {
+                    error: 'DEVICE_APPROVAL_REQUIRED',
+                    deviceId,
+                    status: verification.record.status,
+                    message: `This device footprint (${deviceId}) status is ${verification.record.status} and requires manual Invify operations team approval.`
+                }
+            };
+        }
+        return { allowed: true };
+    }
+    catch (err) {
+        return { allowed: true };
+    }
+}
+function dispatchLoginSecurityAlert(req, user) {
+    try {
+        const { emailService } = require('../services/email.service');
+        const forwarded = req.headers['x-forwarded-for'];
+        let ip = '';
+        if (typeof forwarded === 'string') {
+            ip = forwarded.split(',')[0].trim();
+        }
+        else if (Array.isArray(forwarded) && forwarded.length > 0) {
+            ip = forwarded[0].trim();
+        }
+        else {
+            ip = (req.headers && req.headers['x-real-ip']) || req.socket?.remoteAddress || req.ip || '127.0.0.1';
+        }
+        if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+            ip = '127.0.0.1';
+        }
+        const deviceId = req.body?.deviceId || req.headers['x-device-id'] || 'Web Browser (Default Device)';
+        const userAgent = req.headers['user-agent'] || 'Web Browser';
+        const city = (req.headers['cf-ipcity'] || req.headers['x-client-city']);
+        const country = (req.headers['cf-ipcountry'] || req.headers['x-client-country'] || req.headers['x-country-name'] || req.headers['x-country-code']);
+        let location = '';
+        if (city && country) {
+            location = `${city}, ${country}`;
+        }
+        else if (country) {
+            location = country;
+        }
+        else if (ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+            location = 'Local Network / Development Environment';
+        }
+        else {
+            location = 'Detected via IP Address';
+        }
+        const portal = req.body?.portal === 'admin' || (user.role && user.role.startsWith('admin_')) || user.role === 'super_admin' || user.role === 'internal_staff'
+            ? 'Invify Super Admin Portal'
+            : 'Invify Business & Tenant Portal';
+        emailService.sendLoginAlertEmail(user.email, {
+            name: user.name || user.email.split('@')[0],
+            ipAddress: ip,
+            deviceId: String(deviceId),
+            userAgent: String(userAgent),
+            location,
+            loginTime: new Date().toUTCString(),
+            portal
+        }).then(() => {
+            console.log(`[AuthController] Sent login security alert to: ${user.email}`);
+        }).catch((err) => {
+            console.warn('[AuthController] Failed to send login security alert:', err.message);
+        });
+        // Write audit event to GovAuditService ledger
+        const actionType = (user.role && user.role.startsWith('admin_')) || user.role === 'super_admin'
+            ? 'ADMIN_LOGIN_SUCCESS'
+            : 'USER_LOGIN_SUCCESS';
+        gov_audit_service_1.GovAuditService.logAction({
+            id: require('crypto').randomUUID(),
+            timestamp: new Date().toISOString(),
+            module: 'AUTH',
+            action: actionType,
+            user_email: user.email,
+            user_name: user.name || user.email.split('@')[0],
+            ip_address: ip,
+            location,
+            target: portal,
+            status: 'success',
+            metadata: {
+                device_id: String(deviceId),
+                user_agent: String(userAgent),
+                portal,
+                role: user.role
+            }
+        }).then(() => {
+            console.log(`[AuthController] Audit log recorded for login: ${user.email}`);
+        }).catch((err) => {
+            console.warn('[AuthController] Failed to record login audit log:', err.message);
+        });
+    }
+    catch (err) {
+        console.warn('[AuthController] Failed to trigger login alert email / audit log:', err.message);
+    }
+}
+const MFA_CHALLENGE_COOKIE = 'invify_mfa_challenge';
+function readMfaChallengeToken(req) {
+    const bodyToken = req.body?.challengeToken || req.body?.setupToken;
+    if (typeof bodyToken === 'string' && bodyToken.trim())
+        return bodyToken.trim();
+    const cookieHeader = req.headers.cookie || '';
+    for (const entry of cookieHeader.split(';')) {
+        const separator = entry.indexOf('=');
+        if (separator < 0)
+            continue;
+        const name = entry.slice(0, separator).trim();
+        if (name === MFA_CHALLENGE_COOKIE) {
+            return decodeURIComponent(entry.slice(separator + 1).trim());
+        }
+    }
+    return '';
+}
+function setMfaChallengeCookie(res, token, req) {
+    const variant = require('../config/build-variant').BuildVariantService.getInstance();
+    const protectedEnvironment = process.env.NODE_ENV === 'staging' ||
+        process.env.NODE_ENV === 'production' ||
+        process.env.APP_ENV === 'staging' ||
+        process.env.APP_ENV === 'production' ||
+        variant.isStaging() ||
+        variant.isProd();
+    const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
+    const requestIsHttps = !!(req && (req.secure || forwardedProto === 'https'));
+    res.cookie(MFA_CHALLENGE_COOKIE, token, {
+        httpOnly: true,
+        // LAN admin is HTTP; Secure cookies are dropped by the browser on http://192.168.x
+        secure: protectedEnvironment && requestIsHttps,
+        sameSite: 'strict',
+        maxAge: 5 * 60 * 1000,
+        path: '/api/auth/mfa',
+    });
+}
+function clearMfaChallengeCookie(res) {
+    res.clearCookie(MFA_CHALLENGE_COOKIE, { path: '/api/auth/mfa' });
+}
+function mfaErrorResponse(res, error) {
+    if (error instanceof mfa_challenge_service_1.MfaChallengeError) {
+        return res.status(error.status).json({ error: error.code, message: error.message });
+    }
+    console.error('[MFA] Error:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'MFA_OPERATION_FAILED', message: 'MFA operation failed' });
+}
+function respondWithWebMfaGate(req, res, profile, pendingSession) {
+    if (!profile.mfa_enabled) {
+        let setupToken;
+        try {
+            setupToken = (0, mfa_challenge_service_1.issueMfaChallenge)(profile.id, 'setup', pendingSession, mfaSnapshotFromProfile(profile)).token;
+        }
+        catch (error) {
+            return mfaErrorResponse(res, error);
+        }
+        setMfaChallengeCookie(res, setupToken, req);
+        return res.status(200).json({
+            requiresMfaSetup: true,
+            setupToken,
+            challengeToken: setupToken,
+            userId: profile.id,
+            role: profile.role,
+        });
+    }
+    let challengeToken;
+    try {
+        challengeToken = (0, mfa_challenge_service_1.issueMfaChallenge)(profile.id, 'verify', pendingSession, mfaSnapshotFromProfile(profile)).token;
+    }
+    catch (error) {
+        return mfaErrorResponse(res, error);
+    }
+    setMfaChallengeCookie(res, challengeToken, req);
+    return res.status(200).json({
+        requires2FA: true,
+        challengeToken,
+        userId: profile.id,
+        role: profile.role,
+        message: 'MFA challenge required',
+    });
+}
+class AuthController {
+    /**
+     * POST /api/auth/login
+     * Authenticates user against Supabase Auth and checks password reset requirements.
+     */
+    static async login(req, res) {
+        try {
+            const { email, password, portal, isolationTier } = req.body;
+            const loginPortal = normalizeLoginPortal(portal, isolationTier);
+            if (!email || !password) {
+                return res.status(400).json({ error: 'Email and password are required' });
+            }
+            if (!loginPortal) {
+                return res.status(400).json({
+                    error: 'PORTAL_REQUIRED',
+                    message: 'Login portal is required. Use /admin/login or /tenant/login.',
+                    code: 'PORTAL_REQUIRED',
+                });
+            }
+            // 0. Check Maintenance Mode Global Lockout
+            let is_maintenance_locked = false;
+            let maintenance_message = 'System is currently under maintenance. Please try again later.';
+            try {
+                const { data, error } = await supabase_1.supabase.from('system_configurations').select('config_key, config_value').in('config_key', ['is_maintenance_locked', 'maintenance_message']);
+                if (!error && data && data.length > 0) {
+                    for (const row of data) {
+                        if (row.config_key === 'is_maintenance_locked')
+                            is_maintenance_locked = row.config_value === true || row.config_value === 'true';
+                        if (row.config_key === 'maintenance_message')
+                            maintenance_message = row.config_value;
+                    }
+                }
+            }
+            catch (dbErr) {
+                is_maintenance_locked = false;
+            }
+            if (is_maintenance_locked) {
+                const emailLower = (email || '').toLowerCase();
+                const isSuperAdmin = emailLower === 'sysadmin@invify.org' || emailLower === 'superadmin@invify.org' || emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('invify') || emailLower.includes('iips');
+                if (!isSuperAdmin) {
+                    return res.status(403).json({
+                        error: 'MAINTENANCE_LOCK',
+                        message: maintenance_message
+                    });
+                }
+            }
+            const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+            // Offline Developer Bypass (local + staging when flag set)
+            if (process.env.OFFLINE_LOCAL_AUTH === 'true' && offlineAuthAllowed(variantService)) {
+                if (password === 'wrongpassword' || email.includes('notauser')) {
+                    return res.status(401).json({ error: 'Invalid credentials' });
+                }
+                console.log(`[AuthController] OFFLINE_LOCAL_AUTH is true. Bypassing Supabase for: ${email}`);
+                const identity = resolveOfflineIdentity(email);
+                const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+                if (!portalGate.ok) {
+                    return res.status(portalGate.status).json(portalGate.body);
+                }
+                const mockToken = buildOfflineToken(email, identity);
+                const check = await validateDeviceOrBlock(identity.userId, email, req);
+                if (!check.allowed) {
+                    return res.status(403).json(check.errorResponse);
+                }
+                return res.status(200).json({
+                    token: mockToken,
+                    refreshToken: 'mock_refresh_token',
+                    user: { id: identity.userId, email: email, role: identity.role, tenantId: identity.tenantId }
+                });
+            }
+            // 1. Authenticate with Supabase Auth
+            let authData = null;
+            let authError = null;
+            try {
+                const result = await supabase_1.supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                authData = result.data;
+                authError = result.error;
+            }
+            catch (networkErr) {
+                authError = networkErr;
+            }
+            if (authError || !authData?.user || !authData?.session) {
+                // Supabase unreachable — do not pretend this is a bad password.
+                if (isAuthConnectivityFailure(authError)) {
+                    console.error(`[AuthController] Supabase Auth unreachable: ${authError?.message || authError}` +
+                        (authError?.cause ? ` cause=${authError.cause?.message || authError.cause}` : ''));
+                    if (offlineAuthAllowed(variantService)) {
+                        console.warn(`[AuthController] Issuing offline login token for ${email} (Supabase connect timeout)`);
+                        const identity = resolveOfflineIdentity(email);
+                        const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+                        if (!portalGate.ok) {
+                            return res.status(portalGate.status).json(portalGate.body);
+                        }
+                        const mockToken = buildOfflineToken(email, identity);
+                        const check = await validateDeviceOrBlock(identity.userId, email, req);
+                        if (!check.allowed) {
+                            return res.status(403).json(check.errorResponse);
+                        }
+                        return res.status(200).json({
+                            token: mockToken,
+                            refreshToken: 'mock_refresh_token',
+                            user: {
+                                id: identity.userId,
+                                email,
+                                role: identity.role,
+                                tenantId: identity.tenantId,
+                            },
+                            offlineAuth: true,
+                            warning: 'Logged in offline — Supabase Auth is unreachable from this machine',
+                        });
+                    }
+                    return res.status(503).json({
+                        error: 'AUTH_SERVICE_UNAVAILABLE',
+                        message: 'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443. Offline auth is LOCAL-only (OFFLINE_LOCAL_AUTH=true + BUILD_VARIANT=LOCAL).',
+                        retryable: true,
+                    });
+                }
+                // Dynamic Developer Bypass for local environment sandbox presets (LOCAL only; no email→super_admin)
+                const devAccounts = ['olive@invify.com'];
+                const normalizedEmail = (email || '').trim().toLowerCase();
+                if (devAccounts.includes(normalizedEmail) && variantService.isLocal() && process.env.OFFLINE_LOCAL_AUTH === 'true') {
+                    console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${normalizedEmail}`);
+                    const identity = resolveOfflineIdentity(normalizedEmail);
+                    const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+                    if (!portalGate.ok) {
+                        return res.status(portalGate.status).json(portalGate.body);
+                    }
+                    const mockToken = buildOfflineToken(email, identity);
+                    const check = await validateDeviceOrBlock(identity.userId, email, req);
+                    if (!check.allowed) {
+                        return res.status(403).json(check.errorResponse);
+                    }
+                    return res.status(200).json({
+                        token: mockToken,
+                        refreshToken: 'mock_refresh_token',
+                        user: {
+                            id: identity.userId,
+                            email: email,
+                            role: identity.role,
+                            tenantId: identity.tenantId,
+                        }
+                    });
+                }
+                // Log failed login attempt
+                const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+                try {
+                    await gov_audit_service_1.GovAuditService.logAction({
+                        id: `auth-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                        timestamp: new Date().toISOString(),
+                        module: 'AUTH',
+                        action: 'FAILED_LOGIN',
+                        user_email: email,
+                        user_name: 'Unknown',
+                        ip_address: String(ip),
+                        location: 'System',
+                        target: 'Authentication',
+                        status: 'failed',
+                        metadata: { reason: authError?.message || 'Invalid credentials' }
+                    });
+                }
+                catch (e) {
+                    console.error('Failed to log audit event', e);
+                }
+                return res.status(401).json({ error: authError?.message || 'Invalid credentials' });
+            }
+            // 2. Fetch public profile to check role and password reset status (using unpolluted supabaseAdmin to bypass RLS recursion)
+            const { data: profile, error: profileError } = await supabase_1.supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
+            if (profileError || !profile) {
+                console.error('[AuthController] Profile Fetch Error:', profileError);
+                return res.status(403).json({ error: 'User profile not found' });
+            }
+            // Roles come solely from persisted users.role — no email-based elevation
+            const portalGate = assertPortalRoleAllowed(loginPortal, profile.role);
+            if (!portalGate.ok) {
+                // Valid password but wrong portal — do not issue a session
+                try {
+                    await supabase_1.supabase.auth.signOut();
+                }
+                catch (_) {
+                    /* ignore */
+                }
+                return res.status(portalGate.status).json(portalGate.body);
+            }
+            // Check tenant plan restriction for Web Dashboard access
+            // Basic / free trial cannot use the web portal — Standard or Premium required.
+            // Platform operators (super_admin / system scope) are never plan-gated.
+            const roleNorm = String(profile.role || '')
+                .toLowerCase()
+                .split(',')
+                .map((r) => r.trim())
+                .filter(Boolean);
+            const isPlatformOperator = roleNorm.includes('super_admin') ||
+                roleNorm.includes('internal_staff') ||
+                roleNorm.some((r) => r.startsWith('admin_'));
+            const tenantIdRaw = String(profile.tenant_id || '').trim();
+            const isSystemTenant = !tenantIdRaw ||
+                tenantIdRaw === constants_1.SYSTEM_TENANT_UUID ||
+                tenantIdRaw.toLowerCase() === 'global' ||
+                tenantIdRaw.toLowerCase() === 'system' ||
+                !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantIdRaw);
+            if (!isPlatformOperator && !isSystemTenant) {
+                const { data: tenant, error: tenantPlanError } = await supabase_1.supabaseAdmin
+                    .from('tenants')
+                    .select('plan')
+                    .eq('id', tenantIdRaw)
+                    .single();
+                if (tenantPlanError) {
+                    console.error('[AuthController] tenant plan lookup failed:', tenantPlanError.message);
+                    try {
+                        await supabase_1.supabase.auth.signOut();
+                    }
+                    catch (_) {
+                        /* ignore */
+                    }
+                    return res.status(503).json({
+                        error: 'TENANT_PLAN_UNAVAILABLE',
+                        message: 'Unable to verify subscription plan. Please try again or contact support.',
+                    });
+                }
+                if (tenant) {
+                    const plan = String(tenant.plan || '')
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[\s-]+/g, '_');
+                    const blockedPlans = [
+                        'basic',
+                        'free',
+                        'trial',
+                        'free_trial',
+                        'free_tier',
+                    ];
+                    if (!plan || blockedPlans.includes(plan)) {
+                        try {
+                            await supabase_1.supabase.auth.signOut();
+                        }
+                        catch (_) {
+                            /* ignore */
+                        }
+                        return res.status(403).json({
+                            error: 'UPGRADE_REQUIRED',
+                            message: 'You need to upgrade to Standard or Premium to have access to the web. Please upgrade on your device, then try again.',
+                        });
+                    }
+                }
+            }
+            // 3. Check password reset requirement flag
+            if (profile.require_password_reset) {
+                return res.status(200).json({
+                    requiresPasswordReset: true,
+                    userId: profile.id,
+                    email: profile.email,
+                    role: profile.role || 'tenant_admin'
+                });
+            }
+            // 4. Issue a session only after MFA setup or TOTP challenge.
+            const check = await validateDeviceOrBlock(profile.id, profile.email, req);
+            if (!check.allowed) {
+                return res.status(403).json(check.errorResponse);
+            }
+            const pendingSession = {
+                token: authData.session.access_token,
+                refreshToken: authData.session.refresh_token,
+            };
+            // Web portals (admin + tenant) must enroll or pass TOTP before a session is issued.
+            return respondWithWebMfaGate(req, res, profile, pendingSession);
+        }
+        catch (error) {
+            console.error('[AuthController] Login Error:', error.message);
+            const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+            if (isAuthConnectivityFailure(error) && offlineAuthAllowed(variantService)) {
+                console.log('[AuthController] Network/Supabase connectivity timeout detected. Activating offline auth fallback...');
+                const email = req.body.email;
+                const identity = resolveOfflineIdentity(email);
+                const portalGate = assertPortalRoleAllowed(normalizeLoginPortal(req.body.portal, req.body.isolationTier), identity.role);
+                if (!portalGate.ok) {
+                    return res.status(portalGate.status).json(portalGate.body);
+                }
+                const mockToken = buildOfflineToken(email, identity);
+                const check = await validateDeviceOrBlock(identity.userId, email, req);
+                if (!check.allowed) {
+                    return res.status(403).json(check.errorResponse);
+                }
+                dispatchLoginSecurityAlert(req, {
+                    email: email,
+                    role: identity.role
+                });
+                return res.status(200).json({
+                    token: mockToken,
+                    refreshToken: 'mock_refresh_token',
+                    user: {
+                        id: identity.userId,
+                        email: email,
+                        role: identity.role,
+                        tenantId: identity.tenantId,
+                    },
+                    offlineAuth: true,
+                    warning: 'Logged in offline — Supabase Auth is unreachable from this machine',
+                });
+            }
+            if (isAuthConnectivityFailure(error)) {
+                return res.status(503).json({
+                    error: 'AUTH_SERVICE_UNAVAILABLE',
+                    message: 'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443.',
+                    retryable: true,
+                });
+            }
+            return res.status(500).json({ error: error.message });
+        }
+    }
+    /**
+     * POST /api/auth/reset-password
+     *
+     * Supported payloads:
+     * 1) { userId, newPassword } — authenticated / forced first-login reset
+     * 2) { email, code|otp, newPassword } — OTP password recovery (PASSWORD_RESET)
+     */
+    static async resetPassword(req, res) {
+        try {
+            const { userId, email, newPassword, code, otp, } = req.body || {};
+            if (!newPassword || String(newPassword).length < 6) {
+                return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+            }
+            const policy = (0, password_policy_1.evaluatePasswordPolicy)(String(newPassword), { email });
+            if (!policy.ok) {
+                return res.status(400).json({
+                    error: policy.errors[0],
+                    code: 'PASSWORD_POLICY',
+                    checks: policy.checks,
+                });
+            }
+            let targetUserId = userId || null;
+            // OTP recovery path: verify email OTP then resolve user by email
+            if (!targetUserId && email) {
+                const otpCode = String(code || otp || '').trim();
+                const normalizedEmail = String(email).trim().toLowerCase();
+                const { verificationService } = require('../services/verification.service');
+                // Wizard already verified OTP → trust fresh VERIFIED row (do not re-require PENDING)
+                const alreadyVerified = await verificationService.hasFreshPasswordResetVerification(normalizedEmail);
+                if (!alreadyVerified) {
+                    if (!otpCode) {
+                        return res.status(400).json({
+                            error: 'Verify your recovery email OTP before setting a new password.',
+                        });
+                    }
+                    const result = await verificationService.verifyOTPDetailed(normalizedEmail, otpCode, 'EMAIL', 'PASSWORD_RESET');
+                    if (!result.ok) {
+                        return res.status(400).json({
+                            error: result.error || 'Invalid or expired verification code.',
+                        });
+                    }
+                }
+                // Resolve auth user id by email
+                const { data: profile, error: profileLookupError } = await supabase_1.supabaseAdmin
+                    .from('users')
+                    .select('id, email')
+                    .ilike('email', normalizedEmail)
+                    .maybeSingle();
+                if (profileLookupError) {
+                    console.warn('[AuthController] users lookup:', profileLookupError.message);
+                }
+                if (profile?.id) {
+                    targetUserId = profile.id;
+                }
+                else {
+                    // Fallback: list auth users (small tenants / local)
+                    try {
+                        const { data: listed, error: listErr } = await supabase_1.supabaseAdmin.auth.admin.listUsers({
+                            page: 1,
+                            perPage: 1000,
+                        });
+                        if (!listErr && listed?.users?.length) {
+                            const match = listed.users.find((u) => String(u.email || '').toLowerCase() === normalizedEmail);
+                            if (match?.id)
+                                targetUserId = match.id;
+                        }
+                    }
+                    catch (e) {
+                        console.warn('[AuthController] auth.admin.listUsers failed:', e?.message || e);
+                    }
+                }
+                if (!targetUserId) {
+                    return res.status(404).json({
+                        error: 'No account found for that email. Check the address and try again.',
+                    });
+                }
+            }
+            if (!targetUserId) {
+                return res.status(400).json({ error: 'Missing userId or email for password reset.' });
+            }
+            const { data: currentProfile } = await supabase_1.supabaseAdmin
+                .from('users')
+                .select('email')
+                .eq('id', targetUserId)
+                .maybeSingle();
+            const accountEmail = String(currentProfile?.email || email || '').trim().toLowerCase();
+            const reusePolicy = (0, password_policy_1.evaluatePasswordPolicy)(String(newPassword), { email: accountEmail });
+            if (!reusePolicy.ok) {
+                return res.status(400).json({
+                    error: reusePolicy.errors[0],
+                    code: 'PASSWORD_POLICY',
+                    checks: reusePolicy.checks,
+                });
+            }
+            if (accountEmail) {
+                const { data: reuseSession } = await supabase_1.supabase.auth.signInWithPassword({
+                    email: accountEmail,
+                    password: String(newPassword),
+                });
+                if (reuseSession?.session) {
+                    try {
+                        await supabase_1.supabase.auth.signOut();
+                    }
+                    catch {
+                        /* ignore */
+                    }
+                    return res.status(400).json({
+                        error: 'New password cannot be the same as your current or default password. Please choose a different password.',
+                        code: 'SAME_AS_PREVIOUS_PASSWORD',
+                    });
+                }
+            }
+            // 1. Update password in Supabase Auth (service_role required for admin API)
+            const { error: authError } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+                password: newPassword,
+            });
+            if (authError) {
+                const authMsg = String(authError.message || '').toLowerCase();
+                const authCode = String(authError.code || '').toLowerCase();
+                // Only treat real same-password rejections (not generic "User not allowed")
+                if (authCode === 'same_password' ||
+                    authMsg.includes('same password') ||
+                    authMsg.includes('different from the old') ||
+                    authMsg.includes('should be different') ||
+                    authMsg.includes('password should be different')) {
+                    return res.status(400).json({
+                        error: 'New password cannot be the same as your previous password. Please choose a different passphrase.',
+                        code: 'SAME_AS_PREVIOUS_PASSWORD',
+                    });
+                }
+                console.error(`[AuthController] updateUserById failed for ${targetUserId}:`, authError.message, authError.code || '');
+                return res.status(400).json({ error: authError.message });
+            }
+            // 2. Clear require_password_reset flag in public users table
+            const { error: profileError } = await supabase_1.supabaseAdmin
+                .from('users')
+                .update({ require_password_reset: false })
+                .eq('id', targetUserId);
+            if (profileError) {
+                console.warn('[AuthController] require_password_reset clear failed:', profileError.message);
+            }
+            return res.status(200).json({
+                message: 'Password reset completed successfully. You can now log in.',
+            });
+        }
+        catch (error) {
+            console.error('[AuthController] ResetPassword Error:', error.message);
+            return res.status(500).json({ error: 'Password reset failed' });
+        }
+    }
+    /**
+     * POST /api/auth/change-password
+     * Authenticated user sets a new password after proving the current one.
+     */
+    static async changePassword(req, res) {
+        try {
+            const user = req.user || {};
+            const userId = String(user.id || '').trim();
+            const email = String(user.email || '').trim().toLowerCase();
+            const currentPassword = String(req.body?.currentPassword || req.body?.oldPassword || '');
+            const newPassword = String(req.body?.newPassword || '');
+            if (!userId || !email) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({ error: 'Current password and new password are required.' });
+            }
+            const { data: verified, error: verifyError } = await supabase_1.supabase.auth.signInWithPassword({
+                email,
+                password: currentPassword,
+            });
+            if (verifyError || !verified?.session) {
+                return res.status(401).json({ error: 'Current password is incorrect.' });
+            }
+            try {
+                await supabase_1.supabase.auth.signOut();
+            }
+            catch {
+                /* ignore */
+            }
+            const policy = (0, password_policy_1.evaluatePasswordPolicy)(newPassword, { email, currentPassword });
+            if (!policy.ok) {
+                return res.status(400).json({
+                    error: policy.errors[0],
+                    code: 'PASSWORD_POLICY',
+                    checks: policy.checks,
+                });
+            }
+            const { error: authError } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(userId, {
+                password: newPassword,
+            });
+            if (authError) {
+                return res.status(400).json({ error: authError.message || 'Failed to update password.' });
+            }
+            await supabase_1.supabaseAdmin
+                .from('users')
+                .update({ require_password_reset: false })
+                .eq('id', userId);
+            return res.status(200).json({
+                success: true,
+                message: 'Password changed successfully. Please log in again on other devices.',
+            });
+        }
+        catch (error) {
+            console.error('[AuthController] changePassword Error:', error.message);
+            return res.status(500).json({ error: 'Failed to change password' });
+        }
+    }
+    static async sendWhatsappOtp(req, res) {
+        try {
+            const { phone } = req.body;
+            if (!phone || typeof phone !== 'string') {
+                res.status(400).json({ error: 'Valid phone number is required.' });
+                return;
+            }
+            const { otpService } = require('../services/otp.service');
+            await otpService.generateOTP(phone);
+            res.status(200).json({ message: 'OTP sent successfully via WhatsApp.' });
+        }
+        catch (error) {
+            console.error('[AuthController] sendWhatsappOtp error:', error.message);
+            res.status(400).json({ error: error.message });
+        }
+    }
+    static async verifyWhatsappOtp(req, res) {
+        try {
+            const { phone, otp } = req.body;
+            if (!phone || !otp) {
+                res.status(400).json({ error: 'Phone and OTP are required.' });
+                return;
+            }
+            const { otpService } = require('../services/otp.service');
+            const isValid = await otpService.verifyOTP(phone, otp);
+            if (isValid) {
+                try {
+                    const { dbQuery } = require('../db/pg');
+                    // Check if tenants table exists
+                    const tableCheck = await dbQuery(`SELECT EXISTS (
+              SELECT FROM information_schema.tables 
+              WHERE table_schema = 'public' 
+              AND table_name = 'tenants'
+            );`);
+                    if (tableCheck.rows[0]?.exists) {
+                        // Update phone_verified = true
+                        const safePhone = phone.replace(/\+/g, '');
+                        const reversed = safePhone.split('').reverse().join('');
+                        const expectedTenantId = `tenant-` + reversed;
+                        await dbQuery(`UPDATE tenants SET phone_verified = true WHERE id = $1 OR phone = $2`, [expectedTenantId, phone]);
+                    }
+                    res.status(200).json({
+                        message: 'OTP verified successfully.',
+                        data: { phone_verified: true }
+                    });
+                }
+                catch (dbErr) {
+                    console.error('Failed to update tenant status after OTP verification', dbErr);
+                    res.status(200).json({
+                        message: 'OTP verified successfully (Tenant sync failed).',
+                        data: { phone_verified: true }
+                    });
+                }
+            }
+            else {
+                res.status(400).json({ error: 'Invalid or expired OTP.' });
+            }
+        }
+        catch (error) {
+            console.error('[AuthController] verifyWhatsappOtp error:', error.message);
+            res.status(400).json({ error: error.message });
+        }
+    }
+    /**
+     * POST /api/auth/mfa/setup
+     * Generates TOTP secret and QR code URL for setup.
+     */
+    static async mfaSetup(req, res) {
+        try {
+            const requestedUserId = typeof req.body?.userId === 'string' && req.body.userId.trim()
+                ? req.body.userId.trim()
+                : undefined;
+            const setupChallenge = (0, mfa_challenge_service_1.validateMfaChallenge)(readMfaChallengeToken(req), 'setup', requestedUserId);
+            // Claim before any database mutation. Concurrent/replayed setup requests fail closed.
+            const pendingSession = (0, mfa_challenge_service_1.consumeMfaChallenge)(setupChallenge);
+            const userId = setupChallenge.userId;
+            const { data: profile, error: profileErr } = await supabase_1.supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+            if (profileErr || !profile) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            // Always rotate an incomplete enrollment secret; never disclose a stored secret.
+            const secret = otplib_1.authenticator.generateSecret();
+            const { error: updateErr } = await supabase_1.supabaseAdmin
+                .from('users')
+                .update({ mfa_secret: secret, mfa_enabled: false })
+                .eq('id', userId);
+            if (updateErr) {
+                console.error('[MfaSetup] Failed to store MFA secret:', updateErr.message);
+                return res.status(500).json({ error: 'Failed to prepare MFA setup' });
+            }
+            const otpAuthUrl = otplib_1.authenticator.keyuri(profile.email, 'Invify Admin', secret);
+            const qrCodeUrl = await qrcode_1.default.toDataURL(otpAuthUrl);
+            const verificationChallenge = (0, mfa_challenge_service_1.issueMfaChallenge)(userId, 'verify', pendingSession, mfaSnapshotFromProfile(profile, { mfaSecret: secret, mfaEnabled: false }));
+            setMfaChallengeCookie(res, verificationChallenge.token, req);
+            // Raw secret is returned only in this password-authenticated, single-user enrollment flow.
+            return res.status(200).json({
+                secret,
+                qrCodeUrl,
+                challengeToken: verificationChallenge.token,
+            });
+        }
+        catch (error) {
+            return mfaErrorResponse(res, error);
+        }
+    }
+    /**
+     * POST /api/auth/mfa/verify
+     * Verifies OTP code and activates MFA if setup. Returns the cached session.
+     */
+    static async mfaVerify(req, res) {
+        try {
+            const requestedUserId = typeof req.body?.userId === 'string' && req.body.userId.trim()
+                ? req.body.userId.trim()
+                : undefined;
+            const tokenCode = req.body?.tokenCode || req.body?.code;
+            if (!tokenCode) {
+                return res.status(400).json({ error: 'MFA code is required' });
+            }
+            const verificationChallenge = (0, mfa_challenge_service_1.validateMfaChallenge)(readMfaChallengeToken(req), 'verify', requestedUserId);
+            const userId = verificationChallenge.userId;
+            const snapshot = verificationChallenge.snapshot;
+            let profile = snapshot
+                ? {
+                    id: snapshot.id,
+                    email: snapshot.email,
+                    role: snapshot.role,
+                    tenant_id: snapshot.tenantId,
+                    name: snapshot.name,
+                    mfa_secret: snapshot.mfaSecret,
+                    mfa_enabled: snapshot.mfaEnabled,
+                }
+                : null;
+            if (!profile?.mfa_secret) {
+                const { data, error: profileErr } = await supabase_1.supabaseAdmin
+                    .from('users')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                if (profileErr || !data) {
+                    return res.status(404).json({ error: 'User not found' });
+                }
+                profile = data;
+            }
+            const secret = profile.mfa_secret;
+            if (!secret) {
+                return res.status(400).json({ error: 'MFA not initialized' });
+            }
+            const cleanToken = String(tokenCode).trim();
+            if (!otplib_1.authenticator.verify({ token: cleanToken, secret })) {
+                return res.status(400).json({
+                    message: 'Invalid or expired 2FA code',
+                    error: 'Invalid or expired 2FA code',
+                });
+            }
+            if (!profile.mfa_enabled) {
+                const { error: updateErr } = await supabase_1.supabaseAdmin
+                    .from('users')
+                    .update({ mfa_enabled: true })
+                    .eq('id', userId);
+                if (updateErr) {
+                    console.error('[MfaVerify] Failed to update mfa_enabled:', updateErr.message);
+                    return res.status(500).json({ error: 'Failed to enable MFA' });
+                }
+            }
+            // Consuming after successful TOTP verification enforces one-time session release.
+            const session = (0, mfa_challenge_service_1.consumeMfaChallenge)(verificationChallenge);
+            clearMfaChallengeCookie(res);
+            dispatchLoginSecurityAlert(req, {
+                name: profile.name,
+                email: profile.email,
+                role: profile.role
+            });
+            return res.status(200).json({
+                token: session.token,
+                refreshToken: session.refreshToken,
+                user: {
+                    id: profile.id,
+                    email: profile.email,
+                    role: profile.role || 'tenant_admin',
+                    tenantId: profile.tenant_id
+                }
+            });
+        }
+        catch (error) {
+            return mfaErrorResponse(res, error);
+        }
+    }
+    /**
+     * POST /api/auth/refresh
+     * Thin facade over Supabase Auth refresh-token rotation. Does not mint custom JWTs.
+     */
+    static async refresh(req, res) {
+        try {
+            const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+            const currentAccess = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+            const boundUserId = (0, auth_session_service_1.peekTokenSubject)(currentAccess);
+            const session = await (0, auth_session_service_1.exchangeRefreshToken)(req.body?.refreshToken, boundUserId);
+            return res.status(200).json({
+                token: session.token,
+                refreshToken: session.refreshToken,
+                user: session.user,
+            });
+        }
+        catch (error) {
+            if (error instanceof auth_session_service_1.AuthSessionError) {
+                return res.status(error.status).json({ error: error.code, message: error.message });
+            }
+            return res.status(401).json({
+                error: 'REFRESH_TOKEN_INVALID',
+                message: 'Refresh token is invalid or expired',
+            });
+        }
+    }
+    /**
+     * POST /api/auth/logout
+     * Best-effort Supabase session revocation, then always succeeds so the client can clear storage.
+     */
+    static async logout(req, res) {
+        clearMfaChallengeCookie(res);
+        const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+        const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+        try {
+            await (0, auth_session_service_1.revokeProviderSession)({
+                refreshToken: req.body?.refreshToken,
+                accessToken,
+            });
+        }
+        catch {
+            // Local logout remains authoritative even if the provider is unreachable.
+        }
+        return res.status(200).json({ ok: true });
+    }
+}
+exports.AuthController = AuthController;
+//# sourceMappingURL=auth.controller.js.map

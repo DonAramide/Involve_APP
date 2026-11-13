@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/service_mode/service_mode_terms.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import '../../domain/entities/health_insurance_entities.dart';
 import '../bloc/health_insurance_bloc.dart';
 import '../bloc/health_insurance_event.dart';
@@ -28,6 +30,16 @@ class HealthWellnessHomePage extends StatefulWidget {
 }
 
 class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
+  ServiceModeTerms get _terms {
+    try {
+      final mode =
+          context.read<SettingsBloc>().state.settings?.normalizedBusinessMode;
+      return ServiceModeTerms.fromRaw(mode);
+    } catch (_) {
+      return const ServiceModeTerms(ServiceMode.school);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +47,22 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkFirstTimeWelcome();
     });
+  }
+
+  String? get _organizationName {
+    try {
+      return context.read<SettingsBloc>().state.settings?.organizationName;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? get _businessMode {
+    try {
+      return context.read<SettingsBloc>().state.settings?.normalizedBusinessMode;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _checkFirstTimeWelcome() async {
@@ -47,6 +75,8 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
         context,
         tenantId: state.activeTenantId,
         hmoProviderName: state.assignedProvider?.name,
+        organizationName: _organizationName,
+        businessMode: _businessMode,
       );
     }
   }
@@ -56,6 +86,8 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
       context,
       tenantId: state.activeTenantId,
       hmoProviderName: state.assignedProvider?.name,
+      organizationName: _organizationName,
+      businessMode: _businessMode,
     );
   }
 
@@ -65,6 +97,8 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
         builder: (_) => HmoGuidedTourPage(
           tenantId: state.activeTenantId,
           hmoProviderName: state.assignedProvider?.name,
+          organizationName: _organizationName,
+          businessMode: _businessMode,
         ),
       ),
     );
@@ -120,7 +154,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'A Health Maintenance Organization (HMO) coordinates hospital and medical care for schools and organizations. Instead of paying unexpected out-of-pocket medical bills, eligible members receive covered services at authorized clinics and hospitals under the terms of their school\'s selected health plan.',
+                  'A Health Maintenance Organization (HMO) coordinates hospital and medical care for ${_terms.organisation.toLowerCase()}s and organizations. Instead of paying unexpected out-of-pocket medical bills, eligible members receive covered services at authorized clinics and hospitals under the terms of their ${_terms.organisation.toLowerCase()}\'s selected health plan.',
                   style: TextStyle(
                     fontSize: 13.5,
                     height: 1.4,
@@ -129,7 +163,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '• School Role: Selects and sponsors or subsidizes eligible plan packages.\n• HMO Role: Provides the accredited network of hospitals, doctors, and covers authorized treatments.\n• Family Role: Enrols verified beneficiaries and accesses digital health ID passes for care.',
+                  '• ${_terms.organisation} Role: Selects and sponsors or subsidizes eligible plan packages.\n• HMO Role: Provides the accredited network of hospitals, doctors, and covers authorized treatments.\n• ${_terms.responsiblePerson} Role: Enrols verified beneficiaries and accesses digital health ID passes for care.',
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.45,
@@ -201,9 +235,13 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'To protect student privacy and ensure proper underwriter records, students must be linked to a verified guardian profile.\n\n1. Ensure your child is registered with the school.\n2. Obtain their official admission number or student identifier.\n3. The school administration will verify your guardian relationship.\n4. Once verified, your child appears here with full plan options.',
-                  style: TextStyle(fontSize: 13, height: 1.4),
+                Text(
+                  'To protect ${_terms.beneficiary.toLowerCase()} privacy and ensure proper underwriter records, ${_terms.beneficiaries.toLowerCase()} must be linked to a verified ${_terms.responsiblePerson.toLowerCase()} profile.\n\n'
+                  '1. Ensure the ${_terms.beneficiary.toLowerCase()} is registered with the ${_terms.organisation.toLowerCase()}.\n'
+                  '2. Obtain their official ${_terms.beneficiaryId.toLowerCase()} or ${_terms.beneficiary.toLowerCase()} identifier.\n'
+                  '3. The ${_terms.organisation.toLowerCase()} administration will verify your ${_terms.responsiblePerson.toLowerCase()} relationship.\n'
+                  '4. Once verified, the ${_terms.beneficiary.toLowerCase()} appears here with full plan options.',
+                  style: const TextStyle(fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 18),
                 SizedBox(
@@ -222,23 +260,24 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
   }
 
   void _showSchoolSupportDialog(BuildContext context, HealthInsuranceState state) {
+    final terms = _terms;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.contact_support_outlined, color: Colors.teal),
-            SizedBox(width: 8),
-            Text('School Support', style: TextStyle(fontSize: 16)),
+            const Icon(Icons.contact_support_outlined, color: Colors.teal),
+            const SizedBox(width: 8),
+            Text('${terms.organisation} Support', style: const TextStyle(fontSize: 16)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'For assistance with student linking, roster updates, or health insurance plan availability, contact your school administration office:',
-              style: TextStyle(fontSize: 13, height: 1.35),
+            Text(
+              'For assistance with ${_terms.beneficiary.toLowerCase()} linking, roster updates, or health insurance plan availability, contact your ${terms.organisation.toLowerCase()} administration office:',
+              style: const TextStyle(fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 12),
             Container(
@@ -250,7 +289,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Campus Administrative Office', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('${terms.organisation} Administrative Office', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   const SizedBox(height: 2),
                   const Text('Email: health-support@invify.org', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 2),
@@ -428,7 +467,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Loading school health plans & dependants...',
+              'Loading ${_terms.hmoPlans.toLowerCase()} & dependants...',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ],
@@ -452,7 +491,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               ),
               const SizedBox(height: 6),
               Text(
-                state.errorMessage ?? 'Please check your connection or contact the school office.',
+                state.errorMessage ?? 'Please check your connection or contact the ${_terms.organisation.toLowerCase()} office.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
               ),
@@ -538,7 +577,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'School Health & Wellness Hub',
+                      _terms.hmoHubTitle,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -614,15 +653,16 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
   }
 
   String _roleLabel(HealthUserRole role) {
+    final terms = _terms;
     switch (role) {
       case HealthUserRole.parent:
-        return 'Parent / Guardian';
+        return terms.responsiblePerson;
       case HealthUserRole.student:
-        return 'Student View';
+        return terms.hmoStudentView;
       case HealthUserRole.staff:
-        return 'School Staff';
+        return terms.hmoStaffRole;
       case HealthUserRole.admin:
-        return 'School Admin';
+        return terms.hmoAdminRole;
     }
   }
 
@@ -806,18 +846,18 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                         child: const Icon(Icons.family_restroom_rounded, color: Colors.indigo, size: 24),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'No Linked Dependants Found',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Coverage is tied to verified student records',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              'Coverage is tied to verified ${_terms.beneficiary.toLowerCase()} records',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -826,7 +866,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'To enrol your child in school health insurance, their student profile must be linked to your account with a verified admission number.',
+                    'To enrol a ${_terms.beneficiary.toLowerCase()} in ${_terms.hmoEnrolment.toLowerCase()}, their profile must be linked to your account with a verified ${_terms.beneficiaryId.toLowerCase()}.',
                     style: TextStyle(fontSize: 12.5, height: 1.35, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700),
                   ),
                   const SizedBox(height: 14),
@@ -846,7 +886,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                       TextButton.icon(
                         onPressed: () => _showSchoolSupportDialog(context, state),
                         icon: const Icon(Icons.contact_support_outlined, size: 16),
-                        label: const Text('Contact School Office'),
+                        label: Text('Contact ${_terms.organisation} Office'),
                         style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
                       ),
                     ],
@@ -898,7 +938,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'School Health Plans (${state.offers.length})',
+              '${_terms.hmoPlans} (${state.offers.length})',
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
@@ -929,18 +969,18 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                         child: const Icon(Icons.health_and_safety_outlined, color: Colors.teal, size: 24),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'No School Health Plans Published Yet',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              _terms.hmoNoPlansYet,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Waiting for school package configuration',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              'Waiting for ${_terms.organisation.toLowerCase()} package configuration',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -949,7 +989,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Your school administration selects and configures the exact health plans offered to families and staff. Once published, plan benefits, hospital tiers, and any school subsidies will appear here.',
+                    'Your ${_terms.organisation.toLowerCase()} administration selects and configures the exact health plans offered to ${_terms.beneficiaries.toLowerCase()} and staff. Once published, plan benefits, hospital tiers, and any subsidies will appear here.',
                     style: TextStyle(fontSize: 12.5, height: 1.35, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700),
                   ),
                   const SizedBox(height: 14),
@@ -969,7 +1009,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                       TextButton.icon(
                         onPressed: () => _showSchoolSupportDialog(context, state),
                         icon: const Icon(Icons.contact_support_outlined, size: 16),
-                        label: const Text('Contact School Admin'),
+                        label: Text('Contact ${_terms.organisation} Admin'),
                         style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
                       ),
                     ],
@@ -1073,7 +1113,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Policy Number:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('Enrollee ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   Text(
                     enrolment.policyNumber ?? 'Pending Confirmation',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -1146,9 +1186,9 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                 ],
               ),
             ] else ...[
-              const Text(
-                'This student does not currently have an active health insurance policy.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+              Text(
+                'This ${_terms.beneficiary.toLowerCase()} does not currently have an active health insurance policy.',
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
@@ -1163,7 +1203,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   );
                 },
                 icon: const Icon(Icons.add_task),
-                label: const Text('Enrol in School Health Plan'),
+                label: Text(_terms.hmoEnrolInPlan),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: Colors.white,
@@ -1187,14 +1227,16 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
-        const Text(
-          'Student Health Pass',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Text(
+          _terms.hmoStudentPass,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Present this digital coverage card at accredited school partner hospitals and the campus sick bay.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+        Text(
+          _terms.isSchool
+              ? 'Present this digital coverage card at accredited school partner hospitals and the campus sick bay.'
+              : 'Present this digital coverage card at accredited partner hospitals and clinics.',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
         const SizedBox(height: 16),
 
@@ -1262,7 +1304,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               ),
               const SizedBox(height: 24),
               Text(
-                enrolment?.memberName.isNotEmpty == true ? enrolment!.memberName : 'Student Beneficiary',
+                enrolment?.memberName.isNotEmpty == true ? enrolment!.memberName : _terms.hmoBeneficiary,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -1272,7 +1314,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Student ID: ${enrolment?.admissionNumber.isNotEmpty == true ? enrolment!.admissionNumber : "VERIFIED"}',
+                '${_terms.hmoStudentIdLabel}: ${enrolment?.admissionNumber.isNotEmpty == true ? enrolment!.admissionNumber : "VERIFIED"}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 22),
@@ -1440,7 +1482,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Policy Number:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text('Enrollee ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                       Text(
                         enrolment.policyNumber ?? 'Pending Activation',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -1511,9 +1553,9 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Check with HR or enrol in one of the school\'s staff health plans below.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Text(
+                      'Check with HR or enrol in one of the ${_terms.organisation.toLowerCase()}\'s staff health plans below.',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -1603,7 +1645,7 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
             Expanded(
               child: _kpiCard(
                 'Pending Activation',
-                metrics.awaitingActivationCount.toString(),
+                metrics.pendingActivationFor(state.enrolments).toString(),
                 Icons.hourglass_top,
                 Colors.deepOrange,
               ),
@@ -1662,49 +1704,234 @@ class _HealthWellnessHomePageState extends State<HealthWellnessHomePage> {
             child: Padding(
               padding: EdgeInsets.all(20),
               child: Center(
-                child: Text('No enrolments registered for this school yet.', style: TextStyle(color: Colors.grey)),
+                child: Text('No enrolments registered yet.', style: TextStyle(color: Colors.grey)),
               ),
             ),
           ),
         ] else ...[
-          ...state.enrolments.take(15).map((enrol) => Card(
-                elevation: 1,
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: enrol.isCoverageActive ? Colors.green.withValues(alpha: 0.15) : Colors.amber.withValues(alpha: 0.15),
-                    child: Icon(
-                      enrol.isCoverageActive ? Icons.verified : Icons.hourglass_top,
-                      color: enrol.isCoverageActive ? Colors.green : Colors.amber.shade900,
-                      size: 20,
+          ...state.enrolments.take(15).map((enrol) {
+            final isRejected = enrol.status == EnrolmentLifecycleStatus.rejected ||
+                enrol.status == EnrolmentLifecycleStatus.cancelled;
+            final reason = (enrol.statusReason ?? '').trim();
+            final avatarColor = enrol.isCoverageActive
+                ? Colors.green
+                : isRejected
+                    ? Colors.red
+                    : Colors.amber;
+            final card = Card(
+              elevation: 1,
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PolicyDetailsPage(enrolment: enrol),
                     ),
-                  ),
-                  title: Text(
-                    enrol.memberName.isNotEmpty ? enrol.memberName : 'Member',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    '${enrol.planName} • ID: ${enrol.admissionNumber}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: CoverageStatusBadge(
-                    status: enrol.status,
-                    policyStatus: enrol.policyStatus,
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PolicyDetailsPage(enrolment: enrol),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: avatarColor.withValues(alpha: 0.15),
+                            child: Icon(
+                              enrol.isCoverageActive
+                                  ? Icons.verified
+                                  : isRejected
+                                      ? Icons.block
+                                      : Icons.hourglass_top,
+                              color: enrol.isCoverageActive
+                                  ? Colors.green
+                                  : isRejected
+                                      ? Colors.red.shade900
+                                      : Colors.amber.shade900,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  enrol.memberName.isNotEmpty ? enrol.memberName : 'Member',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${enrol.planName} • ID: ${enrol.admissionNumber}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: CoverageStatusBadge(
+                              status: enrol.status,
+                              policyStatus: enrol.policyStatus,
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
+                      if (isRejected) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.28)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.info_outline, size: 14, color: Colors.red.shade800),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  reason.isNotEmpty
+                                      ? 'Rejection reason: $reason'
+                                      : 'Rejection reason: Not provided by HMO',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.red.shade900,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Swipe left to delete or re-push',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              )),
+              ),
+            );
+
+            if (!isRejected) return card;
+
+            return Dismissible(
+              key: ValueKey('rejected-enrol-${enrol.id}'),
+              direction: DismissDirection.endToStart,
+              confirmDismiss: (_) => _confirmRejectedEnrolmentAction(context, enrol),
+              background: Container(
+                alignment: Alignment.centerRight,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade700,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(Icons.replay, color: Colors.white, size: 22),
+                    SizedBox(width: 12),
+                    Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                    SizedBox(width: 4),
+                    Text(
+                      'Delete / Re-push',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              child: card,
+            );
+          }),
         ],
         const SizedBox(height: 32),
       ],
     );
+  }
+
+  Future<bool> _confirmRejectedEnrolmentAction(
+    BuildContext context,
+    HealthEnrolment enrol,
+  ) async {
+    final name = enrol.memberName.isNotEmpty ? enrol.memberName : 'this member';
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Manage rejected enrolment',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  name,
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue.withValues(alpha: 0.12),
+                    child: const Icon(Icons.replay, color: Colors.blue),
+                  ),
+                  title: const Text('Re-push enrolment'),
+                  subtitle: const Text('Submit again for HMO verification'),
+                  onTap: () => Navigator.pop(sheetContext, 'repush'),
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.red.withValues(alpha: 0.12),
+                    child: Icon(Icons.delete_outline, color: Colors.red.shade700),
+                  ),
+                  title: Text('Delete', style: TextStyle(color: Colors.red.shade700)),
+                  subtitle: const Text('Remove this rejected enrolment'),
+                  onTap: () => Navigator.pop(sheetContext, 'delete'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted || action == null) return false;
+
+    final bloc = context.read<HealthInsuranceBloc>();
+    if (action == 'delete') {
+      bloc.add(DismissRejectedEnrolmentRequest(enrol.id));
+      return true;
+    }
+    if (action == 'repush') {
+      bloc.add(RepushRejectedEnrolmentRequest(enrol.id));
+      return true;
+    }
+    return false;
   }
 
   static Widget _kpiCard(String label, String value, IconData icon, Color color) {

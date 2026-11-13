@@ -1,15 +1,17 @@
 <!-- invify-admin/src/pages/school/attendance/AttendanceManagementPage.vue -->
 <template>
-  <q-page class="q-pa-md bg-grey-1 text-dark">
+  <q-page class="q-pa-md attendance-page text-white">
     <!-- Header -->
     <div class="row items-center justify-between q-mb-md">
       <div>
         <div class="row items-center q-gutter-sm">
           <q-icon name="fact_check" size="2em" color="primary" />
-          <h1 class="text-h5 text-weight-bolder q-ma-none text-indigo-10">Attendance Management & Reporting</h1>
+          <h1 class="text-h5 text-weight-bolder q-ma-none text-white">{{ terms.attendanceTitle }}</h1>
         </div>
-        <div class="text-caption text-grey-7 q-mt-xs">
-          Comprehensive multi-tenant class attendance, weekly registers, monthly analytics, and audit tracking.
+        <div class="text-caption text-grey-5 q-mt-xs">
+          {{ terms.isSchool
+            ? 'Comprehensive multi-tenant class attendance, weekly registers, monthly analytics, and audit tracking.'
+            : `Multi-tenant ${terms.attendanceTitle.toLowerCase()}, registers, analytics, and audit tracking.` }}
         </div>
       </div>
       <div class="row q-gutter-sm items-center">
@@ -36,21 +38,21 @@
     </div>
 
     <!-- Navigation Tabs -->
-    <q-card flat bordered class="bg-white q-mb-md shadow-1">
+    <q-card flat bordered class="bg-card-dark q-mb-md shadow-1">
       <q-tabs
         v-model="activeTab"
         dense
         align="left"
-        class="text-grey-7"
+        class="text-grey-5"
         active-color="primary"
         indicator-color="primary"
         narrow-indicator
       >
         <q-tab name="dashboard" icon="dashboard" label="Dashboard" />
-        <q-tab name="mark" icon="edit_calendar" label="Mark Attendance" />
+        <q-tab name="mark" icon="edit_calendar" :label="terms.markAttendance" />
         <q-tab name="register" icon="view_week" label="Weekly Register" />
-        <q-tab name="report" icon="analytics" label="Class Attendance Report" />
-        <q-tab name="student_history" icon="person_search" label="Student History" />
+        <q-tab name="report" icon="analytics" :label="terms.classAttendance" />
+        <q-tab name="student_history" icon="person_search" :label="terms.studentHistory" />
         <q-tab name="settings" icon="settings" label="Settings & Calendar" />
       </q-tabs>
     </q-card>
@@ -62,44 +64,44 @@
         <!-- KPI Summary Cards -->
         <div class="row q-col-gutter-md q-mb-md">
           <div class="col-12 col-sm-6 col-md-3">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between">
                 <div>
-                  <div class="text-caption text-grey-7">Active Classes</div>
-                  <div class="text-h5 text-weight-bolder text-indigo-10">{{ classOptions.length }}</div>
+                  <div class="text-caption text-grey-5">{{ terms.activeGroups }}</div>
+                  <div class="text-h5 text-weight-bolder text-white">{{ classOptions.length }}</div>
                 </div>
                 <q-avatar color="indigo-1" text-color="indigo-9" icon="school" />
               </div>
             </q-card>
           </div>
           <div class="col-12 col-sm-6 col-md-3">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between">
                 <div>
-                  <div class="text-caption text-grey-7">Total Students</div>
-                  <div class="text-h5 text-weight-bolder text-indigo-10">{{ allStudentsCount }}</div>
+                  <div class="text-caption text-grey-5">{{ terms.totalBeneficiaries }}</div>
+                  <div class="text-h5 text-weight-bolder text-white">{{ allStudentsCount }}</div>
                 </div>
                 <q-avatar color="teal-1" text-color="teal-9" icon="groups" />
               </div>
             </q-card>
           </div>
           <div class="col-12 col-sm-6 col-md-3">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between">
                 <div>
-                  <div class="text-caption text-grey-7">Attendance Threshold</div>
-                  <div class="text-h5 text-weight-bolder text-indigo-10">{{ settings.minimum_attendance_threshold }}%</div>
+                  <div class="text-caption text-grey-5">Attendance Threshold</div>
+                  <div class="text-h5 text-weight-bolder text-white">{{ thresholdDisplay }}</div>
                 </div>
                 <q-avatar color="amber-1" text-color="amber-9" icon="tune" />
               </div>
             </q-card>
           </div>
           <div class="col-12 col-sm-6 col-md-3">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between">
                 <div>
-                  <div class="text-caption text-grey-7">School Holidays Configured</div>
-                  <div class="text-h5 text-weight-bolder text-indigo-10">{{ calendarExceptions.length }}</div>
+                  <div class="text-caption text-grey-5">School Holidays Configured</div>
+                  <div class="text-h5 text-weight-bolder text-white">{{ holidayCount }}</div>
                 </div>
                 <q-avatar color="purple-1" text-color="purple-9" icon="event_busy" />
               </div>
@@ -110,34 +112,34 @@
         <!-- Quick Launch Cards -->
         <div class="row q-col-gutter-md q-mb-md">
           <div class="col-12 col-md-4">
-            <q-card flat bordered class="bg-white q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'mark'">
+            <q-card flat bordered class="bg-card-dark q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'mark'">
               <div class="row items-center q-gutter-md">
                 <q-avatar color="primary" text-color="white" icon="how_to_reg" size="48px" />
                 <div>
-                  <div class="text-subtitle1 text-weight-bold text-indigo-10">Mark Daily Attendance</div>
-                  <div class="text-caption text-grey-7">Record present, absent, late, or excused students with auto-save.</div>
+                  <div class="text-subtitle1 text-weight-bold text-white">Mark Daily Attendance</div>
+                  <div class="text-caption text-grey-5">Record present, absent, late, or excused students with auto-save.</div>
                 </div>
               </div>
             </q-card>
           </div>
           <div class="col-12 col-md-4">
-            <q-card flat bordered class="bg-white q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'register'">
+            <q-card flat bordered class="bg-card-dark q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'register'">
               <div class="row items-center q-gutter-md">
                 <q-avatar color="teal-7" text-color="white" icon="view_week" size="48px" />
                 <div>
-                  <div class="text-subtitle1 text-weight-bold text-indigo-10">Class Attendance Register</div>
-                  <div class="text-caption text-grey-7">Inspect 5-week class register grid and print official PDF.</div>
+                  <div class="text-subtitle1 text-weight-bold text-white">Class Attendance Register</div>
+                  <div class="text-caption text-grey-5">Inspect 5-week class register grid and print official PDF.</div>
                 </div>
               </div>
             </q-card>
           </div>
           <div class="col-12 col-md-4">
-            <q-card flat bordered class="bg-white q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'report'">
+            <q-card flat bordered class="bg-card-dark q-pa-md cursor-pointer hover-shadow" @click="activeTab = 'report'">
               <div class="row items-center q-gutter-md">
                 <q-avatar color="indigo-7" text-color="white" icon="insert_chart" size="48px" />
                 <div>
-                  <div class="text-subtitle1 text-weight-bold text-indigo-10">Class Attendance Report</div>
-                  <div class="text-caption text-grey-7">View monthly attendance rates, individual totals, & below-threshold warnings.</div>
+                  <div class="text-subtitle1 text-weight-bold text-white">Class Attendance Report</div>
+                  <div class="text-caption text-grey-5">View monthly attendance rates, individual totals, & below-threshold warnings.</div>
                 </div>
               </div>
             </q-card>
@@ -145,9 +147,9 @@
         </div>
 
         <!-- Recent Activity / Audit Log -->
-        <q-card flat bordered class="bg-white">
+        <q-card flat bordered class="bg-card-dark">
           <q-card-section class="row items-center justify-between">
-            <div class="text-subtitle1 text-weight-bold text-indigo-10">Recent Attendance Audit Activity</div>
+            <div class="text-subtitle1 text-weight-bold text-white">Recent Attendance Audit Activity</div>
             <q-btn flat dense icon="refresh" label="Refresh" @click="fetchAuditLog" />
           </q-card-section>
           <q-separator />
@@ -175,14 +177,14 @@
 
       <!-- 2. MARK ATTENDANCE -->
       <q-tab-panel name="mark" class="q-pa-none">
-        <q-card flat bordered class="bg-white q-pa-md q-mb-md">
+        <q-card flat bordered class="bg-card-dark q-pa-md q-mb-md">
           <!-- Selection Filter Header -->
           <div class="row q-col-gutter-md items-center">
             <div class="col-12 col-sm-6 col-md-3">
               <q-select
                 v-model="selectedClass"
                 :options="classOptions"
-                label="Class / Form *"
+                :label="terms.selectGroup"
                 outlined
                 dense
                 @update:model-value="fetchRegister"
@@ -199,7 +201,7 @@
               />
             </div>
             <div class="col-12 col-sm-6 col-md-2">
-              <q-input v-model="teacherName" label="Teacher Name" outlined dense />
+              <q-input v-model="teacherName" :label="terms.teacherName" outlined dense />
             </div>
             <div class="col-12 col-sm-6 col-md-2">
               <q-input v-model="subjectName" label="Subject (Optional)" outlined dense />
@@ -236,12 +238,12 @@
 
           <!-- Finalized Warning / Correction Alert -->
           <div v-if="isFinalized" class="q-mt-md">
-            <q-banner rounded class="bg-blue-1 text-indigo-10 border-indigo">
+            <q-banner rounded class="bg-indigo-10 text-white border-indigo">
               <template v-slot:avatar>
                 <q-icon name="verified" color="primary" />
               </template>
               <div class="text-weight-bold">This attendance register is finalized.</div>
-              <div class="text-caption text-grey-8">
+              <div class="text-caption text-grey-5">
                 Changes require an authorized correction with an auditable reason.
               </div>
             </q-banner>
@@ -278,20 +280,20 @@
         </q-card>
 
         <!-- Student Attendance List -->
-        <q-card flat bordered class="bg-white">
+        <q-card flat bordered class="bg-card-dark">
           <div v-if="loadingRegister" class="flex flex-center q-pa-xl">
             <q-spinner-dots color="primary" size="3em" />
           </div>
 
           <div v-else-if="!selectedClass" class="flex flex-center q-pa-xl text-grey-6 column">
             <q-icon name="school" size="4em" class="q-mb-sm" />
-            <div class="text-subtitle1">Select a Class / Form to load students and record attendance</div>
+            <div class="text-subtitle1">Select a {{ terms.beneficiaryGroup.toLowerCase() }} to load {{ terms.beneficiaries.toLowerCase() }} and record attendance</div>
           </div>
 
           <div v-else-if="!students.length" class="flex flex-center q-pa-xl text-grey-6 column">
             <q-icon name="person_off" size="4em" class="q-mb-sm" />
             <div class="text-subtitle1">No students found enrolled in {{ selectedClass }}</div>
-            <q-btn color="primary" label="Quick Enroll Student" class="q-mt-md" @click="showAddStudentDialog = true" />
+            <q-btn color="primary" :label="`Quick Enroll ${terms.beneficiary}`" class="q-mt-md" @click="showAddStudentDialog = true" />
           </div>
 
           <div v-else>
@@ -311,7 +313,7 @@
 
                 <!-- Student Identity -->
                 <q-item-section>
-                  <q-item-label class="text-weight-bold text-dark">{{ student.full_name }}</q-item-label>
+                  <q-item-label class="text-weight-bold text-white">{{ student.full_name }}</q-item-label>
                   <q-item-label caption class="text-grey-6">
                     Admission No: {{ student.admission_number || 'N/A' }}
                   </q-item-label>
@@ -361,13 +363,13 @@
 
       <!-- 3. WEEKLY REGISTER (Reference Image 2) -->
       <q-tab-panel name="register" class="q-pa-none">
-        <q-card flat bordered class="bg-white q-pa-md q-mb-md">
+        <q-card flat bordered class="bg-card-dark q-pa-md q-mb-md">
           <div class="row q-col-gutter-md items-center justify-between">
             <div class="col-12 col-md-3">
               <q-select
                 v-model="selectedClass"
                 :options="classOptions"
-                label="Class / Form *"
+                :label="terms.selectGroup"
                 outlined
                 dense
                 @update:model-value="fetchRegister"
@@ -386,11 +388,11 @@
         </q-card>
 
         <!-- Formal Register Container -->
-        <q-card flat bordered class="bg-white q-pa-lg">
+        <q-card flat bordered class="bg-card-dark q-pa-lg">
           <!-- Register Formal Header -->
           <div class="text-center q-mb-md">
-            <div class="text-h6 text-weight-bolder text-uppercase text-dark">{{ activeBusinessName || 'School of Education' }}</div>
-            <div class="text-subtitle1 text-weight-bold text-uppercase text-grey-9 text-decoration-underline">Class Attendance Register</div>
+            <div class="text-h6 text-weight-bolder text-uppercase text-white">{{ activeBusinessName || 'School of Education' }}</div>
+            <div class="text-subtitle1 text-weight-bold text-uppercase text-grey-4 text-decoration-underline">Class Attendance Register</div>
           </div>
 
           <div class="row q-col-gutter-md text-caption text-weight-medium q-mb-md">
@@ -431,7 +433,12 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(student, sIdx) in (students.length ? students : mockRegisterRows)" :key="sIdx">
+                <tr v-if="!students.length">
+                  <td colspan="27" class="text-center text-grey-5 q-pa-md">
+                    No students loaded for this class. Open Mark Attendance and select a class with enrolled students.
+                  </td>
+                </tr>
+                <tr v-for="(student, sIdx) in students" :key="student.id || sIdx">
                   <td class="text-center">{{ sIdx + 1 }}</td>
                   <td>{{ student.full_name || student.name }}</td>
                   <!-- 25 daily attendance cells -->
@@ -444,7 +451,7 @@
           </div>
 
           <!-- Legend and Signatures -->
-          <div class="row items-center justify-between text-caption text-grey-8 q-mt-lg pt-border">
+          <div class="row items-center justify-between text-caption text-grey-5 q-mt-lg pt-border">
             <div class="text-weight-bold">
               LEGEND: P = Present | A = Absent | L = Late | E = Excused
             </div>
@@ -456,13 +463,13 @@
 
       <!-- 4. CLASS ATTENDANCE REPORT (Reference Image 1) -->
       <q-tab-panel name="report" class="q-pa-none">
-        <q-card flat bordered class="bg-white q-pa-md q-mb-md">
+        <q-card flat bordered class="bg-card-dark q-pa-md q-mb-md">
           <div class="row q-col-gutter-md items-center">
             <div class="col-12 col-sm-6 col-md-3">
               <q-select
                 v-model="selectedClass"
                 :options="classOptions"
-                label="Class / Form *"
+                :label="terms.selectGroup"
                 outlined
                 dense
               />
@@ -499,18 +506,18 @@
         </div>
 
         <div v-else>
-          <q-card flat bordered class="bg-white q-pa-lg">
+          <q-card flat bordered class="bg-card-dark q-pa-lg">
             <!-- Formal School Title -->
             <div class="text-center q-mb-md">
-              <div class="text-h5 text-weight-bolder text-uppercase text-dark">{{ reportData.schoolName || activeBusinessName }}</div>
-              <div class="text-caption text-italic text-grey-7">Leading from darkness to light</div>
+              <div class="text-h5 text-weight-bolder text-uppercase text-white">{{ reportData.schoolName || activeBusinessName }}</div>
+              <div class="text-caption text-italic text-grey-5">Leading from darkness to light</div>
               <div class="text-subtitle1 text-weight-bold text-uppercase text-right q-mt-sm">CLASS ATTENDANCE REPORT</div>
             </div>
 
             <!-- Metadata Line -->
             <div class="row justify-between text-caption text-weight-medium q-mb-lg border-bottom-line">
-              <div>CLASS: <strong class="text-indigo-10">{{ selectedClass }}</strong></div>
-              <div>TEACHER: <strong class="text-indigo-10">{{ reportData.teacherName }}</strong></div>
+              <div>CLASS: <strong class="text-white">{{ selectedClass }}</strong></div>
+              <div>TEACHER: <strong class="text-white">{{ reportData.teacherName }}</strong></div>
               <div>REPORTING PERIOD: <strong>{{ reportPeriodFrom }}</strong> TO <strong>{{ reportPeriodTo }}</strong></div>
             </div>
 
@@ -518,19 +525,19 @@
             <div class="row q-col-gutter-md q-mb-lg">
               <div class="col-12 col-sm-6 col-md-3">
                 <div class="metric-card bg-blue-1 text-center q-pa-md rounded-borders">
-                  <div class="text-caption text-grey-8">Number of Students</div>
+                  <div class="text-caption text-grey-5">Number of {{ terms.beneficiaries }}</div>
                   <div class="text-h4 text-weight-bolder text-primary q-mt-xs">{{ reportData.enrolledStudents }}</div>
                 </div>
               </div>
               <div class="col-12 col-sm-6 col-md-3">
                 <div class="metric-card bg-blue-1 text-center q-pa-md rounded-borders">
-                  <div class="text-caption text-grey-8">Number of Working Days</div>
+                  <div class="text-caption text-grey-5">Number of Working Days</div>
                   <div class="text-h4 text-weight-bolder text-primary q-mt-xs">{{ reportData.instructionalDays }}</div>
                 </div>
               </div>
               <div class="col-12 col-sm-6 col-md-3">
                 <div class="metric-card bg-blue-1 text-center q-pa-md rounded-borders">
-                  <div class="text-caption text-grey-8">Attendance Rate</div>
+                  <div class="text-caption text-grey-5">Attendance Rate</div>
                   <div class="text-h4 text-weight-bolder text-primary q-mt-xs">
                     {{ reportData.overall.ratePercent !== null ? reportData.overall.ratePercent + '%' : 'N/A' }}
                   </div>
@@ -538,9 +545,9 @@
               </div>
               <div class="col-12 col-sm-6 col-md-3">
                 <div class="metric-card bg-blue-1 text-center q-pa-md rounded-borders">
-                  <div class="text-caption text-grey-8">Not meeting Requirements</div>
+                  <div class="text-caption text-grey-5">Not meeting Requirements</div>
                   <div class="text-h4 text-weight-bolder text-negative q-mt-xs">{{ reportData.belowThresholdCount }}</div>
-                  <div class="text-caption text-grey-7">Min Required: {{ reportData.thresholdPercent }}%</div>
+                  <div class="text-caption text-grey-5">Min Required: {{ reportData.thresholdPercent }}%</div>
                 </div>
               </div>
             </div>
@@ -579,15 +586,15 @@
 
             <!-- Student Attendance Rates (Individual breakdown) -->
             <div>
-              <div class="text-subtitle2 text-weight-bolder text-uppercase q-mb-none">Student Attendance Rates</div>
-              <div class="text-caption text-grey-7 q-mb-sm">
+              <div class="text-subtitle2 text-weight-bolder text-uppercase q-mb-none">{{ terms.beneficiary }} Attendance Rates</div>
+              <div class="text-caption text-grey-5 q-mb-sm">
                 Attendance Rate = (Number of Days Present + Late) / Working Days (Excused excluded from denominator)
               </div>
               <div class="overflow-auto">
                 <table class="report-table">
                   <thead>
                     <tr>
-                      <th style="min-width: 200px">Student Name</th>
+                      <th style="min-width: 200px">{{ terms.beneficiary }} Name</th>
                       <th v-for="m in reportData.months" :key="m.month">{{ m.month }}</th>
                       <th class="bg-blue-2">Overall</th>
                     </tr>
@@ -600,7 +607,7 @@
                     >
                       <td>
                         {{ st.studentName }}
-                        <span v-if="st.admissionNumber" class="text-caption text-grey-7">({{ st.admissionNumber }})</span>
+                        <span v-if="st.admissionNumber" class="text-caption text-grey-5">({{ st.admissionNumber }})</span>
                       </td>
                       <td v-for="m in reportData.months" :key="m.month" class="text-center">
                         {{ st.months[m.month]?.ratePercent !== null && st.months[m.month]?.ratePercent !== undefined ? st.months[m.month].ratePercent + '%' : '-' }}
@@ -619,13 +626,13 @@
 
       <!-- 5. STUDENT ATTENDANCE HISTORY -->
       <q-tab-panel name="student_history" class="q-pa-none">
-        <q-card flat bordered class="bg-white q-pa-md q-mb-md">
+        <q-card flat bordered class="bg-card-dark q-pa-md q-mb-md">
           <div class="row q-col-gutter-md items-center">
             <div class="col-12 col-md-4">
               <q-select
                 v-model="selectedStudentId"
                 :options="studentSelectOptions"
-                label="Select Student *"
+                :label="`Select ${terms.beneficiary} *`"
                 outlined
                 dense
                 emit-value
@@ -649,32 +656,32 @@
           <!-- Student Summary Cards -->
           <div class="row q-col-gutter-md q-mb-md">
             <div class="col-12 col-sm-6 col-md-3">
-              <q-card flat bordered class="bg-white q-pa-md text-center">
-                <div class="text-caption text-grey-7">Attendance Rate</div>
+              <q-card flat bordered class="bg-card-dark q-pa-md text-center">
+                <div class="text-caption text-grey-5">Attendance Rate</div>
                 <div class="text-h4 text-weight-bolder text-primary">
                   {{ studentHistory.summary.overall.ratePercent !== null ? studentHistory.summary.overall.ratePercent + '%' : 'N/A' }}
                 </div>
               </q-card>
             </div>
             <div class="col-12 col-sm-6 col-md-3">
-              <q-card flat bordered class="bg-white q-pa-md text-center">
-                <div class="text-caption text-grey-7">Days Present</div>
+              <q-card flat bordered class="bg-card-dark q-pa-md text-center">
+                <div class="text-caption text-grey-5">Days Present</div>
                 <div class="text-h4 text-weight-bolder text-positive">
                   {{ studentHistory.summary.overall.counts.present }}
                 </div>
               </q-card>
             </div>
             <div class="col-12 col-sm-6 col-md-3">
-              <q-card flat bordered class="bg-white q-pa-md text-center">
-                <div class="text-caption text-grey-7">Days Absent</div>
+              <q-card flat bordered class="bg-card-dark q-pa-md text-center">
+                <div class="text-caption text-grey-5">Days Absent</div>
                 <div class="text-h4 text-weight-bolder text-negative">
                   {{ studentHistory.summary.overall.counts.absent }}
                 </div>
               </q-card>
             </div>
             <div class="col-12 col-sm-6 col-md-3">
-              <q-card flat bordered class="bg-white q-pa-md text-center">
-                <div class="text-caption text-grey-7">Late / Excused</div>
+              <q-card flat bordered class="bg-card-dark q-pa-md text-center">
+                <div class="text-caption text-grey-5">Late / Excused</div>
                 <div class="text-h4 text-weight-bolder text-warning">
                   {{ studentHistory.summary.overall.counts.late + studentHistory.summary.overall.counts.excused }}
                 </div>
@@ -683,9 +690,9 @@
           </div>
 
           <!-- Daily Attendance Records -->
-          <q-card flat bordered class="bg-white">
+          <q-card flat bordered class="bg-card-dark">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold text-indigo-10">Daily Attendance Log</div>
+              <div class="text-subtitle1 text-weight-bold text-white">Daily Attendance Log</div>
             </q-card-section>
             <q-table
               flat
@@ -716,11 +723,11 @@
         <div class="row q-col-gutter-md">
           <!-- Threshold & Policy Settings -->
           <div class="col-12 col-md-6">
-            <q-card flat bordered class="bg-white q-pa-md">
-              <div class="text-subtitle1 text-weight-bold text-indigo-10 q-mb-md">Attendance Policy & Thresholds</div>
+            <q-card flat bordered class="bg-card-dark q-pa-md">
+              <div class="text-subtitle1 text-weight-bold text-white q-mb-md">Attendance Policy & Thresholds</div>
               <div class="q-gutter-md">
                 <div>
-                  <div class="text-caption text-grey-8 q-mb-xs">Minimum Attendance Threshold (%)</div>
+                  <div class="text-caption text-grey-5 q-mb-xs">Minimum Attendance Threshold (%)</div>
                   <q-slider
                     v-model="settings.minimum_attendance_threshold"
                     :min="50"
@@ -728,6 +735,7 @@
                     label
                     label-always
                     color="primary"
+                    dark
                   />
                 </div>
 
@@ -742,6 +750,7 @@
                   label="Late Arrival Policy"
                   outlined
                   dense
+                  dark
                 />
 
                 <q-select
@@ -756,6 +765,7 @@
                   label="Excused Absence Policy"
                   outlined
                   dense
+                  dark
                 />
 
                 <q-btn color="primary" label="Save Settings" :loading="savingSettings" @click="saveSettings" />
@@ -765,23 +775,23 @@
 
           <!-- School Holidays / Calendar Exceptions -->
           <div class="col-12 col-md-6">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between q-mb-md">
-                <div class="text-subtitle1 text-weight-bold text-indigo-10">School Holidays & Closures</div>
+                <div class="text-subtitle1 text-weight-bold text-white">School Holidays & Closures</div>
                 <q-btn color="indigo-7" icon="add" label="Add Holiday" dense @click="showAddHolidayDialog = true" />
               </div>
 
-              <q-list separator>
-                <q-item v-for="h in calendarExceptions" :key="h.id">
+              <q-list separator dark>
+                <q-item v-for="h in asArray(calendarExceptions)" :key="h.id" dark>
                   <q-item-section>
-                    <q-item-label class="text-weight-bold">{{ h.description }}</q-item-label>
-                    <q-item-label caption class="text-grey-6">{{ h.exception_date }}</q-item-label>
+                    <q-item-label class="text-weight-bold text-white">{{ h.description }}</q-item-label>
+                    <q-item-label caption class="text-grey-5">{{ h.exception_date }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <q-btn flat round dense color="negative" icon="delete" @click="deleteHoliday(h.id)" />
                   </q-item-section>
                 </q-item>
-                <q-item v-if="!calendarExceptions.length" class="text-grey-6 text-center q-pa-md">
+                <q-item v-if="!holidayCount" class="text-grey-5 text-center q-pa-md" dark>
                   No holidays configured. Weekends are automatically excluded.
                 </q-item>
               </q-list>
@@ -790,11 +800,11 @@
 
           <!-- Teacher-to-Class Assignments -->
           <div class="col-12">
-            <q-card flat bordered class="bg-white q-pa-md">
+            <q-card flat bordered class="bg-card-dark q-pa-md">
               <div class="row items-center justify-between q-mb-md">
                 <div>
-                  <div class="text-subtitle1 text-weight-bold text-indigo-10">Teacher-to-Class Assignments</div>
-                  <div class="text-caption text-grey-7">Enforces role-based permissions so teachers only record for assigned classes.</div>
+                  <div class="text-subtitle1 text-weight-bold text-white">Teacher-to-Class Assignments</div>
+                  <div class="text-caption text-grey-5">Enforces role-based permissions so teachers only record for assigned classes.</div>
                 </div>
                 <q-btn color="primary" icon="person_add" label="Assign Teacher" @click="showAssignDialog = true" />
               </div>
@@ -860,12 +870,12 @@
     <q-dialog v-model="showAddStudentDialog">
       <q-card style="width: 400px">
         <q-card-section class="bg-indigo-9 text-white">
-          <div class="text-h6">Quick Enroll Student</div>
+          <div class="text-h6">Quick Enroll {{ terms.beneficiary }}</div>
         </q-card-section>
         <q-card-section class="q-pa-md q-gutter-md">
           <q-input v-model="newStudent.name" label="Full Name *" outlined autofocus />
-          <q-select v-model="newStudent.classLevel" :options="classOptions" label="Class / Form *" outlined />
-          <q-input v-model="newStudent.admissionNumber" label="Admission Number" outlined />
+          <q-select v-model="newStudent.classLevel" :options="classOptions" :label="terms.selectGroup" outlined />
+          <q-input v-model="newStudent.admissionNumber" :label="terms.beneficiaryId" outlined />
         </q-card-section>
         <q-card-actions align="right" class="q-pa-md">
           <q-btn flat label="Cancel" v-close-popup color="grey" />
@@ -895,7 +905,7 @@
     <q-dialog v-model="showAssignDialog">
       <q-card style="width: 400px">
         <q-card-section class="bg-indigo-9 text-white">
-          <div class="text-h6">Assign Teacher to Class</div>
+          <div class="text-h6">Assign {{ terms.isSchool ? 'Teacher' : 'Supervisor' }} to {{ terms.beneficiaryGroup }}</div>
         </q-card-section>
         <q-card-section class="q-pa-md q-gutter-md">
           <q-select v-model="newAssignment.className" :options="classOptions" label="Class *" outlined />
@@ -913,11 +923,41 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { attendanceApi, schoolApi } from '../../../api'
+import { attendanceApi, adminApi } from '../../../api'
 import { Dialog, Notify } from 'quasar'
+import { serviceModeTerms } from '../../../utils/serviceModeTerms'
+import { tenantIndustry } from '../../../utils/tenantIndustry'
+
+const terms = computed(() => serviceModeTerms(tenantIndustry()))
+
+function asArray(value) {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.data)) return value.data
+  return []
+}
+
+function getTenantIdFromToken() {
+  const token = localStorage.getItem('invify_token')
+  const role = String(localStorage.getItem('operator_role') || '').toUpperCase()
+  const isPlatform = ['SUPER_ADMIN', 'ADMIN', 'AGENT', 'SUPPORT', 'PLATFORM_ADMIN'].includes(role)
+  let jwtTenant = null
+  if (token) {
+    try {
+      const base64Url = token.split('.')[1]
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
+      const payload = JSON.parse(jsonPayload)
+      jwtTenant = payload.tenantId || payload.user_metadata?.tenant_id || payload.app_metadata?.tenant_id || null
+    } catch (_) {
+      jwtTenant = null
+    }
+  }
+  const explicitId = localStorage.getItem('tenant_id')
+  return isPlatform ? (explicitId || jwtTenant) : (jwtTenant || explicitId)
+}
 
 const activeTab = ref('dashboard')
-const activeBusinessName = ref(localStorage.getItem('tenant_name') || 'Invify School')
+const activeBusinessName = ref('')
 
 const selectedClass = ref('Primary 1')
 const attendanceDate = ref(new Date().toISOString().split('T')[0])
@@ -933,6 +973,7 @@ const students = ref([])
 const attendanceMap = ref({})
 const loadingRegister = ref(false)
 const saving = ref(false)
+const rosterStudentCount = ref(0)
 
 const reportData = ref(null)
 const loadingReport = ref(false)
@@ -975,13 +1016,14 @@ const classOptions = ref([
   'JSS 1', 'JSS 2', 'JSS 3', 'SSS 1', 'SSS 2', 'SSS 3', 'IV A'
 ])
 
-const mockRegisterRows = [
-  { name: 'Adebayo Samuel' }, { name: 'Chukwuma Grace' }, { name: 'Ibrahim Fatima' },
-  { name: 'Okonkwo David' }, { name: 'Williams Daniel' }, { name: 'Bello Amina' }
-]
+const allStudentsCount = computed(() => rosterStudentCount.value || students.value.length || 0)
 
-const allStudentsCount = computed(() => {
-  return students.value.length || 45
+const holidayCount = computed(() => asArray(calendarExceptions.value).length)
+
+const thresholdDisplay = computed(() => {
+  const raw = settings.value?.minimum_attendance_threshold
+  const n = Number(raw)
+  return Number.isFinite(n) ? `${n}%` : '—'
 })
 
 const studentSelectOptions = computed(() => {
@@ -1211,10 +1253,37 @@ const fetchStudentHistory = async () => {
   }
 }
 
+const loadSchoolBranding = async () => {
+  const tenantId = getTenantIdFromToken()
+  if (!tenantId) {
+    activeBusinessName.value = localStorage.getItem('active_business_name') || ''
+    return
+  }
+  try {
+    const res = await adminApi.getTenantDetails(tenantId)
+    const tenant = res.data?.tenant || res.data?.data?.tenant || null
+    if (tenant?.name) {
+      activeBusinessName.value = tenant.name
+      localStorage.setItem('active_business_name', tenant.name)
+    }
+  } catch (e) {
+    activeBusinessName.value = localStorage.getItem('active_business_name') || ''
+    console.error('School branding load error:', e)
+  }
+}
+
 const fetchSettings = async () => {
   try {
     const res = await attendanceApi.getSettings()
-    settings.value = res.data
+    const payload = res.data?.data || res.data || {}
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      settings.value = {
+        minimum_attendance_threshold: Number(payload.minimum_attendance_threshold) || 80,
+        policy_late: payload.policy_late || 'attended',
+        policy_excused: payload.policy_excused || 'excluded',
+        ...payload
+      }
+    }
   } catch (e) {
     console.error('Settings read error:', e)
   }
@@ -1235,8 +1304,9 @@ const saveSettings = async () => {
 const fetchCalendar = async () => {
   try {
     const res = await attendanceApi.listCalendar()
-    calendarExceptions.value = res.data || []
+    calendarExceptions.value = asArray(res.data)
   } catch (e) {
+    calendarExceptions.value = []
     console.error('Calendar error:', e)
   }
 }
@@ -1271,8 +1341,9 @@ const deleteHoliday = async (id) => {
 const fetchAssignments = async () => {
   try {
     const res = await attendanceApi.listAssignments()
-    classAssignments.value = res.data || []
+    classAssignments.value = asArray(res.data)
   } catch (e) {
+    classAssignments.value = []
     console.error('Assignments error:', e)
   }
 }
@@ -1304,11 +1375,22 @@ const fetchAuditLog = async () => {
   loadingAudit.value = true
   try {
     const res = await attendanceApi.getAuditLog()
-    auditLogs.value = res.data || []
+    auditLogs.value = asArray(res.data)
   } catch (e) {
+    auditLogs.value = []
     console.error('Audit log error:', e)
   } finally {
     loadingAudit.value = false
+  }
+}
+
+const fetchRosterCount = async () => {
+  try {
+    const res = await attendanceApi.listStudents({ limit: 1 })
+    const total = res.data?.total ?? res.data?.count ?? asArray(res.data).length
+    rosterStudentCount.value = Number(total) || students.value.length || 0
+  } catch (_) {
+    rosterStudentCount.value = students.value.length || 0
   }
 }
 
@@ -1333,28 +1415,39 @@ const enrollStudent = async () => {
 }
 
 onMounted(async () => {
+  await loadSchoolBranding()
   fetchRegister()
   fetchSettings()
   fetchCalendar()
   fetchAssignments()
   fetchAuditLog()
+  fetchRosterCount()
 })
 </script>
 
 <style scoped>
+.attendance-page {
+  background: #070a12;
+  min-height: 100%;
+}
+.bg-card-dark {
+  background: #090c15 !important;
+  border-color: #1f2937 !important;
+  color: #e5e7eb;
+}
 .hover-shadow:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   transition: all 0.2s ease-in-out;
 }
 .border-indigo {
-  border-left: 4px solid #3f51b5;
+  border-left: 4px solid #6366f1;
 }
 .border-bottom-line {
-  border-bottom: 2px solid #cbd5e1;
+  border-bottom: 2px solid #334155;
   padding-bottom: 8px;
 }
 .pt-border {
-  border-top: 1px solid #cbd5e1;
+  border-top: 1px solid #334155;
   padding-top: 16px;
 }
 .register-table, .report-table {
@@ -1363,15 +1456,32 @@ onMounted(async () => {
 }
 .register-table th, .register-table td,
 .report-table th, .report-table td {
-  border: 1px solid #94a3b8;
+  border: 1px solid #334155;
   padding: 6px 8px;
   font-size: 11px;
+  color: #e5e7eb;
 }
 .register-table th, .report-table th {
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: #111827;
+  color: #f8fafc;
 }
 .metric-card {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #1f2937;
+}
+:deep(.q-field__control),
+:deep(.q-field__native),
+:deep(.q-field__label),
+:deep(.q-tab),
+:deep(.q-item__label),
+:deep(.q-table),
+:deep(.q-table th),
+:deep(.q-table td) {
+  color: #e5e7eb !important;
+}
+:deep(.q-field--outlined .q-field__control:before) {
+  border-color: #334155;
+}
+:deep(.q-slider__pin-value-marker-text) {
+  color: #0f172a;
 }
 </style>

@@ -97,6 +97,24 @@ class SimulateSandboxActivationRequest extends HealthInsuranceEvent {
   List<Object?> get props => [enrolmentId];
 }
 
+class DismissRejectedEnrolmentRequest extends HealthInsuranceEvent {
+  final String enrolmentId;
+
+  const DismissRejectedEnrolmentRequest(this.enrolmentId);
+
+  @override
+  List<Object?> get props => [enrolmentId];
+}
+
+class RepushRejectedEnrolmentRequest extends HealthInsuranceEvent {
+  final String enrolmentId;
+
+  const RepushRejectedEnrolmentRequest(this.enrolmentId);
+
+  @override
+  List<Object?> get props => [enrolmentId];
+}
+
 class ResetHealthInsuranceState extends HealthInsuranceEvent {
   const ResetHealthInsuranceState();
 }

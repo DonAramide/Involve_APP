@@ -135,20 +135,38 @@ export class InventoryController {
         const published = await CatalogService.get().updateItem(actor, tenantId, req.params.id, req.body);
         return res.status(200).json(withCostPolicy(req, { ...published.item, catalog_version: published.catalog_version }));
       }
+      // School fee / stock matrix edits from the web must land on items even when
+      // catalog publish RPC is missing or only partially applied.
+      const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (req.body?.name != null) patch.name = String(req.body.name);
+      if (req.body?.price != null) patch.price = Number(req.body.price);
+      if (req.body?.stock_qty != null) patch.stock_qty = Number(req.body.stock_qty);
+      if (req.body?.min_stock_qty != null) patch.min_stock_qty = Number(req.body.min_stock_qty);
+      if (req.body?.status != null) patch.status = String(req.body.status);
+      const hasDirectFields = Object.keys(patch).length > 1;
+      let updated: any = null;
+      if (hasDirectFields) {
+        updated = await InventoryService.updateItem(tenantId, req.params.id, patch as any);
+      }
       try {
         const live = await publishCatalogLive({
           tenantId,
           entityType: 'item',
           entityId: req.params.id,
           op: 'upsert',
-          item: { ...req.body, id: req.params.id },
+          item: { ...(updated || {}), ...req.body, id: req.params.id },
           payload: req.body || {},
           changedBy: actor.userId || null,
         });
-        return res.status(200).json(withCostPolicy(req, live));
+        return res.status(200).json(withCostPolicy(req, live || updated));
       } catch (err: any) {
-        if (err instanceof CatalogSchemaUnavailableError) {
-          return res.status(503).json(CATALOG_SCHEMA_UNAVAILABLE);
+        if (updated && (err instanceof CatalogSchemaUnavailableError || err?.status === 400 || err?.status === 404)) {
+          return res.status(200).json(withCostPolicy(req, updated));
+        }
+        if (updated) {
+          return res.status(200).json(withCostPolicy(req, updated));
         }
         throw err;
       }

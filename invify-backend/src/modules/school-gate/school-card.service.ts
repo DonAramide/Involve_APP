@@ -12,6 +12,7 @@ import {
 } from './school-card.rules';
 import { SchoolCardStore } from './school-card.store';
 import { SchoolSignatureUploader, SIGNATURE_STORAGE_PREREQUISITE, validateSchoolSignature } from './school-card.signature';
+import { buildInvifyCode, deriveBeneficiaryNine, deriveOrgPrefix, isInvifyCode } from './school-card.identity';
 import { createBarcodeToken, sha256Hex } from './school-card.token';
 import {
   CardActor,
@@ -101,7 +102,7 @@ export class SchoolCardService {
     const identity = this.identity(scope.tenantId, request);
     const settings = this.store.getSettings(scope.tenantId) || defaultSettings(scope.tenantId, scope.userId);
     const active = this.activeCard(scope.tenantId, identity.subjectType, identity.subjectId);
-    return this.face(scope.tenantId, settings, identity, active, null);
+    return this.face(scope.tenantId, settings, identity, active, active?.invifyCode || null);
   }
 
   issue(actor: CardActor | undefined, request: SubjectRequest): IssuedCardResult {
@@ -127,9 +128,12 @@ export class SchoolCardService {
     }
     const identity = this.identityFromCard(current);
     const token = this.tokenFor(identity.predictable);
+    const invifyCode = current.invifyCode && isInvifyCode(current.invifyCode)
+      ? current.invifyCode.toUpperCase()
+      : this.allocateInvifyCode(scope.tenantId, identity);
     const expiresAt = current.expiresAt;
     const issuedAt = new Date().toISOString();
-    const next = this.cardRow(scope, identity, token.sha256, issuedAt, expiresAt, current.id);
+    const next = this.cardRow(scope, identity, token.sha256, issuedAt, expiresAt, current.id, invifyCode);
     this.store.transaction((journal) => {
       journal.insertCard(next);
       journal.addAudit({ tenantId: scope.tenantId, actorUserId: scope.userId, action: 'card_issued', cardId: next.id, reason: null });
@@ -139,11 +143,7 @@ export class SchoolCardService {
     });
     const settings = this.store.getSettings(scope.tenantId) || defaultSettings(scope.tenantId, scope.userId);
     const stored = this.store.findCard(next.id)!;
-    return {
-      card: toPublic(stored),
-      face: this.face(scope.tenantId, settings, identity, stored, token.raw),
-      barcodeValue: token.raw,
-    };
+    return this.issuedResult(scope.tenantId, settings, identity, stored, invifyCode, token.raw);
   }
 
   revoke(actor: CardActor | undefined, cardId: string, reason: unknown): PublicCard {
@@ -227,7 +227,11 @@ export class SchoolCardService {
     const scope = assertCardManager(actor);
     this.requireManager(scope.userId, scope.tenantId);
     if (typeof rawToken !== 'string' || rawToken.trim() === '') return null;
-    const card = this.store.findByHash(scope.tenantId, sha256Hex(rawToken));
+    const trimmed = rawToken.trim();
+    const card = isInvifyCode(trimmed)
+      ? this.store.listCards(scope.tenantId).find((row) =>
+        row.status === 'active' && row.invifyCode === trimmed.toUpperCase()) || null
+      : this.store.findByHash(scope.tenantId, sha256Hex(trimmed));
     if (!card || card.status !== 'active') return null;
     if (card.expiresAt && new Date(card.expiresAt).getTime() <= Date.now()) return null;
     return toPublic(card);
@@ -240,20 +244,49 @@ export class SchoolCardService {
     expiresAt: unknown,
   ): IssuedCardResult {
     const token = this.tokenFor(identity.predictable);
+    const invifyCode = this.allocateInvifyCode(scope.tenantId, identity);
     const issuedAt = new Date().toISOString();
     const expiry = parseExpiry(issuedAt, expiresAt);
-    const next = this.cardRow(scope, identity, token.sha256, issuedAt, expiry, replacesCardId);
+    const next = this.cardRow(scope, identity, token.sha256, issuedAt, expiry, replacesCardId, invifyCode);
     this.store.transaction((journal) => {
       journal.insertCard(next);
       journal.addAudit({ tenantId: scope.tenantId, actorUserId: scope.userId, action: 'card_issued', cardId: next.id, reason: null });
     });
     const settings = this.store.getSettings(scope.tenantId) || defaultSettings(scope.tenantId, scope.userId);
     const stored = this.store.findCard(next.id)!;
+    return this.issuedResult(scope.tenantId, settings, identity, stored, invifyCode, token.raw);
+  }
+
+  private issuedResult(
+    tenantId: string,
+    settings: SettingsRow,
+    identity: Identity,
+    card: CardRow,
+    invifyCode: string,
+    verificationToken: string,
+  ): IssuedCardResult {
+    const face = this.face(tenantId, settings, identity, card, invifyCode);
+    face.verificationToken = verificationToken;
     return {
-      card: toPublic(stored),
-      face: this.face(scope.tenantId, settings, identity, stored, token.raw),
-      barcodeValue: token.raw,
+      card: toPublic(card),
+      face,
+      barcodeValue: invifyCode,
+      cardIdentityCode: invifyCode,
+      verificationToken,
     };
+  }
+
+  private allocateInvifyCode(tenantId: string, identity: Identity): string {
+    const tenant = this.store.getTenant(tenantId);
+    const org = deriveOrgPrefix(tenant?.name || 'ORG');
+    let nine = deriveBeneficiaryNine(identity.printedName, identity.printedCode, identity.subjectId);
+    for (let n = 0; n < 40; n += 1) {
+      const code = buildInvifyCode(org, nine);
+      const taken = this.store.listCards(tenantId).some((row) => row.invifyCode === code && row.status === 'active');
+      if (!taken) return code;
+      nine = deriveBeneficiaryNine(identity.printedName, `${identity.printedCode}${n}`, `${identity.subjectId}:${n}`);
+    }
+    return buildInvifyCode(org, deriveBeneficiaryNine(identity.printedName, identity.printedCode, identity.subjectId + Date.now()));
   }
 
   private tokenFor(values: Array<string | null>): { raw: string; sha256: string } {
@@ -331,6 +364,7 @@ export class SchoolCardService {
     issuedAt: string,
     expiresAt: string | null,
     replacesCardId: string | null,
+    invifyCode: string,
   ): CardRow {
     return {
       id: randomUUID(),
@@ -340,6 +374,7 @@ export class SchoolCardService {
       staffId: identity.subjectType === 'staff' ? identity.subjectId : null,
       adminUserId: identity.subjectType === 'admin' ? identity.subjectId : null,
       tokenSha256: hash,
+      invifyCode,
       status: replacesCardId ? 'pending' : 'active',
       issuedAt,
       expiresAt,
@@ -362,6 +397,9 @@ export class SchoolCardService {
       : identity.subjectType === 'staff'
         ? settings.staffTemplate
         : settings.adminTemplate;
+    const fromCard = card?.invifyCode && isInvifyCode(card.invifyCode) ? card.invifyCode.toUpperCase() : null;
+    const fromArg = barcodeValue && isInvifyCode(barcodeValue) ? barcodeValue.toUpperCase() : null;
+    const identityCode = fromArg || fromCard;
     return {
       pairId: card?.id || identity.subjectId,
       templateKey,
@@ -374,10 +412,15 @@ export class SchoolCardService {
       fullName: identity.printedName,
       printedCode: identity.printedCode,
       detail: settings.showClassOrDepartment ? identity.printedDetail : null,
+      hmoName: null,
+      enrolleeId: null,
       category: identity.subjectType === 'student' ? 'STUDENT' : identity.subjectType === 'staff' ? 'STAFF' : 'ADMIN',
       statusLabel: settings.showStatus ? identity.statusLabel : null,
-      barcodeValue,
-      barcodeState: barcodeValue ? 'ready' : card ? 'replacement_required' : 'not_issued',
+      barcodeValue: identityCode,
+      invifyCode: identityCode,
+      cardIdentityCode: identityCode,
+      verificationToken: null,
+      barcodeState: identityCode ? 'ready' : card ? 'replacement_required' : 'not_issued',
       issuedAt: settings.showIssueDate ? card?.issuedAt || null : null,
       expiresAt: settings.showExpiry ? card?.expiresAt || null : null,
       disclaimer: settings.disclaimer,
@@ -469,6 +512,9 @@ function parseExpiry(issuedAt: string, value: unknown): string | null {
 }
 
 function toPublic(card: CardRow): PublicCard {
+  const code = card.invifyCode && /^[A-Z0-9]{12}$/i.test(card.invifyCode)
+    ? card.invifyCode.toUpperCase()
+    : null;
   return {
     id: card.id,
     subjectType: card.subjectType,
@@ -481,6 +527,7 @@ function toPublic(card: CardRow): PublicCard {
     issuedAt: card.issuedAt,
     expiresAt: card.expiresAt,
     revokeKind: card.revokeKind,
+    invifyCode: code,
   };
 }
 

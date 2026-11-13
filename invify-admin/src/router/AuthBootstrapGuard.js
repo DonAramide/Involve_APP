@@ -68,6 +68,16 @@ export function registerAuthBootstrapGuard(router) {
       return next()
     }
 
+    // 4.5 Platform shell without a session always goes to login.
+    // The global catch-all 404 has no requiresAuth. A stale or unmatched
+    // /hmo/catalogue (or other /hmo, /admin, /fleet, … path) must not render
+    // "Oops. Nothing here…" to an anonymous visitor. Catalogue data is still
+    // loaded only after auth + hmo.workspace, and API writes still need
+    // platform.plans.manage.
+    if (!token && isPlatformShellPath(to.path)) {
+      return next({ path: getLoginPath(to.path), query: { redirect: to.fullPath } })
+    }
+
     // 5. Protected Operational Route enforcement checks
     if (to.meta?.requiresAuth || to.matched.some(record => record.meta?.requiresAuth)) {
       // Gate 1: Identity Matrix validation

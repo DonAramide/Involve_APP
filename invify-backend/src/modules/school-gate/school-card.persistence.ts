@@ -3,6 +3,12 @@ import { assertCardManager } from './school-card.access';
 import { defaultSettings, validateSettings } from './school-card.rules';
 import { SqlQueryClient, executeCardIssue, executeCardReplacement, executeCardRevoke, executeSettingsSave, runSchoolCardTransaction, cardInsertStatement, replacementStatements, CardSqlWrite } from './school-card.sql';
 import { createBarcodeToken } from './school-card.token';
+import {
+  alternateOrgPrefix,
+  buildInvifyCode,
+  deriveBeneficiaryNine,
+  deriveOrgPrefix,
+} from './school-card.identity';
 import { httpsLogo } from './school-card.rules';
 import { randomUUID } from 'crypto';
 import { CardActor, CardFace, PublicCard, SettingsRow, SubjectType, TemplateKey } from './school-card.types';
@@ -254,11 +260,31 @@ export async function previewThroughDatabase(actor: CardActor | undefined, reque
     const person = findPerson(directoryRows, request.subjectType, request.subjectId);
     const settings = await loadSettings(client, scope.tenantId, scope.userId);
     const tenant = await readTenant(client, scope.tenantId);
-    return buildFace(settings, tenant, person, null);
+    let invifyCode: string | null = null;
+    let card: PublicCard | undefined;
+    if (person.activeCardId) {
+      const found = await client.query(
+        `SELECT id, subject_type, student_id, staff_id, admin_user_id, status,
+                printed_name, printed_code, printed_detail, issued_at, expires_at, revoke_kind, invify_code
+         FROM public.school_id_cards
+         WHERE id = $1 AND tenant_id = $2 AND status = 'active'`,
+        [person.activeCardId, scope.tenantId],
+      );
+      const row = found.rows[0] as Record<string, unknown> | undefined;
+      if (row) {
+        card = publicCard(row);
+        const code = typeof row.invify_code === 'string' ? row.invify_code.trim().toUpperCase() : '';
+        invifyCode = /^[A-Z0-9]{12}$/.test(code) ? code : null;
+      }
+    }
+    const hmo = person.subjectType === 'student'
+      ? await readStudentHmoCoverage(client, scope.tenantId, person.subjectId)
+      : { hmoName: null, enrolleeId: null };
+    return buildFace(settings, tenant, person, invifyCode, card, invifyCode, hmo);
   });
 }
 
-export async function batchThroughDatabase(actor: CardActor | undefined, people: Array<{ subjectType?: unknown; subjectId?: unknown }>): Promise<Array<{ card: PublicCard; face: CardFace; barcodeValue: string }>> {
+export async function batchThroughDatabase(actor: CardActor | undefined, people: Array<{ subjectType?: unknown; subjectId?: unknown }>): Promise<Array<{ card: PublicCard; face: CardFace; barcodeValue: string; cardIdentityCode: string; verificationToken: string }>> {
   const scope = assertCardManager(actor);
   if (!Array.isArray(people) || people.length < 1 || people.length > 100) {
     throw new SchoolCardError('Choose between 1 and 100 people.', 400, 'INVALID_BATCH');
@@ -276,8 +302,16 @@ export async function batchThroughDatabase(actor: CardActor | undefined, people:
       }
       return identity;
     });
-    const writes = plans.map((identity) => {
+    const tenant = await readTenant(client, scope.tenantId);
+    const writes: Array<{
+      identity: EligiblePerson;
+      token: ReturnType<typeof createBarcodeToken>;
+      card: CardSqlWrite;
+      invifyCode: string;
+    }> = [];
+    for (const identity of plans) {
       const token = createBarcodeToken();
+      const invifyCode = await allocateInvifyCode(client, scope.tenantId, tenant.name, identity);
       const card: CardSqlWrite = {
         id: randomUUID(),
         tenantId: scope.tenantId,
@@ -292,9 +326,10 @@ export async function batchThroughDatabase(actor: CardActor | undefined, people:
         printedCode: identity.printedCode,
         printedDetail: identity.detail,
         issuedBy: scope.userId,
+        invifyCode,
       };
-      return { identity, token, card };
-    });
+      writes.push({ identity, token, card, invifyCode });
+    }
     await runSchoolCardTransaction(client, async (query) => {
       for (const write of writes) {
         if (write.card.replacesCardId) {
@@ -320,8 +355,8 @@ export async function batchThroughDatabase(actor: CardActor | undefined, people:
       return [String(value.id), value];
     }));
     const settings = await readSettingsRow(client, scope.tenantId, scope.userId);
-    const tenant = await readTenant(client, scope.tenantId);
-    return writes.map((write) => {
+    const faces = [];
+    for (const write of writes) {
       const row = byId.get(write.card.id);
       const card = row ? publicCard(row) : publicCard({
         id: write.card.id,
@@ -337,13 +372,25 @@ export async function batchThroughDatabase(actor: CardActor | undefined, people:
         expires_at: null,
         revoke_kind: null,
       });
-      return { card, face: buildFace(settings, tenant, write.identity, write.token.raw, card), barcodeValue: write.token.raw };
-    });
+      const hmo = write.identity.subjectType === 'student'
+        ? await readStudentHmoCoverage(client, scope.tenantId, write.identity.subjectId)
+        : { hmoName: null, enrolleeId: null };
+      const face = buildFace(settings, tenant, write.identity, write.invifyCode, card, write.invifyCode, hmo);
+      face.verificationToken = write.token.raw;
+      faces.push({
+        card,
+        face,
+        barcodeValue: write.invifyCode,
+        cardIdentityCode: write.invifyCode,
+        verificationToken: write.token.raw,
+      });
+    }
+    return faces;
   });
 }
 
 const CARD_PUBLIC_SQL = `SELECT id, subject_type, student_id, staff_id, admin_user_id, status,
-  printed_name, printed_code, printed_detail, issued_at, expires_at, revoke_kind
+  printed_name, printed_code, printed_detail, issued_at, expires_at, revoke_kind, invify_code
   FROM public.school_id_cards
   WHERE tenant_id = $1`;
 
@@ -450,9 +497,9 @@ async function readSettingsRow(client: SqlQueryClient, tenantId: string, userId:
   return loadSettings(client, tenantId, userId);
 }
 
-async function readTenant(client: SqlQueryClient, tenantId: string): Promise<{ name: string; address: string | null; phone: string | null }> {
+async function readTenant(client: SqlQueryClient, tenantId: string): Promise<{ name: string; address: string | null; phone: string | null; invifyOrgPrefix: string | null }> {
   const found = await client.query(
-    `SELECT name, phone, street_address FROM public.tenants WHERE id = $1`,
+    `SELECT name, phone, street_address, invify_org_prefix FROM public.tenants WHERE id = $1`,
     [tenantId],
   );
   const row = found.rows[0] as Record<string, unknown> | undefined;
@@ -460,7 +507,105 @@ async function readTenant(client: SqlQueryClient, tenantId: string): Promise<{ n
     name: text(row?.name) || 'School',
     address: text(row?.street_address) || null,
     phone: text(row?.phone) || null,
+    invifyOrgPrefix: text(row?.invify_org_prefix),
   };
+}
+
+/** Persist a stable 3-char org prefix on the tenant (once). */
+async function ensureOrgPrefix(client: SqlQueryClient, tenantId: string, organizationName: string): Promise<string> {
+  const tenant = await readTenant(client, tenantId);
+  if (tenant.invifyOrgPrefix && /^[A-Z0-9]{3}$/.test(tenant.invifyOrgPrefix)) {
+    return tenant.invifyOrgPrefix;
+  }
+  let prefix = deriveOrgPrefix(organizationName || tenant.name);
+  for (let attempt = 0; attempt < 36; attempt += 1) {
+    const candidate = alternateOrgPrefix(prefix, attempt);
+    try {
+      await client.query(
+        `UPDATE public.tenants SET invify_org_prefix = $2
+         WHERE id = $1 AND (invify_org_prefix IS NULL OR btrim(invify_org_prefix) = '')`,
+        [tenantId, candidate],
+      );
+      const again = await readTenant(client, tenantId);
+      if (again.invifyOrgPrefix && /^[A-Z0-9]{3}$/.test(again.invifyOrgPrefix)) {
+        return again.invifyOrgPrefix;
+      }
+    } catch {
+      // unique collision — try next alternate
+    }
+  }
+  return deriveOrgPrefix(organizationName || tenant.name);
+}
+
+async function allocateInvifyCode(
+  client: SqlQueryClient,
+  tenantId: string,
+  organizationName: string,
+  person: EligiblePerson,
+): Promise<string> {
+  const org = await ensureOrgPrefix(client, tenantId, organizationName);
+  let nine = deriveBeneficiaryNine(person.name, person.printedCode, person.subjectId);
+  for (let n = 0; n < 20; n += 1) {
+    const code = buildInvifyCode(org, nine);
+    const exists = await client.query(
+      `SELECT 1 FROM public.school_id_cards WHERE tenant_id = $1 AND invify_code = $2 LIMIT 1`,
+      [tenantId, code],
+    );
+    if (exists.rows.length === 0) return code;
+    // Collision: tweak last chars using subject id hash counter
+    const tweak = deriveBeneficiaryNine(person.name, `${person.printedCode}${n}`, `${person.subjectId}:${n}`);
+    nine = tweak;
+  }
+  return buildInvifyCode(org, deriveBeneficiaryNine(person.name, person.printedCode, person.subjectId + Date.now()));
+}
+
+async function readStudentHmoCoverage(
+  client: SqlQueryClient,
+  tenantId: string,
+  studentId: string,
+): Promise<{ hmoName: string | null; enrolleeId: string | null }> {
+  try {
+    const found = await client.query(
+      `SELECT
+         coalesce(nullif(trim(prov.display_name), ''), 'HMO') AS hmo_name,
+         coalesce(
+           nullif(trim(mem.insurer_member_ref), ''),
+           nullif(trim(pol.policy_number), '')
+         ) AS enrollee_id
+       FROM public.hw_members mem
+       JOIN public.hw_enrolments enr
+         ON enr.member_id = mem.id AND enr.tenant_id = mem.tenant_id
+       LEFT JOIN public.hw_policies pol
+         ON pol.enrolment_id = enr.id AND pol.tenant_id = enr.tenant_id
+       LEFT JOIN public.hw_providers prov
+         ON prov.id = coalesce(pol.provider_id, (
+           SELECT pl.provider_id
+           FROM public.hw_plan_versions pv
+           JOIN public.hw_plans pl ON pl.id = pv.plan_id
+           WHERE pv.id = enr.plan_version_id
+           LIMIT 1
+         ))
+       WHERE mem.tenant_id = $1
+         AND mem.student_id = $2
+         AND (
+           enr.status = 'active'
+           OR pol.status = 'active'
+         )
+       ORDER BY
+         CASE WHEN pol.status = 'active' THEN 0 WHEN enr.status = 'active' THEN 1 ELSE 2 END,
+         coalesce(pol.updated_at, enr.updated_at) DESC NULLS LAST
+       LIMIT 1`,
+      [tenantId, studentId],
+    );
+    const row = found.rows[0] as { hmo_name?: string; enrollee_id?: string } | undefined;
+    const hmoName = text(row?.hmo_name) || null;
+    const enrolleeId = text(row?.enrollee_id) || null;
+    if (!hmoName && !enrolleeId) return { hmoName: null, enrolleeId: null };
+    return { hmoName, enrolleeId };
+  } catch {
+    // HMO tables may be absent on older DBs — card issue must still work.
+    return { hmoName: null, enrolleeId: null };
+  }
 }
 
 function buildFace(
@@ -469,12 +614,17 @@ function buildFace(
   person: EligiblePerson,
   barcodeValue: string | null,
   card?: PublicCard,
+  invifyCode?: string | null,
+  hmo?: { hmoName: string | null; enrolleeId: string | null },
 ): CardFace {
   const templateKey = person.subjectType === 'student'
     ? settings.studentTemplate
     : person.subjectType === 'staff'
       ? settings.staffTemplate
       : settings.adminTemplate;
+  const identity = (invifyCode && /^[A-Z0-9]{12}$/.test(invifyCode))
+    ? invifyCode
+    : (barcodeValue && /^[A-Z0-9]{12}$/.test(barcodeValue) ? barcodeValue : null);
   return {
     pairId: card?.id || person.subjectId,
     templateKey,
@@ -487,10 +637,16 @@ function buildFace(
     fullName: person.name,
     printedCode: person.printedCode,
     detail: settings.showClassOrDepartment ? person.detail : null,
+    hmoName: person.subjectType === 'student' ? (hmo?.hmoName || null) : null,
+    enrolleeId: person.subjectType === 'student' ? (hmo?.enrolleeId || null) : null,
     category: person.subjectType === 'student' ? 'STUDENT' : person.subjectType === 'staff' ? 'STAFF' : 'ADMIN',
     statusLabel: null,
-    barcodeValue,
-    barcodeState: barcodeValue ? 'ready' : card ? 'replacement_required' : 'not_issued',
+    // barcodeValue is ONLY the 12-char identity — never the opaque verification token.
+    barcodeValue: identity,
+    invifyCode: identity,
+    cardIdentityCode: identity,
+    verificationToken: null,
+    barcodeState: identity ? 'ready' : card ? 'replacement_required' : 'not_issued',
     issuedAt: settings.showIssueDate ? card?.issuedAt || null : null,
     expiresAt: settings.showExpiry ? card?.expiresAt || null : null,
     disclaimer: settings.disclaimer,
@@ -549,6 +705,8 @@ function publicCard(row: Record<string, unknown>): PublicCard {
     : subjectType === 'staff'
       ? String(row.staff_id || '')
       : String(row.admin_user_id || '');
+  const rawCode = typeof row.invify_code === 'string' ? row.invify_code.trim().toUpperCase() : '';
+  const invifyCode = /^[A-Z0-9]{12}$/.test(rawCode) ? rawCode : null;
   return {
     id: String(row.id),
     subjectType,
@@ -561,6 +719,7 @@ function publicCard(row: Record<string, unknown>): PublicCard {
     issuedAt: row.issued_at ? String(row.issued_at) : '',
     expiresAt: row.expires_at ? String(row.expires_at) : null,
     revokeKind: row.revoke_kind === 'replaced' || row.revoke_kind === 'retired' ? row.revoke_kind : null,
+    invifyCode,
   };
 }
 

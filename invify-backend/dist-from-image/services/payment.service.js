@@ -1,0 +1,792 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PaymentService = void 0;
+const crypto_1 = require("crypto");
+const factory_1 = require("../integrations/quasar/factory");
+const quasar_provisioning_service_1 = require("../integrations/quasar/quasar-provisioning.service");
+const supabase_1 = require("../db/supabase");
+const audit_service_1 = require("./audit.service");
+const ledger_service_1 = require("./ledger.service");
+const wallet_service_1 = require("./wallet.service");
+const payout_reversal_service_1 = require("./payout-reversal.service");
+const fee_live_gate_1 = require("./fee-live-gate");
+const treasury_fee_service_1 = require("./treasury-fee.service");
+const school_fund_ownership_1 = require("./school-fund-ownership");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+/**
+ * PaymentService handles the initiation of external payments via Quasar.
+ * Responsibilities:
+ * - Reference generation
+ * - Quasar SDK orchestration
+ * - Transaction persistence (PENDING state)
+ */
+function inferPayoutBankCode(row) {
+    const code = String(row?.bank_code || row?.bankCode || '').trim();
+    if (code)
+        return code;
+    const name = String(row?.bank_name || row?.bankName || '').toLowerCase();
+    if (!name)
+        return '';
+    if (name.includes('opay'))
+        return '999992';
+    if (name.includes('palmpay'))
+        return '999991';
+    if (name.includes('moniepoint'))
+        return '50515';
+    if (name.includes('kuda'))
+        return '50211';
+    if (name.includes('access'))
+        return '044';
+    if (name.includes('gtbank') || name.includes('guaranty trust'))
+        return '058';
+    if (name.includes('first bank'))
+        return '011';
+    if (name.includes('uba') || name.includes('united bank'))
+        return '033';
+    if (name.includes('zenith'))
+        return '057';
+    return '';
+}
+function normalizeLoadedBank(row) {
+    if (!row)
+        return null;
+    const account_number = String(row.account_number || row.accountNumber || '').trim();
+    const account_name = String(row.account_name || row.accountName || '').trim();
+    const bank_name = String(row.bank_name || row.bankName || '').trim();
+    const bank_code = inferPayoutBankCode(row);
+    if (!account_number)
+        return null;
+    return { ...row, account_number, account_name, bank_name, bank_code };
+}
+async function loadTenantPayoutBank(tenantId) {
+    try {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('payout_settings')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+        if (!error) {
+            const row = normalizeLoadedBank(data);
+            if (row)
+                return row;
+        }
+    }
+    catch (_) { /* fall through */ }
+    try {
+        const { data: tenant } = await supabase_1.supabaseAdmin
+            .from('tenants')
+            .select('settings')
+            .eq('id', tenantId)
+            .maybeSingle();
+        const fromTenant = normalizeLoadedBank(tenant?.settings?.payout);
+        if (fromTenant)
+            return fromTenant;
+    }
+    catch (_) { /* fall through */ }
+    try {
+        const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
+        if (fs.existsSync(filePath)) {
+            const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            return normalizeLoadedBank(allSettings[tenantId]);
+        }
+    }
+    catch (err) {
+        console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
+    }
+    return null;
+}
+class PaymentService {
+    /**
+     * Creates a payment intent.
+     * Path: POST /payments/create
+     *
+     * IMPORTANT:
+     * - DO NOT update ledger here.
+     * - DO NOT update wallet here.
+     * - Ledger sync happens ONLY via Quasar Webhook (payment.success).
+     */
+    static async createIntent(params) {
+        const { tenantId, walletId, amount, studentName, metadata = {}, idempotencyKey } = params;
+        if (!amount || Number(amount) <= 0) {
+            throw new Error('Invalid payment amount');
+        }
+        // Idempotency: return existing intent when client key already used for this tenant
+        if (idempotencyKey) {
+            const { data: existingRows } = await supabase_1.supabase
+                .from('transactions_log')
+                .select('*')
+                .eq('tenant_id', tenantId)
+                .contains('metadata', { idempotency_key: idempotencyKey })
+                .order('created_at', { ascending: false })
+                .limit(1);
+            const existing = existingRows?.[0];
+            if (existing) {
+                return {
+                    reference: existing.reference,
+                    intent: { reference: existing.metadata?.quasar_intent_id || existing.reference },
+                    transaction: existing,
+                    idempotentReplay: true,
+                };
+            }
+        }
+        // 1. Generate unique payment reference (UUID primary; timestamp only as prefix)
+        const reference = `QNX-${(0, crypto_1.randomUUID)().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+        // 2. Fetch tenant & Call QuasarService (ApiKey lookup happens in factory)
+        // 3. Call QuasarService.createPaymentIntent
+        let intent;
+        try {
+            const quasar = await (0, factory_1.getQuasarService)(tenantId);
+            intent = await quasar.createPaymentIntent({
+                amount: Math.round(amount),
+                reference,
+                description: `Fees Payment - Student: ${studentName}`,
+                metadata: { ...metadata, reference, tenantId, studentName, idempotency_key: idempotencyKey }
+            });
+        }
+        catch (error) {
+            console.error('[PaymentService] Quasar SDK Failure:', error.message);
+            throw new Error(`Failed to initialize payment with Quasar: ${error.message}`);
+        }
+        // 4. Store transaction record in database
+        // Structure: { reference, tenantId, amount, provider: "quasar", status: "PENDING" }
+        const { data: transaction, error } = await supabase_1.supabase
+            .from('transactions_log') // Using 'transactions_log' for external audit trail
+            .insert({
+            reference,
+            tenant_id: tenantId,
+            wallet_id: walletId,
+            amount: Math.round(amount),
+            provider: "quasar",
+            status: "PENDING",
+            metadata: {
+                ...metadata,
+                quasar_intent_id: intent.reference,
+                studentName,
+                ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+            }
+        })
+            .select()
+            .single();
+        if (error) {
+            console.error('[PaymentService] DB Audit Write Failed:', error.message);
+            // Unique violation on concurrent duplicate idempotency → re-fetch
+            if (idempotencyKey && error.code === '23505') {
+                const { data: raced } = await supabase_1.supabase
+                    .from('transactions_log')
+                    .select('*')
+                    .eq('tenant_id', tenantId)
+                    .contains('metadata', { idempotency_key: idempotencyKey })
+                    .limit(1)
+                    .maybeSingle();
+                if (raced) {
+                    return {
+                        reference: raced.reference,
+                        intent: { reference: raced.metadata?.quasar_intent_id || raced.reference },
+                        transaction: raced,
+                        idempotentReplay: true,
+                    };
+                }
+            }
+        }
+        // 5. IMMUTABLE AUDIT LOG
+        await audit_service_1.AuditService.log({
+            eventType: 'payment.intent.created',
+            reference,
+            tenantId,
+            payload: { amount: Math.round(amount), studentName, metadata, intent_reference: intent.reference, idempotencyKey }
+        });
+        // 6. Return intent to frontend
+        return {
+            reference,
+            intent,
+            transaction
+        };
+    }
+    /** Posted USER_WALLET minus parent deposits that were credited onto it. */
+    static async spendableSchoolNaira(tenantId) {
+        const balance = await wallet_service_1.WalletService.getBalance(tenantId);
+        const walletKobo = (0, school_fund_ownership_1.nairaToKobo)(Number(balance?.balance || 0));
+        const { data } = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .select('amount, metadata, type, status')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'SUCCESS')
+            .limit(5000);
+        let parentKobo = 0;
+        for (const row of data || []) {
+            const metadata = row.metadata || {};
+            if (!(0, school_fund_ownership_1.parentCreditLandedOnSchoolWallet)(metadata))
+                continue;
+            parentKobo += (0, school_fund_ownership_1.nairaToKobo)(Number(row.amount || 0));
+        }
+        return (0, school_fund_ownership_1.koboToNaira)((0, school_fund_ownership_1.spendableSchoolKobo)(walletKobo, parentKobo));
+    }
+    /**
+     * School withdrawals may spend only the posted school-owned settlement pool.
+     * A low cached wallet balance must not create a USER_WALLET credit.
+     */
+    static async fundQuasarWithdrawal(tenantId, quote, _idempotencyKey) {
+        const { QuasarWithdrawableService } = await Promise.resolve().then(() => __importStar(require('./quasar-withdrawable.service')));
+        const settleable = await QuasarWithdrawableService.available(tenantId);
+        const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+        const spendable = await PaymentService.spendableSchoolNaira(tenantId);
+        const proven = Math.min(round2(settleable), round2(spendable));
+        if (proven + 0.009 < round2(quote.total_required)) {
+            const err = new Error(`Insufficient proven school-owned funds. Available ₦${proven.toFixed(2)}, this withdrawal needs ₦${quote.total_required} (₦${quote.requested_amount} plus ₦${quote.service_fee} fee).`);
+            err.status = 402;
+            err.code = 'INSUFFICIENT_BALANCE';
+            err.quote = { ...quote, available_balance: proven, sufficient: false };
+            throw err;
+        }
+        await PaymentService.reserveSchoolWithdrawal(tenantId, _idempotencyKey, round2(quote.total_required));
+    }
+    /**
+     * Cross-instance reservation. The database function is proposal-only until
+     * a separate migration is approved. A missing function fails the payout.
+     * It must not credit USER_WALLET.
+     */
+    static async reserveSchoolWithdrawal(tenantId, idempotencyKey, amount) {
+        const { error } = await supabase_1.supabaseAdmin.rpc('reserve_school_withdrawal', {
+            p_tenant_id: tenantId,
+            p_idempotency_key: idempotencyKey,
+            p_amount: amount,
+        });
+        if (!error)
+            return;
+        const message = String(error.message || '');
+        const insufficient = message.includes('INSUFFICIENT_BALANCE');
+        const err = new Error(insufficient
+            ? message
+            : 'School withdrawal reservation is not available. Keep FEATURE_REAL_MONEY_PAYOUTS off until the reservation function is approved and applied.');
+        err.status = insufficient ? 402 : 503;
+        err.code = insufficient ? 'INSUFFICIENT_BALANCE' : 'RESERVATION_UNAVAILABLE';
+        throw err;
+    }
+    /**
+     * Initiates a fund sweep (payout) to the school's bank account,
+     * or to an explicit destination (e.g. staff salary).
+     * Path: POST /payments/payout
+     */
+    static async createPayout(tenantId, amount, options) {
+        const { FeatureGateService, BuildVariantService } = await Promise.resolve().then(() => __importStar(require('../config/build-variant')));
+        const wallet = await wallet_service_1.WalletService.ensureWallet(tenantId);
+        if (!wallet) {
+            throw new Error(`Could not create wallet for tenant ${tenantId}`);
+        }
+        const variant = BuildVariantService.getInstance();
+        if (variant.isProd()) {
+            if (!FeatureGateService.isFeatureEnabled('real_money_payouts')) {
+                const err = new Error('Real-money payouts are disabled for this environment. Set FEATURE_REAL_MONEY_PAYOUTS=true only when intentionally enabling live exits.');
+                err.status = 403;
+                throw err;
+            }
+        }
+        else if (!(0, fee_live_gate_1.isSandboxPayoutAllowed)()) {
+            const err = new Error('Payouts are not enabled in this environment.');
+            err.status = 403;
+            throw err;
+        }
+        if (!amount || Number(amount) <= 0) {
+            throw new Error('Valid payout amount required');
+        }
+        const payoutType = options?.metadata?.type || 'fund_sweep';
+        let bankDetails = options?.destination || null;
+        // 1. Fetch tenant bank details when no explicit destination
+        if (!bankDetails) {
+            bankDetails = await loadTenantPayoutBank(tenantId);
+        }
+        else {
+            bankDetails = normalizeLoadedBank(bankDetails) || bankDetails;
+        }
+        if (!bankDetails?.account_number || !bankDetails?.bank_code || !bankDetails?.account_name) {
+            throw new Error(payoutType === 'staff_salary'
+                ? 'Payout failed: Staff bank details incomplete'
+                : `Payout failed: No bank details configured for tenant ${tenantId}`);
+        }
+        // 2. Generate unique payout reference + client/server idempotency key
+        const prefix = payoutType === 'staff_salary' ? 'SAL' : 'POUT';
+        const reference = `${prefix}-${(0, crypto_1.randomUUID)().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+        const idempotencyKey = options?.idempotencyKey
+            ? `payout:${tenantId}:${options.idempotencyKey}`
+            : `payout:${reference}`;
+        const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+        const requestedAmount = round2(amount);
+        const quote = await treasury_fee_service_1.TreasuryFeeService.quote(tenantId, requestedAmount);
+        const version = quote.fee_profile_version_id ? await treasury_fee_service_1.TreasuryFeeService.resolve(tenantId) : null;
+        const feeEntries = version ? treasury_fee_service_1.TreasuryFeeService.feeCreditEntriesNaira(version, quote.service_fee) : [];
+        const spendable = await PaymentService.spendableSchoolNaira(tenantId);
+        if (round2(spendable) + 0.009 < round2(quote.total_required)) {
+            const err = new Error(`Treasury cannot spend unproven or parent-owned funds. School-owned available ₦${spendable.toFixed(2)}. This payout needs ₦${quote.total_required}.`);
+            err.status = 402;
+            err.code = 'INSUFFICIENT_BALANCE';
+            err.quote = { ...quote, available_balance: spendable, sufficient: false };
+            throw err;
+        }
+        if (options?.metadata?.quasarCap === true) {
+            await PaymentService.fundQuasarWithdrawal(tenantId, quote, idempotencyKey);
+        }
+        else {
+            await PaymentService.reserveSchoolWithdrawal(tenantId, idempotencyKey, round2(quote.total_required));
+        }
+        // 3. Atomic lock: balance >= requested + treasury fee. External amount stays requested.
+        const { data: ledgerRes, error: ledgerError } = await supabase_1.supabaseAdmin.rpc('request_treasury_withdrawal_with_fee', {
+            p_tenant_id: tenantId,
+            p_idempotency_key: idempotencyKey,
+            p_reference: reference,
+            p_requested_amount: requestedAmount,
+            p_fee_entries: feeEntries,
+            p_metadata: {
+                type: payoutType === 'staff_salary' ? 'staff_salary' : 'payout_request',
+                transaction_type: 'TREASURY_WITHDRAWAL',
+                requested_amount: requestedAmount,
+                service_fee: quote.service_fee,
+                total_required: quote.total_required,
+                fee_profile_version_id: quote.fee_profile_version_id,
+                ...(options?.metadata || {}),
+            },
+        });
+        if (ledgerError) {
+            const message = String(ledgerError.message || '');
+            if (message.includes('INSUFFICIENT_BALANCE')) {
+                const err = new Error(`Insufficient balance for requested amount plus service fee. Available ₦${quote.available_balance}, this withdrawal needs ₦${quote.total_required} (₦${requestedAmount} plus ₦${quote.service_fee} fee).`);
+                err.status = 402;
+                err.code = 'INSUFFICIENT_BALANCE';
+                err.quote = { ...quote, sufficient: false };
+                throw err;
+            }
+            throw new Error(`Payout rejected: ${ledgerError.message}`);
+        }
+        // Client retry with the same idempotency key: the wallet was debited once
+        // under the original reference — never initiate a second transfer.
+        if (ledgerRes?.status === 'DE-DUPLICATED') {
+            const { data: original } = await supabase_1.supabaseAdmin
+                .from('ledgers')
+                .select('reference')
+                .eq('idempotency_key', idempotencyKey)
+                .maybeSingle();
+            const originalReference = original?.reference || null;
+            let originalStatus = 'PENDING';
+            if (originalReference) {
+                const { data: originalTx } = await supabase_1.supabaseAdmin
+                    .from('transactions_log')
+                    .select('status')
+                    .eq('reference', originalReference)
+                    .maybeSingle();
+                originalStatus = originalTx?.status || originalStatus;
+            }
+            return {
+                reference: originalReference,
+                status: originalStatus,
+                transfer: null,
+                idempotentReplay: true,
+                quote,
+            };
+        }
+        if (version) {
+            try {
+                await treasury_fee_service_1.TreasuryFeeService.persistAssessment({
+                    tenantId,
+                    reference,
+                    requestedAmount,
+                    version,
+                });
+            }
+            catch (assessErr) {
+                console.error('[PaymentService] treasury fee assessment persist failed:', assessErr?.message || assessErr);
+            }
+        }
+        // 4. Call Quasar SDK (via service)
+        let transfer;
+        try {
+            const quasar = await (0, factory_1.getQuasarService)(tenantId);
+            transfer = await quasar.initiateTransfer({
+                amount: requestedAmount,
+                reference,
+                destination: {
+                    account_number: bankDetails.account_number,
+                    bank_code: bankDetails.bank_code,
+                    account_name: bankDetails.account_name,
+                },
+                metadata: {
+                    tenantId,
+                    schoolId: tenantId,
+                    type: payoutType,
+                    ...(options?.metadata || {}),
+                },
+            });
+        }
+        catch (error) {
+            console.error('[PaymentService] Quasar Transfer Failure:', error.message);
+            await PaymentService.handleTransferInitiationFailure({
+                tenantId,
+                reference,
+                amount: requestedAmount,
+                payoutType,
+                bankDetails,
+                metadata: {
+                    ...(options?.metadata || {}),
+                    requested_amount: requestedAmount,
+                    service_fee: quote.service_fee,
+                    total_required: quote.total_required,
+                },
+                ledgerId: ledgerRes?.ledger_id || null,
+                error,
+            });
+            const providerMessage = String(error?.message || 'unknown error');
+            if (/PlatformTransferSettings|No metadata for/i.test(providerMessage)) {
+                throw new Error('Quasar cannot send this withdrawal to the bank right now. Bank transfer settings are missing on the payment provider. No money was sent.');
+            }
+            throw new Error(`Failed to initiate transfer with Quasar: ${providerMessage}`);
+        }
+        // 5. Store transaction record — open until transfer.success / GET SUCCESS.
+        // AWAITING_APPROVAL / PENDING / PROCESSING must not be marked paid.
+        const { normalizeQuasarTransferStatus, invifyStatusFromQuasar, } = require('./payout-status.service');
+        const quasarStatus = normalizeQuasarTransferStatus(transfer?.status || transfer?.data?.status || 'PENDING');
+        const openStatus = invifyStatusFromQuasar(quasarStatus) || 'PENDING';
+        const initialStatus = openStatus === 'SUCCESS' || openStatus === 'FAILED' ? 'PENDING' : openStatus;
+        const { error: txError } = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .insert({
+            reference,
+            tenant_id: tenantId,
+            wallet_id: ledgerRes?.ledger_id || null,
+            amount: requestedAmount,
+            provider: 'quasar',
+            type: 'payout',
+            status: initialStatus,
+            metadata: {
+                quasar_transfer_id: transfer.reference || transfer?.id || null,
+                quasar_status: quasarStatus,
+                destination: bankDetails.account_number,
+                bank_name: bankDetails.bank_name || null,
+                payout_type: payoutType,
+                requested_amount: requestedAmount,
+                service_fee: quote.service_fee,
+                total_required: quote.total_required,
+                fee_profile_version_id: quote.fee_profile_version_id,
+                ...(options?.metadata || {}),
+            },
+        })
+            .select()
+            .single();
+        if (txError) {
+            console.error('[PaymentService] DB Audit Write Failed:', txError.message);
+        }
+        await audit_service_1.AuditService.log({
+            eventType: 'payout.initiated',
+            reference,
+            tenantId,
+            payload: {
+                amount,
+                bankDetails: bankDetails.account_number,
+                payoutType,
+                quasarStatus,
+                ...(options?.metadata || {}),
+            },
+        });
+        try {
+            const { TenantAlertService } = require('./tenant-alert.service');
+            TenantAlertService.notifyWithdrawal(tenantId, { amount, reference });
+        }
+        catch (alertErr) {
+            console.warn('[PaymentService] Tenant withdrawal alert skipped:', alertErr?.message || alertErr);
+        }
+        return {
+            reference,
+            status: initialStatus,
+            transfer,
+            quote,
+        };
+    }
+    /**
+     * Definitive provider rejection → restore the reserved wallet debit (idempotent).
+     * Ambiguous outcome (timeout / network / 5xx) → keep the reservation, record a
+     * PENDING row flagged for reconciliation, and let the webhook settle it.
+     */
+    static async handleTransferInitiationFailure(params) {
+        const { tenantId, reference, amount, payoutType, bankDetails, metadata, ledgerId, error } = params;
+        const definitive = (0, payout_reversal_service_1.isDefinitiveTransferRejection)(error);
+        const errorMessage = String(error?.message || error);
+        let reversalStatus = null;
+        let reversalError = null;
+        if (definitive) {
+            try {
+                const reversal = await payout_reversal_service_1.PayoutReversalService.reverseFailedPayout({
+                    tenantId,
+                    reference,
+                    reason: `transfer_rejected: ${errorMessage}`,
+                    source: 'SYNC_TRANSFER_REJECTED',
+                });
+                reversalStatus = reversal.status;
+            }
+            catch (revErr) {
+                reversalError = String(revErr?.message || revErr);
+                console.error(`[PaymentService] CRITICAL payout reversal failed for ${reference}:`, reversalError);
+            }
+        }
+        const { error: txError } = await supabase_1.supabaseAdmin.from('transactions_log').insert({
+            reference,
+            tenant_id: tenantId,
+            wallet_id: ledgerId,
+            amount,
+            provider: 'quasar',
+            type: 'payout',
+            status: definitive ? 'FAILED' : 'PENDING',
+            metadata: {
+                destination: bankDetails?.account_number,
+                bank_name: bankDetails?.bank_name || null,
+                payout_type: payoutType,
+                ...metadata,
+                transfer_error: errorMessage,
+                reconciliation_required: !definitive || reversalError !== null,
+                reversal_status: reversalStatus,
+                ...(reversalError ? { reversal_error: reversalError } : {}),
+            },
+        });
+        if (txError) {
+            console.error('[PaymentService] DB Audit Write Failed (payout failure):', txError.message);
+        }
+        try {
+            await audit_service_1.AuditService.log({
+                eventType: (definitive && !reversalError ? 'payout.failed' : 'payout.reconciliation_required'),
+                reference,
+                tenantId,
+                payload: {
+                    amount,
+                    payoutType,
+                    definitive_rejection: definitive,
+                    reversal_status: reversalStatus,
+                    reversal_error: reversalError,
+                    transfer_error: errorMessage,
+                },
+            });
+        }
+        catch (auditErr) {
+            console.error('[PaymentService] payout failure audit failed:', auditErr?.message || auditErr);
+        }
+    }
+    /** Prefer reference match; only query id when value looks like a UUID (PostgREST OR with non-UUID id breaks). */
+    static async findTransactionByRefOrId(referenceOrId) {
+        const byRef = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .select('*')
+            .eq('reference', referenceOrId)
+            .maybeSingle();
+        if (byRef.data)
+            return byRef.data;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referenceOrId);
+        if (!isUuid)
+            return null;
+        const byId = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .select('*')
+            .eq('id', referenceOrId)
+            .maybeSingle();
+        return byId.data || null;
+    }
+    static async getIntent(reference) {
+        const transaction = await PaymentService.findTransactionByRefOrId(reference);
+        if (!transaction) {
+            throw new Error(`Transaction not found: ${reference}`);
+        }
+        try {
+            const paymentsClient = await quasar_provisioning_service_1.QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+            const liveIntent = await paymentsClient.getPaymentIntent(transaction.reference);
+            return {
+                ...transaction,
+                status: liveIntent.status || transaction.status,
+                liveIntent
+            };
+        }
+        catch (err) {
+            console.warn(`[PaymentService] Failed to fetch live intent from Quasar:`, err.message);
+            return transaction;
+        }
+    }
+    static async cancelIntent(reference) {
+        const { data: transaction, error } = await supabase_1.supabase
+            .from('transactions_log')
+            .select('*')
+            .or(`reference.eq.${reference},id.eq.${reference}`)
+            .single();
+        if (error || !transaction) {
+            throw new Error(`Transaction not found: ${reference}`);
+        }
+        // Try to cancel on Quasar
+        try {
+            const paymentsClient = await quasar_provisioning_service_1.QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+            await paymentsClient.client.post(`/payments/intents/${transaction.reference}/cancel`, {});
+        }
+        catch (err) {
+            console.warn(`[PaymentService] Quasar cancellation endpoint failed; marking local intent FAILED without provider confirm:`, err.message);
+        }
+        // Update locally
+        const { data: updatedTx, error: updateError } = await supabase_1.supabase
+            .from('transactions_log')
+            .update({ status: 'FAILED', processed_at: new Date().toISOString() })
+            .eq('id', transaction.id)
+            .select()
+            .single();
+        if (updateError) {
+            throw new Error(`Failed to update transaction locally: ${updateError.message}`);
+        }
+        // Audit log
+        await audit_service_1.AuditService.log({
+            eventType: 'payment.intent.cancelled',
+            reference: transaction.reference,
+            tenantId: transaction.tenant_id,
+            payload: { reason: 'User request' }
+        });
+        return updatedTx;
+    }
+    static async getHistory(tenantId) {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .order('created_at', { ascending: false });
+        if (error) {
+            throw new Error(`Failed to fetch history: ${error.message}`);
+        }
+        return data || [];
+    }
+    static async refundIntent(reference, amount, reason, clientIdempotencyKey) {
+        const transaction = await PaymentService.findTransactionByRefOrId(reference);
+        if (!transaction) {
+            throw new Error(`Transaction not found: ${reference}`);
+        }
+        const refundAmount = Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
+        if (refundAmount <= 0 || refundAmount > Number(transaction.amount)) {
+            const amountErr = new Error(`Invalid refund amount: ${amount}. Must be greater than 0 and less than or equal to original amount ${transaction.amount}.`);
+            amountErr.status = 400;
+            throw amountErr;
+        }
+        const refundMeta = (transaction.metadata || {});
+        if (refundMeta.paidVia === 'parent_account' || refundMeta.schoolWalletCredit === false) {
+            const err = new Error('Parent-owned or unproven deposits cannot be refunded from the school wallet.');
+            err.status = 409;
+            err.code = 'PARENT_OWNED_REFUND_BLOCKED';
+            throw err;
+        }
+        const spendableForRefund = await PaymentService.spendableSchoolNaira(transaction.tenant_id);
+        if (spendableForRefund + 0.009 < refundAmount) {
+            const err = new Error(`Refund blocked. Proven school-owned funds ₦${spendableForRefund.toFixed(2)} are below ₦${refundAmount.toFixed(2)}.`);
+            err.status = 402;
+            err.code = 'INSUFFICIENT_BALANCE';
+            throw err;
+        }
+        if (clientIdempotencyKey) {
+            const { data: existingRefunds } = await supabase_1.supabaseAdmin
+                .from('transactions_log')
+                .select('*')
+                .eq('tenant_id', transaction.tenant_id)
+                .eq('type', 'refund')
+                .contains('metadata', { idempotency_key: clientIdempotencyKey })
+                .limit(1);
+            if (existingRefunds?.[0]) {
+                return { ...existingRefunds[0], idempotentReplay: true };
+            }
+        }
+        // Provider refund MUST succeed before any SUCCESS ledger/financial outcome (fail-closed)
+        let providerRefund;
+        try {
+            const paymentsClient = await quasar_provisioning_service_1.QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+            providerRefund = await paymentsClient.createIntentRefund(transaction.reference, {
+                amount: Math.round(amount),
+                reason,
+            });
+        }
+        catch (err) {
+            console.error(`[PaymentService] Quasar refund failed — failing closed (no local SUCCESS):`, err.message);
+            await audit_service_1.AuditService.log({
+                eventType: 'payment.refund.failed',
+                reference: transaction.reference,
+                tenantId: transaction.tenant_id,
+                payload: { amount, reason, error: err.message },
+            });
+            const failErr = new Error(`Refund provider failure: ${err.message}`);
+            failErr.status = 502;
+            throw failErr;
+        }
+        // Record the refund in transactions_log only after provider confirmation
+        const refundRef = `REF-${transaction.reference}-${(0, crypto_1.randomUUID)().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+        const { data: refundTx, error: refundTxErr } = await supabase_1.supabaseAdmin
+            .from('transactions_log')
+            .insert({
+            reference: refundRef,
+            tenant_id: transaction.tenant_id,
+            wallet_id: transaction.wallet_id,
+            amount: refundAmount,
+            provider: "quasar",
+            type: "refund",
+            status: "SUCCESS",
+            metadata: {
+                original_reference: transaction.reference,
+                reason,
+                provider_refund: providerRefund?.data || providerRefund || null,
+                ...(clientIdempotencyKey ? { idempotency_key: clientIdempotencyKey } : {}),
+            }
+        })
+            .select()
+            .single();
+        if (refundTxErr) {
+            throw new Error(`Failed to create refund transaction record: ${refundTxErr.message}`);
+        }
+        // Execute double-entry bookkeeping: Debit merchant wallet, Credit refunds
+        const idempotencyKey = `ledger:refund:${clientIdempotencyKey || refundRef}`;
+        await ledger_service_1.LedgerService.createDoubleEntry({
+            idempotencyKey,
+            tenantId: transaction.tenant_id,
+            reference: refundRef,
+            entries: [
+                { account: 'USER_WALLET', type: 'DEBIT', amount: refundAmount },
+                { account: 'REFUNDS', type: 'CREDIT', amount: refundAmount }
+            ],
+            metadata: { originalReference: transaction.reference, reason }
+        });
+        // Audit log
+        await audit_service_1.AuditService.log({
+            eventType: 'payment.refund.created',
+            reference: refundRef,
+            tenantId: transaction.tenant_id,
+            payload: { amount, original_reference: transaction.reference, reason }
+        });
+        return refundTx;
+    }
+}
+exports.PaymentService = PaymentService;
+//# sourceMappingURL=payment.service.js.map

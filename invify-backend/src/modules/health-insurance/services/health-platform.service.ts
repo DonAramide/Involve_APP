@@ -1,9 +1,21 @@
 // invify-backend/src/modules/health-insurance/services/health-platform.service.ts
 import { supabaseAdmin } from '../../../db/supabase';
 import { HealthAuditService } from './health-audit.service';
-import { HealthContext } from '../types';
+import { HealthContext, PLATFORM_GRANTABLE_PERMISSIONS } from '../types';
 import { premiumOverviewTotals, summarizeStatusAmounts, commandPremiumTotals, premiumMonthSeries, integerMinor } from './finance-summary';
 import { PlatformEntitlementService } from './platform-entitlement.service';
+import {
+  memberDisplayName,
+  premiumSnapshot,
+  relationMissing,
+  describeInstitutions,
+  foldClaims,
+  foldPremiums,
+  resolveInstitutionsForTenants,
+  recordedInstitutionCode,
+  collectProviderTenantCounts,
+  summariseClaims
+} from './health-institution-context';
 
 export interface OperatorGrantDiagnostic {
   hasActiveGrants: boolean;
@@ -234,7 +246,7 @@ export class HealthPlatformService {
     // Query tenants
     let tenantQuery = supabaseAdmin
       .from('tenants')
-      .select('id, name, type, created_at', { count: 'exact' });
+      .select('id, name, type, tenant_code, agent_code, created_at', { count: 'exact' });
 
     if (search) {
       tenantQuery = tenantQuery.ilike('name', `%${search}%`);
@@ -272,7 +284,7 @@ export class HealthPlatformService {
     // Get health settings
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('hw_tenant_settings')
-      .select('tenant_id, enabled, school_enabled, retail_enabled, services_enabled')
+      .select('tenant_id, enabled, school_enabled, retail_enabled, services_enabled, assigned_provider_id, assignment_source')
       .in('tenant_id', tenantIds);
 
     const settingsMap = new Map((settings || []).map(s => [s.tenant_id, s]));
@@ -309,12 +321,22 @@ export class HealthPlatformService {
       pendingCountMap.set(e.tenant_id, (pendingCountMap.get(e.tenant_id) || 0) + 1);
     }
 
+    const institutionMap = await resolveInstitutionsForTenants(tenants || []);
+
     const enriched = (tenants || []).map(t => {
       const s = settingsMap.get(t.id);
+      const institutions = institutionMap.get(t.id);
       return {
         id: t.id,
         name: t.name,
         mode: t.type || 'school',
+        tenantCode: t.tenant_code || null,
+        agentCode: t.agent_code || null,
+        institutionName: institutions?.institutionName || 'Not linked',
+        institutionCode: recordedInstitutionCode(institutions, t),
+        institutionId: institutions?.primary?.id || null,
+        institutions: institutions?.institutions || [],
+        institutionResolution: institutions?.resolution || 'unlinked',
         isEnabled: settingsError ? null : Boolean(s?.enabled),
         is_enabled: settingsError ? null : Boolean(s?.enabled),
         schoolEnabled: settingsError ? null : Boolean(s?.school_enabled),
@@ -327,6 +349,8 @@ export class HealthPlatformService {
         active_count: policyCountError ? null : (policiesCountMap.get(t.id) || 0),
         activePoliciesCount: policyCountError ? null : (policiesCountMap.get(t.id) || 0),
         pendingEnrolmentsCount: pendingError ? null : (pendingCountMap.get(t.id) || 0),
+        assignmentSource: settingsError ? null : (s?.assignment_source || 'UNASSIGNED'),
+        assignedProviderId: settingsError ? null : (s?.assigned_provider_id || null),
         integrationStatus: settingsError ? 'unavailable' : (s?.enabled ? 'active' : 'disabled')
       };
     });
@@ -387,6 +411,122 @@ export class HealthPlatformService {
     });
 
     return { tenantId, name: tenant.name, enabled: data.enabled === true };
+  }
+
+  static async assignTenantProvider(ctx: HealthContext, tenantId: string, providerId: string) {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuid.test(String(tenantId || ''))) {
+      const invalid: any = new Error('tenantId must be a UUID');
+      invalid.status = 400;
+      throw invalid;
+    }
+    if (!uuid.test(String(providerId || ''))) {
+      const invalid: any = new Error('providerId must be a UUID');
+      invalid.status = 400;
+      throw invalid;
+    }
+
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('id, name, type')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to read tenant: ${error.message}`);
+    if (!tenant) {
+      const missing: any = new Error('Tenant was not found.');
+      missing.status = 404;
+      throw missing;
+    }
+
+    const { data: provider, error: providerError } = await supabaseAdmin
+      .from('hw_providers')
+      .select('id, code, display_name, integration_status')
+      .eq('id', providerId)
+      .maybeSingle();
+    if (providerError) throw new Error(`Failed to read HMO: ${providerError.message}`);
+    if (!provider) {
+      const missing: any = new Error('HMO was not found.');
+      missing.status = 404;
+      throw missing;
+    }
+    if (provider.integration_status !== 'verified') {
+      const blocked: any = new Error(
+        `Only active (verified) HMO providers can be assigned to tenants. Current status: ${provider.integration_status || 'none'}.`
+      );
+      blocked.status = 409;
+      blocked.code = 'PROVIDER_NOT_ASSIGNABLE';
+      throw blocked;
+    }
+
+    const now = new Date().toISOString();
+    const settingsPayload: Record<string, unknown> = {
+      tenant_id: tenantId,
+      assigned_provider_id: provider.id,
+      assignment_source: 'ADMIN_ASSIGNED',
+      assignment_mode: 'SELECTABLE',
+      assigned_by: ctx.userId || null,
+      assigned_at: now,
+      updated_at: now
+    };
+    let { error: saveError } = await supabaseAdmin
+      .from('hw_tenant_settings')
+      .upsert(settingsPayload, { onConflict: 'tenant_id' });
+    if (saveError && /assigned_by/i.test(saveError.message)) {
+      delete settingsPayload.assigned_by;
+      const retry = await supabaseAdmin
+        .from('hw_tenant_settings')
+        .upsert(settingsPayload, { onConflict: 'tenant_id' });
+      saveError = retry.error;
+    }
+    if (saveError) throw new Error(`Failed to assign HMO: ${saveError.message}`);
+
+    const tenantType = String(tenant.type || 'school').toLowerCase();
+    const linkType = tenantType === 'retail' ? 'employer' : tenantType === 'services' ? 'organization' : 'school';
+    const { error: linkError } = await supabaseAdmin
+      .from('hw_hmo_school_links')
+      .upsert({
+        provider_id: provider.id,
+        tenant_id: tenantId,
+        tenant_type: linkType,
+        onboarding_status: 'active',
+        updated_at: now
+      }, { onConflict: 'provider_id,tenant_id' });
+    if (linkError && !relationMissing(linkError)) {
+      throw new Error(`Failed to record HMO school link: ${linkError.message}`);
+    }
+
+    try {
+      const { ensureTenantOffersFromAssignedHmo } = await import('./tenant-plan-offer-sync');
+      await ensureTenantOffersFromAssignedHmo(tenantId, ctx.userId);
+    } catch (err: any) {
+      console.warn('[HealthPlatformService.assignTenantProvider] plan offer sync:', err?.message || err);
+    }
+
+    await HealthAuditService.recordEvent({
+      tenantId: '00000000-0000-0000-0000-000000000000',
+      actorUserId: ctx.userId,
+      actorRole: 'platform_admin',
+      action: 'tenant.health.hmo_assigned',
+      resourceType: 'hw_tenant_settings',
+      resourceId: tenantId,
+      changes: {
+        tenantName: tenant.name,
+        providerId: provider.id,
+        providerCode: provider.code,
+        providerName: provider.display_name,
+        reason: ctx.platformReason
+      },
+      viaPlatformAccess: true,
+      platformReason: ctx.platformReason
+    });
+
+    return {
+      tenantId,
+      name: tenant.name,
+      providerId: provider.id,
+      providerCode: provider.code,
+      providerName: provider.display_name
+    };
   }
 
   // ─── 3. Provider Integration & Telemetry Health ───────────────────
@@ -591,15 +731,9 @@ export class HealthPlatformService {
       throw new Error('A valid justification reason (> 5 characters) is mandatory');
     }
 
-    const allowedPermissions = [
-      'platform.providers.manage',
-      'platform.plans.manage',
-      'platform.tenants.onboard',
-      'platform.integration.health',
-      'platform.tenant_access'
-    ];
+    const allowedPermissions = [...PLATFORM_GRANTABLE_PERMISSIONS];
 
-    if (!allowedPermissions.includes(permission)) {
+    if (!allowedPermissions.includes(permission as any)) {
       throw new Error(`Invalid platform permission '${permission}'. Allowed: ${allowedPermissions.join(', ')}`);
     }
 
@@ -751,14 +885,392 @@ export class HealthPlatformService {
     return { ...classified, durableEntitlements };
   }
 
+  static async getTenantHealthDetail(tenantId: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(tenantId || ''))) {
+      const invalid: any = new Error('tenantId must be a UUID');
+      invalid.status = 400;
+      throw invalid;
+    }
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('id, name, type, tenant_code, agent_code, status')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to read tenant: ${error.message}`);
+    if (!tenant) {
+      const missing: any = new Error('Tenant was not found.');
+      missing.status = 404;
+      throw missing;
+    }
+    const [institutionMap, settingsRes, membersRes, policiesRes, enrolmentsRes, dependantsRes, invoicesRes, paymentsRes, claimsRes, linksRes] =
+      await Promise.all([
+        resolveInstitutionsForTenants([tenant]),
+        supabaseAdmin.from('hw_tenant_settings').select('enabled, assigned_provider_id').eq('tenant_id', tenantId).maybeSingle(),
+        supabaseAdmin.from('hw_members').select('id, status, member_category').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_policies').select('id, status').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_enrolments').select('id, status, plan_version_id').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_dependants').select('id, principal_member_id'),
+        supabaseAdmin.from('hw_premium_invoices').select('status, amount_due_minor, amount_paid_minor').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_payments').select('status, amount_minor').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_claim_status_records').select('status, authorised_amount_minor, record_type, member_id').eq('tenant_id', tenantId),
+        supabaseAdmin.from('hw_hmo_school_links').select('provider_id, institution_id, onboarding_status, hw_providers (id, code, display_name)').eq('tenant_id', tenantId)
+      ]);
+
+    const members = membersRes.error ? null : (membersRes.data || []);
+    const policies = policiesRes.error ? null : (policiesRes.data || []);
+    const enrolments = enrolmentsRes.error ? null : (enrolmentsRes.data || []);
+    const invoices = invoicesRes.error ? null : (invoicesRes.data || []);
+    const payments = paymentsRes.error ? null : (paymentsRes.data || []);
+    const claims = claimsRes.error ? null : (claimsRes.data || []);
+    const memberIds = new Set((members || []).map((row: any) => row.id));
+    const dependantCount = dependantsRes.error
+      ? null
+      : (dependantsRes.data || []).filter((row: any) => memberIds.has(row.principal_member_id)).length;
+
+    const byStatus: Record<string, number> = {};
+    const byCategory: Record<string, number> = {};
+    for (const row of members || []) {
+      const status = String(row.status || 'unknown');
+      const category = String(row.member_category || 'unknown');
+      byStatus[status] = (byStatus[status] || 0) + 1;
+      byCategory[category] = (byCategory[category] || 0) + 1;
+    }
+
+    const hmos = (linksRes.error && !relationMissing(linksRes.error) ? [] : (linksRes.data || [])).map((row: any) => {
+      const provider = Array.isArray(row.hw_providers) ? row.hw_providers[0] : row.hw_providers;
+      return {
+        id: provider?.id || row.provider_id,
+        code: provider?.code || null,
+        name: provider?.display_name || null,
+        onboardingStatus: row.onboarding_status || null
+      };
+    }).filter((row: any) => row.id);
+
+    const pending = (enrolments || []).filter((row: any) =>
+      ['awaiting_verification', 'awaiting_premium_payment', 'awaiting_insurer_activation'].includes(String(row.status || ''))
+    ).length;
+
+    return {
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        mode: tenant.type || 'school',
+        tenantCode: tenant.tenant_code || null,
+        status: tenant.status || null
+      },
+      institutions: institutionMap.get(tenantId) || describeInstitutions([]),
+      healthAccess: settingsRes.error ? 'unavailable' : (settingsRes.data?.enabled ? 'enabled' : 'disabled'),
+      members: members === null ? null : {
+        total: members.length,
+        active: (members || []).filter((row: any) => String(row.status) === 'active').length,
+        pendingEnrolments: pending,
+        suspendedOrInactive: (members || []).filter((row: any) => ['suspended', 'inactive', 'exited'].includes(String(row.status))).length,
+        dependants: dependantCount,
+        byPlan: [] as { plan: string; count: number }[],
+        byStatus,
+        byCategory
+      },
+      policies: policies === null ? null : {
+        total: policies.length,
+        active: policies.filter((row: any) => String(row.status) === 'active').length
+      },
+      hmos,
+      premiums: invoices === null || payments === null ? null : premiumSnapshot(invoices, payments),
+      claims: claims === null ? null : summariseClaims(claims),
+      utilisation: { available: false, reason: 'Provider utilisation is not stored on platform tenant reads.' }
+    };
+  }
+
+  static async getInstitutionHealthDetail(institutionId: string) {
+    const id = String(institutionId || '').trim();
+    if (!id) {
+      const invalid: any = new Error('institutionId is required');
+      invalid.status = 400;
+      throw invalid;
+    }
+
+    const byId = await supabaseAdmin
+      .from('institutions')
+      .select('id, institution_code, legal_name, trading_name, institution_type, status')
+      .eq('id', id)
+      .maybeSingle();
+    let institution = byId.data;
+    let instError = byId.error;
+    if (!institution && (!instError || relationMissing(instError))) {
+      const byCode = await supabaseAdmin
+        .from('institutions')
+        .select('id, institution_code, legal_name, trading_name, institution_type, status')
+        .ilike('institution_code', id)
+        .maybeSingle();
+      institution = byCode.data;
+      instError = byCode.error;
+    }
+    if (instError && !relationMissing(instError)) throw new Error(`Failed to read institution: ${instError.message}`);
+
+    const safeId = id.replace(/[^a-zA-Z0-9-]/g, '');
+    const { data: agent, error: agentError } = await supabaseAdmin
+      .from('agents')
+      .select('id, agent_code, name, institution_name, institution_type')
+      .or(`id.eq.${safeId},agent_code.eq.${safeId}`)
+      .maybeSingle();
+    if (agentError && !relationMissing(agentError) && !/multiple|results/i.test(String(agentError.message || ''))) {
+      throw new Error(`Failed to read agent institution: ${agentError.message}`);
+    }
+
+    let provider: { id: string; code: string; display_name: string; integration_status?: string | null } | null = null;
+    if (!institution && !agent) {
+      const byProviderId = await supabaseAdmin
+        .from('hw_providers')
+        .select('id, code, display_name, integration_status')
+        .eq('id', id)
+        .maybeSingle();
+      if (byProviderId.error && !relationMissing(byProviderId.error)) {
+        throw new Error(`Failed to read HMO institute: ${byProviderId.error.message}`);
+      }
+      provider = byProviderId.data || null;
+      if (!provider) {
+        const byProviderCode = await supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name, integration_status')
+          .eq('code', id.toLowerCase())
+          .maybeSingle();
+        if (byProviderCode.error && !relationMissing(byProviderCode.error) && !/multiple|results/i.test(String(byProviderCode.error.message || ''))) {
+          throw new Error(`Failed to read HMO institute: ${byProviderCode.error.message}`);
+        }
+        provider = byProviderCode.data || null;
+      }
+    }
+
+    const profile = institution
+      ? {
+          id: institution.id,
+          code: institution.institution_code,
+          name: institution.trading_name || institution.legal_name,
+          mode: institution.institution_type,
+          status: institution.status,
+          source: 'institutions'
+        }
+      : agent
+        ? {
+            id: agent.id,
+            code: agent.agent_code,
+            name: agent.institution_name || agent.name,
+            mode: agent.institution_type,
+            status: null,
+            source: 'agents'
+          }
+        : provider
+          ? {
+              id: provider.id,
+              code: provider.code,
+              name: provider.display_name,
+              mode: 'HMO',
+              status: provider.integration_status || null,
+              source: 'hw_providers'
+            }
+          : null;
+    if (!profile) {
+      const missing: any = new Error('Institution was not found.');
+      missing.status = 404;
+      throw missing;
+    }
+
+    const relTenants = await supabaseAdmin
+      .from('tenant_institution_relationships')
+      .select('tenant_id')
+      .eq('institution_id', profile.id);
+    const assignedTenants = await supabaseAdmin
+      .from('hw_tenant_settings')
+      .select('tenant_id')
+      .eq('assigned_institution_id', profile.id);
+    const assignedProviderTenants = await supabaseAdmin
+      .from('hw_tenant_settings')
+      .select('tenant_id')
+      .eq('assigned_provider_id', profile.id);
+    const linkTenants = await supabaseAdmin
+      .from('hw_hmo_school_links')
+      .select('tenant_id')
+      .eq('institution_id', profile.id);
+    const linkProviderTenants = await supabaseAdmin
+      .from('hw_hmo_school_links')
+      .select('tenant_id')
+      .eq('provider_id', profile.id);
+    const agentTenants = profile.code
+      ? await supabaseAdmin.from('tenants').select('id, name, type').eq('agent_code', profile.code)
+      : { data: [], error: null };
+    const codeTenants = profile.code
+      ? await supabaseAdmin.from('tenants').select('id, name, type').eq('tenant_code', profile.code)
+      : { data: [], error: null };
+
+    const tenantIds = new Set<string>();
+    for (const pack of [relTenants, assignedTenants, assignedProviderTenants, linkTenants, linkProviderTenants]) {
+      if (pack.error && !relationMissing(pack.error)) throw new Error(pack.error.message);
+      for (const row of pack.data || []) if (row.tenant_id) tenantIds.add(row.tenant_id);
+    }
+    if (agentTenants.error && !relationMissing(agentTenants.error)) throw new Error(agentTenants.error.message);
+    if (codeTenants.error && !relationMissing(codeTenants.error)) throw new Error(codeTenants.error.message);
+    for (const row of [...(agentTenants.data || []), ...(codeTenants.data || [])]) if (row.id) tenantIds.add(row.id);
+
+    const ids = [...tenantIds];
+    const { data: tenantRows } = ids.length
+      ? await supabaseAdmin.from('tenants').select('id, name, type, tenant_code, agent_code').in('id', ids)
+      : { data: [] as any[] };
+
+    const summaries = [];
+    for (const row of (tenantRows || []).slice(0, 50)) {
+      summaries.push(await HealthPlatformService.getTenantHealthDetail(row.id));
+    }
+
+    const memberTotal = summaries.reduce((sum, row) => sum + (row.members?.total || 0), 0);
+    const dependantTotal = summaries.reduce((sum, row) => sum + (row.members?.dependants || 0), 0);
+
+    return {
+      institution: profile,
+      tenants: (tenantRows || []).map((row) => ({ id: row.id, name: row.name, mode: row.type || 'school' })),
+      totals: {
+        institutions: 1,
+        tenants: (tenantRows || []).length,
+        members: summaries.some((row) => row.members === null) ? null : memberTotal,
+        dependants: summaries.some((row) => row.members === null) ? null : dependantTotal,
+        activePolicies: summaries.some((row) => row.policies === null)
+          ? null
+          : summaries.reduce((sum, row) => sum + (row.policies?.active || 0), 0)
+      },
+      membersByTenant: summaries.map((row) => ({
+        tenantId: row.tenant.id,
+        tenantName: row.tenant.name,
+        members: row.members?.total ?? null,
+        byCategory: row.members?.byCategory || {}
+      })),
+      premiums: foldPremiums(summaries.map((row) => row.premiums)),
+      claims: foldClaims(summaries.map((row) => row.claims)),
+      utilisation: { available: false, reason: 'Provider utilisation is not stored on this institution read.' }
+    };
+  }
+
+  static async listPlatformMembers(query: any) {
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    const search = String(query.search || '').trim().replace(/[%_\\]/g, '').slice(0, 64);
+
+    let memberQuery = supabaseAdmin
+      .from('hw_members')
+      .select(`
+        id,
+        tenant_id,
+        member_category,
+        status,
+        insurer_member_ref,
+        created_at,
+        students ( first_name, last_name ),
+        hw_staff_profiles ( tenant_staff ( name ) )
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (search) memberQuery = memberQuery.ilike('insurer_member_ref', `%${search}%`);
+
+    const { data, count, error } = await memberQuery;
+    if (error) {
+      if (relationMissing(error)) return { members: [], total: 0, limit, offset };
+      throw new Error(`Failed to list members: ${error.message}`);
+    }
+    const members = data || [];
+    const tenantIds = [...new Set(members.map((row: any) => row.tenant_id).filter(Boolean))];
+    const { data: tenantRows } = tenantIds.length
+      ? await supabaseAdmin.from('tenants').select('id, name, type, tenant_code, agent_code').in('id', tenantIds)
+      : { data: [] as any[] };
+    const tenants = tenantRows || [];
+    const tenantMap = new Map(tenants.map((row: any) => [row.id, row]));
+    const institutionMap = await resolveInstitutionsForTenants(tenants);
+
+    const memberIds = members.map((row: any) => row.id);
+    const { data: dependants } = memberIds.length
+      ? await supabaseAdmin.from('hw_dependants').select('id, principal_member_id').in('principal_member_id', memberIds)
+      : { data: [] as any[] };
+    const dependantCounts = new Map<string, number>();
+    for (const row of dependants || []) {
+      dependantCounts.set(row.principal_member_id, (dependantCounts.get(row.principal_member_id) || 0) + 1);
+    }
+
+    const { data: enrolments } = memberIds.length
+      ? await supabaseAdmin
+          .from('hw_enrolments')
+          .select('id, member_id, status, created_at, plan_version_id, hw_plan_versions ( id, hw_plans ( name, code, hw_providers ( display_name, code ) ) )')
+          .in('member_id', memberIds)
+          .order('created_at', { ascending: false })
+      : { data: [] as any[] };
+    const enrolmentByMember = new Map<string, any>();
+    for (const row of enrolments || []) {
+      if (!enrolmentByMember.has(row.member_id)) enrolmentByMember.set(row.member_id, row);
+    }
+    const enrolmentIds = [...enrolmentByMember.values()].map((row: any) => row.id).filter(Boolean);
+    const { data: policies } = enrolmentIds.length
+      ? await supabaseAdmin.from('hw_policies').select('enrolment_id, status').in('enrolment_id', enrolmentIds)
+      : { data: [] as any[] };
+    const policyByEnrolment = new Map((policies || []).map((row: any) => [row.enrolment_id, row]));
+
+    return {
+      members: members.map((row: any) => {
+        const tenant = tenantMap.get(row.tenant_id);
+        const institutions = tenant ? institutionMap.get(tenant.id) : null;
+        const enrolment = enrolmentByMember.get(row.id);
+        const version = Array.isArray(enrolment?.hw_plan_versions) ? enrolment.hw_plan_versions[0] : enrolment?.hw_plan_versions;
+        const plan = Array.isArray(version?.hw_plans) ? version.hw_plans[0] : version?.hw_plans;
+        const provider = Array.isArray(plan?.hw_providers) ? plan.hw_providers[0] : plan?.hw_providers;
+        return {
+          id: row.id,
+          memberId: row.insurer_member_ref || row.id,
+          name: memberDisplayName(row),
+          tenantId: row.tenant_id,
+          tenantName: tenant?.name || 'Tenant not recorded',
+          institutionName: institutions?.institutionName || 'Not linked',
+          institutionCode: recordedInstitutionCode(institutions, tenant),
+          institutionId: institutions?.primary?.id || null,
+          institutionResolution: institutions?.resolution || 'unlinked',
+          hmoName: provider?.display_name || null,
+          planName: plan?.name || null,
+          memberCategory: row.member_category || null,
+          enrolmentDate: enrolment?.created_at || row.created_at || null,
+          membershipStatus: row.status || null,
+          dependantsCount: dependantCounts.get(row.id) || 0,
+          policyStatus: policyByEnrolment.get(enrolment?.id)?.status || null
+        };
+      }),
+      total: typeof count === 'number' ? count : null,
+      limit,
+      offset
+    };
+  }
+
   /** Canonical HMO organisation rows. This read does not load plans. */
   static async listProviderRegistry() {
     const { data, error } = await supabaseAdmin
       .from('hw_providers')
-      .select('id, code, display_name, integration_status, licence_reference')
+      .select('id, code, display_name, integration_status, licence_reference, registration_channel')
       .order('display_name');
-    if (error) throw new Error(`Failed to list HMO registry: ${error.message}`);
-    return data || [];
+    if (error) {
+      if (/registration_channel|column.*does not exist/i.test(error.message)) {
+        const fallback = await supabaseAdmin
+          .from('hw_providers')
+          .select('id, code, display_name, integration_status, licence_reference')
+          .order('display_name');
+        if (fallback.error) throw new Error(`Failed to list HMO registry: ${fallback.error.message}`);
+        const providers = fallback.data || [];
+        const tenantCounts = await collectProviderTenantCounts(providers);
+        return providers.map((provider) => ({
+          ...provider,
+          registration_channel: 'platform',
+          tenant_count: tenantCounts.get(provider.id) || 0
+        }));
+      }
+      throw new Error(`Failed to list HMO registry: ${error.message}`);
+    }
+    const providers = data || [];
+    const tenantCounts = await collectProviderTenantCounts(providers);
+    return providers.map((provider) => ({
+      ...provider,
+      tenant_count: tenantCounts.get(provider.id) || 0
+    }));
   }
 
   /** Invoice and payment status totals. No payer, member, or enrolment identifiers. */
@@ -873,5 +1385,78 @@ export class HealthPlatformService {
     const { data, error } = await query;
     if (error) throw new Error(`Failed to list facilities: ${error.message}`);
     return data || [];
+  }
+
+  /** Platform oversight of bank HMO offerings (no settlement / payout). */
+  static async listBankOfferings(query: { search?: string; limit?: number; offset?: number } = {}) {
+    const limit = Math.min(Math.max(Number(query.limit) || 25, 1), 100);
+    const offset = Math.max(Number(query.offset) || 0, 0);
+    const { data, error, count } = await supabaseAdmin
+      .from('hw_bank_hmo_offerings')
+      .select(
+        'id, agent_id, plan_version_id, is_active, reason, created_at, updated_at, hw_plan_versions(id, version, status, hw_plans(id, code, name, provider_id, hw_providers(id, code, display_name, integration_status)))',
+        { count: 'exact' }
+      )
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw new Error(`Failed to list bank offerings: ${error.message}`);
+    const rows = (data || []).map((row: any) => {
+      const version = Array.isArray(row.hw_plan_versions) ? row.hw_plan_versions[0] : row.hw_plan_versions;
+      const plan = Array.isArray(version?.hw_plans) ? version.hw_plans[0] : version?.hw_plans;
+      const provider = Array.isArray(plan?.hw_providers) ? plan.hw_providers[0] : plan?.hw_providers;
+      return {
+        id: row.id,
+        agentId: row.agent_id,
+        planVersionId: row.plan_version_id,
+        isActive: row.is_active === true,
+        reason: row.reason,
+        planCode: plan?.code || null,
+        planName: plan?.name || null,
+        providerId: provider?.id || plan?.provider_id || null,
+        providerCode: provider?.code || null,
+        providerName: provider?.display_name || null,
+        providerStatus: provider?.integration_status || null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    });
+    const search = String(query.search || '').trim().toLowerCase();
+    const filtered = search
+      ? rows.filter((r) =>
+          `${r.providerName || ''} ${r.providerCode || ''} ${r.planName || ''} ${r.planCode || ''} ${r.agentId || ''}`
+            .toLowerCase()
+            .includes(search)
+        )
+      : rows;
+    return { offerings: filtered, total: typeof count === 'number' ? count : filtered.length, limit, offset };
+  }
+
+  /**
+   * Aggregate claims oversight without clinical detail.
+   * Settled/approved counts are status tallies — not paid disbursements.
+   */
+  static async getClaimsOverview() {
+    const { data, error } = await supabaseAdmin
+      .from('hw_claim_status_records')
+      .select('status, record_type, authorised_amount_minor');
+    if (error) throw new Error(`Failed to summarise claims: ${error.message}`);
+    const byStatus: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    let authorisedMinor = 0;
+    for (const row of data || []) {
+      const status = String(row.status || 'unknown');
+      const type = String(row.record_type || 'unknown');
+      byStatus[status] = (byStatus[status] || 0) + 1;
+      byType[type] = (byType[type] || 0) + 1;
+      if (typeof row.authorised_amount_minor === 'number') authorisedMinor += row.authorised_amount_minor;
+    }
+    return {
+      totalRecords: (data || []).length,
+      byStatus,
+      byType,
+      authorisedAmountMinorTotal: authorisedMinor,
+      disclaimer:
+        'Authorised amounts and settled statuses are administrative. They are not claims paid, disbursements, or fee postings.'
+    };
   }
 }

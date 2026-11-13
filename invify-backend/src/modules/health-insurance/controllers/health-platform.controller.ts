@@ -4,6 +4,9 @@ import { HealthPlatformService } from '../services/health-platform.service';
 import { PlatformEntitlementError, PlatformEntitlementService } from '../services/platform-entitlement.service';
 import { HealthPlanGovernanceService } from '../services/health-plan-governance.service';
 import { PlanDraftValidationError } from '../services/plan-draft.validation';
+import { InvifyCatalogueService } from '../services/invify-catalogue.service';
+import { CatalogueValidationError, clientSafeCatalogueError } from '../services/invify-catalogue.rules';
+import { HealthProviderGovernanceService } from '../services/health-provider-governance.service';
 import { supabaseAdmin } from '../../../db/supabase';
 
 function sendPlatformData(res: Response, data: unknown, status = 200) {
@@ -57,6 +60,14 @@ function sendPlanError(res: Response, err: any, fallback: string) {
   });
 }
 
+function sendCatalogueError(res: Response, err: any, fallback: string) {
+  const safe = err instanceof CatalogueValidationError ? err : clientSafeCatalogueError(err, fallback);
+  return res.status(safe.status).json({
+    success: false,
+    error: { code: safe.code, message: safe.message }
+  });
+}
+
 export class HealthPlatformController {
   // ─── 1. Cross-Tenant Overview ──────────────────────────────────────
   static async getOverview(req: Request, res: Response) {
@@ -76,6 +87,56 @@ export class HealthPlatformController {
     } catch (err: any) {
       const message = err?.message || 'Failed to list participating tenants';
       const status = /mode must be|health must be/.test(message) ? 400 : 500;
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async getTenantDetail(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getTenantHealthDetail(String(req.params.tenantId || ''));
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load tenant health detail';
+      const status = err?.status || (/UUID/.test(message) ? 400 : 500);
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async getInstitutionDetail(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getInstitutionHealthDetail(String(req.params.institutionId || ''));
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load institution health detail';
+      const status = err?.status || 500;
+      return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async listMembers(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.listPlatformMembers(req.query);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(500).json({ error: { message: err?.message || 'Failed to list members' } });
+    }
+  }
+
+  static async assignTenantProvider(req: Request, res: Response) {
+    try {
+      const providerId = String(req.body?.providerId || '').trim();
+      if (!providerId) {
+        return res.status(400).json({ error: { message: 'providerId is required' } });
+      }
+      const data = await HealthPlatformService.assignTenantProvider(
+        req.healthContext!,
+        req.params.tenantId,
+        providerId
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to assign HMO';
+      const status = err?.status || (/UUID|required/.test(message) ? 400 : 500);
       return res.status(status).json({ error: { message } });
     }
   }
@@ -413,6 +474,92 @@ export class HealthPlatformController {
     }
   }
 
+  static async listCatalogueOfferings(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.listOfferings(req.query);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to list Invify catalogue offerings');
+    }
+  }
+
+  static async getCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.getOfferingTree(req.params.offeringId);
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to load offering');
+    }
+  }
+
+  static async createCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.createOffering(req.healthContext!, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to create offering');
+    }
+  }
+
+  static async updateCatalogueOffering(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.updateOffering(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to update offering');
+    }
+  }
+
+  static async setCatalogueOfferingStatus(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.setOfferingStatus(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to change offering status');
+    }
+  }
+
+  static async addCatalogueService(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.addService(req.healthContext!, req.params.offeringId, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to add service');
+    }
+  }
+
+  static async addCatalogueProduct(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.addProduct(req.healthContext!, req.params.serviceId, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to add product');
+    }
+  }
+
+  static async assignCatalogueFacility(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.assignFacility(req.healthContext!, req.params.productId, req.body || {});
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to assign facility');
+    }
+  }
+
+  static async removeCatalogueFacility(req: Request, res: Response) {
+    try {
+      const data = await InvifyCatalogueService.removeFacility(
+        req.healthContext!,
+        req.params.productId,
+        req.params.facilityId,
+        req.body?.reason || req.headers['x-platform-reason']
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return sendCatalogueError(res, err, 'Failed to remove facility assignment');
+    }
+  }
+
   static async issueEntitlement(req: Request, res: Response) {
     return mutateEntitlement(req, res, (actorUserId, permission, reason) =>
       PlatformEntitlementService.issue(actorUserId, permission, reason, req.body?.userId), 201);
@@ -430,12 +577,130 @@ export class HealthPlatformController {
     );
   }
 
-  static async listProviderRegistry(_req: Request, res: Response) {
+  static async listProviderRegistry(req: Request, res: Response) {
     try {
+      // Prefer governed listing when query filters are present; keep legacy shape otherwise.
+      const hasFilters = Boolean(
+        req.query?.search || req.query?.status || req.query?.channel || req.query?.limit || req.query?.offset
+      );
+      if (hasFilters) {
+        const data = await HealthProviderGovernanceService.listProviders({
+          search: String(req.query.search || ''),
+          status: String(req.query.status || ''),
+          channel: String(req.query.channel || ''),
+          limit: Number(req.query.limit),
+          offset: Number(req.query.offset)
+        });
+        return sendPlatformData(res, data);
+      }
       const providers = await HealthPlatformService.listProviderRegistry();
       return sendPlatformData(res, { providers });
     } catch (err: any) {
-      return res.status(500).json({ error: { message: err?.message || 'Failed to list HMO registry' } });
+      const status = err?.status || 500;
+      return res.status(status).json({ error: { code: err?.code, message: err?.message || 'Failed to list HMO registry' } });
+    }
+  }
+
+  static async getProviderStatistics(_req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.getProviderStatistics();
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { message: err?.message || 'Failed to load provider statistics' } });
+    }
+  }
+
+  static async getProviderDetail(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.getProviderDetail(String(req.params.providerId || ''));
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message || 'Failed to load provider' } });
+    }
+  }
+
+  static async registerProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.registerProvider(req.healthContext!, req.body || {});
+      return sendPlatformData(res, data, 201);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to register provider' } });
+    }
+  }
+
+  static async updateProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.updateProvider(
+        req.healthContext!,
+        String(req.params.providerId || ''),
+        req.body || {}
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to update provider' } });
+    }
+  }
+
+  static async approveProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.approveProvider(
+        req.healthContext!,
+        String(req.params.providerId || '')
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to approve provider' } });
+    }
+  }
+
+  static async rejectProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.rejectProvider(
+        req.healthContext!,
+        String(req.params.providerId || ''),
+        req.body || {}
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to reject provider' } });
+    }
+  }
+
+  static async suspendProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.suspendProvider(
+        req.healthContext!,
+        String(req.params.providerId || ''),
+        req.body || {}
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to suspend provider' } });
+    }
+  }
+
+  static async reactivateProvider(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.reactivateProvider(
+        req.healthContext!,
+        String(req.params.providerId || ''),
+        req.body || {}
+      );
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message || 'Failed to reactivate provider' } });
+    }
+  }
+
+  static async listProviderAudit(req: Request, res: Response) {
+    try {
+      const data = await HealthProviderGovernanceService.listProviderAudit(String(req.params.providerId || ''), {
+        limit: Number(req.query.limit),
+        offset: Number(req.query.offset)
+      });
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message || 'Failed to load provider audit' } });
     }
   }
 
@@ -456,6 +721,28 @@ export class HealthPlatformController {
       const message = err?.message || 'Failed to load the finance command';
       const status = /YYYY-MM-DD|from is after to|status is not/.test(message) ? 400 : 500;
       return res.status(status).json({ error: { message } });
+    }
+  }
+
+  static async listBankOfferings(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.listBankOfferings({
+        search: String(req.query.search || ''),
+        limit: Number(req.query.limit),
+        offset: Number(req.query.offset)
+      });
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(500).json({ error: { message: err?.message || 'Failed to list bank offerings' } });
+    }
+  }
+
+  static async getClaimsOverview(req: Request, res: Response) {
+    try {
+      const data = await HealthPlatformService.getClaimsOverview();
+      return sendPlatformData(res, data);
+    } catch (err: any) {
+      return res.status(500).json({ error: { message: err?.message || 'Failed to summarise claims' } });
     }
   }
 

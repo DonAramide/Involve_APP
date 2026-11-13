@@ -169,6 +169,18 @@ export const adminApi = {
   createFeeWithdrawal: (data) => api.post('/api/admin/platform-fees/withdrawals', data),
   approveFeeWithdrawal: (id) => api.post(`/api/admin/platform-fees/withdrawals/${encodeURIComponent(id)}/approve`),
   rejectFeeWithdrawal: (id, data) => api.post(`/api/admin/platform-fees/withdrawals/${encodeURIComponent(id)}/reject`, data || {}),
+  listBankAccountRequests: (params) => api.get('/api/admin/bank-account-requests', { params }),
+  getBankAccountRequest: (id) => api.get(`/api/admin/bank-account-requests/${encodeURIComponent(id)}`),
+  decideBankAccountRequest: (id, data) => api.post(`/api/admin/bank-account-requests/${encodeURIComponent(id)}/decide`, data || {}),
+  getHmoFinanceReport: (params) => api.get('/api/admin/hmo-finance-report', { params }),
+  previewHmoServiceFee: (data) => api.post('/api/admin/hmo-service-fee/preview', data || {}),
+  listTenantBankAccounts: () => api.get('/api/tenant/bank-accounts'),
+  submitTenantBankAccount: (data) => api.post('/api/tenant/bank-accounts', data),
+  listInstitutionHmoEarnings: (params) => api.get('/api/agent/hmo/earnings', { params }),
+  listInstitutionWithdrawals: () => api.get('/api/agent/hmo/withdrawals'),
+  createInstitutionWithdrawal: (data) => api.post('/api/agent/hmo/withdrawals', data),
+  listInstitutionBankAccounts: () => api.get('/api/agent/hmo/bank-accounts'),
+  submitInstitutionBankAccount: (data) => api.post('/api/agent/hmo/bank-accounts', data),
   reviewKycDocument: (id, data) => api.patch(`/api/admin/kyc/documents/${id}`, data),
   uploadTenantKyc: (data) => api.post('/api/tenant/kyc/upload', data, {
     timeout: 120000,
@@ -328,7 +340,7 @@ export const deviceApi = {
   resendActivationEmail: (id) => api.post(`/api/devices/activations/${id}/resend-email`),
   validateCode: (data) => api.post('/api/devices/validate', data),
   updateDevice: (id, data) => api.patch(`/api/devices/${id}`, data),
-  resetActivation: (code, data) => api.patch(`/api/devices/activations/${code}/reset`, data),
+  resetActivation: (code, data) => api.patch(`/api/devices/activations/${encodeURIComponent(code)}/reset`, data),
 
   // Telemetry & Fleet Visibility
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
@@ -377,6 +389,7 @@ export const inventoryApi = {
   getOutOfStock: () => api.get('/api/inventory/stock/out'),
   getStockSummary: () => api.get('/api/inventory/stock/summary'),
   getStockHistory: (id) => api.get(`/api/inventory/stock/${id}/history`),
+  addStock: (id, data) => api.post(`/api/inventory/stock/${id}/add`, data),
   getCategories: () => api.get('/api/inventory/categories'),
   getSuppliers: () => api.get('/api/inventory/suppliers'),
 };
@@ -409,6 +422,7 @@ export const attendanceApi = {
 export const schoolApi = {
   getRoster: (config) => api.get('/api/school/roster', config),
   getAcademics: () => api.get('/api/school/roster', { params: { type: 'result' } }),
+  getBilling: (config) => api.get('/api/school/billing', config),
   bulkSync: (data) => api.post('/api/school/bulk-sync', data),
   getPayments: (config) => api.get('/api/school/payments', config),
   syncPayments: (data) => api.post('/api/school/payments/sync', data),

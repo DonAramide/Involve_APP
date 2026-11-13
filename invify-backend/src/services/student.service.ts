@@ -1,6 +1,7 @@
 // invify-backend/src/services/student.service.ts
 import { supabase } from '../db/supabase';
-import { getQuasarService } from '../integrations/quasar/factory';
+import { getQuasarServiceForTenantVa } from '../integrations/quasar/factory';
+import { resolveVaInstitutionCodeForTenant } from '../integrations/quasar/va-institution-code';
 import { AuditService } from './audit.service';
 import { toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
 
@@ -44,12 +45,13 @@ export class StudentService {
       }
 
       // 3. Resolve Quasar Service (Multi-Tenant)
-      const quasar = await getQuasarService(schoolId);
+      const quasar = await getQuasarServiceForTenantVa(schoolId);
 
       // 4. Call Quasar SDK (childId must be UUID; map stu-* keys deterministically)
       const quasarChildId = toQuasarChildUuid(schoolId, studentId);
       const reference = `VA-${quasarChildId.substring(0, 8)}-${Date.now()}`;
 
+      const institutionCode = await resolveVaInstitutionCodeForTenant(schoolId);
       const quasarAccount = await quasar.createVirtualAccount({
         childId: quasarChildId,
         parentId: schoolId,
@@ -57,11 +59,13 @@ export class StudentService {
         phone: (student as any).phone || (student as any).parent_phone || undefined,
         firstName: student.first_name,
         lastName: student.last_name,
+        institutionCode,
         metadata: {
           admissionNumber: student.admission_number,
           source: 'student_provisioning',
           externalStudentKey: studentId,
           phone: (student as any).phone || (student as any).parent_phone || undefined,
+          ...(institutionCode ? { institutionCode } : {}),
         },
       });
 

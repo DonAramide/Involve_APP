@@ -506,7 +506,10 @@ app.get('/api/v1/admin/financial-sandbox/analytics', authenticate, checkRole(['s
 // Terminal Management Endpoints
 import { TenantKycController } from './controllers/tenant-kyc.controller';
 import multer from 'multer';
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 20 },
+});
 
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
 app.get('/api/admin/kyc/documents', authenticate, checkRole(['super_admin', 'admin', 'internal_staff']), TenantKycController.listPending);
@@ -665,7 +668,10 @@ const storage = multer.diskStorage({
   }
 });
 
-const localUpload = multer({ storage: storage });
+const localUpload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024, files: 1, fields: 20 },
+});
 
 app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), upload.single('cac_document'), AdminController.uploadCacDocument);
 app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('backup_file'), AdminController.uploadClaudeBackup);

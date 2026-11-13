@@ -70,8 +70,9 @@ android {
                 signingConfigs.getByName("debug")
             }
             
-            isMinifyEnabled = true
-            isShrinkResources = true
+            val minifyRelease = System.getenv("BUILD_NO_MINIFY") != "true"
+            isMinifyEnabled = minifyRelease
+            isShrinkResources = minifyRelease
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

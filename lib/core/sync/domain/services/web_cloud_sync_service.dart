@@ -989,10 +989,18 @@ Future<int?> _upsertSchoolFee(
   if (existing.isEmpty) {
     existing = await (db.select(db.items)..where((t) => t.name.equals(name))).get();
   }
+  final stockQty = row.containsKey('stock_qty') || row.containsKey('stockQty')
+      ? _num(row['stock_qty'] ?? row['stockQty']).round()
+      : null;
+  final minStock = row.containsKey('min_stock_qty') || row.containsKey('minStockQty')
+      ? _num(row['min_stock_qty'] ?? row['minStockQty'])
+      : null;
   final companion = ItemsCompanion(
     name: Value(name),
     category: Value(_text(row['category']).isEmpty ? 'service' : _text(row['category'])),
     price: Value(price),
+    stockQty: stockQty == null ? const Value.absent() : Value(stockQty),
+    minStockQty: minStock == null ? const Value.absent() : Value(minStock),
     type: Value('service'),
     billingType: Value(
       _text(row['billing_type'] ?? row['billingType']).isEmpty

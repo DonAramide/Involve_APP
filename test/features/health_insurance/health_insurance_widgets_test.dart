@@ -297,6 +297,8 @@ class _WidgetTestFakeRepo implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async =>
       const HealthEnrolment(
         id: 'enr-new',
@@ -318,4 +320,12 @@ class _WidgetTestFakeRepo implements HealthInsuranceRepository {
 
   @override
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId) async => {};
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {}
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    throw UnimplementedError();
+  }
 }

@@ -1,5 +1,6 @@
 // lib/features/health_insurance/presentation/pages/hmo_welcome_page.dart
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/service_mode/service_mode_terms.dart';
 import '../utils/hmo_tour_storage.dart';
 import 'hmo_guided_tour_page.dart';
 
@@ -8,8 +9,11 @@ class HmoWelcomePage extends StatelessWidget {
 
   final String? userId;
   final String? tenantId;
+  /// Display name of the organisation (legacy param name: schoolName).
   final String? schoolName;
+  final String? organizationName;
   final String? hmoProviderName;
+  final String? businessMode;
   final VoidCallback? onDismiss;
 
   const HmoWelcomePage({
@@ -17,7 +21,9 @@ class HmoWelcomePage extends StatelessWidget {
     this.userId,
     this.tenantId,
     this.schoolName,
+    this.organizationName,
     this.hmoProviderName,
+    this.businessMode,
     this.onDismiss,
   });
 
@@ -27,7 +33,9 @@ class HmoWelcomePage extends StatelessWidget {
     String? userId,
     String? tenantId,
     String? schoolName,
+    String? organizationName,
     String? hmoProviderName,
+    String? businessMode,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -40,11 +48,21 @@ class HmoWelcomePage extends StatelessWidget {
           userId: userId,
           tenantId: tenantId,
           schoolName: schoolName,
+          organizationName: organizationName,
           hmoProviderName: hmoProviderName,
+          businessMode: businessMode,
           onDismiss: () => Navigator.of(context).pop(),
         ),
       ),
     );
+  }
+
+  ServiceModeTerms get _terms => ServiceModeTerms.fromRaw(businessMode);
+
+  String get _orgName {
+    final raw = (organizationName ?? schoolName)?.trim();
+    if (raw != null && raw.isNotEmpty) return raw;
+    return 'Your ${_terms.organisation.toLowerCase()}';
   }
 
   void _markCompletedAndClose(BuildContext context) {
@@ -63,7 +81,9 @@ class HmoWelcomePage extends StatelessWidget {
           userId: userId,
           tenantId: tenantId,
           schoolName: schoolName,
+          organizationName: organizationName ?? schoolName,
           hmoProviderName: hmoProviderName,
+          businessMode: businessMode,
           onFinish: () {
             _markCompletedAndClose(context);
           },
@@ -76,6 +96,9 @@ class HmoWelcomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final terms = _terms;
+    final org = _orgName;
+    final orgLower = terms.organisation.toLowerCase();
 
     return Container(
       decoration: BoxDecoration(
@@ -86,7 +109,6 @@ class HmoWelcomePage extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            // Handle bar
             const SizedBox(height: 12),
             Container(
               width: 44,
@@ -97,14 +119,12 @@ class HmoWelcomePage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Image / Illustration Banner
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -171,8 +191,6 @@ class HmoWelcomePage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Title
                     Text(
                       'Welcome to Health & Wellness',
                       key: const Key('hmo_welcome_title'),
@@ -182,10 +200,8 @@ class HmoWelcomePage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-
-                    // Introduction
                     Text(
-                      '${schoolName != null && schoolName!.isNotEmpty ? schoolName! : "Your school"} coordinates digital healthcare coverage for eligible students, staff, and families in partnership with accredited Health Maintenance Organizations (HMOs).',
+                      '$org coordinates digital healthcare coverage for eligible ${terms.beneficiaries.toLowerCase()} and staff in partnership with accredited Health Maintenance Organizations (HMOs).',
                       style: TextStyle(
                         fontSize: 14,
                         color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
@@ -193,8 +209,6 @@ class HmoWelcomePage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-
-                    // Educational Explanation Card
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -235,50 +249,48 @@ class HmoWelcomePage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Key Capabilities / Benefits Grid
                     Text(
                       'What you can do here:',
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
-
                     _buildBenefitItem(
                       context,
                       icon: Icons.list_alt_rounded,
                       color: Colors.blue,
-                      title: 'View Eligible School Plans',
-                      description: 'Explore health plans, covered hospital tiers, consultations, and benefit limits selected by your institution.',
+                      title: 'View Eligible ${terms.hmoPlans}',
+                      description:
+                          'Explore health plans, covered hospital tiers, consultations, and benefit limits selected by your $orgLower.',
                     ),
                     _buildBenefitItem(
                       context,
                       icon: Icons.pie_chart_outline_rounded,
                       color: Colors.purple,
                       title: 'Transparent Contributions',
-                      description: 'See whether your school subsidizes coverage and understand exact member premium contributions before enrolling.',
+                      description:
+                          'See whether your $orgLower subsidizes coverage and understand exact member premium contributions before enrolling.',
                     ),
                     _buildBenefitItem(
                       context,
                       icon: Icons.track_changes_rounded,
                       color: Colors.orange,
                       title: 'Live Enrolment Tracking',
-                      description: 'Submit beneficiary applications and monitor real-time verification and underwriter approval stages.',
+                      description:
+                          'Submit beneficiary applications and monitor real-time verification and underwriter approval stages.',
                     ),
                     _buildBenefitItem(
                       context,
                       icon: Icons.badge_outlined,
                       color: Colors.green,
                       title: 'Digital Health ID',
-                      description: 'Access hospital check-in passes and policy numbers once enrollment activation is confirmed by the HMO.',
+                      description:
+                          'Access hospital check-in passes and policy numbers once enrollment activation is confirmed by the HMO.',
                     ),
-
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
-
-            // Bottom Actions Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
@@ -290,7 +302,6 @@ class HmoWelcomePage extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Primary Button: Take Quick Tour
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -313,10 +324,8 @@ class HmoWelcomePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   Row(
                     children: [
-                      // Secondary: Explore Health & Wellness
                       Expanded(
                         child: OutlinedButton(
                           key: const Key('hmo_explore_button'),
@@ -330,8 +339,6 @@ class HmoWelcomePage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-
-                      // Tertiary: Skip for now
                       TextButton(
                         key: const Key('hmo_skip_button'),
                         onPressed: () => _markCompletedAndClose(context),

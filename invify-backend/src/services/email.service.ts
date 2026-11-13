@@ -3,6 +3,13 @@ import * as dotenv from 'dotenv';
 import { IntegrationVaultService } from './integration-vault.service';
 import { BuildVariantService } from '../config/build-variant';
 import { buildTermBillSubject } from './pdf.service';
+import {
+  formatMailFromHeader,
+  PLATFORM_MAIL_FROM,
+  resolveMailFrom,
+  resolveMailReplyTo,
+  resolveSmtpUser,
+} from '../utils/mail-identity';
 
 dotenv.config();
 
@@ -57,8 +64,12 @@ export class EmailService {
         }
       }
 
-      if (!smtpPass) smtpPass = process.env.SMTP_PASSWORD || process.env.STAGING_SMTP_PASSWORD || '';
-      if (!smtpUser) smtpUser = process.env.SMTP_USER || process.env.STAGING_SMTP_USER || 'support@invify.org';
+      const envPass = process.env.SMTP_PASSWORD || process.env.STAGING_SMTP_PASSWORD || '';
+      const envUser = process.env.SMTP_USER || process.env.STAGING_SMTP_USER || '';
+      if (envPass) smtpPass = envPass;
+      else if (!smtpPass) smtpPass = '';
+      if (envUser) smtpUser = envUser;
+      else if (!smtpUser) smtpUser = resolveSmtpUser();
 
       this.transporter = nodemailer.createTransport({
         host: 'smtp.zoho.com',
@@ -98,7 +109,9 @@ export class EmailService {
         return true;
       }
       
-      const user = (transporter.options as any).auth?.user || 'support@invify.org';
+      const user = (transporter.options as any).auth?.user || PLATFORM_MAIL_FROM;
+      const fromAddress = resolveMailFrom(process.env, user);
+      const replyTo = resolveMailReplyTo();
 
       const fs = require('fs');
       const path = require('path');
@@ -122,9 +135,10 @@ export class EmailService {
         </div>
       `;
 
-      const fromName = (options?.fromName || 'Invify Support').replace(/"/g, '');
+      const fromName = (options?.fromName || 'Invify').replace(/"/g, '');
       await transporter.sendMail({
-        from: `"${fromName}" <${user}>`,
+        from: formatMailFromHeader(fromName, fromAddress),
+        replyTo,
         to,
         subject,
         html,
@@ -879,6 +893,96 @@ export class EmailService {
     return this.sendMail(to, safeSubject, body, [], {
       fromName: schoolName || 'School Notice',
       skipLogo: true,
+    });
+  }
+
+  /**
+   * Parent/staff notice when a student or staff member clocks in or out at the gate.
+   */
+  public async sendGateClockNotice(
+    to: string,
+    opts: {
+      schoolName: string;
+      personName: string;
+      personCode?: string | null;
+      /** Parent/guardian family name for student notices, e.g. "Jhon Family". */
+      familyName?: string | null;
+      subjectType: 'student' | 'staff' | string;
+      direction: 'arrival' | 'departure';
+      recordedAt: Date | string;
+      openedAt?: Date | string | null;
+      closedAt?: Date | string | null;
+    },
+  ): Promise<boolean> {
+    const school = this.escapeHtml(opts.schoolName || 'Your school');
+    const person = this.escapeHtml(opts.personName || 'the cardholder');
+    const code = this.escapeHtml(String(opts.personCode || '').trim());
+    const familyRaw = String(opts.familyName || '').trim();
+    const family = this.escapeHtml(familyRaw);
+    const isArrival = opts.direction === 'arrival';
+    const action = isArrival ? 'clocked in' : 'clocked out';
+    const subjectLabel = opts.subjectType === 'staff' ? 'Staff member' : 'Student';
+    const when = this.formatGateWhen(opts.recordedAt);
+    const opened = opts.openedAt ? this.formatGateWhen(opts.openedAt) : null;
+    const closed = opts.closedAt ? this.formatGateWhen(opts.closedAt) : null;
+    const safeSubject = `${school}: ${person} ${action}`.slice(0, 120);
+    const detailRows = [
+      `<tr><td style="padding:4px 16px 4px 0;color:#64748b;">${subjectLabel}</td><td style="padding:4px 0;color:#0f172a;font-weight:600;">${person}${code ? ` (${code})` : ''}</td></tr>`,
+      `<tr><td style="padding:4px 16px 4px 0;color:#64748b;">Event</td><td style="padding:4px 0;color:#0f172a;font-weight:600;">${isArrival ? 'Clock in' : 'Clock out'}</td></tr>`,
+      `<tr><td style="padding:4px 16px 4px 0;color:#64748b;">Date &amp; time</td><td style="padding:4px 0;color:#0f172a;font-weight:600;">${this.escapeHtml(when)}</td></tr>`,
+    ];
+    if (opened) {
+      detailRows.push(
+        `<tr><td style="padding:4px 16px 4px 0;color:#64748b;">Clock-in time</td><td style="padding:4px 0;color:#0f172a;">${this.escapeHtml(opened)}</td></tr>`,
+      );
+    }
+    if (closed) {
+      detailRows.push(
+        `<tr><td style="padding:4px 16px 4px 0;color:#64748b;">Clock-out time</td><td style="padding:4px 0;color:#0f172a;">${this.escapeHtml(closed)}</td></tr>`,
+      );
+    }
+    const blessing = family
+      ? `God Bless ${family}<br/>`
+      : '';
+    const body = `
+      <div style="border-top: 6px solid #0e7490; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="padding: 18px 22px 10px 22px; background: #f8fafc;">
+          <h2 style="margin: 0; font-size: 17px; color: #0f172a;">${school}</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; font-weight: 600; color: #0e7490; letter-spacing: 0.6px;">GATE ${isArrival ? 'CLOCK IN' : 'CLOCK OUT'}</p>
+        </div>
+        <div style="padding: 20px 22px;">
+          <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">
+            ${opts.subjectType === 'staff'
+              ? `<strong>${person}</strong> has ${action} at the school gate.`
+              : `Your child <strong>${person}</strong> has ${action} at the school gate.`}
+          </p>
+          <table style="font-size: 14px; color: #334155; margin-top: 8px;">${detailRows.join('')}</table>
+          <p style="font-size: 13px; color: #334155; margin-top: 20px;">
+            Kind regards,<br/>
+            ${blessing}<strong>${school}</strong><br/>
+            <span style="color: #94a3b8; font-size: 12px;">Sent via Invify School Portal</span>
+          </p>
+        </div>
+      </div>
+    `;
+    return this.sendMail(to, safeSubject, body, [], {
+      fromName: opts.schoolName || 'School Gate',
+      skipLogo: true,
+    });
+  }
+
+  private formatGateWhen(value: Date | string): string {
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value || '');
+    return d.toLocaleString('en-GB', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
     });
   }
 

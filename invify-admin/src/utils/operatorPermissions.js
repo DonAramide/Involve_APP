@@ -24,6 +24,7 @@ export const TENANT_WORKSPACE_PERMISSIONS = [
   'tenant.audit.view',
   'tenant.analytics.view',
   'tenant.inventory.view',
+  'tenant.bank_accounts.manage',
 ]
 
 const PLATFORM_SCOPE = {
@@ -41,6 +42,9 @@ const PLATFORM_SCOPE = {
     'FEE_DISTRIBUTION_VIEW', 'STAKEHOLDER_VIEW', 'STAKEHOLDER_MANAGE',
     'WITHDRAWAL_VIEW', 'WITHDRAWAL_REQUEST', 'WITHDRAWAL_APPROVE',
     'SETTLEMENT_VIEW', 'SETTLEMENT_APPROVE',
+    'platform.hmo_fees.view', 'platform.hmo_fees.manage', 'platform.hmo_fees.approve',
+    'platform.withdrawals.approve',
+    'platform.bank_accounts.view', 'platform.bank_accounts.approve', 'platform.bank_accounts.reject',
   ],
   ADMIN_FINANCE: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',
@@ -79,6 +83,9 @@ const PLATFORM_SCOPE = {
     'FEE_DISTRIBUTION_VIEW', 'STAKEHOLDER_VIEW', 'STAKEHOLDER_MANAGE',
     'WITHDRAWAL_VIEW', 'WITHDRAWAL_REQUEST', 'WITHDRAWAL_APPROVE',
     'SETTLEMENT_VIEW', 'SETTLEMENT_APPROVE',
+    'platform.hmo_fees.view', 'platform.hmo_fees.manage', 'platform.hmo_fees.approve',
+    'platform.withdrawals.approve',
+    'platform.bank_accounts.view', 'platform.bank_accounts.approve', 'platform.bank_accounts.reject',
   ],
   STAFF: [
     'read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams',

@@ -235,8 +235,10 @@ class PlanGatingInterceptor extends Interceptor {
     return p.contains('/settings') ||
         p.contains('/overview') ||
         p.contains('/tenant-offers') ||
+        p.contains('/plans/offers') ||
         p.contains('/guardian/children') ||
-        p.contains('/enrolments');
+        p.contains('/enrolments') ||
+        p.contains('/claims');
   }
 
   static Future<bool> checkHasHealthInsuranceEntitlement(RequestOptions options) async {
@@ -511,6 +513,42 @@ class FinanceApiClient {
   }) async {
     try {
       return await _dio.patch<T>(path, data: data);
+    } on DioException catch (e) {
+      throw _unwrap(e);
+    }
+  }
+
+  Future<Response<T>> put<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    try {
+      return await _dio.put<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+      );
+    } on DioException catch (e) {
+      throw _unwrap(e);
+    }
+  }
+
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    try {
+      return await _dio.delete<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+      );
     } on DioException catch (e) {
       throw _unwrap(e);
     }

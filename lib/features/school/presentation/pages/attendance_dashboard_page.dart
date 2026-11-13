@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
+import '../../../../core/service_mode/service_mode_terms.dart';
 import '../../../../core/utils/api_error_message.dart';
 import '../../../../core/widgets/invify_loading_indicator.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/attendance_models.dart';
@@ -62,6 +64,16 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
 
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
   final DateFormat _displayDateFormat = DateFormat('EEE, MMM d, yyyy');
+
+  ServiceModeTerms get _terms {
+    try {
+      final mode =
+          context.read<SettingsBloc>().state.settings?.normalizedBusinessMode;
+      return ServiceModeTerms.fromRaw(mode);
+    } catch (_) {
+      return const ServiceModeTerms(ServiceMode.school);
+    }
+  }
 
   @override
   void initState() {
@@ -736,9 +748,9 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Student: ${student.fullName}',
+                    Text('${_terms.beneficiary}: ${student.fullName}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text('Admission No: ${student.admissionNumber}',
+                    Text('${_terms.admissionNoLabel}: ${student.admissionNumber}',
                         style: const TextStyle(color: Colors.grey)),
                     const SizedBox(height: 16),
                     const Text('New Status:', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -1172,14 +1184,15 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final terms = _terms;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('School Attendance'),
+        title: Text(terms.attendanceTitle),
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Academic Setup',
+            tooltip: terms.academicSetupTooltip,
             icon: const Icon(Icons.tune),
             onPressed: () async {
               await Navigator.push(
@@ -1219,10 +1232,10 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.calendar_today), text: 'Register'),
-            Tab(icon: Icon(Icons.analytics), text: 'Class Report'),
-            Tab(icon: Icon(Icons.history), text: 'Student History'),
+          tabs: [
+            const Tab(icon: Icon(Icons.calendar_today), text: 'Register'),
+            Tab(icon: const Icon(Icons.analytics), text: terms.classReportTab),
+            Tab(icon: const Icon(Icons.history), text: terms.studentHistoryTab),
           ],
         ),
       ),
@@ -1239,21 +1252,21 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
                     children: [
                       Icon(Icons.school_outlined, size: 64, color: theme.colorScheme.primary.withValues(alpha: 0.6)),
                       const SizedBox(height: 16),
-                      const Text(
-                        'No Classes in Academic Setup',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      Text(
+                        terms.noGroupsEmptyTitle,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'School Attendance requires classes from your Academic Setup. Please add classes in Academic Setup first.',
+                      Text(
+                        terms.noGroupsEmptyBody,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
+                        style: const TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 20),
                       FilledButton.icon(
                         icon: const Icon(Icons.settings),
-                        label: const Text('Open Academic Setup'),
+                        label: Text('Open ${terms.academicSetupTooltip}'),
                         onPressed: () async {
                           await Navigator.push(
                             context,
@@ -1265,7 +1278,7 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
                       const SizedBox(height: 8),
                       TextButton.icon(
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Refresh Classes'),
+                        label: Text('Refresh ${terms.beneficiaryGroup}s'),
                         onPressed: _initializeClasses,
                       ),
                     ],
@@ -1309,11 +1322,11 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
             child: DropdownButtonFormField<String>(
               key: ValueKey('class-picker-${_selectedClass ?? "none"}-${_availableClasses.join(",")}-${_classStudentCounts.entries.map((e) => "${e.key}:${e.value}").join(",")}'),
               initialValue: _availableClasses.contains(_selectedClass) ? _selectedClass : null,
-              decoration: const InputDecoration(
-                labelText: 'Class / Form',
+              decoration: InputDecoration(
+                labelText: _terms.selectGroupLabel,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: const OutlineInputBorder(),
               ),
               items: _availableClasses.map((c) {
                 final count = _classStudentCounts[c] ?? 0;
@@ -1434,13 +1447,13 @@ class _AttendanceDashboardPageState extends State<AttendanceDashboardPage>
               const Icon(Icons.people_outline, size: 48, color: Colors.grey),
               const SizedBox(height: 12),
               Text(
-                'No students found enrolled in ${_selectedClass ?? "this class"}.',
+                'No ${_terms.beneficiaries.toLowerCase()} found enrolled in ${_selectedClass ?? "this ${_terms.beneficiaryGroup.toLowerCase()}"}.',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Enrol students or select another class.',
-                style: TextStyle(color: Colors.grey),
+              Text(
+                'Enrol ${_terms.beneficiaries.toLowerCase()} or select another ${_terms.beneficiaryGroup.toLowerCase()}.',
+                style: const TextStyle(color: Colors.grey),
               ),
             ],
           ),

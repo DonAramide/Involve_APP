@@ -102,6 +102,8 @@ export interface CardRow {
   staffId: string | null;
   adminUserId: string | null;
   tokenSha256: string;
+  /** 12-char printed Code 128 identity (SSSBBBBBBBBB). */
+  invifyCode: string | null;
   status: CardStatus;
   issuedAt: string;
   expiresAt: string | null;
@@ -138,6 +140,8 @@ export interface PublicCard {
   issuedAt: string;
   expiresAt: string | null;
   revokeKind: RevokeKind | null;
+  /** Printed 12-char Invify identity when present — safe for gate offline roster sync. */
+  invifyCode?: string | null;
 }
 
 export interface CardFace {
@@ -152,9 +156,23 @@ export interface CardFace {
   fullName: string;
   printedCode: string;
   detail: string | null;
+  /** Active HMO / insurer display name for student cards (null when not enrolled). */
+  hmoName: string | null;
+  /** Insurer enrollee / member reference (formerly policy number label on the card). */
+  enrolleeId: string | null;
   category: 'STUDENT' | 'STAFF' | 'ADMIN';
   statusLabel: string | null;
+  /** Printed Code 128 payload — MUST be the 12-char identity code when issued. */
   barcodeValue: string | null;
+  /** 12-char Invify Code 128 identity (SSSBBBBBBBBB). */
+  invifyCode: string | null;
+  /** Alias for clients: same as invifyCode. */
+  cardIdentityCode: string | null;
+  /**
+   * Opaque gate/QR verification secret. NEVER print as Code 128.
+   * Only returned once at issue time when available.
+   */
+  verificationToken: string | null;
   barcodeState: 'ready' | 'not_issued' | 'replacement_required';
   issuedAt: string | null;
   expiresAt: string | null;
@@ -176,5 +194,9 @@ export interface CardFace {
 export interface IssuedCardResult {
   card: PublicCard;
   face: CardFace;
+  /** Printed Code 128 payload — always the 12-char identity. */
   barcodeValue: string;
+  cardIdentityCode: string;
+  /** Opaque verification secret — never encode in the printed barcode. */
+  verificationToken: string;
 }

@@ -41,7 +41,8 @@ class HealthInsuranceRepositoryImpl implements HealthInsuranceRepository {
   @override
   Future<List<TenantPlanOffer>> getTenantPlanOffers() async {
     try {
-      final response = await _client.get('/api/v1/health-insurance/plans/offers');
+      // Prefer /tenant-offers (mobile health whitelist). /plans/offers is an alias.
+      final response = await _client.get('/api/v1/health-insurance/tenant-offers');
       final data = response.data;
       List<dynamic> list = const [];
       if (data is Map<String, dynamic> && data['data'] is List) {
@@ -49,10 +50,13 @@ class HealthInsuranceRepositoryImpl implements HealthInsuranceRepository {
       } else if (data is List) {
         list = data;
       }
-      return list
+      final offers = list
           .whereType<Map<String, dynamic>>()
           .map((item) => TenantPlanOffer.fromJson(item))
+          .where((offer) => offer.planVersionId.isNotEmpty && offer.plan.id.isNotEmpty)
           .toList();
+      debugPrint('[HealthInsuranceRepo] getTenantPlanOffers count=${offers.length}');
+      return offers;
     } catch (e) {
       debugPrint('[HealthInsuranceRepo] getTenantPlanOffers error: $e');
       rethrow;
@@ -130,16 +134,39 @@ class HealthInsuranceRepositoryImpl implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async {
     try {
+      final uuidPattern = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      );
+      final trimmedMember = memberId.trim();
+      final resolvedAdmission = (admissionNumber ?? '').trim().isNotEmpty
+          ? admissionNumber!.trim()
+          : (!uuidPattern.hasMatch(trimmedMember) ? trimmedMember : null);
+      final resolvedStudentId = (studentId ?? '').trim().isNotEmpty
+          ? studentId!.trim()
+          : (uuidPattern.hasMatch(trimmedMember) ? trimmedMember : null);
+
+      final body = <String, dynamic>{
+        'planVersionId': planVersionId,
+        'periodStart': periodStart,
+        'periodEnd': periodEnd,
+      };
+      if (resolvedAdmission != null && resolvedAdmission.isNotEmpty) {
+        body['admissionNumber'] = resolvedAdmission;
+        body['memberId'] = resolvedAdmission;
+      } else if (resolvedStudentId != null && resolvedStudentId.isNotEmpty) {
+        body['studentId'] = resolvedStudentId;
+        body['memberId'] = resolvedStudentId;
+      } else {
+        body['memberId'] = trimmedMember;
+      }
+
       final response = await _client.post(
         '/api/v1/health-insurance/enrolments',
-        data: {
-          'memberId': memberId,
-          'planVersionId': planVersionId,
-          'periodStart': periodStart,
-          'periodEnd': periodEnd,
-        },
+        data: body,
       );
       return HealthEnrolment.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
@@ -210,6 +237,29 @@ class HealthInsuranceRepositoryImpl implements HealthInsuranceRepository {
       return {'status': 'activated'};
     } catch (e) {
       debugPrint('[HealthInsuranceRepo] simulateSandboxActivation error: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {
+    try {
+      await _client.delete('/api/v1/health-insurance/enrolments/$enrolmentId');
+    } catch (e) {
+      debugPrint('[HealthInsuranceRepo] dismissRejectedEnrolment error: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    try {
+      final response = await _client.post(
+        '/api/v1/health-insurance/enrolments/$enrolmentId/repush',
+      );
+      return HealthEnrolment.fromJson(response.data as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('[HealthInsuranceRepo] repushRejectedEnrolment error: $e');
       rethrow;
     }
   }

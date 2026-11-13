@@ -277,7 +277,13 @@ class PolicyDetailsPage extends StatelessWidget {
                         if (currentEnrolment.statusReason != null &&
                             currentEnrolment.statusReason!.isNotEmpty) ...[
                           const Divider(height: 16),
-                          _detailRow('Status Notes', currentEnrolment.statusReason!),
+                          _detailRow(
+                            currentEnrolment.status == EnrolmentLifecycleStatus.rejected ||
+                                    currentEnrolment.status == EnrolmentLifecycleStatus.cancelled
+                                ? 'Rejection Reason'
+                                : 'Status Notes',
+                            currentEnrolment.statusReason!,
+                          ),
                         ],
                       ],
                     ),

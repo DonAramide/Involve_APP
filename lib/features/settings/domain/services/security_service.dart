@@ -142,8 +142,14 @@ class SecurityService {
   }
 
   Future<bool> isDeviceAuthorized() async {
-    final status = await _storage.read(key: _isAuthorizedKey);
-    return status == 'true';
+    try {
+      final status = await _storage.read(key: _isAuthorizedKey);
+      return status == 'true';
+    } catch (_) {
+      // Plugin/storage failures must not abort plan gating — callers fall through
+      // to Pro expiry / server-activated plan / license checks.
+      return false;
+    }
   }
 
   Future<bool> hasPassword() async {

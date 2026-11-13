@@ -62,6 +62,8 @@ class StagingUatFakeRepository implements HealthInsuranceRepository {
     required String planVersionId,
     required String periodStart,
     required String periodEnd,
+    String? studentId,
+    String? admissionNumber,
   }) async {
     return enrolments.first;
   }
@@ -79,6 +81,14 @@ class StagingUatFakeRepository implements HealthInsuranceRepository {
   @override
   Future<Map<String, dynamic>> simulateSandboxActivation(String enrolmentId) async {
     return {'status': 'active', 'policy_id': 'POL-UAT-ACTIVE-999'};
+  }
+
+  @override
+  Future<void> dismissRejectedEnrolment(String enrolmentId) async {}
+
+  @override
+  Future<HealthEnrolment> repushRejectedEnrolment(String enrolmentId) async {
+    return enrolments.first;
   }
 }
 

@@ -318,7 +318,7 @@ class AppSettings extends Equatable {
     final mode = businessMode.toLowerCase().trim().replaceAll(RegExp(r'[\s-]+'), '_');
     if (mode == 'service' || mode == 'hospitality' || mode == 'invify_services') return 'services';
     if (mode == 'education' || mode == 'invify_school') return 'school';
-    if (mode == 'invify_retail') return 'retail';
+    if (mode == 'invify_retail' || mode == 'order' || mode == 'pos') return 'retail';
     return mode;
   }
 
@@ -333,7 +333,7 @@ class AppSettings extends Equatable {
     if (mode == 'school' || mode == 'education' || mode == 'invify_school') {
       return 'school';
     }
-    return 'retail';
+    return 'retail'; // retail, order, pos, and unknown modes share order/retail tiles
   }
 
   static int? colorFromHex(String? hex) {

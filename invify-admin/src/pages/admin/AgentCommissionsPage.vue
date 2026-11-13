@@ -1523,17 +1523,44 @@ const loadGlobalSettings = async () => {
   }
 };
 
+function agentCodeOf(agent) {
+  return String(agent?.agentCode || agent?.agent_code || agent?.code || '').trim()
+}
+
+function agentDisplayName(agent) {
+  const first = String(agent?.firstName || agent?.first_name || '').trim()
+  const last = String(agent?.lastName || agent?.last_name || '').trim()
+  const combined = `${first} ${last}`.trim()
+  return String(
+    agent?.name ||
+    agent?.full_name ||
+    agent?.fullName ||
+    agent?.tradingName ||
+    agent?.trading_name ||
+    combined ||
+    agent?.email ||
+    ''
+  ).trim()
+}
+
+function toAgentOption(agent) {
+  const code = agentCodeOf(agent)
+  const name = agentDisplayName(agent)
+  const label = [code, name].filter(Boolean).join(' — ') || code || name || String(agent?.id || 'Unknown agent')
+  return {
+    id: agent?.id,
+    agentCode: code,
+    name: name || code || 'Unknown agent',
+    label
+  }
+}
+
 const loadAgents = async () => {
   try {
     const res = await adminApi.listAgents();
     if (res.data?.success && res.data.agents) {
       agentsList.value = res.data.agents;
-      agentOptions.value = res.data.agents.map(a => ({
-        id: a.id,
-        agentCode: a.agent_code,
-        name: `${a.first_name} ${a.last_name}`,
-        label: `${a.agent_code} - ${a.first_name} ${a.last_name}`
-      }));
+      agentOptions.value = res.data.agents.map(toAgentOption);
       filteredAgentOptions.value = [...agentOptions.value];
     }
   } catch (error) {

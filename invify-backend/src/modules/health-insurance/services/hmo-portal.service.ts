@@ -12,6 +12,10 @@ import {
 } from './hmo-excel-exchange.service';
 import { validateImageBase64 } from '../../../utils/image-validator';
 import { uploadBase64ToContabo } from '../../agent-portal/utils/kyc-storage';
+import {
+  ensureTenantOffersFromAssignedHmo,
+  offerPublishedVersionToLinkedSchools
+} from './tenant-plan-offer-sync';
 
 export class HmoPortalService {
   /**
@@ -401,18 +405,9 @@ export class HmoPortalService {
     } catch {}
 
     const allTenantIds = Array.from(new Set([...tenantIds, ...schoolLinks.map((l: any) => l.tenant_id)]));
-    let tenantsMap = new Map<string, any>();
-    if (allTenantIds.length > 0) {
-      const { data: tenants } = await supabaseAdmin
-        .from('tenants')
-        .select('id, name, business_name, email, phone, status, business_type, state, city, created_at')
-        .in('id', allTenantIds);
-      for (const t of tenants || []) {
-        tenantsMap.set(t.id, t);
-      }
-    }
+    const tenantsMap = await this.fetchTenantsByIds(allTenantIds);
 
-    let enrolmentsByTenant: Record<string, { total: number; active: number; pending: number }> = {};
+    let enrolmentsByTenant: Record<string, { total: number; active: number; pending: number; rejected: number }> = {};
     if (planScope.versionIds.length > 0 && allTenantIds.length > 0) {
       const { data: enrols } = await supabaseAdmin
         .from('hw_enrolments')
@@ -421,12 +416,16 @@ export class HmoPortalService {
         .in('tenant_id', allTenantIds);
       for (const e of enrols || []) {
         if (!enrolmentsByTenant[e.tenant_id]) {
-          enrolmentsByTenant[e.tenant_id] = { total: 0, active: 0, pending: 0 };
+          enrolmentsByTenant[e.tenant_id] = { total: 0, active: 0, pending: 0, rejected: 0 };
         }
         enrolmentsByTenant[e.tenant_id].total++;
         if (e.status === 'active') enrolmentsByTenant[e.tenant_id].active++;
         if (['enrolment_pending', 'awaiting_verification', 'awaiting_insurer_activation'].includes(e.status)) {
           enrolmentsByTenant[e.tenant_id].pending++;
+        }
+        if (e.status === 'rejected' || e.status === 'cancelled') {
+          enrolmentsByTenant[e.tenant_id].rejected =
+            (enrolmentsByTenant[e.tenant_id].rejected || 0) + 1;
         }
       }
     }
@@ -437,24 +436,255 @@ export class HmoPortalService {
     return allTenantIds.map((tid) => {
       const t = tenantsMap.get(tid) || {};
       const link = linkByTenant.get(tid) || {};
-      const counts = enrolmentsByTenant[tid] || { total: 0, active: 0, pending: 0 };
+      const counts = enrolmentsByTenant[tid] || { total: 0, active: 0, pending: 0, rejected: 0 };
+      const location = this.formatTenantLocation(t);
       return {
         id: link.id || tid,
         tenantId: tid,
-        schoolName: t.business_name || t.name || `Organization ${tid.slice(0, 8)}`,
-        tenantType: link.tenant_type || (t.business_type === 'school' ? 'school' : 'organization'),
+        schoolName:
+          t.business_name ||
+          t.name ||
+          t.owner_name ||
+          link.contact_person ||
+          `Organization ${tid.slice(0, 8)}`,
+        tenantType:
+          link.tenant_type ||
+          (String(t.business_type || t.type || '').toLowerCase() === 'school' ? 'school' : 'organization'),
         onboardingStatus: link.onboarding_status || 'active',
-        contactPerson: link.contact_person || t.name || 'Administrator',
-        contactEmail: link.contact_email || t.email || '',
+        contactPerson: link.contact_person || t.owner_name || t.name || 'Administrator',
+        contactEmail: link.contact_email || t.owner_email || t.email || '',
         contactPhone: link.contact_phone || t.phone || '',
-        state: t.state || t.city || 'Lagos',
+        state: t.state || t.city || null,
+        city: t.city || null,
+        location,
+        streetAddress: t.street_address || t.address || null,
         allowedPlanIds: link.allowed_plan_ids || planScope.planIds,
         enrolledMembers: counts.total,
         activeMembers: counts.active,
         pendingMembers: counts.pending,
+        rejectedMembers: counts.rejected || 0,
         createdAt: link.created_at || t.created_at,
       };
     });
+  }
+
+  /**
+   * Institute-facing tenant metrics for a participating school (HMO-safe subset of admin detail).
+   */
+  async getSchoolTenantMetrics(ctx: ResolvedInstitutionContext, tenantId: string) {
+    const providerId = ctx.hmoProviderId!;
+    const tid = String(tenantId || '').trim();
+    if (!tid) throw new Error('Tenant id is required.');
+
+    const network = await this.listSchoolNetwork(ctx);
+    const school = network.find((row: any) => String(row.tenantId) === tid);
+    if (!school) {
+      throw new Error('School/tenant is not linked to your HMO institution.');
+    }
+
+    const tenantsMap = await this.fetchTenantsByIds([tid]);
+    const t = tenantsMap.get(tid) || {};
+    const planScope = await this.getProviderPlanScope(providerId);
+
+    let devices: any[] = [];
+    try {
+      const { data } = await supabaseAdmin
+        .from('devices')
+        .select('id, device_id, device_number, status, last_seen, created_at, agent_code')
+        .eq('tenant_id', tid)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      devices = data || [];
+    } catch {
+      try {
+        const { data } = await supabaseAdmin
+          .from('devices')
+          .select('id, device_id, status, created_at')
+          .eq('tenant_id', tid)
+          .limit(20);
+        devices = data || [];
+      } catch {
+        devices = [];
+      }
+    }
+
+    let walletBalance = 0;
+    let walletCurrency = 'NGN';
+    try {
+      const { data: wallets } = await supabaseAdmin
+        .from('wallets')
+        .select('id, balance, currency, wallet_type, status')
+        .eq('tenant_id', tid)
+        .limit(10);
+      for (const w of wallets || []) {
+        walletBalance += Number(w.balance || 0);
+        if (w.currency) walletCurrency = String(w.currency);
+      }
+    } catch {
+      /* wallets schema varies */
+    }
+
+    let claims = { total: 0, pending: 0, approved: 0, rejected: 0 };
+    try {
+      if (planScope.versionIds.length) {
+        const { data: enrols } = await supabaseAdmin
+          .from('hw_enrolments')
+          .select('id')
+          .eq('tenant_id', tid)
+          .in('plan_version_id', planScope.versionIds);
+        const enrolmentIds = (enrols || []).map((e: any) => e.id);
+        if (enrolmentIds.length) {
+          const { data: policies } = await supabaseAdmin
+            .from('hw_policies')
+            .select('id')
+            .in('enrolment_id', enrolmentIds);
+          const policyIds = (policies || []).map((p: any) => p.id);
+          if (policyIds.length) {
+            const { data: claimRows } = await supabaseAdmin
+              .from('hw_claim_status_records')
+              .select('id, status')
+              .in('policy_id', policyIds);
+            for (const c of claimRows || []) {
+              claims.total++;
+              const st = String(c.status || '').toLowerCase();
+              if (st === 'approved' || st === 'settled') claims.approved++;
+              else if (st === 'rejected') claims.rejected++;
+              else claims.pending++;
+            }
+          }
+        }
+      }
+    } catch {
+      /* claims optional */
+    }
+
+    return {
+      tenantId: tid,
+      name: school.schoolName,
+      status: t.status || school.onboardingStatus || 'active',
+      type: school.tenantType || t.type || 'school',
+      plan: t.plan || null,
+      planExpiresAt: t.plan_expires_at || null,
+      agentCode: t.agent_code || null,
+      ownerName: t.owner_name || school.contactPerson || null,
+      ownerEmail: school.contactEmail || t.owner_email || null,
+      phone: school.contactPhone || t.phone || null,
+      location: school.location || this.formatTenantLocation(t),
+      streetAddress: school.streetAddress || t.street_address || null,
+      state: school.state || t.state || null,
+      city: school.city || t.city || t.lga || null,
+      country: t.country || null,
+      createdAt: school.createdAt || t.created_at || null,
+      onboardingStatus: school.onboardingStatus,
+      allowedPlanIds: school.allowedPlanIds || [],
+      metrics: {
+        enrolledMembers: school.enrolledMembers || 0,
+        activeMembers: school.activeMembers || 0,
+        pendingMembers: school.pendingMembers || 0,
+        rejectedMembers: school.rejectedMembers || 0,
+        deviceCount: devices.length,
+        walletBalance,
+        walletCurrency,
+        claimsTotal: claims.total,
+        claimsPending: claims.pending,
+        claimsApproved: claims.approved,
+        claimsRejected: claims.rejected,
+      },
+      devices: devices.map((d: any) => ({
+        id: d.id,
+        deviceId: d.device_id || d.id,
+        deviceNumber: d.device_number || null,
+        status: d.status || null,
+        lastSeen: d.last_seen || null,
+        agentCode: d.agent_code || null,
+        createdAt: d.created_at || null,
+      })),
+    };
+  }
+
+  /**
+   * Progressive tenant select — staging tenants schema does not always have
+   * business_name / email / city. Prefer the proven admin column set, then fall back.
+   */
+  private async fetchTenantsByIds(tenantIds: string[]): Promise<Map<string, any>> {
+    const map = new Map<string, any>();
+    if (!tenantIds.length) return map;
+    const attempts = [
+      'id, name, phone, country, state, lga, street_address, owner_email, owner_name, settings, kyc_data, type, status, created_at',
+      'id, name, phone, country, state, lga, street_address, owner_email, owner_name, settings, type, status',
+      'id, name, phone, state, lga, street_address, owner_email, owner_name, settings',
+      'id, name, phone, state, street_address, owner_email, owner_name',
+      'id, name, phone, owner_email, owner_name, state',
+      'id, name, phone, owner_email',
+      'id, name, phone',
+      'id, name',
+    ];
+    for (const cols of attempts) {
+      const { data, error } = await supabaseAdmin.from('tenants').select(cols).in('id', tenantIds);
+      if (error || !Array.isArray(data)) continue;
+      for (const raw of data as any[]) {
+        if (!raw?.id) continue;
+        map.set(String(raw.id), this.normalizeTenantRow(raw));
+      }
+      return map;
+    }
+    return map;
+  }
+
+  private normalizeTenantRow(t: any): any {
+    const settings = t?.settings && typeof t.settings === 'object' ? t.settings : {};
+    const owner =
+      (settings.owner_profile && typeof settings.owner_profile === 'object' && settings.owner_profile) ||
+      (settings.ownerProfile && typeof settings.ownerProfile === 'object' && settings.ownerProfile) ||
+      {};
+    const kyc = t?.kyc_data && typeof t.kyc_data === 'object' ? t.kyc_data : {};
+    const street =
+      t.street_address ||
+      t.address ||
+      owner.streetAddress ||
+      owner.address ||
+      kyc.street_address ||
+      kyc.address ||
+      null;
+    const city = t.city || owner.city || t.lga || kyc.city || null;
+    const state = t.state || owner.state || kyc.state || null;
+    const country = t.country || owner.country || kyc.country || null;
+    const phone = t.phone || owner.phone || settings.phone || kyc.phone || null;
+    const email = t.owner_email || t.email || owner.email || settings.email || kyc.email || null;
+    const displayName =
+      t.business_name ||
+      t.name ||
+      owner.businessName ||
+      kyc.business_name ||
+      t.owner_name ||
+      null;
+    return {
+      ...t,
+      business_name: displayName,
+      name: t.name || displayName,
+      owner_name:
+        t.owner_name ||
+        [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim() ||
+        null,
+      owner_email: email,
+      email,
+      phone,
+      street_address: street,
+      address: street,
+      city,
+      state,
+      country,
+      lga: t.lga || owner.city || null,
+    };
+  }
+
+  private formatTenantLocation(t: any): string | null {
+    if (!t || typeof t !== 'object') return null;
+    const line = [t.street_address || t.address, t.city || t.lga, t.state, t.country]
+      .map((p) => (p == null ? '' : String(p).trim()))
+      .filter(Boolean)
+      .join(', ');
+    return line || (t.state ? String(t.state) : null) || (t.city || t.lga ? String(t.city || t.lga) : null);
   }
 
   async updateSchoolOnboarding(
@@ -506,6 +736,14 @@ export class HmoPortalService {
           { onConflict: 'tenant_id,service_type' }
         );
       } catch {}
+    }
+
+    if (status === 'active') {
+      try {
+        await ensureTenantOffersFromAssignedHmo(tenantId, actorUserId);
+      } catch (err: any) {
+        console.warn('[HmoPortalService.updateSchoolOnboarding] plan offer sync:', err?.message || err);
+      }
     }
 
     return data || record;
@@ -628,6 +866,19 @@ export class HmoPortalService {
 
     if (verErr) throw new Error(verErr.message);
 
+    if (isPublished && versionRow?.id) {
+      try {
+        await offerPublishedVersionToLinkedSchools(
+          providerId,
+          versionRow.id,
+          planRow.id,
+          actorUserId
+        );
+      } catch (err: any) {
+        console.warn('[HmoPortalService.createOrVersionPlan] linked-school offer sync:', err?.message || err);
+      }
+    }
+
     return {
       plan: planRow,
       version: versionRow,
@@ -656,6 +907,42 @@ export class HmoPortalService {
       .single();
 
     if (error) throw new Error(error.message);
+
+    if (status === 'active') {
+      try {
+        // Activate often happens without the "publish version" checkbox; promote latest draft.
+        const { data: versions } = await supabaseAdmin
+          .from('hw_plan_versions')
+          .select('id, status, version')
+          .eq('plan_id', planId)
+          .order('version', { ascending: false });
+        let publishedIds = (versions || [])
+          .filter((v: any) => String(v.status) === 'published')
+          .map((v: any) => String(v.id));
+        if (publishedIds.length === 0) {
+          const draft = (versions || []).find((v: any) => String(v.status) === 'draft');
+          if (draft) {
+            const { data: promoted } = await supabaseAdmin
+              .from('hw_plan_versions')
+              .update({
+                status: 'published',
+                published_at: new Date().toISOString()
+              })
+              .eq('id', draft.id)
+              .eq('status', 'draft')
+              .select('id')
+              .maybeSingle();
+            if (promoted?.id) publishedIds = [String(promoted.id)];
+          }
+        }
+        for (const versionId of publishedIds) {
+          await offerPublishedVersionToLinkedSchools(providerId, versionId, planId, null);
+        }
+      } catch (err: any) {
+        console.warn('[HmoPortalService.updatePlanStatus] linked-school offer sync:', err?.message || err);
+      }
+    }
+
     return updated;
   }
 
@@ -698,17 +985,221 @@ export class HmoPortalService {
     const tenantIds = Array.from(new Set(enrolments.map((e: any) => e.tenant_id)));
     const enrolmentIds = enrolments.map((e: any) => e.id);
 
-    const [{ data: members }, { data: tenants }, { data: policies }] = await Promise.all([
-      supabaseAdmin.from('hw_members').select('*').in('id', memberIds),
-      supabaseAdmin.from('tenants').select('id, name, business_name').in('id', tenantIds),
-      supabaseAdmin.from('hw_policies').select('*').in('enrolment_id', enrolmentIds),
-    ]);
+    const membersRes = await supabaseAdmin.from('hw_members').select('*').in('id', memberIds);
+    const policiesRes = await supabaseAdmin.from('hw_policies').select('*').in('enrolment_id', enrolmentIds);
+    const tenantMap = await this.fetchTenantsByIds(tenantIds);
+    const schoolLinkByTenant = new Map<string, any>();
+    try {
+      const { data: links } = await supabaseAdmin
+        .from('hw_hmo_school_links')
+        .select('tenant_id, contact_person, contact_email, contact_phone, tenant_type, onboarding_status')
+        .eq('provider_id', providerId)
+        .in('tenant_id', tenantIds);
+      for (const link of links || []) {
+        if (link?.tenant_id) schoolLinkByTenant.set(String(link.tenant_id), link);
+      }
+    } catch {
+      /* school links optional */
+    }
+    const members = membersRes.data;
+    const policies = policiesRes.data;
 
     const memberMap = new Map<string, any>((members || []).map((m: any) => [m.id, m]));
-    const tenantMap = new Map<string, any>((tenants || []).map((t: any) => [t.id, t]));
     const policyMap = new Map<string, any>((policies || []).map((p: any) => [p.enrolment_id, p]));
     const planById = new Map<string, any>(scope.plans.map((p: any) => [p.id, p]));
     const versionById = new Map<string, any>(scope.versions.map((v: any) => [v.id, v]));
+
+    const studentIds = Array.from(
+      new Set(
+        (members || [])
+          .map((m: any) => m.student_id)
+          .filter((id: unknown) => typeof id === 'string' && id.length > 0),
+      ),
+    ) as string[];
+
+    const studentMap = new Map<string, any>();
+    const entityPayloadByStudentId = new Map<string, any>();
+    const guardiansByStudentId = new Map<string, any[]>();
+    const parentsByKey = new Map<string, any>();
+    const parentCustomerById = new Map<string, any>();
+
+    const normalizePhone = (value: unknown): string =>
+      String(value || '').replace(/\D/g, '').replace(/^0+/, '');
+    const parentIdentityKey = (name: unknown, phone: unknown): string =>
+      `${String(name || '').trim().toLowerCase()}|${normalizePhone(phone)}`;
+    const rememberParent = (raw: any, syncId?: string | null) => {
+      if (!raw || typeof raw !== 'object') return;
+      const email =
+        String(raw.email || raw.parentEmail || raw.parent_email || raw.guardianEmail || '').trim() ||
+        null;
+      const phone = raw.phone || raw.parentPhone || raw.parent_phone || null;
+      const name = raw.fullName || raw.name || raw.parentName || raw.parent_name || null;
+      const relationship =
+        raw.relationship ||
+        raw.parentRelationship ||
+        raw.parent_relationship ||
+        raw.guardianRelationship ||
+        raw.guardian_relationship ||
+        null;
+      const record = {
+        ...raw,
+        email,
+        phone,
+        name,
+        relationship: relationship ? String(relationship) : null,
+        syncId: syncId || raw.syncId || raw.sync_id || raw.id || null,
+      };
+      const keys = [
+        syncId,
+        raw.syncId,
+        raw.sync_id,
+        raw.id,
+        raw.localKey,
+        raw.localId,
+        raw.parentKey,
+      ]
+        .map((k) => (k == null ? '' : String(k).trim()))
+        .filter(Boolean);
+      for (const key of keys) parentsByKey.set(key, record);
+      const phoneKey = normalizePhone(phone);
+      if (phoneKey) parentsByKey.set(`phone:${phoneKey}`, record);
+      const identity = parentIdentityKey(name, phone);
+      if (identity !== '|') parentsByKey.set(`id:${identity}`, record);
+    };
+
+    if (studentIds.length > 0) {
+      const studentsRes = await supabaseAdmin.from('students').select('*').in('id', studentIds);
+      for (const s of studentsRes.data || []) studentMap.set(s.id, s);
+
+      try {
+        const entitiesRes = await supabaseAdmin
+          .from('school_entities')
+          .select('sync_id, payload')
+          .eq('entity_type', 'student')
+          .in('sync_id', studentIds);
+        for (const ent of entitiesRes.data || []) {
+          if (ent?.sync_id) entityPayloadByStudentId.set(String(ent.sync_id), ent.payload || {});
+        }
+      } catch {
+        // school_entities may be absent on some environments
+      }
+
+      // School parent directory (email lives here, not on students.parent_*)
+      try {
+        const parentEntitiesRes = await supabaseAdmin
+          .from('school_entities')
+          .select('sync_id, payload, tenant_id')
+          .eq('entity_type', 'parent')
+          .in('tenant_id', tenantIds);
+        for (const ent of parentEntitiesRes.data || []) {
+          rememberParent(ent.payload || {}, ent.sync_id);
+        }
+      } catch {
+        // optional
+      }
+
+      try {
+        const guardianJoined = await supabaseAdmin
+          .from('hw_guardian_links')
+          .select('student_id, relationship, is_primary, status, guardian_user_id, users:guardian_user_id(id, name, email, phone)')
+          .in('student_id', studentIds);
+
+        let guardianLinks: any[] | null = guardianJoined.data as any[] | null;
+        if (guardianJoined.error || !guardianLinks) {
+          const guardianPlain = await supabaseAdmin
+            .from('hw_guardian_links')
+            .select('student_id, relationship, is_primary, status, guardian_user_id')
+            .in('student_id', studentIds);
+          guardianLinks = guardianPlain.data as any[] | null;
+        }
+
+        const guardianUserIds = Array.from(
+          new Set(
+            (guardianLinks || [])
+              .map((l: any) => l.guardian_user_id)
+              .filter((id: unknown) => typeof id === 'string' && id.length > 0),
+          ),
+        ) as string[];
+        const usersById = new Map<string, any>();
+        if (guardianUserIds.length > 0) {
+          const usersRes = await supabaseAdmin
+            .from('users')
+            .select('id, name, email, phone')
+            .in('id', guardianUserIds);
+          for (const u of usersRes.data || []) usersById.set(u.id, u);
+        }
+
+        for (const link of guardianLinks || []) {
+          const sid = String(link.student_id || '');
+          if (!sid) continue;
+          const status = String(link.status || '').toLowerCase();
+          if (['rejected', 'revoked', 'expired'].includes(status)) continue;
+          const joined = Array.isArray((link as any).users) ? (link as any).users[0] : (link as any).users;
+          const user = joined || usersById.get(String(link.guardian_user_id || '')) || null;
+          const list = guardiansByStudentId.get(sid) || [];
+          list.push({
+            relationship: link.relationship || null,
+            isPrimary: !!link.is_primary,
+            status: link.status || null,
+            name: user?.name || null,
+            email: user?.email || null,
+            phone: user?.phone || null,
+          });
+          guardiansByStudentId.set(sid, list);
+        }
+      } catch {
+        // guardian enrichment is optional for the queue
+      }
+
+      // customers: student mirror + parent (par-*) contacts
+      const parentCustomerIds = Array.from(
+        new Set(
+          Array.from(entityPayloadByStudentId.values())
+            .flatMap((payload: any) => [
+              payload?.parentSyncId,
+              payload?.parent_sync_id,
+              payload?.parentId,
+              payload?.parent_id,
+            ])
+            .map((v) => (v == null ? '' : String(v).trim()))
+            .filter(Boolean),
+        ),
+      );
+      try {
+        const customerIds = Array.from(new Set([...studentIds, ...parentCustomerIds]));
+        if (customerIds.length > 0) {
+          const customersRes = await supabaseAdmin
+            .from('customers')
+            .select('id, name, email, phone, address')
+            .in('id', customerIds);
+          for (const c of customersRes.data || []) {
+            parentCustomerById.set(String(c.id), c);
+            if (studentIds.includes(c.id)) {
+              const existing = entityPayloadByStudentId.get(String(c.id)) || {};
+              entityPayloadByStudentId.set(String(c.id), {
+                ...existing,
+                customerName: c.name,
+                customerEmail: c.email,
+                customerPhone: c.phone,
+                customerAddress: c.address,
+              });
+            } else {
+              rememberParent(
+                {
+                  name: c.name,
+                  email: c.email,
+                  phone: c.phone,
+                  address: c.address,
+                },
+                c.id,
+              );
+            }
+          }
+        }
+      } catch {
+        // optional
+      }
+    }
 
     let rows = enrolments.map((e: any) => {
       const m = memberMap.get(e.member_id) || {};
@@ -717,14 +1208,135 @@ export class HmoPortalService {
       const ver = versionById.get(e.plan_version_id) || {};
       const plan = planById.get(ver.plan_id) || {};
       const enrolmentRef = `ENR-${String(e.id).slice(0, 8).toUpperCase()}`;
+      const student = m.student_id ? studentMap.get(m.student_id) || {} : {};
+      const entity = m.student_id ? entityPayloadByStudentId.get(String(m.student_id)) || {} : {};
+      const guardians = m.student_id ? guardiansByStudentId.get(String(m.student_id)) || [] : [];
+      const primaryGuardian =
+        guardians.find((g) => g.isPrimary) || guardians[0] || null;
+
+      const firstName = student.first_name || entity.firstName || entity.first_name || null;
+      const middleName = student.middle_name || entity.middleName || entity.middle_name || null;
+      const lastName = student.last_name || entity.lastName || entity.last_name || null;
+      const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || null;
+      const dateOfBirth =
+        student.date_of_birth || entity.dateOfBirth || entity.date_of_birth || null;
+      const gender = student.gender || entity.gender || null;
+      const currentClass =
+        student.current_class || entity.className || entity.current_class || m.cohort_label || null;
+      const admissionNumber =
+        student.admission_number || entity.admissionNumber || entity.admission_number || null;
+      const linkedParentKeys = [
+        entity.parentSyncId,
+        entity.parent_sync_id,
+        entity.parentId,
+        entity.parent_id,
+        entity.parentKey,
+        entity.parent_key,
+      ]
+        .map((k) => (k == null ? '' : String(k).trim()))
+        .filter(Boolean);
+      let linkedParent: any = null;
+      for (const key of linkedParentKeys) {
+        linkedParent = parentsByKey.get(key) || parentCustomerById.get(key) || null;
+        if (linkedParent) break;
+      }
+      const provisionalParentName =
+        student.parent_name ||
+        entity.parentName ||
+        entity.parent_name ||
+        primaryGuardian?.name ||
+        entity.customerName ||
+        null;
+      const provisionalParentPhone =
+        student.parent_phone ||
+        entity.parentPhone ||
+        entity.parent_phone ||
+        primaryGuardian?.phone ||
+        entity.customerPhone ||
+        student.phone ||
+        null;
+      if (!linkedParent) {
+        linkedParent =
+          parentsByKey.get(`phone:${normalizePhone(provisionalParentPhone)}`) ||
+          parentsByKey.get(`id:${parentIdentityKey(provisionalParentName, provisionalParentPhone)}`) ||
+          null;
+      }
+
+      const parentName = provisionalParentName || linkedParent?.name || null;
+      const parentPhone = provisionalParentPhone || linkedParent?.phone || null;
+      const parentEmail =
+        student.parent_email ||
+        entity.parentEmail ||
+        entity.parent_email ||
+        entity.guardianEmail ||
+        entity.guardian_email ||
+        linkedParent?.email ||
+        primaryGuardian?.email ||
+        entity.customerEmail ||
+        null;
+      const parentRelationship =
+        primaryGuardian?.relationship ||
+        entity.parentRelationship ||
+        entity.parent_relationship ||
+        entity.relationship ||
+        entity.guardianRelationship ||
+        entity.guardian_relationship ||
+        linkedParent?.relationship ||
+        (parentName || parentPhone || parentEmail ? 'parent_guardian' : null);
+      const parentLocation =
+        entity.parentAddress ||
+        entity.parent_address ||
+        linkedParent?.address ||
+        entity.address ||
+        entity.homeAddress ||
+        entity.home_address ||
+        entity.customerAddress ||
+        null;
+      const memberAddress = parentLocation || this.formatTenantLocation(t);
+
+      const link = schoolLinkByTenant.get(String(e.tenant_id)) || {};
+      const schoolName =
+        t.business_name ||
+        t.name ||
+        t.owner_name ||
+        link.contact_person ||
+        `School ${String(e.tenant_id).slice(0, 6)}`;
+      const schoolPhone = t.phone || link.contact_phone || null;
+      const schoolEmail = t.owner_email || t.email || link.contact_email || null;
+      const schoolAddress = this.formatTenantLocation(t);
 
       return {
         id: e.id,
         enrolmentReference: enrolmentRef,
         tenantId: e.tenant_id,
-        schoolName: t.business_name || t.name || `School ${String(e.tenant_id).slice(0, 6)}`,
+        schoolName,
+        schoolPhone,
+        schoolEmail,
+        schoolAddress,
+        schoolState: t.state || null,
+        schoolCity: t.city || t.lga || null,
         memberId: e.member_id,
         memberCategory: m.member_category || 'student',
+        member: {
+          id: e.member_id,
+          studentId: m.student_id || null,
+          fullName,
+          firstName,
+          middleName,
+          lastName,
+          admissionNumber,
+          dateOfBirth,
+          gender,
+          currentClass,
+          address: memberAddress,
+          parentName,
+          parentPhone,
+          parentEmail,
+          parentLocation,
+          parentRelationship,
+          guardians,
+        },
+        statusReason: e.status_reason || null,
         insurerMemberRef: m.insurer_member_ref || pol?.policy_number || null,
         cohortLabel: m.cohort_label || null,
         planId: plan.id || null,
@@ -749,7 +1361,11 @@ export class HmoPortalService {
           r.enrolmentReference.toLowerCase().includes(q) ||
           String(r.insurerMemberRef || '').toLowerCase().includes(q) ||
           String(r.schoolName || '').toLowerCase().includes(q) ||
-          String(r.planName || '').toLowerCase().includes(q)
+          String(r.planName || '').toLowerCase().includes(q) ||
+          String(r.member?.fullName || '').toLowerCase().includes(q) ||
+          String(r.member?.admissionNumber || '').toLowerCase().includes(q) ||
+          String(r.member?.parentName || '').toLowerCase().includes(q) ||
+          String(r.member?.parentEmail || '').toLowerCase().includes(q),
       );
     }
 
@@ -794,14 +1410,17 @@ export class HmoPortalService {
       const expiryDate = payload.expiryDate || enrolment.period_end;
 
       // 1. Update hw_members.insurer_member_ref
-      await supabaseAdmin
+      const { error: memberErr } = await supabaseAdmin
         .from('hw_members')
         .update({ insurer_member_ref: hmoMemberId, updated_at: new Date().toISOString() })
         .eq('id', enrolment.member_id);
+      if (memberErr) {
+        throw new Error(`Failed to save HMO Member ID: ${memberErr.message}`);
+      }
 
       // 2. Upsert active hw_policies record first (required by trg_hw_enrolment_active_policy_check)
       const eventId = `hmo-portal-confirm-${enrolmentId}-${Date.now()}`;
-      await supabaseAdmin.from('hw_policies').upsert(
+      const { error: policyErr } = await supabaseAdmin.from('hw_policies').upsert(
         {
           tenant_id: enrolment.tenant_id,
           enrolment_id: enrolment.id,
@@ -816,49 +1435,115 @@ export class HmoPortalService {
         },
         { onConflict: 'enrolment_id' }
       );
-
-      // 3. Advance enrolment through valid state machine to 'active'
-      if (enrolment.status !== 'active') {
-        if (enrolment.status === 'draft') {
-          await supabaseAdmin.from('hw_enrolments').update({ status: 'enrolment_pending' }).eq('id', enrolment.id);
-          enrolment.status = 'enrolment_pending';
-        }
-        if (enrolment.status === 'enrolment_pending') {
-          await supabaseAdmin.from('hw_enrolments').update({ status: 'awaiting_verification' }).eq('id', enrolment.id);
-          enrolment.status = 'awaiting_verification';
-        }
-        if (enrolment.status === 'awaiting_verification' || enrolment.status === 'awaiting_premium_payment') {
-          await supabaseAdmin
-            .from('hw_enrolments')
-            .update({ status: 'awaiting_insurer_activation' })
-            .eq('id', enrolment.id);
-        }
-        await supabaseAdmin
-          .from('hw_enrolments')
-          .update({
-            status: 'active',
-            provider_sync_status: 'synced',
-            last_provider_sync_at: new Date().toISOString(),
-            verified_by: ctx.authUserId,
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', enrolment.id);
+      if (policyErr) {
+        throw new Error(`Failed to create active policy: ${policyErr.message}`);
       }
 
-      return { enrolmentId, status: 'active', hmoMemberId, policyNumber };
+      // 3. Advance through legal trigger edges only (never assume an update succeeded)
+      const fromStatus = String(enrolment.status || '');
+      const hops: string[] =
+        fromStatus === 'active'
+          ? []
+          : fromStatus === 'draft'
+            ? ['enrolment_pending', 'awaiting_verification', 'awaiting_insurer_activation', 'active']
+            : fromStatus === 'enrolment_pending'
+              ? ['awaiting_verification', 'awaiting_insurer_activation', 'active']
+              : fromStatus === 'awaiting_verification' || fromStatus === 'awaiting_premium_payment'
+                ? ['awaiting_insurer_activation', 'active']
+                : fromStatus === 'awaiting_insurer_activation'
+                  ? ['active']
+                  : fromStatus === 'rejected' || fromStatus === 'cancelled'
+                    ? []
+                    : ['active'];
+
+      if (fromStatus === 'rejected' || fromStatus === 'cancelled') {
+        throw new Error(`Cannot confirm a ${fromStatus} enrollment. Create a new enrollment instead.`);
+      }
+
+      const actorUserId = await this.resolvePublicUserIdOrNull(ctx.authUserId);
+      let currentStatus = fromStatus;
+      for (const next of hops) {
+        const updates: Record<string, any> = {
+          status: next,
+          updated_at: new Date().toISOString(),
+        };
+        if (next === 'active') {
+          updates.provider_sync_status = 'synced';
+          updates.last_provider_sync_at = new Date().toISOString();
+          updates.verified_at = new Date().toISOString();
+          if (actorUserId) updates.verified_by = actorUserId;
+          updates.status_reason = `Confirmed by HMO with member ID ${hmoMemberId}`;
+        }
+        const { data: updated, error } = await supabaseAdmin
+          .from('hw_enrolments')
+          .update(updates)
+          .eq('id', enrolment.id)
+          .select('id, status')
+          .single();
+        if (error) {
+          throw new Error(
+            `Failed to confirm enrollment (${currentStatus} → ${next}): ${error.message}`
+          );
+        }
+        currentStatus = updated?.status || next;
+      }
+
+      return { enrolmentId, status: currentStatus || 'active', hmoMemberId, policyNumber };
     }
 
     if (payload.decision === 'reject') {
-      await supabaseAdmin
-        .from('hw_enrolments')
-        .update({
-          status: 'rejected',
-          status_reason: payload.reason || 'Rejected by HMO Enrollment Officer',
-          provider_sync_status: 'failed',
-          provider_error: payload.reason || 'Rejected by HMO',
-        })
-        .eq('id', enrolment.id);
-      return { enrolmentId, status: 'rejected', reason: payload.reason };
+      const reason = String(
+        payload.reason || (payload as any).rejectionReason || (payload as any).rejection_reason || ''
+      ).trim();
+      if (reason.length < 5) {
+        throw new Error('A rejection reason is required (minimum 5 characters).');
+      }
+
+      // Staging DB trigger only allows specific edges. enrolment_pending cannot
+      // jump straight to rejected — hop through awaiting_verification first.
+      // Some states only allow cancelled; treat that as a closed rejection.
+      const from = String(enrolment.status || '');
+      const hops: string[] =
+        from === 'enrolment_pending'
+          ? ['awaiting_verification', 'rejected']
+          : from === 'awaiting_verification' || from === 'awaiting_insurer_activation'
+            ? ['rejected']
+            : from === 'awaiting_premium_payment' || from === 'draft'
+              ? ['cancelled']
+              : from === 'rejected' || from === 'cancelled'
+                ? []
+                : ['rejected'];
+
+      if (from === 'rejected' || from === 'cancelled') {
+        return { enrolmentId, status: from, reason };
+      }
+
+      let currentStatus = from;
+      for (const next of hops) {
+        const updates: Record<string, any> = {
+          status: next,
+          status_reason: reason,
+          updated_at: new Date().toISOString(),
+        };
+        if (next === 'rejected' || next === 'cancelled') {
+          updates.provider_sync_status = 'failed';
+          updates.provider_error = reason;
+        }
+        const { data: updated, error } = await supabaseAdmin
+          .from('hw_enrolments')
+          .update(updates)
+          .eq('id', enrolment.id)
+          .select('id, status')
+          .single();
+        if (error) {
+          throw new Error(
+            `Failed to reject enrollment (${currentStatus} → ${next}): ${error.message}`
+          );
+        }
+        currentStatus = updated?.status || next;
+      }
+
+      return { enrolmentId, status: currentStatus, reason };
     }
 
     if (payload.decision === 'suspend') {
@@ -922,12 +1607,13 @@ export class HmoPortalService {
     let invalidCount = 0;
 
     const batchItemsPayload = candidateRows.map((row: any, idx: number) => {
+      const member = row.member || {};
       const itemCandidate = {
         enrolment_reference: row.enrolmentReference,
-        member_full_name: `Member ${row.enrolmentReference}`,
+        member_full_name: member.fullName || `Member ${row.enrolmentReference}`,
         member_category: row.memberCategory || 'student',
-        date_of_birth: '2010-05-15',
-        sex: 'female',
+        date_of_birth: member.dateOfBirth || null,
+        sex: member.gender || null,
         plan_code: row.planCode || 'STD',
         period_start: row.periodStart,
         period_end: row.periodEnd,
@@ -1417,6 +2103,7 @@ export class HmoPortalService {
       status: 'approved' | 'rejected' | 'settled';
       authorisedAmountMinor?: number;
       rejectionReason?: string;
+      notes?: string;
     }
   ) {
     const providerId = ctx.hmoProviderId!;
@@ -1431,7 +2118,7 @@ export class HmoPortalService {
     // Verify policy belongs to this HMO provider
     const { data: policy } = await supabaseAdmin
       .from('hw_policies')
-      .select('id, provider_id')
+      .select('id, provider_id, tenant_id')
       .eq('id', rec.policy_id)
       .eq('provider_id', providerId)
       .maybeSingle();
@@ -1440,16 +2127,33 @@ export class HmoPortalService {
       throw new Error('Access denied: Claim/Pre-Authorization belongs to another HMO.');
     }
 
+    const from = String(rec.status || '');
+    const next = payload.status;
+    const allowed: Record<string, string[]> = {
+      approved: ['submitted', 'pending'],
+      rejected: ['submitted', 'pending'],
+      settled: ['approved'],
+    };
+    if (!allowed[next]?.includes(from)) {
+      throw new Error(
+        `Cannot move claim from ${from} to ${next}. Approval and settlement are separate; settlement does not disburse funds.`
+      );
+    }
+    if (next === 'rejected') {
+      const reason = String(payload.rejectionReason || '').trim();
+      if (reason.length < 5) throw new Error('Rejection requires a recorded reason (at least 5 characters).');
+    }
+
     const updates: Record<string, any> = {
-      status: payload.status,
+      status: next,
       status_date: new Date().toISOString(),
       last_synced_at: new Date().toISOString(),
     };
     if (payload.authorisedAmountMinor !== undefined) {
       updates.authorised_amount_minor = Math.max(0, Number(payload.authorisedAmountMinor));
     }
-    if (payload.status === 'rejected') {
-      updates.rejection_reason = payload.rejectionReason || 'Rejected by HMO Claims/Auth Officer';
+    if (next === 'rejected') {
+      updates.rejection_reason = String(payload.rejectionReason).trim();
     }
 
     const { data: updated, error } = await supabaseAdmin
@@ -1460,6 +2164,39 @@ export class HmoPortalService {
       .single();
 
     if (error) throw new Error(error.message);
+
+    try {
+      await supabaseAdmin.from('hw_claim_status_events').insert({
+        claim_id: recordId,
+        from_status: from,
+        to_status: next,
+        actor_user_id: ctx.authUserId || null,
+        notes: payload.notes || payload.rejectionReason || null,
+        occurred_at: new Date().toISOString(),
+      });
+    } catch {
+      /* history table may be unapplied */
+    }
+
+    const { HealthAuditService } = await import('./health-audit.service');
+    await HealthAuditService.log({
+      tenantId: policy.tenant_id,
+      actorUserId: ctx.authUserId || undefined,
+      action: `claim.${next}`,
+      resourceType: 'hw_claim_status_records',
+      resourceId: recordId,
+      changes: { from, to: next, rejectionReason: updates.rejection_reason || null },
+    });
+
+    const { HealthNotificationService } = await import('./health-notification.service');
+    await HealthNotificationService.notifyTenantAdmins(
+      policy.tenant_id,
+      next === 'approved' ? 'claim.approved' : next === 'rejected' ? 'claim.rejected' : 'claim.settled',
+      `HMO claim ${next}`,
+      `Claim ${rec.claim_reference} is now ${next}. Settlement tracking is not a payout.`,
+      { claimId: recordId, claimReference: rec.claim_reference }
+    );
+
     return updated;
   }
 

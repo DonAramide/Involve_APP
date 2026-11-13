@@ -16,7 +16,18 @@ import {
   readMyCardThroughDatabase,
   batchThroughDatabase,
 } from './school-card.persistence';
-import { listGateSessionsThroughDatabase, scanHttpStatus, scanThroughDatabase } from './school-gate.scan';
+import {
+  deliverQueuedGateEmails,
+  listGateSessionsThroughDatabase,
+  scanHttpStatus,
+  scanThroughDatabase,
+} from './school-gate.scan';
+import {
+  readParentGateNotify,
+  saveParentGateNotify,
+  readStaffGateNotify,
+  saveStaffGateNotify,
+} from './school-gate.notify';
 
 export function createUnappliedSchoolCardService(): SchoolCardService {
   return new SchoolCardService(new UnappliedSchoolCardStore());
@@ -122,10 +133,31 @@ export function registerSchoolCardRoutes(
   });
   route('post', '/api/school/gate/scans', async (req, res) => {
     const result = await scanThroughDatabase(actor(req), body(req));
+    // Fire-and-forget parent/staff clock emails after the scan commits.
+    if (result.notificationStatus === 'queued' && result.sessionId) {
+      const a = actor(req);
+      void deliverQueuedGateEmails({
+        tenantId: String(a.tenantId || ''),
+        sessionId: result.sessionId,
+        direction: result.direction,
+      }).catch((err) => console.warn('[GateScan] notification delivery error:', err?.message || err));
+    }
     res.status(scanHttpStatus(result)).json(result);
   });
   route('get', '/api/school/gate/sessions', async (req, res) => {
     res.json(await listGateSessionsThroughDatabase(actor(req), req.query as Record<string, unknown>));
+  });
+  route('get', '/api/school/gate/notify/parent', async (req, res) => {
+    res.json(await readParentGateNotify(actor(req), req.query as Record<string, unknown>));
+  });
+  route('put', '/api/school/gate/notify/parent', async (req, res) => {
+    res.json(await saveParentGateNotify(actor(req), body(req)));
+  });
+  route('get', '/api/school/gate/notify/staff', async (req, res) => {
+    res.json(await readStaffGateNotify(actor(req), req.query as Record<string, unknown>));
+  });
+  route('put', '/api/school/gate/notify/staff', async (req, res) => {
+    res.json(await saveStaffGateNotify(actor(req), body(req)));
   });
 }
 

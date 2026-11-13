@@ -3,10 +3,11 @@
  */
 export function isTenantSurfacePath(pathname = '') {
   const p = String(pathname || '').toLowerCase()
+  // Match /tenant and /tenant/... only — never /tenants (admin tenant detail pages).
   return (
-    p.startsWith('/tenant') ||
-    p.startsWith('/teacher-workspace') ||
-    p === '/tenant/login'
+    p === '/tenant' ||
+    p.startsWith('/tenant/') ||
+    p.startsWith('/teacher-workspace')
   )
 }
 

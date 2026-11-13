@@ -5,6 +5,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:image/image.dart' as img; // Added image package
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
+import '../esc_pos_text.dart';
 
 class BlueThermalPrinterService implements IPrinterService {
   final btp.BlueThermalPrinter bluetooth = btp.BlueThermalPrinter.instance;
@@ -87,7 +88,7 @@ class BlueThermalPrinterService implements IPrinterService {
 
     for (final cmd in commands) {
       if (cmd is TextCommand) {
-        final sanitized = cmd.text.replaceAll('₦', 'N');
+        final sanitized = sanitizeEscPosText(cmd.text);
         bytes += generator.text(
           sanitized,
           styles: PosStyles(
@@ -102,15 +103,50 @@ class BlueThermalPrinterService implements IPrinterService {
       } else if (cmd is ImageCommand) {
         if (cmd.bytes != null) {
           final img.Image? image = img.decodeImage(cmd.bytes!);
-          if (image != null) {
-            // Resize logic based on paper width
-            // 58mm = ~384 dots, 80mm = ~576 dots
-            final maxWidth = paperWidth == 58 ? 370 : 550;
+          if (image == null) {
+            debugPrint('SPP ImageCommand: decodeImage failed (${cmd.bytes!.length} bytes)');
+          } else {
+            // 58mm ≈ 384 dots, 80mm ≈ 576 dots — keep under printer width.
+            final maxWidth = paperWidth == 58 ? 384 : 576;
             img.Image resized = image;
             if (image.width > maxWidth) {
               resized = img.copyResize(image, width: maxWidth);
             }
-            bytes += generator.image(resized, align: _getAlign(cmd.align));
+            // Align width to multiple of 8 (ESC/POS bit packing).
+            final alignedW = (resized.width ~/ 8) * 8;
+            if (alignedW > 0 && alignedW != resized.width) {
+              resized = img.copyResize(resized, width: alignedW);
+            }
+            debugPrint(
+              'SPP ImageCommand: ${resized.width}x${resized.height} '
+              'useRaster=${cmd.useRaster} src=${cmd.bytes!.length}B',
+            );
+            // Do NOT band+rotate — that shreds ID cards into disconnected strips.
+            // Chunked Bluetooth write below carries large bitmaps safely.
+            // ESC * (image) is what receipt logos already use successfully on these printers.
+            // useRaster still selects GS v 0 when the caller needs no 270° transform.
+            if (cmd.useRaster) {
+              bytes += generator.imageRaster(resized, align: _getAlign(cmd.align));
+            } else {
+              bytes += generator.image(resized, align: _getAlign(cmd.align));
+            }
+          }
+        }
+      } else if (cmd is BarcodeCommand) {
+        final payload = cmd.data.trim();
+        if (payload.isNotEmpty) {
+          try {
+            final data = '{B$payload'.split('');
+            bytes += generator.barcode(
+              Barcode.code128(data),
+              textPos: BarcodeText.none,
+              align: _getAlign(cmd.align),
+              // Wider modules + taller bars for gate scanners on 58/80mm rolls.
+              width: paperWidth >= 80 ? 3 : 2,
+              height: 120,
+            );
+          } catch (e) {
+            debugPrint('SPP barcode failed: $e');
           }
         }
       }
@@ -118,7 +154,19 @@ class BlueThermalPrinterService implements IPrinterService {
 
     bytes += generator.cut();
 
-    await bluetooth.writeBytes(Uint8List.fromList(bytes));
+    // One-shot writeBytes truncates large ID-card rasters on many SPP stacks —
+    // only the leading text commands survive (exactly the symptom we saw).
+    await _writeChunked(Uint8List.fromList(bytes));
+  }
+
+  Future<void> _writeChunked(Uint8List data) async {
+    const chunkSize = 512;
+    debugPrint('SPP write: ${data.length} bytes in ${(data.length / chunkSize).ceil()} chunks');
+    for (var i = 0; i < data.length; i += chunkSize) {
+      final end = (i + chunkSize < data.length) ? i + chunkSize : data.length;
+      await bluetooth.writeBytes(Uint8List.fromList(data.sublist(i, end)));
+      await Future.delayed(const Duration(milliseconds: 40));
+    }
   }
 
   PosAlign _getAlign(String align) {

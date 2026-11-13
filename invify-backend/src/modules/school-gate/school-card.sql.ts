@@ -63,12 +63,14 @@ export interface CardSqlWrite {
   printedCode: string;
   printedDetail: string | null;
   issuedBy: string;
+  /** 12-char Invify Code 128 identity (nullable until migration applied). */
+  invifyCode?: string | null;
 }
 
 const CARD_INSERT = `INSERT INTO public.school_id_cards (
   id, tenant_id, subject_type, student_id, staff_id, admin_user_id, token_sha256,
-  expires_at, replaces_card_id, printed_name, printed_code, printed_detail, issued_by
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`;
+  expires_at, replaces_card_id, printed_name, printed_code, printed_detail, issued_by, invify_code
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`;
 
 export function cardInsertStatement(card: CardSqlWrite): SqlStatement {
   return {
@@ -87,6 +89,7 @@ export function cardInsertStatement(card: CardSqlWrite): SqlStatement {
       card.printedCode,
       card.printedDetail,
       card.issuedBy,
+      card.invifyCode ?? null,
     ],
   };
 }

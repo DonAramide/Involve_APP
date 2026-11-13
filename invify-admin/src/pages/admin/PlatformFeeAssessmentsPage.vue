@@ -104,6 +104,7 @@ const typeOptions = [
   { label: 'TREASURY_TRANSFER', value: 'TREASURY_TRANSFER' },
   { label: 'SMS', value: 'SMS' },
   { label: 'AI_TASK', value: 'AI_TASK' },
+  { label: 'HMO_SERVICE', value: 'HMO_SERVICE' },
 ]
 
 const filters = reactive({

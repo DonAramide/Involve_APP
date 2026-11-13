@@ -52,7 +52,14 @@ export class InventoryService {
     if (!tenantId || tenantId === 'undefined' || tenantId === 'null') {
       return { items: [] };
     }
-    let q = supabase.from('items').select('*').eq('tenant_id', tenantId).eq('type', 'product');
+    // Include school fee catalog items (business_mode=school / type=service),
+    // not only retail type=product — otherwise school Inventory Stock Matrix stays empty.
+    let q = supabase
+      .from('items')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .or('is_deleted.is.null,is_deleted.eq.false')
+      .neq('status', 'archived');
     if (query) {
       q = q.ilike('name', `%${query}%`);
     }
@@ -198,9 +205,20 @@ export class InventoryService {
   }
 
   static async updateItem(tenantId: string, id: string, payload: Partial<ItemDTO>): Promise<ItemDTO> {
-    const { data, error } = await supabase.from('items').update(payload).eq('tenant_id', tenantId).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
+    const byId = await supabase.from('items').update(payload).eq('tenant_id', tenantId).eq('id', id).select().maybeSingle();
+    if (!byId.error && byId.data) return byId.data as ItemDTO;
+    // Mobile-synced fee rows sometimes surface sync_id as the client id.
+    const bySync = await supabase
+      .from('items')
+      .update(payload)
+      .eq('tenant_id', tenantId)
+      .eq('sync_id', id)
+      .select()
+      .maybeSingle();
+    if (!bySync.error && bySync.data) return bySync.data as ItemDTO;
+    if (byId.error) throw byId.error;
+    if (bySync.error) throw bySync.error;
+    throw new Error('Item not found for update');
   }
 
   static async archiveItem(tenantId: string, id: string): Promise<void> {

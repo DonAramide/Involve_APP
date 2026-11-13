@@ -19,9 +19,15 @@ describePg('Phase 2 throwaway PostgreSQL concurrency', () => {
   let pool: Pool;
 
   beforeAll(async () => {
+    // node-pg rejects multi-statement strings as prepared statements; run DDL one-by-one.
     pool = new Pool({ connectionString: PG_URL, max: 8 });
+    await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    // Disposable DB may retain tables from sibling suites with incompatible shapes.
+    await pool.query('DROP TABLE IF EXISTS ledger_entries CASCADE');
+    await pool.query('DROP TABLE IF EXISTS ledgers CASCADE');
+    await pool.query('DROP TABLE IF EXISTS school_entities CASCADE');
+    await pool.query('DROP TABLE IF EXISTS invoices CASCADE');
     await pool.query(`
-      CREATE EXTENSION IF NOT EXISTS pgcrypto;
       CREATE TABLE IF NOT EXISTS ledgers (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         tenant_id UUID NOT NULL,
@@ -29,7 +35,8 @@ describePg('Phase 2 throwaway PostgreSQL concurrency', () => {
         idempotency_key TEXT UNIQUE NOT NULL,
         metadata JSONB DEFAULT '{}'::jsonb,
         created_at TIMESTAMPTZ DEFAULT now()
-      );
+      )`);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS ledger_entries (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         ledger_id UUID NOT NULL REFERENCES ledgers(id),
@@ -38,7 +45,8 @@ describePg('Phase 2 throwaway PostgreSQL concurrency', () => {
         type TEXT NOT NULL,
         amount NUMERIC(15,2) NOT NULL,
         currency TEXT NOT NULL DEFAULT 'NGN'
-      );
+      )`);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS school_entities (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         tenant_id UUID NOT NULL,
@@ -47,7 +55,8 @@ describePg('Phase 2 throwaway PostgreSQL concurrency', () => {
         payload JSONB NOT NULL DEFAULT '{}'::jsonb,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         UNIQUE (tenant_id, entity_type, sync_id)
-      );
+      )`);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS invoices (
         id UUID PRIMARY KEY,
         tenant_id UUID NOT NULL,
@@ -56,11 +65,13 @@ describePg('Phase 2 throwaway PostgreSQL concurrency', () => {
         amount_paid NUMERIC(12,2) NOT NULL DEFAULT 0,
         balance_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
         payment_status TEXT NOT NULL DEFAULT 'Unpaid'
-      );
-      INSERT INTO invoices (id, tenant_id, invoice_number, total_amount, balance_amount)
-      VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $1, 'INV-1', 100, 100)
-      ON CONFLICT (id) DO NOTHING;
-    `, [TENANT]);
+      )`);
+    await pool.query(
+      `INSERT INTO invoices (id, tenant_id, invoice_number, total_amount, balance_amount)
+       VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $1, 'INV-1', 100, 100)
+       ON CONFLICT (id) DO NOTHING`,
+      [TENANT],
+    );
   });
 
   afterAll(async () => {

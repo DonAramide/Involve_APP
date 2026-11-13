@@ -79,9 +79,10 @@ export class HealthController {
 
   static async listFacilities(req: Request, res: Response) {
     try {
-      const data = await HealthPlanService.listFacilities({
+      const data = await HealthPlanService.listFacilities(req.healthContext!, {
         state: req.query.state as string,
-        planId: req.query.planId as string
+        planId: req.query.planId as string,
+        providerId: req.query.providerId as string
       });
       return res.status(200).json({ data });
     } catch (err: any) {
@@ -209,6 +210,30 @@ export class HealthController {
     }
   }
 
+  static async dismissRejectedEnrolment(req: Request, res: Response) {
+    try {
+      const data = await HealthEnrolmentService.dismissRejectedEnrolment(
+        req.healthContext!,
+        req.params.id
+      );
+      return res.status(200).json(data);
+    } catch (err: any) {
+      return res.status(400).json({ error: { message: err?.message } });
+    }
+  }
+
+  static async repushRejectedEnrolment(req: Request, res: Response) {
+    try {
+      const data = await HealthEnrolmentService.repushRejectedEnrolment(
+        req.healthContext!,
+        req.params.id
+      );
+      return res.status(201).json(data);
+    } catch (err: any) {
+      return res.status(400).json({ error: { message: err?.message } });
+    }
+  }
+
   // ─── Billing & Payments ───────────────────────────────────────────
   static async issueInvoice(req: Request, res: Response) {
     try {
@@ -259,6 +284,81 @@ export class HealthController {
       return res.status(200).json(data);
     } catch (err: any) {
       return res.status(500).json({ error: { message: err?.message } });
+    }
+  }
+
+  static async submitClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.submitClaim(req.healthContext!, req.body || {});
+      return res.status(201).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async approveClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.approveClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async rejectClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.rejectClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async settleClaim(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.settleClaim(req.healthContext!, req.params.id, req.body || {});
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listClaimHistory(req: Request, res: Response) {
+    try {
+      const data = await HealthClaimService.listClaimHistory(req.healthContext!, req.params.id);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listAffiliations(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.listAffiliations(req.healthContext!);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async requestAffiliation(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.requestAffiliation(req.healthContext!, req.body || {});
+      return res.status(201).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 400).json({ error: { code: err?.code, message: err?.message } });
+    }
+  }
+
+  static async listEligibleProviders(req: Request, res: Response) {
+    try {
+      const { HealthAffiliationService } = await import('../services/health-affiliation.service');
+      const data = await HealthAffiliationService.listEligibleProviders(req.healthContext!);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(err?.status || 500).json({ error: { code: err?.code, message: err?.message } });
     }
   }
 

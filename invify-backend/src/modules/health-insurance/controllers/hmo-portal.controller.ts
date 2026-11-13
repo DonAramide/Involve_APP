@@ -49,6 +49,19 @@ export class HmoPortalController {
     }
   }
 
+  static async getSchoolTenantMetrics(req: Request, res: Response) {
+    try {
+      const ctx = HmoPortalController.getCtx(req);
+      const { tenantId } = req.params;
+      const data = await hmoPortalService.getSchoolTenantMetrics(ctx, tenantId);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load tenant metrics';
+      const status = /not linked|required/i.test(msg) ? 404 : 500;
+      return res.status(status).json({ success: false, message: msg });
+    }
+  }
+
   static async updateSchoolOnboarding(req: Request, res: Response) {
     try {
       const ctx = HmoPortalController.getCtx(req);
