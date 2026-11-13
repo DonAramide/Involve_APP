@@ -54,19 +54,24 @@ function makeTimeoutError(): any {
 
 describe('Chaos — complete outage', () => {
 
-  it('throws after exhausting all retries on persistent 500', async () => {
-    const requestFn = jest.fn().mockRejectedValue(makeServerError(500));
-    mockAxiosInstance(requestFn);
+  it(
+    'throws after exhausting all retries on persistent 500',
+    async () => {
+      const requestFn = jest.fn().mockRejectedValue(makeServerError(500));
+      mockAxiosInstance(requestFn);
 
-    const client = new QuasarApiClient({
-      baseUrl: 'http://x',
-      tenantAuth: { apiKey: 'sk_test' },
-      maxRetries: 3,
-    });
+      const client = new QuasarApiClient({
+        baseUrl: 'http://x',
+        tenantAuth: { apiKey: 'sk_test' },
+        maxRetries: 3,
+      });
 
-    await expect(client.get('/wallets')).rejects.toThrow();
-    expect(requestFn).toHaveBeenCalledTimes(3);
-  });
+      await expect(client.get('/wallets')).rejects.toThrow();
+      expect(requestFn).toHaveBeenCalledTimes(3);
+    },
+    // maxRetries=3 → ~200ms+400ms backoff (~0.6s) plus mock overhead; 15s bounds load spikes without masking hangs.
+    15_000,
+  );
 
   it('throws QuasarApiError when circuit is open', async () => {
     // Force circuit open by injecting enough failures

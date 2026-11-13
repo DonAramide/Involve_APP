@@ -39,9 +39,19 @@ function parseFileToRows(buffer: Buffer, mimetype: string, originalName: string)
       return row;
     });
   } else {
+    // Defense-in-depth caps (SheetJS CE >=0.20.3 + bounded untrusted input).
+    const maxBytes = 10 * 1024 * 1024;
+    const maxRows = 50_000;
+    if (buffer.length > maxBytes) {
+      throw new Error(`Terminal spreadsheet exceeds ${maxBytes} byte limit`);
+    }
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' }) as any[];
+    if (rows.length > maxRows) {
+      throw new Error(`Terminal spreadsheet exceeds ${maxRows} row limit`);
+    }
+    return rows;
   }
 }
 

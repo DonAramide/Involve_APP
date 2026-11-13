@@ -70,6 +70,8 @@ const PG_URL = process.env.FEE_PG_TEST_URL;
 const describePg = PG_URL && /127\.0\.0\.1|localhost/.test(PG_URL) ? describe : describe.skip;
 
 describePg('guarded fee SQL (throwaway local Postgres)', () => {
+  // Applying ledger + fee migrations on a cold disposable DB exceeds Jest's 5s default.
+  jest.setTimeout(120_000);
   const TENANT = '22222222-2222-4222-8222-222222222222';
   const ASSESSMENT = '33333333-3333-4333-8333-333333333333';
   let pool: Pool;

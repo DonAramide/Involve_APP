@@ -33,6 +33,9 @@ jest.mock('../src/db/supabase', () => {
 });
 
 describe('P0-2 Device Activations Integration/Unit Tests', () => {
+  // Full Express app import + first supertest cycle can exceed Jest's 5s default under Windows load.
+  // Scoped only — does not raise the project-wide timeout.
+  jest.setTimeout(20_000);
   const mockFrom = supabase.from as jest.Mock;
   const mockGetUser = supabase.auth.getUser as jest.Mock;
 

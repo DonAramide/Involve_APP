@@ -94,11 +94,20 @@ function isLikelyHeaderRow(cells: unknown[]): boolean {
   );
 }
 
+/** Hard caps for untrusted spreadsheet input (defense-in-depth with SheetJS CE >=0.20.3). */
+export const SETTLEMENT_XLSX_MAX_BYTES = 15 * 1024 * 1024;
+export const SETTLEMENT_XLSX_MAX_ROWS = 50_000;
+
 export class SettlementFileParser {
   static parseBuffer(
     buffer: Buffer,
     templateType: SettlementTemplateType,
   ): NormalizedSettlementRow[] {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return [];
+    if (buffer.length > SETTLEMENT_XLSX_MAX_BYTES) {
+      throw new Error(`Settlement file exceeds ${SETTLEMENT_XLSX_MAX_BYTES} byte limit`);
+    }
+
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return [];
@@ -111,6 +120,9 @@ export class SettlementFileParser {
     }) as unknown[][];
 
     if (!matrix.length) return [];
+    if (matrix.length > SETTLEMENT_XLSX_MAX_ROWS) {
+      throw new Error(`Settlement sheet exceeds ${SETTLEMENT_XLSX_MAX_ROWS} row limit`);
+    }
 
     let headerRowIdx = 0;
     for (let i = 0; i < Math.min(matrix.length, 15); i++) {
