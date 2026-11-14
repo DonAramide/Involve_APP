@@ -84,19 +84,17 @@ export class CardSettlementService {
       batchQuery = batchQuery.eq('tenant_id', access.tenantId);
     }
 
-    const [{ data: batch, error: batchErr }, { data: matches, error: matchErr }] =
-      await Promise.all([
-        batchQuery.maybeSingle(),
-        supabaseAdmin
-          .from('card_settlement_matches')
-          .select('*')
-          .eq('batch_id', batchId)
-          .order('row_index', { ascending: true }),
-      ]);
-
+    const { data: batch, error: batchErr } = await batchQuery.maybeSingle();
     if (batchErr) throw new Error(batchErr.message);
-    if (matchErr) throw new Error(matchErr.message);
     assertSettlementBatchTenantAccess(batch, access.tenantId, access.isPlatform);
+    if (!batch) throw new SettlementBatchAccessError();
+
+    const { data: matches, error: matchErr } = await supabaseAdmin
+      .from('card_settlement_matches')
+      .select('*')
+      .eq('batch_id', batch.id)
+      .order('row_index', { ascending: true });
+    if (matchErr) throw new Error(matchErr.message);
 
     return { batch, matches: matches ?? [] };
   }
