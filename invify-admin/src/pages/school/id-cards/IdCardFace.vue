@@ -50,6 +50,10 @@
             <dt>Lost email</dt>
             <dd>{{ face.lostFoundEmail }}</dd>
           </div>
+          <div v-if="face.phone">
+            <dt>Phone</dt>
+            <dd>{{ face.phone }}</dd>
+          </div>
           <div v-if="face.showIssueDate && face.issuedAt">
             <dt>Issued</dt>
             <dd>{{ issuedLabel }}</dd>

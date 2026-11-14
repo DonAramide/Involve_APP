@@ -79,7 +79,7 @@ export const healthInsuranceApi = {
   getPlatformTenantDetail: (tenantId, reason) => api.get(`/api/v1/health-insurance/platform/tenants/${tenantId}`, {
     headers: platformReasonHeader(reason)
   }),
-  getPlatformInstitutionDetail: (institutionId, reason) => api.get(`/api/v1/health-insurance/platform/institutions/${institutionId}`, {
+  getPlatformInstitutionDetail: (institutionId, reason) => api.get(`/api/v1/health-insurance/platform/institutions/${encodeURIComponent(institutionId)}`, {
     headers: platformReasonHeader(reason)
   }),
   getPlatformMembers: (params, reason) => api.get('/api/v1/health-insurance/platform/members', {

@@ -606,6 +606,11 @@
       <div class="text-caption text-grey-5 q-mb-sm">
         Member rows come from hw_members. Institution and tenant names are links when a recorded relationship exists. This is not a clinical record dump.
       </div>
+      <div v-if="trends" class="q-mb-sm text-caption text-grey-4">
+        Category counts from coverage trends:
+        <span v-for="item in trends.byCategory || []" :key="item.category"> {{ item.category }} {{ item.count }}.</span>
+        <span v-if="!(trends.byCategory || []).length"> No category rows were returned.</span>
+      </div>
       <q-banner v-if="integrationState === 'access_denied' || integrationState === 'reason_required'" dense rounded class="bg-amber-10 text-amber-2">
         <div>{{ integrationDenial || 'The member roster requires an unexpired platform.integration.health grant.' }}</div>
         <q-btn flat dense color="amber-2" label="Open Platform Governance" no-caps to="/admin/health-insurance" />
@@ -1038,6 +1043,10 @@ const overview = ref(null)
 const overviewLoad = ref('idle')
 const tenants = ref([])
 const tenantTotal = ref(null)
+const contextDetail = ref(null)
+const contextDetailKind = ref('')
+const contextDetailLoad = ref('idle')
+const contextDetailError = ref('')
 const tenantSearch = ref('')
 const tenantMode = ref('')
 const tenantHealth = ref('')
@@ -1059,10 +1068,6 @@ const memberTotal = ref(null)
 const memberSearch = ref('')
 const memberOffset = ref(0)
 const memberLoad = ref('idle')
-const contextDetail = ref(null)
-const contextDetailKind = ref('')
-const contextDetailLoad = ref('idle')
-const contextDetailError = ref('')
 const trends = ref(null)
 const trendLoad = ref('idle')
 const finance = ref(null)
@@ -1472,8 +1477,7 @@ function institutionCodeLabel(row) {
 }
 
 function isLinkedInstitution(row) {
-  if (row?.institutionId) return true
-  return row?.institutionResolution === 'resolved' && !!(row?.institutionCode)
+  return row?.institutionResolution === 'resolved' && !!(row?.institutionId || row?.institutionCode)
 }
 
 function institutionRef(row) {

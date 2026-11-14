@@ -8,7 +8,7 @@
     </div>
 
     <q-banner v-if="forbidden" class="bg-grey-8 text-grey-1 q-mb-md id-card-no-print" rounded>
-      Card management is limited to the owner and a tenant administrator. Gate scans are recorded on the gate clock page, and they are not saved until gate persistence is enabled.
+      Card management is limited to the owner and a tenant administrator. Gate scans are recorded on Entry and Exit, and they are not saved until gate persistence is enabled.
     </q-banner>
 
     <q-banner v-if="schemaUnapplied" class="id-card-warning-banner q-mb-md id-card-no-print" rounded>
@@ -100,7 +100,8 @@
             <q-btn color="teal-6" text-color="black" label="Publish for mobile print" :disable="!selected.length" :loading="publishingMobile" @click="publishForMobile" />
           </div>
           <q-banner class="id-card-info-banner q-mb-md" rounded>
-            Browser print issues a new barcode for paper/CR80. <b>Publish for mobile print</b> issues the same people so the phone can open ID Card → Issue/Print, attach the {{ terms.beneficiary.toLowerCase() }} photo saved on the device, and print on a paired 58mm/80mm Bluetooth printer.
+            Browser print and <b>Publish for mobile print</b> issue a new barcode. If a card is already active, issuing replaces it and the previous barcode stops working.
+            Browser print is for paper/CR80. <b>Publish for mobile print</b> issues the same people so the phone can open ID Card → Issue/Print, attach the {{ terms.beneficiary.toLowerCase() }} photo saved on the device, and print on a paired 58mm/80mm Bluetooth printer.
           </q-banner>
           <q-list bordered separator>
             <q-item v-for="person in people" :key="person.subjectType + person.subjectId">
@@ -315,8 +316,8 @@ export default {
         disclaimer: this.draft.disclaimer || face.disclaimer,
         accentColor: normalizeAccent(this.draft.accentColor, face.accentColor),
         logoPlacement: this.draft.logoPlacement || face.logoPlacement,
-        lostFoundPhone: this.draft.lostFoundPhone || null,
-        lostFoundEmail: this.draft.lostFoundEmail || null,
+        lostFoundPhone: this.draft.lostFoundPhone || face.lostFoundPhone || null,
+        lostFoundEmail: this.draft.lostFoundEmail || face.lostFoundEmail || null,
         paperSize: this.draft.paperSize || face.paperSize,
         sample: true
       }
