@@ -1,41 +1,75 @@
 // src/controllers/integrity.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
-import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { supabaseAdmin } from '../db/supabase';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import {
+  computeStudentBalanceMismatches,
+  studentBelongsToTenant,
+} from '../utils/student-balance-integrity';
 
 export class IntegrityController {
   /**
    * GET /api/finance/integrity/student-balances
-   * Validates running_balance cache against raw ledger sums.
+   * Validates running_balance cache against raw ledger sums for the
+   * authenticated tenant only. The historical 0-arg RPC
+   * `validate_student_balances()` is unscoped and must not be called.
    */
   static async validateStudentBalances(req: Request, res: Response) {
-    const tenantId = resolveTenantScope(req);
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
+    let tenantId: string;
+    try {
+      tenantId = resolveAuthoritativeTenantId(req);
+    } catch (err: any) {
+      return res.status(err?.status || 403).json({ error: err?.message || 'Tenant ID required' });
     }
 
     try {
-      // 1. Call the RPC function we created
-      const { data, error } = await supabase.rpc('validate_student_balances');
+      const [{ data: bySchool, error: schoolErr }, { data: byTenant, error: tenantErr }] =
+        await Promise.all([
+          supabaseAdmin
+            .from('students')
+            .select('id, running_balance, school_id, tenant_id')
+            .eq('school_id', tenantId),
+          supabaseAdmin
+            .from('students')
+            .select('id, running_balance, school_id, tenant_id')
+            .eq('tenant_id', tenantId),
+        ]);
+      if (schoolErr) throw schoolErr;
+      if (tenantErr) throw tenantErr;
 
-      if (error) throw error;
+      const studentsById = new Map<string, any>();
+      for (const row of [...(bySchool || []), ...(byTenant || [])]) {
+        studentsById.set(String(row.id), row);
+      }
+      const students = Array.from(studentsById.values());
 
-      const mismatches = data as any[];
+      const [{ data: ledgerBySchool }, { data: ledgerByTenant }] = await Promise.all([
+        supabaseAdmin
+          .from('ledgers')
+          .select('student_id, amount, school_id, tenant_id')
+          .eq('school_id', tenantId),
+        supabaseAdmin
+          .from('ledgers')
+          .select('student_id, amount, school_id, tenant_id')
+          .eq('tenant_id', tenantId),
+      ]);
+
+      const ledgerRows = [...(ledgerBySchool || []), ...(ledgerByTenant || [])];
+      const mismatches = computeStudentBalanceMismatches(students, ledgerRows, tenantId);
 
       if (mismatches.length > 0) {
         console.error(`[Integrity Error] Found ${mismatches.length} student balance mismatches!`);
         return res.status(400).json({
           status: 'CORRUPTED',
           message: 'Integrity mismatch detected between running_balance and ledger sums.',
-          mismatches
+          mismatches,
         });
       }
 
       return res.status(200).json({
         status: 'VALID',
         message: 'All student running balances are in sync with the ledger.',
-        count: 0
+        count: 0,
       });
     } catch (error: any) {
       console.error('[IntegrityController] Error:', error.message);
@@ -45,36 +79,59 @@ export class IntegrityController {
 
   /**
    * POST /api/finance/integrity/recompute
-   * Forced recomputation of all running_balances from raw ledgers.
+   * Forced recomputation of running_balances from raw ledgers for this tenant.
    */
   static async recomputeBalances(req: Request, res: Response) {
-    const tenantId = resolveTenantScope(req);
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
+    let tenantId: string;
+    try {
+      tenantId = resolveAuthoritativeTenantId(req);
+    } catch (err: any) {
+      return res.status(err?.status || 403).json({ error: err?.message || 'Tenant ID required' });
     }
 
     try {
-      // 1. Fetch all student ledger sums
-      const { data: ledgerSums, error: ledgerError } = await supabase
-        .from('ledgers')
-        .select('student_id, amount')
-        .eq('school_id', tenantId);
+      const [{ data: ledgerBySchool, error: ledgerSchoolErr }, { data: ledgerByTenant, error: ledgerTenantErr }] =
+        await Promise.all([
+          supabaseAdmin.from('ledgers').select('student_id, amount, school_id, tenant_id').eq('school_id', tenantId),
+          supabaseAdmin.from('ledgers').select('student_id, amount, school_id, tenant_id').eq('tenant_id', tenantId),
+        ]);
+      if (ledgerSchoolErr) throw ledgerSchoolErr;
+      if (ledgerTenantErr) throw ledgerTenantErr;
 
-      if (ledgerError) throw ledgerError;
+      const [{ data: studentsBySchool }, { data: studentsByTenant }] = await Promise.all([
+        supabaseAdmin.from('students').select('id, school_id, tenant_id').eq('school_id', tenantId),
+        supabaseAdmin.from('students').select('id, school_id, tenant_id').eq('tenant_id', tenantId),
+      ]);
+      const allowedStudents = [...(studentsBySchool || []), ...(studentsByTenant || [])];
+      const allowedIds = new Set(
+        allowedStudents.filter((s) => studentBelongsToTenant(s, tenantId)).map((s) => String(s.id)),
+      );
 
-      // Group by student
       const balances: Record<string, number> = {};
-      ledgerSums.forEach(l => {
-        balances[l.student_id] = (balances[l.student_id] || 0) + Number(l.amount);
-      });
+      for (const row of [...(ledgerBySchool || []), ...(ledgerByTenant || [])]) {
+        const studentId = String(row.student_id || '');
+        if (!allowedIds.has(studentId)) continue;
+        if (
+          (row.school_id || row.tenant_id) &&
+          !studentBelongsToTenant({ school_id: row.school_id, tenant_id: row.tenant_id }, tenantId)
+        ) {
+          continue;
+        }
+        balances[studentId] = (balances[studentId] || 0) + Number(row.amount);
+      }
 
-      // 2. Batch update students (One by one for now, or use a complex RPC)
       for (const [studentId, amount] of Object.entries(balances)) {
-        await supabase
+        if (!allowedIds.has(studentId)) continue;
+        await supabaseAdmin
           .from('students')
           .update({ running_balance: amount })
-          .eq('id', studentId);
+          .eq('id', studentId)
+          .eq('school_id', tenantId);
+        await supabaseAdmin
+          .from('students')
+          .update({ running_balance: amount })
+          .eq('id', studentId)
+          .eq('tenant_id', tenantId);
       }
 
       return res.status(200).json({ success: true, message: 'Recomputation completed.' });

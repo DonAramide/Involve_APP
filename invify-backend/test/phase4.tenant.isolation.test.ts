@@ -217,4 +217,39 @@ describe('Phase 4 tenant isolation regressions', () => {
     });
     expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
   });
+
+  test('AI notes, BI PDF and KYC upload ignore header/query/body spoof', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: { tenantId: 'tenant-c', schoolId: 'tenant-d' },
+      query: { tenantId: 'tenant-e' },
+      params: { id: 'tenant-b' },
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
+    expect(resolveTenantScope(req)).toBe('tenant-a');
+  });
+
+  test('merchant admin cannot audit-list another tenant via query tenantId', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'admin', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: { tenantId: 'tenant-b' },
+      params: {},
+    });
+    expect(isPlatformFinanceOperator(req.user)).toBe(false);
+    expect(resolveTenantScope(req)).toBe('tenant-a');
+  });
+
+  test('student-balance integrity fails closed without tenant context', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(() => resolveAuthoritativeTenantId(req)).toThrow(/no tenant context/);
+  });
 });

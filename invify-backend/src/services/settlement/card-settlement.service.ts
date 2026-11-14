@@ -15,6 +15,40 @@ import {
 
 interface PosAttemptRow extends MatchablePosAttempt {}
 
+export class SettlementBatchAccessError extends Error {
+  status: number;
+  constructor(message = 'Settlement batch not found', status = 404) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * Merchant viewers may only see their own batch. Platform operators may view
+ * any batch unless they have selected a tenant, in which case other tenants 404.
+ * Existence of another tenant's batch is not leaked to merchants.
+ */
+export function assertSettlementBatchTenantAccess(
+  batch: { tenant_id?: string | null } | null | undefined,
+  viewerTenantId: string | null | undefined,
+  isPlatform: boolean,
+): void {
+  if (!batch) {
+    throw new SettlementBatchAccessError();
+  }
+  const batchTenant = String(batch.tenant_id || '').trim();
+  const viewer = String(viewerTenantId || '').trim();
+  if (isPlatform) {
+    if (viewer && batchTenant && batchTenant !== viewer) {
+      throw new SettlementBatchAccessError();
+    }
+    return;
+  }
+  if (!viewer || !batchTenant || batchTenant !== viewer) {
+    throw new SettlementBatchAccessError();
+  }
+}
+
 export class CardSettlementService {
   static listTemplates() {
     return SETTLEMENT_TEMPLATES;
@@ -36,10 +70,23 @@ export class CardSettlementService {
     return data ?? [];
   }
 
-  static async getBatchDetails(batchId: string) {
+  static async getBatchDetails(
+    batchId: string,
+    access: { tenantId?: string | null; isPlatform: boolean },
+  ) {
+    let batchQuery = supabaseAdmin.from('card_settlement_batches').select('*').eq('id', batchId);
+    if (!access.isPlatform) {
+      if (!access.tenantId) {
+        throw new SettlementBatchAccessError('Forbidden: tenant context required', 403);
+      }
+      batchQuery = batchQuery.eq('tenant_id', access.tenantId);
+    } else if (access.tenantId) {
+      batchQuery = batchQuery.eq('tenant_id', access.tenantId);
+    }
+
     const [{ data: batch, error: batchErr }, { data: matches, error: matchErr }] =
       await Promise.all([
-        supabaseAdmin.from('card_settlement_batches').select('*').eq('id', batchId).maybeSingle(),
+        batchQuery.maybeSingle(),
         supabaseAdmin
           .from('card_settlement_matches')
           .select('*')
@@ -49,7 +96,7 @@ export class CardSettlementService {
 
     if (batchErr) throw new Error(batchErr.message);
     if (matchErr) throw new Error(matchErr.message);
-    if (!batch) throw new Error('Settlement batch not found');
+    assertSettlementBatchTenantAccess(batch, access.tenantId, access.isPlatform);
 
     return { batch, matches: matches ?? [] };
   }
@@ -58,7 +105,7 @@ export class CardSettlementService {
     buffer: Buffer;
     fileName: string;
     templateType: SettlementTemplateType;
-    tenantId?: string | null;
+    tenantId: string;
     uploadedBy: { id: string; email?: string | null };
     dryRun: boolean;
   }): Promise<SettlementUploadResult> {
@@ -67,12 +114,19 @@ export class CardSettlementService {
       throw new Error('No settlement rows found in file. Check template type and file format.');
     }
 
+    if (!params.tenantId) {
+      const err: any = new Error('tenantId is required for settlement upload');
+      err.status = 400;
+      throw err;
+    }
+
     const fileSha256 = createHash('sha256').update(params.buffer).digest('hex');
 
     const { data: priorUpload } = await supabaseAdmin
       .from('card_settlement_batches')
       .select('id, created_at')
       .eq('file_sha256', fileSha256)
+      .eq('tenant_id', params.tenantId)
       .eq('dry_run', false)
       .maybeSingle();
 
@@ -82,8 +136,8 @@ export class CardSettlementService {
       );
     }
 
-    const attempts = await this.loadApprovedAttempts(params.tenantId ?? null);
-    const matchResults = rows.map((row) => this.matchRow(row, attempts, params.tenantId ?? null));
+    const attempts = await this.loadApprovedAttempts(params.tenantId);
+    const matchResults = rows.map((row) => this.matchRow(row, attempts, params.tenantId));
 
     const matchedCount = matchResults.filter((m) => m.matchStatus === 'matched').length;
     const unmatchedFileRows = matchResults.filter((m) => m.matchStatus === 'unmatched').length;
@@ -95,7 +149,7 @@ export class CardSettlementService {
       const { data: batch, error: batchError } = await supabaseAdmin
         .from('card_settlement_batches')
         .insert({
-          tenant_id: params.tenantId || null,
+          tenant_id: params.tenantId,
           template_type: params.templateType,
           file_name: params.fileName,
           file_sha256: fileSha256,
@@ -161,6 +215,7 @@ export class CardSettlementService {
             updated_at: new Date().toISOString(),
           })
           .eq('id', match.posAttemptId)
+          .eq('tenant_id', params.tenantId)
           .eq('status', 'Approved');
 
         if (updateError) {
@@ -171,7 +226,7 @@ export class CardSettlementService {
       await supabaseAdmin.from('audit_logs').insert({
         module: 'card_settlement',
         action: 'settlement_file_uploaded',
-        tenant_id: params.tenantId || null,
+        tenant_id: params.tenantId,
         user_email: params.uploadedBy.email || 'admin',
         status: 'SUCCESS',
         metadata: {
@@ -198,17 +253,19 @@ export class CardSettlementService {
     };
   }
 
-  private static async loadApprovedAttempts(tenantId: string | null): Promise<PosAttemptRow[]> {
-    let query = supabaseAdmin
+  private static async loadApprovedAttempts(tenantId: string): Promise<PosAttemptRow[]> {
+    if (!tenantId) {
+      const err: any = new Error('tenantId is required for settlement matching');
+      err.status = 400;
+      throw err;
+    }
+    const query = supabaseAdmin
       .from('pos_transaction_attempts')
       .select('id, tenant_id, terminal_id, amount, status, settlement_status, rrn, stan, auth_code')
       .eq('status', 'Approved')
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(5000);
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

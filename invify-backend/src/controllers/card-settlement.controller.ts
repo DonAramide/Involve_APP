@@ -47,10 +47,23 @@ export class CardSettlementController {
 
   static async getBatch(req: Request, res: Response) {
     try {
-      const details = await CardSettlementService.getBatchDetails(req.params.id);
+      const user = (req as any).user;
+      const isPlatform = isPlatformFinanceOperator(user);
+      let tenantId: string | null = null;
+      if (isPlatform) {
+        tenantId = String(req.query.tenantId || req.headers['x-tenant-id'] || '').trim() || null;
+      } else {
+        tenantId = resolveAuthoritativeTenantId(req);
+      }
+      const details = await CardSettlementService.getBatchDetails(req.params.id, {
+        tenantId,
+        isPlatform,
+      });
       return res.status(200).json(details);
     } catch (error: any) {
-      const status = error.message.includes('not found') ? 404 : 500;
+      const status =
+        error?.status ||
+        (String(error.message || '').includes('not found') ? 404 : 500);
       return res.status(status).json({ error: error.message });
     }
   }
@@ -76,9 +89,12 @@ export class CardSettlementController {
         req.query.dryRun === 'true';
 
       const user = (req as any).user;
-      let tenantId: string | null = null;
+      let tenantId: string;
       if (isPlatformFinanceOperator(user)) {
-        tenantId = String(req.body.tenantId || req.headers['x-tenant-id'] || '').trim() || null;
+        tenantId = String(req.body.tenantId || req.query.tenantId || req.headers['x-tenant-id'] || '').trim();
+        if (!tenantId) {
+          return res.status(400).json({ error: 'tenantId is required for settlement upload' });
+        }
       } else {
         tenantId = resolveAuthoritativeTenantId(req);
       }
