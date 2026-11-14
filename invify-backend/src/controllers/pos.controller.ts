@@ -8,11 +8,7 @@ export class PosController {
     try {
       const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse, tenantProfile, deviceInfo, latitude, longitude, field120, geofencing } = req.body;
       const { resolveTenantScope } = require('../utils/resolve-tenant-scope');
-      const tenantId =
-        resolveTenantScope(req) ||
-        (req.headers['x-tenant-id'] as string) ||
-        (req as any).user?.tenantId ||
-        '';
+      const tenantId = resolveTenantScope(req) || '';
 
       if (!tenantId || tenantId === 'default') {
         return res.status(400).json({ error: 'Tenant context required to report POS transaction' });
@@ -74,9 +70,9 @@ export class PosController {
   static async getTransactionHistory(req: Request, res: Response) {
     try {
       const { resolveTenantScope } = require('../utils/resolve-tenant-scope');
-      const role = String((req as any).user?.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'agent', 'support', 'platform_admin'].includes(role);
-      // Super-admin switchboard sees all tenants; tenant operators see their own.
+      const { isPlatformFinanceOperator } = require('../utils/finance-tenant');
+      const isPlatform = isPlatformFinanceOperator((req as any).user);
+      // Platform switchboard sees all tenants; tenant operators see their own.
       const tenantId = isPlatform ? '' : (resolveTenantScope(req) || '');
       const history = await PosService.getTransactionHistory(tenantId);
       res.status(200).json(Array.isArray(history) ? history : []);

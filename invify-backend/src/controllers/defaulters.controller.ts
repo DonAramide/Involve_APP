@@ -1,6 +1,7 @@
 // src/controllers/defaulters.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 export class DefaultersController {
   /**
@@ -8,7 +9,7 @@ export class DefaultersController {
    * Returns a list of students with outstanding balances.
    */
   static async getDefaulters(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
     const { class: className, status } = req.query;
 
     if (!tenantId) {

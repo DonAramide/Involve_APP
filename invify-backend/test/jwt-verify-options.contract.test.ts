@@ -1,6 +1,7 @@
 /**
- * Phase 1.1 — JWT verify options contract (source-level).
- * Documents issuer/audience and device-expiry behaviour without changing semantics.
+ * JWT verify options contract (source-level).
+ * Issuer/audience and device expiry are opt-in so existing production sessions stay valid
+ * until JWT_ENFORCE_ISS_AUD / JWT_DEVICE_ENFORCE_EXP are attested.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,16 +19,18 @@ describe('JWT verify options contract (source)', () => {
     expect(jwtSrc).not.toMatch(/jwt\.decode\([^)]*\)\s*;?\s*$/m);
   });
 
-  it('does not pass issuer or audience constraints to verify calls (documented MEDIUM gap)', () => {
-    expect(jwtSrc).not.toMatch(/issuer\s*:/);
-    expect(jwtSrc).not.toMatch(/audience\s*:/);
-    expect(jwtSrc).not.toMatch(/\biss\b\s*:/);
-    expect(jwtSrc).not.toMatch(/\baud\b\s*:/);
+  it('issuer/audience constraints are opt-in via JWT_EXPECTED_* or JWT_ENFORCE_ISS_AUD', () => {
+    expect(jwtSrc).toMatch(/JWT_EXPECTED_ISS/);
+    expect(jwtSrc).toMatch(/JWT_EXPECTED_AUD/);
+    expect(jwtSrc).toMatch(/JWT_ENFORCE_ISS_AUD/);
+    expect(jwtSrc).toMatch(/expectedJwtIssuer/);
+    expect(jwtSrc).toMatch(/expectedJwtAudience/);
   });
 
-  it('device-token expiry exception lives in HS verify; middleware accepts device-owner claims', () => {
+  it('device-token expiry exception is gated by JWT_DEVICE_ENFORCE_EXP', () => {
     expect(jwtSrc).toMatch(/deviceId/);
     expect(jwtSrc).toMatch(/TokenExpiredError/);
+    expect(jwtSrc).toMatch(/JWT_DEVICE_ENFORCE_EXP/);
     expect(jwtSrc).toMatch(/ignoreExpiration:\s*true/);
     expect(authSrc).toMatch(/deviceOwnerFromJwt/);
   });

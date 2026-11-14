@@ -7,6 +7,7 @@ import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { isUuid, toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
 import { rejectIfVaBlocked } from '../utils/free-trial-guard';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 import {
   isExistingVaError,
   last10PhoneDigits,
@@ -21,7 +22,7 @@ export class StudentController {
   static async getVirtualAccount(req: Request, res: Response) {
     try {
       const { studentId } = req.params;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
 
       if (!studentId) {
         return res.status(400).json({ error: "Student ID is required" });
@@ -63,7 +64,7 @@ export class StudentController {
   static async provisionStudentVirtualAccount(req: Request, res: Response) {
     try {
       const { studentId } = req.params;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       const { firstName, lastName, admissionNumber, phone, email } = req.body || {};
 
       if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
@@ -302,7 +303,7 @@ export class StudentController {
         : '';
       if (isExistingVaError(msg)) {
         try {
-          const tenant = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+          const tenant = resolveTenantScope(req);
           const key = String(req.params.studentId || '').trim();
           const quasar = await getQuasarServiceForTenantVa(tenant);
           const recovered = await StudentController.fetchQuasarVa(

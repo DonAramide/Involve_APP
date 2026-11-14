@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
 import { SyncService } from '../services/sync.service';
 import { DeviceTrustService } from '../services/device-trust.service';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 export class SyncController {
   static async handleSync(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = resolveTenantScope(req);
       const deviceId = String(req.headers['x-device-id'] || '').trim();
       const correlationId = (req as any).correlationId || req.headers['x-correlation-id'] as string;
       

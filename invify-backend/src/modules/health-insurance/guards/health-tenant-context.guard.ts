@@ -85,7 +85,6 @@ export function requireHealthTenantContext() {
           const claimTenant =
             (user as any).tenantId ||
             (user as any).tenant_id ||
-            preferredTenantId ||
             null;
           if (!claimTenant) {
             return res.status(403).json({

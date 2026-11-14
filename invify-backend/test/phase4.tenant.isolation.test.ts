@@ -2,6 +2,7 @@
  * Regression: tenant isolation hard gates (no live network).
  */
 import { resolveAuthoritativeTenantId, assertTransactionTenantAccess } from '../src/utils/finance-tenant';
+import { resolveTenantScope } from '../src/utils/resolve-tenant-scope';
 
 function mockReq(partial: any): any {
   return partial;
@@ -92,6 +93,40 @@ describe('Phase 4 tenant isolation regressions', () => {
       path: '/api/admin/tenants/tenant-b/details',
     });
     expect(resolveAuthoritativeTenantId(req)).toBe('tenant-b');
+  });
+
+  test('resolveTenantScope matches finance helper: merchant admin cannot spoof x-tenant-id', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'admin', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveTenantScope(req)).toBe('tenant-a');
+  });
+
+  test('resolveTenantScope matches finance helper: owner cannot spoof via query or body', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: { tenantId: 'tenant-c' },
+      query: { tenantId: 'tenant-d' },
+      params: {},
+    });
+    expect(resolveTenantScope(req)).toBe('tenant-a');
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
+  });
+
+  test('resolveTenantScope allows platform admin without merchant tenant to select x-tenant-id', () => {
+    const req = mockReq({
+      user: { id: 'ops', role: 'admin', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveTenantScope(req)).toBe('tenant-b');
   });
 
   test('super_admin still requires a real tenant when only sentinels are present', () => {

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '../db/supabase';
 import { AuditService } from '../services/audit.service';
 import { PaymentService } from '../services/payment.service';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -161,8 +162,7 @@ export class StaffController {
    */
   static async bulkSync(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }
@@ -263,10 +263,7 @@ export class StaffController {
    */
   static async list(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) ||
-        (req as any).user?.tenantId ||
-        (req.query.tenantId as string);
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }
@@ -299,8 +296,7 @@ export class StaffController {
    */
   static async create(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }
@@ -360,8 +356,7 @@ export class StaffController {
    */
   static async patch(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }
@@ -441,8 +436,7 @@ export class StaffController {
    */
   static async paySalary(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
       if (!tenantId) {
         return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
       }

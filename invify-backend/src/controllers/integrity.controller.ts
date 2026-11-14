@@ -1,6 +1,7 @@
 // src/controllers/integrity.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 export class IntegrityController {
   /**
@@ -8,7 +9,7 @@ export class IntegrityController {
    * Validates running_balance cache against raw ledger sums.
    */
   static async validateStudentBalances(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
 
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
@@ -47,7 +48,7 @@ export class IntegrityController {
    * Forced recomputation of all running_balances from raw ledgers.
    */
   static async recomputeBalances(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
 
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });

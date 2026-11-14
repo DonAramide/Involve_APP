@@ -3,10 +3,14 @@
  *  - HS family → SUPABASE_JWT_SECRET (legacy JWT secret)
  *  - ES / RS / PS family → project JWKS (asymmetric signing keys)
  *
+ * Issuer/audience and device-token expiry are opt-in so existing production
+ * sessions are not invalidated until JWT_ENFORCE_ISS_AUD / JWT_DEVICE_ENFORCE_EXP
+ * are attested in runtime config.
+ *
  * Does not log tokens or secrets.
  */
 import jwt from 'jsonwebtoken';
-import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify, JWTPayload } from 'jose';
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify, JWTPayload, JWTVerifyOptions } from 'jose';
 
 let remoteJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 let remoteJwksUrl: string | null = null;
@@ -19,6 +23,49 @@ export function supabaseProjectUrl(): string {
     process.env.PRODUCTION_SUPABASE_URL ||
     '';
   return String(url).replace(/\/$/, '');
+}
+
+function envFlag(name: string): boolean {
+  return String(process.env[name] || '').toLowerCase() === 'true';
+}
+
+/** Expected JWT issuer. Unset unless JWT_EXPECTED_ISS or JWT_ENFORCE_ISS_AUD=true. */
+export function expectedJwtIssuer(): string | undefined {
+  const explicit = String(process.env.JWT_EXPECTED_ISS || '').trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+  if (!envFlag('JWT_ENFORCE_ISS_AUD')) return undefined;
+  const base = supabaseProjectUrl();
+  return base ? `${base}/auth/v1` : undefined;
+}
+
+/** Expected JWT audience. Unset unless JWT_EXPECTED_AUD or JWT_ENFORCE_ISS_AUD=true. */
+export function expectedJwtAudience(): string | undefined {
+  const explicit = String(process.env.JWT_EXPECTED_AUD || '').trim();
+  if (explicit) return explicit;
+  if (!envFlag('JWT_ENFORCE_ISS_AUD')) return undefined;
+  return 'authenticated';
+}
+
+export function deviceExpiryEnforced(): boolean {
+  return envFlag('JWT_DEVICE_ENFORCE_EXP');
+}
+
+export function jwtHsVerifyOptions(): jwt.VerifyOptions {
+  const opts: jwt.VerifyOptions = {};
+  const issuer = expectedJwtIssuer();
+  const audience = expectedJwtAudience();
+  if (issuer) opts.issuer = issuer;
+  if (audience) opts.audience = audience;
+  return opts;
+}
+
+function jwtJoseVerifyOptions(): JWTVerifyOptions {
+  const opts: JWTVerifyOptions = {};
+  const issuer = expectedJwtIssuer();
+  const audience = expectedJwtAudience();
+  if (issuer) opts.issuer = issuer;
+  if (audience) opts.audience = audience;
+  return opts;
 }
 
 function getRemoteJwks() {
@@ -47,16 +94,19 @@ export function peekAlg(token: string): string {
 }
 
 /**
- * Tablet device tokens (HS256 with a `deviceId` claim) must never expire.
- * Older ones were issued with a 30-day `exp`, so expiry is ignored for them;
- * the signature is still verified.
+ * Tablet device tokens (HS256 with a `deviceId` claim) historically ignored
+ * expiry so older 30-day tokens kept working. Signature is always verified.
+ * Set JWT_DEVICE_ENFORCE_EXP=true to reject expired device tokens (opt-in;
+ * do not enable against current production until tablets refresh tokens).
  */
 function verifyHs(token: string, secret: string): jwt.JwtPayload | string {
+  const opts = jwtHsVerifyOptions();
   try {
-    return jwt.verify(token, secret);
+    return jwt.verify(token, secret, opts);
   } catch (e: any) {
     if (e?.name !== 'TokenExpiredError') throw e;
-    const payload = jwt.verify(token, secret, { ignoreExpiration: true });
+    if (deviceExpiryEnforced()) throw e;
+    const payload = jwt.verify(token, secret, { ...opts, ignoreExpiration: true });
     if (payload && typeof payload === 'object' && (payload as any).deviceId) {
       return payload;
     }
@@ -75,7 +125,7 @@ export async function verifySupabaseAccessToken(token: string): Promise<JWTPaylo
   // Asymmetric (current Supabase signing keys): ES256 / RS256 / etc.
   if (alg.startsWith('ES') || alg.startsWith('RS') || alg.startsWith('PS')) {
     try {
-      const { payload } = await jwtVerify(token, getRemoteJwks());
+      const { payload } = await jwtVerify(token, getRemoteJwks(), jwtJoseVerifyOptions());
       return payload;
     } catch {
       const err: any = new Error('Invalid or expired token');

@@ -5,6 +5,7 @@ import { TerminalInventoryService } from '../services/terminal-inventory.service
 import { TerminalAssignmentService } from '../services/terminal-assignment.service';
 import { TerminalSyncService } from '../services/terminal-sync.service';
 import { TerminalAuditService } from '../services/terminal-audit.service';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 export const terminalUploadMiddleware = upload.array('files', 10);
@@ -217,7 +218,7 @@ export class TerminalController {
         console.log('[DEBUG] normalizedRows:', JSON.stringify(normalizedRows));
         const importType = req.body.importType || 'tablets';
         console.log('[DEBUG] importType:', importType);
-        const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+        const tenantId = (req as any).effectiveTenantId || resolveTenantScope(req);
         const result = await TerminalInventoryService.bulkImportDecoupled(normalizedRows, batchId, adminId, importType, tenantId);
         console.log('[DEBUG] result:', JSON.stringify(result));
         allResults.push({ filename: file.originalname, ...result });

@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { loadEnv } from './config/load-env';
 import { BuildVariantService } from './config/build-variant';
+import { AUTH_RATE_LIMIT_DEFAULT_MAX, AUTH_RATE_LIMIT_DEFAULT_WINDOW_MS } from './config/auth-limits';
 
 loadEnv();
 
@@ -216,8 +217,8 @@ const globalLimiter = rateLimit({
 });
 
 const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || '900000', 10), // Default: 15 mins
-  max: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10000', 10),
+  windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || String(AUTH_RATE_LIMIT_DEFAULT_WINDOW_MS), 10),
+  max: parseInt(process.env.RATE_LIMIT_AUTH_MAX || String(AUTH_RATE_LIMIT_DEFAULT_MAX), 10),
   message: { error: 'Too many authentication attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
