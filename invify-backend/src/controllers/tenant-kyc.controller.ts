@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
+import { isPlatformFinanceOperator, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket, rewritePublicContaboUrl } from '../utils/contabo-s3';
 
 const TYPE_ALIASES: Record<string, string> = {
@@ -141,13 +142,16 @@ async function loadTenantsByIds(ids: string[]): Promise<Record<string, any>> {
 export class TenantKycController {
   static async uploadKyc(req: Request, res: Response) {
     try {
-      const authUserId =
-        (req.headers['x-tenant-id'] as string) ||
-        (req as any).user?.tenantId ||
-        (req as any).user?.id;
-      if (!authUserId) {
-        return res.status(401).json({ success: false, message: 'Unauthorized. Tenant ID required.' });
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 401).json({
+          success: false,
+          message: err?.message || 'Unauthorized. Tenant ID required.',
+        });
       }
+      const authUserId = tenantId;
 
       const type = normalizeDocType(req.body?.type || req.body?.documentType);
       if (!type) {
@@ -317,16 +321,23 @@ export class TenantKycController {
   static async getKycDocuments(req: Request, res: Response) {
     try {
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const isAdmin = ['super_admin', 'admin', 'internal_staff'].includes(role);
-      const ownTenantId = user.tenantId || user.id;
-      let requestedId = req.params.id;
-
-      if (!isAdmin && requestedId && requestedId !== ownTenantId && requestedId !== user.id) {
-        return res.status(403).json({ success: false, message: 'Forbidden' });
+      const requestedId = String(req.params.id || '').trim();
+      let tenantId: string;
+      try {
+        if (isPlatformFinanceOperator(user)) {
+          tenantId = requestedId || resolveAuthoritativeTenantId(req);
+        } else {
+          tenantId = resolveAuthoritativeTenantId(req);
+          if (requestedId && requestedId !== tenantId && requestedId !== String(user.id || '')) {
+            return res.status(403).json({ success: false, message: 'Forbidden' });
+          }
+        }
+      } catch (err: any) {
+        return res.status(err?.status || 403).json({
+          success: false,
+          message: err?.message || 'Forbidden',
+        });
       }
-
-      const tenantId = isAdmin ? (requestedId || ownTenantId) : ownTenantId;
       if (!tenantId) {
         return res.status(400).json({ success: false, message: 'Tenant ID is required' });
       }
@@ -392,6 +403,9 @@ export class TenantKycController {
 
   static async listPending(req: Request, res: Response) {
     try {
+      if (!isPlatformFinanceOperator((req as any).user)) {
+        return res.status(403).json({ success: false, message: 'Platform authorization required' });
+      }
       const statusFilter = String(req.query.status || 'PENDING').toUpperCase();
       let docs: any[] = [];
       const { data, error } = await supabaseAdmin
@@ -488,6 +502,9 @@ export class TenantKycController {
 
   static async reviewDocument(req: Request, res: Response) {
     try {
+      if (!isPlatformFinanceOperator((req as any).user)) {
+        return res.status(403).json({ success: false, message: 'Platform authorization required' });
+      }
       const id = String(req.params.id || '').trim();
       const nextStatus = String(req.body?.status || '').toUpperCase();
       if (!id) return res.status(400).json({ success: false, message: 'Document id required' });

@@ -507,9 +507,23 @@ app.get('/api/v1/admin/financial-sandbox/analytics', authenticate, checkRole(['s
 // Terminal Management Endpoints
 import { TenantKycController } from './controllers/tenant-kyc.controller';
 import multer from 'multer';
+const KYC_UPLOAD_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+]);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 20 },
+  fileFilter: (_req, file, cb) => {
+    if (KYC_UPLOAD_MIME_TYPES.has(String(file.mimetype || '').toLowerCase())) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Unsupported KYC file type'));
+  },
 });
 
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
@@ -675,7 +689,18 @@ const localUpload = multer({
 });
 
 app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), upload.single('cac_document'), AdminController.uploadCacDocument);
-app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('backup_file'), AdminController.uploadClaudeBackup);
+function requireLocalBackupUpload(req: any, res: any, next: any) {
+  try {
+    if (!BuildVariantService.getInstance().isLocal()) {
+      return res.status(403).json({ error: 'Backup upload is disabled outside LOCAL.' });
+    }
+  } catch {
+    return res.status(403).json({ error: 'Backup upload is disabled.' });
+  }
+  return next();
+}
+
+app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), requireLocalBackupUpload, localUpload.single('backup_file'), AdminController.uploadClaudeBackup);
 app.post('/api/admin/virtual-account/init', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.initVirtualAccountEngine);
 
 import { MfaController } from './controllers/mfa.controller';

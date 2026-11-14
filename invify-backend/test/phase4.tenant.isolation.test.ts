@@ -1,7 +1,12 @@
 /**
  * Regression: tenant isolation hard gates (no live network).
  */
-import { resolveAuthoritativeTenantId, assertTransactionTenantAccess } from '../src/utils/finance-tenant';
+import {
+  assertTransactionTenantAccess,
+  isPlatformFinanceOperator,
+  resolveAuthoritativeTenantId,
+  resolveReconciliationTenantId,
+} from '../src/utils/finance-tenant';
 import { resolveTenantScope } from '../src/utils/resolve-tenant-scope';
 
 function mockReq(partial: any): any {
@@ -138,5 +143,78 @@ describe('Phase 4 tenant isolation regressions', () => {
       params: {},
     });
     expect(() => resolveAuthoritativeTenantId(req)).toThrow(/tenantId is required/);
+  });
+
+  test('merchant admin is not a platform operator and cannot open global reconciliation', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'admin', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: { tenantId: 'global' },
+      params: {},
+    });
+    expect(isPlatformFinanceOperator(req.user)).toBe(false);
+    expect(resolveReconciliationTenantId(req)).toBe('tenant-a');
+  });
+
+  test('merchant owner cannot enumerate another tenant via reconciliation header fallback', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: 'tenant-a' },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(resolveReconciliationTenantId(req)).toBe('tenant-a');
+  });
+
+  test('merchant without tenant context fails closed on reconciliation', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: null },
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(() => resolveReconciliationTenantId(req)).toThrow(/no tenant context/);
+  });
+
+  test('platform operator may use global reconciliation when no tenant is selected', () => {
+    const req = mockReq({
+      user: { id: 'sa', role: 'super_admin', tenantId: null },
+      headers: {},
+      body: {},
+      query: {},
+      params: {},
+    });
+    expect(isPlatformFinanceOperator(req.user)).toBe(true);
+    expect(resolveReconciliationTenantId(req)).toBe('global');
+  });
+
+  test('KYC/audit platform listing is denied to merchant admin even with spoofed header', () => {
+    const merchantAdmin = { id: 'u1', role: 'admin', tenantId: 'tenant-a' };
+    const platformAdmin = { id: 'ops', role: 'admin', tenantId: null };
+    expect(isPlatformFinanceOperator(merchantAdmin)).toBe(false);
+    expect(isPlatformFinanceOperator(platformAdmin)).toBe(true);
+    const req = mockReq({
+      user: merchantAdmin,
+      headers: { 'x-tenant-id': 'tenant-b' },
+      body: {},
+      query: { tenantId: 'tenant-b' },
+      params: { id: 'tenant-b' },
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
+    expect(resolveTenantScope(req)).toBe('tenant-a');
+  });
+
+  test('virtual-account init tenant is the authenticated merchant, not body.tenantId', () => {
+    const req = mockReq({
+      user: { id: 'u1', role: 'owner', tenantId: 'tenant-a' },
+      headers: {},
+      body: { tenantId: 'tenant-b' },
+      query: {},
+      params: {},
+    });
+    expect(resolveAuthoritativeTenantId(req)).toBe('tenant-a');
   });
 });

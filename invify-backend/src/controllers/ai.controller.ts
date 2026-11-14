@@ -1,6 +1,7 @@
 // src/controllers/ai.controller.ts
 import { Request, Response } from 'express';
 import { AIService } from '../services/ai.service';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 export class AIController {
   /**
@@ -8,12 +9,13 @@ export class AIController {
    */
   static async generateLessonNote(req: Request, res: Response) {
     try {
-      const { className, subjectName, term, week, topic, forceRefresh, schoolId } = req.body;
-      const tenantId =
-        (req as any).user?.tenantId ||
-        (req.headers['x-tenant-id'] as string) ||
-        schoolId ||
-        req.body.tenantId;
+      const { className, subjectName, term, week, topic, forceRefresh } = req.body;
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 400).json({ error: err?.message || 'Missing required generation parameters' });
+      }
 
       if (!className || !subjectName || !topic || !tenantId) {
         return res.status(400).json({ error: "Missing required generation parameters" });
@@ -35,12 +37,13 @@ export class AIController {
    */
   static async refreshLessonNote(req: Request, res: Response) {
     try {
-      const { className, subjectName, term, week, schoolId } = req.body;
-      const tenantId =
-        (req as any).user?.tenantId ||
-        (req.headers['x-tenant-id'] as string) ||
-        schoolId ||
-        req.body.tenantId;
+      const { className, subjectName, term, week } = req.body;
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 400).json({ error: err?.message || 'Missing tenant context' });
+      }
 
       const note = await AIService.generateLessonNote({
         className, subjectName, term, week, tenantId, forceRefresh: true

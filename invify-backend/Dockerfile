@@ -37,4 +37,4 @@ CMD ["node", "dist/app.js"]
 # Liveness-style check: process responds (does not require DB).
 # Uses Node (always present) — alpine runner image does not ship wget/curl by default.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3004/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const p=process.env.PORT||'3004'; fetch('http://127.0.0.1:'+p+'/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

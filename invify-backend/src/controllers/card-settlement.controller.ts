@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import multer from 'multer';
 import { CardSettlementService } from '../services/settlement/card-settlement.service';
 import { isSettlementTemplateType } from '../services/settlement/settlement-template.registry';
+import { isPlatformFinanceOperator, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -29,15 +30,18 @@ export class CardSettlementController {
 
   static async listBatches(req: Request, res: Response) {
     try {
-      const tenantId =
-        (req.query.tenantId as string) ||
-        (req.headers['x-tenant-id'] as string) ||
-        undefined;
+      const user = (req as any).user;
+      let tenantId: string | undefined;
+      if (isPlatformFinanceOperator(user)) {
+        tenantId = String(req.query.tenantId || req.headers['x-tenant-id'] || '').trim() || undefined;
+      } else {
+        tenantId = resolveAuthoritativeTenantId(req);
+      }
       const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
       const batches = await CardSettlementService.listBatches({ tenantId, limit });
       return res.status(200).json({ batches });
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return res.status(error?.status || 500).json({ error: error.message });
     }
   }
 
@@ -72,7 +76,12 @@ export class CardSettlementController {
         req.query.dryRun === 'true';
 
       const user = (req as any).user;
-      const tenantId = (req.body.tenantId as string) || (req.headers['x-tenant-id'] as string) || null;
+      let tenantId: string | null = null;
+      if (isPlatformFinanceOperator(user)) {
+        tenantId = String(req.body.tenantId || req.headers['x-tenant-id'] || '').trim() || null;
+      } else {
+        tenantId = resolveAuthoritativeTenantId(req);
+      }
 
       const result = await CardSettlementService.processUpload({
         buffer: file.buffer,
@@ -92,7 +101,7 @@ export class CardSettlementController {
       });
     } catch (error: any) {
       console.error('[CardSettlementController] upload error:', error.message);
-      return res.status(400).json({ error: error.message });
+      return res.status(error?.status || 400).json({ error: error.message });
     }
   }
 }

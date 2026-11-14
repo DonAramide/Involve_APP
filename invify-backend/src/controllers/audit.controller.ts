@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import { PosService } from '../services/pos.service';
-import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { isPlatformFinanceOperator, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 import { GovAuditService } from '../services/gov-audit.service';
 
@@ -13,9 +13,7 @@ export class AuditController {
   static async getSystemAuditLogs(req: Request, res: Response) {
     try {
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const platform = ['super_admin', 'internal_staff'].includes(role);
-      const tenantId = platform
+      const tenantId = isPlatformFinanceOperator(user)
         ? String(req.query.tenantId || req.headers['x-tenant-id'] || user.tenantId || '').trim()
         : resolveTenantScope(req);
 

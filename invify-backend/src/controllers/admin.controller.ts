@@ -2801,6 +2801,10 @@ export class AdminController {
 
   static async uploadClaudeBackup(req: Request, res: Response) {
     try {
+      const { BuildVariantService } = require('../config/build-variant');
+      if (!BuildVariantService.getInstance().isLocal()) {
+        return res.status(403).json({ error: 'Backup upload is disabled outside LOCAL.' });
+      }
       const file = req.file;
       if (!file) {
         return res.status(400).json({ error: 'No backup file provided.' });
@@ -2819,10 +2823,11 @@ export class AdminController {
 
   static async initVirtualAccountEngine(req: Request, res: Response) {
     try {
-      let tenantId = req.body.tenantId || (req as any).user.tenantId;
-
-      if (!tenantId || tenantId === 'undefined' || tenantId === 'null') {
-        return res.status(400).json({ error: 'Valid tenantId is required' });
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 400).json({ error: err?.message || 'Valid tenantId is required' });
       }
 
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

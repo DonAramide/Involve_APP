@@ -1,11 +1,22 @@
 // src/controllers/reconciliation.controller.ts
 import { Request, Response } from 'express';
 import { ReconciliationService } from '../services/reconciliation.service';
+import { resolveReconciliationTenantId } from '../utils/finance-tenant';
+
+function reconTenant(req: Request, res: Response): string | null {
+  try {
+    return resolveReconciliationTenantId(req);
+  } catch (err: any) {
+    res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
+    return null;
+  }
+}
 
 export class ReconciliationController {
   
   static async getReport(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     const { status, cursor, limit } = req.query;
 
     // tenantId defaults to global
@@ -26,7 +37,8 @@ export class ReconciliationController {
 
   // ==== Detail Tabs ====
   static async getDetails(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getDetails(req.params.id, tenantId);
@@ -37,7 +49,8 @@ export class ReconciliationController {
   }
 
   static async getLedger(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getLedger(req.params.id, tenantId);
@@ -48,7 +61,8 @@ export class ReconciliationController {
   }
 
   static async getSettlement(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getSettlement(req.params.id, tenantId);
@@ -59,7 +73,8 @@ export class ReconciliationController {
   }
 
   static async getWallet(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getWallet(req.params.id, tenantId);
@@ -70,7 +85,8 @@ export class ReconciliationController {
   }
 
   static async getCard(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getCard(req.params.id, tenantId);
@@ -81,7 +97,8 @@ export class ReconciliationController {
   }
 
   static async getBank(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getBank(req.params.id, tenantId);
@@ -92,7 +109,8 @@ export class ReconciliationController {
   }
 
   static async getAudit(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getAudit(req.params.id, tenantId);
@@ -103,7 +121,8 @@ export class ReconciliationController {
   }
 
   static async getTimeline(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const result = await ReconciliationService.getTimeline(req.params.id, tenantId);
@@ -115,7 +134,8 @@ export class ReconciliationController {
 
   // ==== Commands ====
   static async assign(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -127,7 +147,8 @@ export class ReconciliationController {
   }
 
   static async escalate(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -139,7 +160,8 @@ export class ReconciliationController {
   }
 
   static async resolve(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -151,7 +173,8 @@ export class ReconciliationController {
   }
 
   static async forceMatch(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -163,7 +186,8 @@ export class ReconciliationController {
   }
 
   static async retry(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -175,7 +199,8 @@ export class ReconciliationController {
   }
 
   static async lock(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;
@@ -187,7 +212,8 @@ export class ReconciliationController {
   }
 
   static async unlock(req: Request, res: Response) {
-    const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || 'global';
+    const tenantId = reconTenant(req, res);
+    if (!tenantId) return;
     // tenantId defaults to global
     try {
       const user = (req as any).user;

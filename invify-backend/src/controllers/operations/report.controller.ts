@@ -1,11 +1,17 @@
 import { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { resolveAuthoritativeTenantId } from '../../utils/finance-tenant';
 
 export class ReportController {
   static async generatePdf(req: Request, res: Response) {
     try {
       const { type } = req.params;
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'] || 'unknown';
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 403).json({ success: false, message: err?.message || 'Forbidden' });
+      }
 
       // Create a PDF document
       const doc = new PDFDocument({ margin: 50 });

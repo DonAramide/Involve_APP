@@ -103,6 +103,30 @@ export function resolveAuthoritativeTenantId(req: Request): string {
   return profileTenant;
 }
 
+/**
+ * Reconciliation may be platform-wide (`global`) only for verified platform operators.
+ * Merchant users fail closed to their authenticated tenant. Header spoofing is ignored.
+ */
+export function resolveReconciliationTenantId(req: Request): string {
+  const user = (req as any).user;
+  if (!user) {
+    const err: any = new Error('Unauthenticated');
+    err.status = 401;
+    throw err;
+  }
+  const effective = usableTenantId((req as any).effectiveTenantId);
+  if (effective) return effective;
+  if (isPlatformFinanceOperator(user)) {
+    return (
+      usableTenantId(req.body?.tenantId) ||
+      usableTenantId(req.query?.tenantId) ||
+      usableTenantId(firstHeader(req.headers['x-tenant-id'])) ||
+      'global'
+    );
+  }
+  return resolveAuthoritativeTenantId(req);
+}
+
 export function assertTransactionTenantAccess(transactionTenantId: string | null | undefined, req: Request): void {
   const user = (req as any).user;
   if (!user) {
