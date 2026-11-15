@@ -50,7 +50,7 @@ describe('HMO workspace navigation', () => {
     const page = fs.readFileSync(path.join(__dirname, '../src/pages/hmo/HmoWorkspacePage.vue'), 'utf8')
     expect(api).toContain("api.get('/api/v1/health-insurance/platform/tenants'")
     expect(api).toContain('`/api/v1/health-insurance/platform/tenants/${tenantId}`')
-    expect(api).toContain('`/api/v1/health-insurance/platform/institutions/${institutionId}`')
+    expect(api).toContain('`/api/v1/health-insurance/platform/institutions/${encodeURIComponent(institutionId)}`')
     expect(api).toContain("api.get('/api/v1/health-insurance/platform/members'")
     expect(page).toContain("label: 'Institution'")
     expect(page).toContain('openTenantDetail')
