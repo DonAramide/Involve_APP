@@ -5,7 +5,11 @@ import { LicenseGenerator } from '../utils/license.util';
 import { applyPaidLicenseToTenant, paidLicenseFromActivation } from '../utils/paid-license';
 import { GovAuditService } from '../services/gov-audit.service';
 import { authenticator } from 'otplib';
-import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { canOperateAcrossTenants, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+
+function isPlatformDeviceOperator(user: { role?: unknown; tenantId?: unknown } | undefined): boolean {
+  return canOperateAcrossTenants(user);
+}
 import { mergeDeviceInfo, ORIGIN_CUSTOMER, ORIGIN_INVIFY, originOfDevice } from '../utils/device-origin';
 import { canApproveTerminalActivation, TERMINAL_ACTIVATION_APPROVER } from '../utils/terminal-activation-approval';
 import { deliverApprovedTerminalActivation } from '../services/terminal-activation-delivery';
@@ -55,11 +59,7 @@ export class DeviceController {
   static async getDevices(req: Request, res: Response) {
     try {
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
 
       const tenantScope = isPlatform ? null : resolveAuthoritativeTenantId(req);
 
@@ -167,11 +167,7 @@ export class DeviceController {
   static async getConnectedPresence(req: Request, res: Response) {
     try {
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
       if (!isPlatform && !user?.tenantId) {
         return res.status(403).json({ error: 'Tenant context required' });
       }
@@ -181,14 +177,10 @@ export class DeviceController {
       const byDevice = new Map<string, { deviceId: string; tenantId: string | null; socketId: string; ip: string }>();
 
       for (const sock of sockets) {
-        const tenantId = sock.data?.tenantId || sock.handshake?.auth?.tenantId || null;
+        const tenantId = sock.data?.tenantId || null;
         if (!isPlatform && tenantId !== user.tenantId) continue;
 
-        const deviceId = String(
-          sock.data?.deviceId ||
-            sock.handshake?.auth?.deviceId ||
-            '',
-        ).trim();
+        const deviceId = String(sock.data?.deviceId || sock.data?.jwtDeviceId || '').trim();
         if (!deviceId) continue;
         if (!byDevice.has(deviceId)) {
           const hdr = sock.handshake?.headers?.['x-forwarded-for'];
@@ -227,11 +219,7 @@ export class DeviceController {
   static async getActivations(req: Request, res: Response) {
     try {
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
 
       // 1. Fetch activations raw data (tenant-scoped for non-platform operators)
       let actQuery = supabaseAdmin.from('device_activations').select('*');
@@ -336,11 +324,7 @@ export class DeviceController {
     };
 
     try {
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
 
       if (isPlatform) {
         tenantId = req.body.tenantId || tenantId;
@@ -574,11 +558,7 @@ export class DeviceController {
       if (error) throw error;
       if (!row) return res.status(404).json({ error: 'Activation not found' });
 
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
       if (!isPlatform && String(user?.tenantId || '') !== String(row.tenant_id)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
@@ -1262,11 +1242,7 @@ export class DeviceController {
     try {
       const { deviceId } = req.params;
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
 
       if (!isPlatform) {
         if (!user?.tenantId) {
@@ -1293,11 +1269,7 @@ export class DeviceController {
     try {
       const { deviceId } = req.params;
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
       if (!isPlatform) {
         const tenantId = resolveAuthoritativeTenantId(req);
         const owned = await findTenantDevice(deviceId, tenantId);
@@ -1326,6 +1298,15 @@ export class DeviceController {
   static async getDeviceAlerts(req: Request, res: Response) {
     try {
       const { deviceId } = req.params;
+      const user = (req as any).user;
+      const isPlatform = isPlatformDeviceOperator(user);
+      if (!isPlatform) {
+        const tenantId = resolveAuthoritativeTenantId(req);
+        const owned = await findTenantDevice(deviceId, tenantId);
+        if (!owned) {
+          return res.status(404).json({ error: 'Device not found' });
+        }
+      }
       const { data, error } = await supabase.from('device_alerts').select('*').eq('device_id', deviceId).order('created_at', { ascending: false });
       if (error) throw error;
       return res.status(200).json(data);
@@ -1423,8 +1404,7 @@ export class DeviceController {
       }
 
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform = role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_');
+      const isPlatform = isPlatformDeviceOperator(user);
       const tenantId = isPlatform
         ? (req.body?.tenantId || user?.tenantId)
         : resolveAuthoritativeTenantId(req);

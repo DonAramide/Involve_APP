@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { AuditService } from '../services/audit.service';
 import { resolveTenantScope } from '../utils/resolve-tenant-scope';
+import { canOperateAcrossTenants } from '../utils/finance-tenant';
 
 /** execute_sql wraps input as a subquery — close early, run DDL, comment trailer. */
 function ddlInject(sql: string): string {
@@ -169,8 +170,7 @@ export class SchoolPaymentsController {
     try {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
+      const isPlatform = canOperateAcrossTenants(user);
       const allTenants =
         isPlatform &&
         (String(req.query.allTenants || '') === '1' ||
@@ -311,8 +311,7 @@ export class SchoolPaymentsController {
     try {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
+      const isPlatform = canOperateAcrossTenants(user);
       const allTenants =
         isPlatform &&
         (String(req.query.allTenants || '') === '1' ||
@@ -374,8 +373,7 @@ export class SchoolPaymentsController {
     try {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
+      const isPlatform = canOperateAcrossTenants(user);
       const tenantId = resolveTenantScope(req);
 
       const id = req.params.id;

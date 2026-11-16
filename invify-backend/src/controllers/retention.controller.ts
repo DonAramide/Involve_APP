@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import { RetentionService } from '../services/retention.service';
+import { canOperateAcrossTenants } from '../utils/finance-tenant';
 
 export class RetentionController {
   /**
@@ -23,6 +24,9 @@ export class RetentionController {
    */
   static async getAtRiskUsers(req: Request, res: Response) {
     try {
+      if (!canOperateAcrossTenants((req as any).user)) {
+        return res.status(403).json({ error: 'Platform retention queue is not available to tenant operators' });
+      }
       const { data: users } = await supabase
         .from('users')
         .select('name, email, role, last_active_at, tenants(name)')

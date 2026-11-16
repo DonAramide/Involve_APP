@@ -8,6 +8,14 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { loadEnv } from './config/load-env';
 import { BuildVariantService } from './config/build-variant';
+import {
+  authoritativeLocationTenantId,
+  PLATFORM_OPS_ROOM,
+  roomsForAuthenticatedSocket,
+} from './utils/socket-tenant-rooms';
+import { canOperateAcrossTenants } from './utils/finance-tenant';
+import { ObservabilityMetrics } from './services/observability/ObservabilityMetrics';
+import { requireMetricsLoopback } from './middleware/metrics-loopback.middleware';
 
 loadEnv();
 
@@ -73,6 +81,7 @@ import { SchoolSyncController } from './controllers/school-sync.controller';
 import { SchoolPaymentsController } from './controllers/school-payments.controller';
 import { TermBillsController } from './controllers/term-bills.controller';
 import { ParentBroadcastController } from './controllers/parent-broadcast.controller';
+import { CustomerBroadcastController } from './controllers/customer-broadcast.controller';
 import { StaffController } from './controllers/staff.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
@@ -294,6 +303,10 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 // Health contract (Phase 3): /livez (alive), /readyz (traffic-ready), /health (compat)
 app.get('/livez', HealthController.livez);
 app.get('/readyz', HealthController.readyz);
+app.get('/internal/metrics', requireMetricsLoopback, (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+  return res.status(200).send(ObservabilityMetrics.exportPrometheus());
+});
 app.get('/health', HealthController.health);
 app.get('/api/livez', HealthController.livez);
 app.get('/api/readyz', HealthController.readyz);
@@ -407,7 +420,7 @@ app.post('/admin/reconciliation/run-job', authenticate, checkRole(['super_admin'
 
 // Insights & Reporting Routes
 app.get('/admin/retention/suggestion', authenticate, checkRole(['super_admin', 'admin']), RetentionController.getPersonalSuggestion);
-app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin', 'admin']), RetentionController.getAtRiskUsers);
+app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin']), RetentionController.getAtRiskUsers);
 
 // Dashboard Routes
 const dashboardRoles = ['super_admin', 'admin', 'operator', 'owner', 'platform_admin', 'tenant_admin', 'internal_staff', 'admin_ops', 'admin_finance', 'admin_treasury', 'admin_executive', 'admin_risk'];
@@ -417,19 +430,19 @@ registerApiPair('get', '/api/dashboard/governance', authenticate, checkRole(dash
 registerApiPair('get', '/api/dashboard/analytics', authenticate, checkRole(dashboardRoles), DashboardController.getAnalytics);
 
 // Admin Agent Onboarding routes
-registerCollisionAdmin('post', '/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.onboardAgent);
-registerCollisionAdmin('get', '/agents', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.listAgents);
-registerCollisionAdmin('get', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.getAgent);
-registerCollisionAdmin('patch', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentProfile);
-registerCollisionAdmin('patch', '/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentStatus);
-registerCollisionAdmin('patch', '/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateKycStatus);
+registerCollisionAdmin('post', '/agents/onboard', authenticate, checkRole(['super_admin']), AdminAgentController.onboardAgent);
+registerCollisionAdmin('get', '/agents', authenticate, checkRole(['super_admin']), AdminAgentController.listAgents);
+registerCollisionAdmin('get', '/agents/:id', authenticate, checkRole(['super_admin']), AdminAgentController.getAgent);
+registerCollisionAdmin('patch', '/agents/:id', authenticate, checkRole(['super_admin']), AdminAgentController.updateAgentProfile);
+registerCollisionAdmin('patch', '/agents/:id/status', authenticate, checkRole(['super_admin']), AdminAgentController.updateAgentStatus);
+registerCollisionAdmin('patch', '/agents/:id/kyc', authenticate, checkRole(['super_admin']), AdminAgentController.updateKycStatus);
 registerCollisionAdmin('get', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.getCommissions);
 registerCollisionAdmin('patch', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.updateCommissions);
-registerCollisionAdmin('post', '/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageAgent);
-registerCollisionAdmin('post', '/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageTenants);
-registerCollisionAdmin('post', '/agents/:id/resend-invite', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.resendInvite);
-registerCollisionAdmin('post', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateLogo);
-registerCollisionAdmin('delete', '/agents/:id/logo', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.deleteLogo);
+registerCollisionAdmin('post', '/agents/:id/message', authenticate, checkRole(['super_admin']), AdminAgentController.messageAgent);
+registerCollisionAdmin('post', '/agents/:id/message-tenants', authenticate, checkRole(['super_admin']), AdminAgentController.messageTenants);
+registerCollisionAdmin('post', '/agents/:id/resend-invite', authenticate, checkRole(['super_admin']), AdminAgentController.resendInvite);
+registerCollisionAdmin('post', '/agents/:id/logo', authenticate, checkRole(['super_admin']), AdminAgentController.updateLogo);
+registerCollisionAdmin('delete', '/agents/:id/logo', authenticate, checkRole(['super_admin']), AdminAgentController.deleteLogo);
 
 registerCollisionAdmin('post', '/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
@@ -1258,6 +1271,18 @@ app.post(
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
   ParentBroadcastController.send,
 );
+app.get(
+  '/api/customers/broadcast/audience',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  CustomerBroadcastController.audience,
+);
+app.post(
+  '/api/customers/broadcast',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin']),
+  CustomerBroadcastController.send,
+);
 
 // POS staff roster + personal salary bank (Flutter Web Sync → tenant admin)
 app.post(
@@ -1574,6 +1599,10 @@ io.use(async (socket, next) => {
 
     // Onboarded tablets already carry tenant on the JWT. Skip the users-table
     // round trip so Engine.IO handshake finishes before the client times out.
+    const jwtDeviceId = String(
+      jwtPayload.device_id || jwtPayload.deviceId || jwtPayload.app_metadata?.deviceId || '',
+    ).trim();
+
     if (isDeviceOwnerClaim) {
       socket.data.user = {
         id: userId,
@@ -1582,6 +1611,8 @@ io.use(async (socket, next) => {
         email: userEmail,
       };
       socket.data.tenantId = claimTenantId;
+      socket.data.isDeviceOwner = true;
+      socket.data.jwtDeviceId = jwtDeviceId || null;
       return next();
     }
 
@@ -1651,6 +1682,10 @@ io.use(async (socket, next) => {
 
     socket.data.user = { id: userId, ...profile };
     socket.data.tenantId = profile.tenant_id;
+    socket.data.isDeviceOwner = !!isDeviceOwnerClaim;
+    socket.data.jwtDeviceId = String(
+      jwtPayload.device_id || jwtPayload.deviceId || jwtPayload.app_metadata?.deviceId || '',
+    ).trim() || null;
     next();
   } catch (err) {
     next(new Error('Authentication error: Server error'));
@@ -1670,22 +1705,28 @@ function socketClientIp(socket: Socket): string {
 }
 
 io.on('connection', (socket: Socket) => {
-  const handshakeDeviceId = socket.handshake.auth?.deviceId;
-  if (handshakeDeviceId) {
-    socket.data.deviceId = String(handshakeDeviceId);
+  const user = socket.data.user || {};
+  const isPlatformOps = canOperateAcrossTenants({
+    role: user.role,
+    tenantId: user.tenant_id || user.tenantId || socket.data.tenantId,
+  });
+  socket.data.isPlatformOps = isPlatformOps;
+  if (socket.data.jwtDeviceId) {
+    socket.data.deviceId = socket.data.jwtDeviceId;
   }
   socket.data.ip = socketClientIp(socket);
   console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId} IP: ${socket.data.ip})`);
 
-  // Join global + tenant rooms immediately so broadcasts and emergency_lock
-  // reach devices even if the client never emits join_room (or emits it late).
-  socket.join('all');
-  if (socket.data.deviceId) {
-    socket.join(`device:${socket.data.deviceId}`);
-  }
+  // Tenant + ops/device-fleet rooms. Unrestricted `all` is not joined.
+  // emergency_lock is emitted to tenant:{id} and device:{id} (device.controller).
+  const initialRooms = roomsForAuthenticatedSocket(socket.data.tenantId, {}, {
+    jwtDeviceId: socket.data.jwtDeviceId,
+    isPlatformOps,
+    isDeviceOwner: !!socket.data.isDeviceOwner,
+  });
+  for (const room of initialRooms) socket.join(room);
   if (socket.data.tenantId) {
-    socket.join(`tenant:${socket.data.tenantId}`);
-    console.log(`[Socket.io] Auto-joined tenant:${socket.data.tenantId} for ${socket.id}`);
+    console.log(`[Socket.io] Auto-joined ${initialRooms.join(', ')} for ${socket.id}`);
     import('./services/payment-alert-trail.service')
       .then(({ PaymentAlertTrailService }) => PaymentAlertTrailService.flushTenant(io, socket.data.tenantId))
       .catch((err: any) => console.warn('[PaymentAlert] flush on connect failed:', err?.message || err));
@@ -1701,33 +1742,21 @@ io.on('connection', (socket: Socket) => {
       .catch((err: any) => console.warn('[PaymentAlert] ack failed:', err?.message || err));
   });
   
-  // Clients will emit 'join_room' passing their characteristics
   socket.on('join_room', (data: any) => {
-    const joined = ['all'];
-    // IGNORE data.tenantId, force authenticated tenantId
-    if (socket.data.tenantId) { 
-      socket.join(`tenant:${socket.data.tenantId}`); 
-      joined.push(`tenant:${socket.data.tenantId}`); 
-    }
-    if (data.plan) { socket.join(`plan:${String(data.plan).toLowerCase()}`); joined.push(`plan:${data.plan}`); }
-    if (data.type) { socket.join(`type:${String(data.type).toLowerCase()}`); joined.push(`type:${data.type}`); }
-    if (data.deviceId) {
-      socket.data.deviceId = String(data.deviceId);
-      socket.join(`device:${data.deviceId}`);
-      joined.push(`device:${data.deviceId}`);
-    }
-    if (data.businessName) { socket.join(`business:${data.businessName}`); joined.push(`business:${data.businessName}`); }
-    socket.join('all');
+    const joined = roomsForAuthenticatedSocket(socket.data.tenantId, data || {}, {
+      jwtDeviceId: socket.data.jwtDeviceId,
+      isPlatformOps: !!socket.data.isPlatformOps,
+      isDeviceOwner: !!socket.data.isDeviceOwner,
+    });
+    for (const room of joined) socket.join(room);
     console.log(`[Socket.io] Client ${socket.id} joined rooms: ${joined.join(', ')}`);
   });
 
-  // Listen for real-time location updates from the mobile app
   socket.on('location_update', (data: any) => {
     console.log(`[Socket.io] Location update from ${socket.id}: lat=${data.lat}, lng=${data.lng}`);
-    // Broadcast to all connected admin dashboards
-    io.to('all').emit('tenant_location', {
+    io.to(PLATFORM_OPS_ROOM).emit('tenant_location', {
       socketId: socket.id,
-      tenantId: data.tenantId || 'unknown',
+      tenantId: authoritativeLocationTenantId(socket.data.tenantId, data?.tenantId),
       lat: data.lat,
       lng: data.lng
     });
@@ -1735,7 +1764,7 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('device_identity_pong', async (data: any) => {
     try {
-      const tenantId = socket.data.tenantId || data?.tenantId;
+      const tenantId = socket.data.tenantId;
       if (!tenantId) return;
       const { persistLiveDeviceIdentity } = require('./utils/persist-live-device-identity');
       const { isUsableDeviceId, normalizeDeviceId } = require('./utils/device-identity');
@@ -1744,10 +1773,18 @@ io.on('connection', (socket: Socket) => {
         deviceId: data?.deviceId,
         location: data?.location,
       });
+      // Device rooms are authorized by JWT device claim, or by a successful
+      // tenant-bound claim — never by an unauthenticated client deviceId.
       if (saved.deviceId && isUsableDeviceId(saved.deviceId)) {
         const serial = normalizeDeviceId(saved.deviceId);
-        socket.data.deviceId = serial;
-        socket.join(`device:${serial}`);
+        const jwtDevice = String(socket.data.jwtDeviceId || '').trim();
+        if (jwtDevice && serial !== jwtDevice) {
+          return;
+        }
+        if (jwtDevice || saved.claimed) {
+          socket.data.deviceId = serial;
+          socket.join(`device:${serial}`);
+        }
       }
     } catch (err: any) {
       console.warn('[Socket.io] device_identity_pong failed:', err?.message || err);
@@ -1775,7 +1812,7 @@ if (!isJest) {
     const memoryUsage = Math.round((usedMem / totalMem) * 100);
 
     // Broadcast real server telemetry to connected clients
-    io.to('all').emit('system_telemetry', {
+    io.to(PLATFORM_OPS_ROOM).emit('system_telemetry', {
       cpu: { label: 'CPU Usage', value: cpuUsage, color: cpuUsage > 80 ? 'red-4' : 'cyan-4' },
       memory: { label: 'Memory Usage', value: memoryUsage, color: memoryUsage > 80 ? 'red-4' : 'purple-4' },
       storage: { label: 'Disk Space', value: 32, color: 'teal-4' }, // Still mocked as os doesn't support disk natively without external lib

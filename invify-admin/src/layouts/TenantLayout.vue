@@ -352,6 +352,7 @@ const industryNavigationTree = computed(() => {
       { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: modeLabel },
       ...identityNav(modeLabel, terms),
       { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: modeLabel },
+      { label: `Message ${terms.beneficiaries.toLowerCase()}`, path: '/tenant/customer-messages', icon: 'campaign', color: 'teal-4', mode: modeLabel },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
       { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: modeLabel }
     ]
@@ -360,6 +361,7 @@ const industryNavigationTree = computed(() => {
       { label: 'Service Jobs', path: '/tenant/services/jobs', icon: 'work_outline', color: 'green-4', mode: modeLabel },
       ...identityNav(modeLabel, terms),
       { label: `${terms.beneficiary} Directory`, path: '/tenant/users', icon: 'people', color: 'blue-4', mode: modeLabel },
+      { label: `Message ${terms.beneficiaries.toLowerCase()}`, path: '/tenant/customer-messages', icon: 'campaign', color: 'teal-4', mode: modeLabel },
       { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: modeLabel },
       { label: 'Wallet & Payouts', path: '/tenant/wallet', icon: 'account_balance_wallet', color: 'amber-4', mode: modeLabel },
       { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: modeLabel }

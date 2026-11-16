@@ -564,6 +564,7 @@ const routes = [
       // School roster synced from Flutter Web Sync
       { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
       { path: 'parent-messages', component: () => import('pages/school/ParentBroadcastPage.vue'), meta: { title: 'Message parents', requiresAuth: true } },
+      { path: 'customer-messages', component: () => import('pages/tenant/CustomerBroadcastPage.vue'), meta: { title: 'Message customers', requiresAuth: true } },
       { path: 'id-cards', component: () => import('pages/school/IdCardManagementPage.vue'), meta: { title: 'ID Card Management', requiresAuth: true } },
       { path: 'entry-exit', component: () => import('pages/school/EntryExitPage.vue'), meta: { title: 'Entry and Exit', requiresAuth: true } },
       { path: 'school-payments', component: () => import('pages/school/SchoolPaymentsPage.vue'), meta: { title: 'School Payments', requiresAuth: true } },

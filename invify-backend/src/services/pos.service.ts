@@ -969,13 +969,14 @@ export class PosService {
     let broadcasted = false;
     try {
       const { io } = require('../app');
-      io.to('all').emit('pos_routing_updated', {
+      const { PLATFORM_OPS_ROOM, DEVICE_FLEET_ROOM } = require('../utils/socket-tenant-rooms');
+      io.to(PLATFORM_OPS_ROOM).to(DEVICE_FLEET_ROOM).emit('pos_routing_updated', {
         configVersion,
         reason,
         timestamp: new Date().toISOString()
       });
       broadcasted = true;
-      console.log(`[POS Service] Broadcast pos_routing_updated (v${configVersion}) to all devices`);
+      console.log(`[POS Service] Broadcast pos_routing_updated (v${configVersion}) to ${PLATFORM_OPS_ROOM}+${DEVICE_FLEET_ROOM}`);
     } catch (e: any) {
       console.warn('[POS Service] Could not broadcast routing update:', e.message);
     }

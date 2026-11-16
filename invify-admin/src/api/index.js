@@ -433,6 +433,12 @@ export const schoolApi = {
   sendParentBroadcast: (data) => api.post('/api/school/parent-broadcast', data),
 };
 
+/** Retail / services customer email+SMS broadcast */
+export const customerBroadcastApi = {
+  audience: () => api.get('/api/customers/broadcast/audience'),
+  send: (data) => api.post('/api/customers/broadcast', data),
+};
+
 export const insightsApi = {
   getClass: (params) => api.get('/insights/class', { params })
 };

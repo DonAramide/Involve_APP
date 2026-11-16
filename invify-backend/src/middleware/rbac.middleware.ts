@@ -1,6 +1,6 @@
 // src/middleware/rbac.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { canOperateAcrossTenants, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 const parseRoles = (roleData: any): string[] => {
   if (typeof roleData === 'string') {
@@ -31,8 +31,8 @@ export const checkRole = (allowedRoles: string[]) => {
     }
 
     // 2. Map platform staff roles if route demands 'super_admin'
-    // This allows specific platform staff roles to access administrative routes relevant to their function
-    if (allowedLower.includes('super_admin')) {
+    // Merchant-bound owner/admin must never inherit this mapping (G13).
+    if (allowedLower.includes('super_admin') && canOperateAcrossTenants(user)) {
       const path = req.path.toLowerCase();
       const isAdminSurface = (legacyPrefix: string) =>
         path.startsWith(legacyPrefix) || path.startsWith(`/api${legacyPrefix}`);

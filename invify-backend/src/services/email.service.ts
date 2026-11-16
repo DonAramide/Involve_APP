@@ -896,6 +896,40 @@ export class EmailService {
     });
   }
 
+  public async sendCustomerNotice(
+    to: string,
+    subject: string,
+    message: string,
+    businessName: string,
+  ): Promise<boolean> {
+    const business = this.escapeHtml(businessName || 'Your business');
+    const safeSubject = String(subject || `Message from ${businessName || 'Your business'}`)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 120);
+    const safeBody = this.escapeHtml(message || '').replace(/\r?\n/g, '<br/>');
+    const body = `
+      <div style="border-top: 6px solid #1d4ed8; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <div style="padding: 18px 22px 10px 22px; background: #f8fafc;">
+          <h2 style="margin: 0; font-size: 17px; color: #0f172a;">${business}</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; font-weight: 600; color: #1d4ed8; letter-spacing: 0.6px;">CUSTOMER NOTICE</p>
+        </div>
+        <div style="padding: 20px 22px;">
+          <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-top: 0;">${safeBody}</p>
+          <p style="font-size: 13px; color: #334155; margin-top: 20px;">
+            Kind regards,<br/>
+            <strong>${business}</strong><br/>
+            <span style="color: #94a3b8; font-size: 12px;">Sent via Invify Business Portal</span>
+          </p>
+        </div>
+      </div>
+    `;
+    return this.sendMail(to, safeSubject, body, [], {
+      fromName: businessName || 'Business Notice',
+      skipLogo: true,
+    });
+  }
+
   /**
    * Parent/staff notice when a student or staff member clocks in or out at the gate.
    */

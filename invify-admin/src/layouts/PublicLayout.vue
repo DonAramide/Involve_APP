@@ -238,6 +238,24 @@
           </div>
         </div>
       </div>
+      <div class="public-footer__marks" role="group" aria-label="Nigeria compliance marks">
+        <a
+          class="public-footer__mark"
+          href="https://ndpc.gov.ng"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img src="/brand/ndpc-logo.png" alt="Nigeria Data Protection Commission" />
+        </a>
+        <a
+          class="public-footer__mark public-footer__mark--seal"
+          href="https://www.cac.gov.ng"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img src="/brand/cac-logo.jpg" alt="Corporate Affairs Commission" />
+        </a>
+      </div>
       <div class="public-footer__legal text-center text-grey-5 text-caption">
         &copy; {{ new Date().getFullYear() }} Invify. {{ t('footer.rights') }}
       </div>
@@ -437,9 +455,42 @@ export default {
   border-radius: 2px;
 }
 
-.public-footer__legal {
-  margin-top: 32px;
+.public-footer__marks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 36px auto 0;
   padding: 20px 16px 0;
+}
+
+.public-footer__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #fff;
+  border-radius: 12px;
+  line-height: 0;
+}
+
+.public-footer__mark img {
+  display: block;
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+
+.public-footer__mark--seal img {
+  height: 64px;
+  width: 64px;
+}
+
+.public-footer__legal {
+  margin-top: 20px;
+  padding: 16px 16px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 

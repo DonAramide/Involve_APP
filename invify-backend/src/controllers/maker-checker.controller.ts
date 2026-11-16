@@ -1,19 +1,14 @@
 import { Request, Response } from 'express';
 import { MakerCheckerService, makerCheckerPublicView } from '../services/maker-checker.service';
 import { requireCheckerMfa } from '../middleware/require-admin-mfa.middleware';
+import { canOperateAcrossTenants } from '../utils/finance-tenant';
 
 function actorEmail(req: Request): string {
   return String((req as any).user?.email || '').trim().toLowerCase();
 }
 
 function isPlatform(req: Request): boolean {
-  const role = String((req as any).user?.role || '').toLowerCase();
-  return (
-    role === 'super_admin' ||
-    role === 'internal_staff' ||
-    role === 'admin' ||
-    role.startsWith('admin_')
-  );
+  return canOperateAcrossTenants((req as any).user);
 }
 
 function runCheckerMfa(req: Request, res: Response): Promise<boolean> {

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket, rewritePublicContaboUrl } from '../utils/contabo-s3';
+import { canOperateAcrossTenants } from '../utils/finance-tenant';
 
 const TYPE_ALIASES: Record<string, string> = {
   CAC: 'CAC_CERT',
@@ -141,13 +142,12 @@ async function loadTenantsByIds(ids: string[]): Promise<Record<string, any>> {
 export class TenantKycController {
   static async uploadKyc(req: Request, res: Response) {
     try {
-      const authUserId =
-        (req.headers['x-tenant-id'] as string) ||
-        (req as any).user?.tenantId ||
-        (req as any).user?.id;
+      const authUserId = String((req as any).user?.id || '').trim();
       if (!authUserId) {
         return res.status(401).json({ success: false, message: 'Unauthorized. Tenant ID required.' });
       }
+      const { rejectClientControlledStoragePath, userKycObjectKey } = require('../utils/object-storage-keys');
+      rejectClientControlledStoragePath(req.body);
 
       const type = normalizeDocType(req.body?.type || req.body?.documentType);
       if (!type) {
@@ -164,9 +164,7 @@ export class TenantKycController {
         return res.status(503).json({ success: false, message: 'Object storage is not configured.' });
       }
 
-      const original = String(file.originalname || 'document.bin');
-      const ext = (original.includes('.') ? original.slice(original.lastIndexOf('.')) : '.bin').toLowerCase();
-      const objectKey = `tenants/${authUserId}/kyc/${type.toLowerCase()}-${Date.now()}${ext}`;
+      const objectKey = userKycObjectKey(authUserId, type, String(file.originalname || 'document.bin'));
       await putContaboObject({
         bucket,
         key: objectKey,
@@ -317,16 +315,15 @@ export class TenantKycController {
   static async getKycDocuments(req: Request, res: Response) {
     try {
       const user = (req as any).user || {};
-      const role = String(user.role || '').toLowerCase();
-      const isAdmin = ['super_admin', 'admin', 'internal_staff'].includes(role);
+      const isPlatform = canOperateAcrossTenants(user);
       const ownTenantId = user.tenantId || user.id;
       let requestedId = req.params.id;
 
-      if (!isAdmin && requestedId && requestedId !== ownTenantId && requestedId !== user.id) {
+      if (!isPlatform && requestedId && requestedId !== ownTenantId && requestedId !== user.id) {
         return res.status(403).json({ success: false, message: 'Forbidden' });
       }
 
-      const tenantId = isAdmin ? (requestedId || ownTenantId) : ownTenantId;
+      const tenantId = isPlatform ? (requestedId || ownTenantId) : ownTenantId;
       if (!tenantId) {
         return res.status(400).json({ success: false, message: 'Tenant ID is required' });
       }
@@ -392,6 +389,9 @@ export class TenantKycController {
 
   static async listPending(req: Request, res: Response) {
     try {
+      if (!canOperateAcrossTenants((req as any).user)) {
+        return res.status(403).json({ success: false, message: 'Platform KYC queue is not available to tenant operators' });
+      }
       const statusFilter = String(req.query.status || 'PENDING').toUpperCase();
       let docs: any[] = [];
       const { data, error } = await supabaseAdmin
@@ -488,6 +488,9 @@ export class TenantKycController {
 
   static async reviewDocument(req: Request, res: Response) {
     try {
+      if (!canOperateAcrossTenants((req as any).user)) {
+        return res.status(403).json({ success: false, message: 'Platform KYC review is not available to tenant operators' });
+      }
       const id = String(req.params.id || '').trim();
       const nextStatus = String(req.body?.status || '').toUpperCase();
       if (!id) return res.status(400).json({ success: false, message: 'Document id required' });

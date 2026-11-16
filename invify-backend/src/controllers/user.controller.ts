@@ -5,6 +5,7 @@ import { UserDeviceService } from '../services/user-device.service';
 import { AuditArchiveService } from '../services/audit-archive.service';
 import { BuildVariantService } from '../config/build-variant';
 import { holdForSupportApproval } from '../services/maker-checker.service';
+import { canOperateAcrossTenants } from '../utils/finance-tenant';
 
 
 
@@ -15,12 +16,8 @@ export class UserController {
    */
   static async listUsers(req: Request, res: Response) {
     try {
-      const { role, tenantId } = (req as any).user;
-      const roleNorm = String(role || '').toLowerCase();
-      const isPlatform =
-        roleNorm === 'super_admin' ||
-        roleNorm === 'internal_staff' ||
-        roleNorm.startsWith('admin_');
+      const { tenantId } = (req as any).user;
+      const isPlatform = canOperateAcrossTenants((req as any).user);
 
       const applyScope = (query: any) => {
         if (!isPlatform) {
@@ -73,8 +70,9 @@ export class UserController {
     if (held) return;
     const { id, name, email, role, tenantId } = req.body;
     const currentUser = (req as any).user;
+    const actorIsPlatform = canOperateAcrossTenants(currentUser);
 
-    const isPlatform = [
+    const assignedRoleIsPlatform = [
       'super_admin',
       'admin_finance',
       'admin_treasury',
@@ -85,15 +83,16 @@ export class UserController {
       'internal_staff'
     ].includes(role);
 
-    // 1. Validation
-    if (currentUser.role !== 'super_admin') {
+    // 1. Validation — merchant-bound admins cannot mint users for other tenants.
+    if (!actorIsPlatform) {
       if (tenantId !== currentUser.tenantId) {
         return res.status(403).json({ error: 'Cannot create users for other tenants' });
       }
-      if (isPlatform) {
+      if (assignedRoleIsPlatform) {
         return res.status(403).json({ error: 'Tenant admins cannot assign platform-level roles' });
       }
     }
+    const isPlatform = assignedRoleIsPlatform;
 
     let authId = id;
 
@@ -234,12 +233,13 @@ export class UserController {
     const { id } = req.params;
     const updates = { ...(req.body || {}) };
     const currentUser = (req as any).user;
+    const actorIsPlatform = canOperateAcrossTenants(currentUser);
     const resetMfa = updates.reset_mfa === true || updates.resetMfa === true;
     delete updates.reset_mfa;
     delete updates.resetMfa;
 
-    // Ensure no tenant-override if not super_admin
-    if (currentUser.role !== 'super_admin') {
+    // Merchant-bound operators cannot retarget tenant_id or mutate other tenants.
+    if (!actorIsPlatform) {
       delete updates.tenant_id;
 
       // Prevent tenant admin from elevating someone to a platform role
@@ -272,7 +272,7 @@ export class UserController {
         return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
       }
     } else {
-      // If super_admin, force tenant_id to null for platform roles
+      // Platform operators: force tenant_id to null for platform roles
       if (updates.role) {
         const isPlatform = [
           'super_admin',
@@ -292,7 +292,7 @@ export class UserController {
 
     try {
       let query = supabaseAdmin.from('users').update(updates).eq('id', id);
-      if (currentUser.role !== 'super_admin') {
+      if (!actorIsPlatform) {
         query = query.eq('tenant_id', currentUser.tenantId);
       }
       const { data, error } = await query.select().single();
@@ -413,6 +413,7 @@ export class UserController {
     if (held) return;
     const { id } = req.params;
     const currentUser = (req as any).user;
+    const actorIsPlatform = canOperateAcrossTenants(currentUser);
 
     try {
       if (!id) {
@@ -424,7 +425,7 @@ export class UserController {
         .select('id, email, name, tenant_id, mfa_enabled, role')
         .eq('id', id);
 
-      if (currentUser.role !== 'super_admin') {
+      if (!actorIsPlatform) {
         if (!currentUser.tenantId) {
           return res.status(403).json({ error: 'Tenant context required' });
         }

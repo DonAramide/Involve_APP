@@ -74,8 +74,8 @@ export class PosController {
   static async getTransactionHistory(req: Request, res: Response) {
     try {
       const { resolveTenantScope } = require('../utils/resolve-tenant-scope');
-      const role = String((req as any).user?.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'agent', 'support', 'platform_admin'].includes(role);
+      const { canOperateAcrossTenants } = require('../utils/finance-tenant');
+      const isPlatform = canOperateAcrossTenants((req as any).user);
       // Super-admin switchboard sees all tenants; tenant operators see their own.
       const tenantId = isPlatform ? '' : (resolveTenantScope(req) || '');
       const history = await PosService.getTransactionHistory(tenantId);

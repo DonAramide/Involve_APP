@@ -49,6 +49,20 @@ export function isPlatformFinanceOperator(user: { role?: unknown; tenantId?: unk
 }
 
 /**
+ * Cross-tenant list / impersonate / admin-surface access.
+ * Merchant-bound users (including role `admin`/`owner` with a real tenantId)
+ * never qualify. Platform `admin_*` / `internal_staff` without a merchant
+ * tenant do, as do `isPlatformFinanceOperator` roles.
+ */
+export function canOperateAcrossTenants(user: { role?: unknown; tenantId?: unknown } | undefined): boolean {
+  if (!user) return false;
+  if (isPlatformFinanceOperator(user)) return true;
+  if (usableTenantId(user.tenantId)) return false;
+  const roles = roleList(user.role);
+  return roles.some((r) => r.startsWith('admin_') || r === 'internal_staff');
+}
+
+/**
  * Resolve the authoritative tenant for financial operations.
  * Client-supplied x-tenant-id / body.tenantId must never override a
  * non–platform user's authenticated tenant. Stale localStorage ids are ignored

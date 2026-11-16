@@ -16,7 +16,8 @@ import { collectedInvoiceAmount } from '../utils/invoice-collection';
 import { displayableDeviceId } from '../utils/device-identity';
 import { planNameFromIndex } from '../utils/paid-license';
 import { canApproveTerminalActivation } from '../utils/terminal-activation-approval';
-import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { canOperateAcrossTenants, isPlatformFinanceOperator, resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+import { DEVICE_FLEET_ROOM, PLATFORM_OPS_ROOM } from '../utils/socket-tenant-rooms';
 import { putContaboObject, publicContaboObjectUrl, resolveContaboBucket } from '../utils/contabo-s3';
 import {
   sanitizeVerificationSearch,
@@ -38,11 +39,6 @@ import {
   resolveVaCounterpartyOwnerId,
   resolveVaInstitutionCodeForTenant,
 } from '../integrations/quasar/va-institution-code';
-
-function isPlatformFinanceOperator(user: any): boolean {
-  const role = String(user?.role || '').toLowerCase()
-  return role === 'super_admin' || role === 'internal_staff' || role.startsWith('admin_') || role === 'admin'
-}
 
 function walletBalanceFromLedger(rows: any[], tenantId: string): number | null {
   const mine = (rows || []).filter((row) => String(row.tenant_id) === String(tenantId))
@@ -1135,33 +1131,43 @@ export class AdminController {
       const { io } = require('../app');
       let room: string | undefined;
       let socketMessage: string | undefined;
+      const payload = { message, timestamp: new Date().toISOString() };
+      const emitRooms = (rooms: string[]) => {
+        for (const next of rooms) io.to(next).emit('app_broadcast', payload);
+      };
 
       if (sendSocket && targetType === 'agent' && targetValue) {
         const { data: agentTenants } = await supabaseAdmin.from('tenants').select('id').eq('agent_code', targetValue);
         const tenantList = agentTenants || [];
+        const rooms = tenantList.map((tenant: any) => `tenant:${tenant.id}`);
         console.log(`[AdminController] Emitting broadcast to ${tenantList.length} tenants under agent: ${targetValue}`);
-        tenantList.forEach((tenant: any) => {
-          io.to(`tenant:${tenant.id}`).emit('app_broadcast', { message, timestamp: new Date().toISOString() });
-        });
+        emitRooms(rooms);
+        room = rooms[0];
         socketMessage = `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}`;
       } else if (sendSocket) {
-        room = 'all';
-
+        let rooms: string[] = [];
         if (targetType === 'tenant' && targetValue) {
-          room = `tenant:${targetValue}`;
+          rooms = [`tenant:${targetValue}`];
         } else if (targetType === 'plan' && targetValue) {
-          room = `plan:${String(targetValue).toLowerCase()}`;
+          const { data } = await supabaseAdmin.from('tenants').select('id').ilike('plan', String(targetValue));
+          rooms = (data || []).map((tenant: any) => `tenant:${tenant.id}`);
         } else if (targetType === 'type' && targetValue) {
-          room = `type:${String(targetValue).toLowerCase()}`;
+          const { data } = await supabaseAdmin.from('tenants').select('id').ilike('type', String(targetValue));
+          rooms = (data || []).map((tenant: any) => `tenant:${tenant.id}`);
+        } else {
+          const { data } = await supabaseAdmin.from('tenants').select('id');
+          rooms = [
+            PLATFORM_OPS_ROOM,
+            DEVICE_FLEET_ROOM,
+            ...(data || []).map((tenant: any) => `tenant:${tenant.id}`),
+          ];
         }
 
         console.log(`[AdminController] Sending Broadcast!`);
         console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
-        console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
-        io.to(room).emit('app_broadcast', {
-          message,
-          timestamp: new Date().toISOString()
-        });
+        console.log(`[AdminController] Emitting broadcast to scoped rooms: ${rooms.join(', ') || '(none)'}`);
+        emitRooms(rooms);
+        room = rooms[0];
         socketMessage = 'Broadcast sent successfully';
       }
 
@@ -1200,11 +1206,7 @@ export class AdminController {
     try {
       const { id } = req.params;
       const user = (req as any).user;
-      const role = String(user?.role || '').toLowerCase();
-      const isPlatform =
-        role === 'super_admin' ||
-        role === 'internal_staff' ||
-        role.startsWith('admin_');
+      const isPlatform = canOperateAcrossTenants(user);
 
       // Tenant operators may only inspect their own tenant (path :id is not trusted).
       if (!isPlatform) {
@@ -1617,13 +1619,7 @@ export class AdminController {
     try {
       const { tenantId, startDate, endDate, reference } = req.query;
       const user = (req as any).user;
-      const roles = String(user?.role || '')
-        .toLowerCase()
-        .split(/[,\s]+/)
-        .filter(Boolean);
-      const isPlatform = roles.some((r) =>
-        ['super_admin', 'admin', 'internal_staff', 'admin_finance'].includes(r),
-      );
+      const isPlatform = canOperateAcrossTenants(user);
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
 
       if (!isPlatform) {
@@ -2738,14 +2734,14 @@ export class AdminController {
       }
 
       const tenantId = resolveAuthoritativeTenantId(req);
+      const { rejectClientControlledStoragePath, tenantCacObjectKey } = require('../utils/object-storage-keys');
+      rejectClientControlledStoragePath(req.body);
       const bucket = resolveContaboBucket();
       if (!bucket) {
         return res.status(503).json({ error: 'Object storage is not configured (CONTABO_BUCKET is missing).' });
       }
 
-      const original = String(file.originalname || 'cac_document.jpg');
-      const ext = (original.includes('.') ? original.slice(original.lastIndexOf('.')) : '.jpg').toLowerCase();
-      const objectKey = `tenants/${tenantId}/cac/${Date.now()}${ext || '.jpg'}`;
+      const objectKey = tenantCacObjectKey(tenantId, String(file.originalname || 'cac_document.jpg'));
       const body = file.buffer;
       if (!body || !body.length) {
         return res.status(400).json({ error: 'CAC document file was empty.' });
