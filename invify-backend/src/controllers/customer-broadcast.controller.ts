@@ -39,7 +39,8 @@ function delay(ms: number) {
 async function loadCustomers(tenantId: string) {
   const { data, error } = await supabaseAdmin
     .from('customers')
-    .select('id, name, email, phone, status')
+    // No customers.status column on staging baseline; soft-default in collectCustomerRecipients.
+    .select('id, name, email, phone')
     .eq('tenant_id', tenantId)
     .limit(2000);
   if (error) {
